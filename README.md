@@ -78,6 +78,17 @@ All settings live in `.env` (see `.env.example`):
 | `TICKETFORGE_CONCURRENCY` | Parallel Claude calls when writing test cases (default 3) |
 | `CLAUDE_BIN` | Path to the `claude` executable if it is not on PATH |
 
+## Deploy to a free VPS
+
+Create a free Ubuntu server (Oracle Cloud Always Free works well), then from this folder:
+
+```bash
+SSH_KEY=~/Downloads/ssh-key.key bash deploy/deploy.sh ubuntu@YOUR.SERVER.IP
+```
+
+It sets the server up (Node.js, Chromium, Claude Code, a service, free HTTPS) and deploys; run it again to ship
+updates. Step-by-step guide: [deploy/README.md](deploy/README.md).
+
 ## How it works
 
 1. **Upload** a PDF, Word (.docx), Markdown, text, HTML, Excel or CSV file, or paste text. You can review
