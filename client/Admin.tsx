@@ -255,7 +255,11 @@ function EmailTab() {
           try { const r = await api('/api/admin/email/test', { method: 'POST', body: {} }); toast(`Test email sent to ${r.to}`); } catch (err: Any) { toast(err.message, 'err'); }
         }}>Send a test email to me</button></div></div>
       <div className="card"><h3>Database</h3><p className="sub">Where projects, users and invites are stored.</p>
-        <table className="tbl"><tbody>{row('Connected to', e.database || '—')}</tbody></table>
+        <table className="tbl"><tbody>{row('Connected to', e.database || '—')}
+          {e.rls && row('Row-level security', e.rls.appRole
+            ? <span className="loz t-pass">On · {e.rls.tables} tables</span>
+            : e.rls.enabled ? <span className="loz t-blocked" title={e.rls.error || ''}>Tables locked, app runs as owner</span>
+            : <span className="loz">Not available (local database)</span>)}</tbody></table>
         <p className="muted small" style={{ marginBottom: 0 }}>{/Supabase|PostgreSQL/.test(e.database || '') ? 'Data is stored in your Postgres database.' : <>Using the built-in local database. Set DATABASE_URL to your Supabase connection string and run <code>npm run db:push</code> to move your data there.</>}</p></div>
       <div className="card wide"><h3>Configuration</h3><p className="sub">Add these to the <code>.env</code> file in the project folder, then restart TicketForge. Passwords are never shown here.</p>
         <pre className="code">{`DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres

@@ -1,7 +1,7 @@
 // Helpers shared by the Next.js route handlers.
 import { cookies, headers } from 'next/headers';
 import * as auth from '@/lib/auth.js';
-import { migrate } from '@/lib/db.js';
+import { migrate, asSystem, asUser, currentContext } from '@/lib/db.js';
 import * as store from '@/lib/store.js';
 
 const G = globalThis as any;
@@ -11,7 +11,7 @@ export function ready(): Promise<void> {
   G.__tfReady ??= (async () => {
     await migrate();
     await auth.seedRoles();
-    const n = await store.importJsonProjects();
+    const n = await asSystem(() => store.importJsonProjects());
     if (n) console.log(`Imported ${n} project(s) from data/projects`);
   })().catch((e: Error) => { G.__tfReady = null; throw e; });
   return G.__tfReady;
@@ -20,6 +20,8 @@ export function ready(): Promise<void> {
 export const HttpError = auth.HttpError;
 
 export async function currentUser() {
+  const c: any = currentContext();
+  if ('user' in c) return c.user; // resolved once per request by api()
   await ready();
   const jar = await cookies();
   return auth.sessionUser(jar.get(auth.SESSION_COOKIE)?.value);
@@ -56,6 +58,7 @@ export const aiOpts = (b: any) => ({ provider: b?.provider || undefined, model: 
 
 type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
+const resolve = async (fn: Handler, req: Request, p: Promise<Record<string, string>>) => fn(req, (await p) || {});
 
 /** Wraps a handler: setup, cross-site check, JSON responses and error mapping. */
 export function api(fn: Handler) {
@@ -66,7 +69,9 @@ export function api(fn: Handler) {
         const origin = req.headers.get('origin');
         if (origin && new URL(origin).host !== req.headers.get('host')) throw new HttpError(403, 'Cross-site request blocked');
       }
-      const out = await fn(req, (await ctx?.params) || {});
+      // Every query in this request runs as the signed-in user, so database row-level security applies.
+      const user = await currentUser();
+      const out = await asUser(user?.id, () => resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({})), user);
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);

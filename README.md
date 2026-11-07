@@ -210,7 +210,7 @@ lib/                       Server modules
   automation.js runner.mjs Playwright test automation
   exporters.js parse.js github.js    Exports, document parsing, PR lookup
 scripts/db-push.js         Copies the local database to DATABASE_URL
-legacy/                    The previous Express + vanilla JS version (run with `npm run legacy`)
+legacy/                    The previous Express + vanilla JS version (run with `TICKETFORGE_RLS=off npm run legacy`)
 ```
 
 ## Notes
@@ -220,3 +220,17 @@ legacy/                    The previous Express + vanilla JS version (run with `
 - Legacy `.doc` files are not supported; save as `.docx` or PDF.
 - Big documents take a few minutes. Test cases are written per epic, so one failure doesn't lose the rest,
   and you can regenerate tests for any ticket later.
+
+## Row-level security
+
+On Postgres (Supabase), every table has row-level security switched on:
+
+- **Supabase's public roles are locked out.** `anon` and `authenticated` get no privileges on any TicketForge table, so the Supabase REST/GraphQL API (and anyone holding your anon key) can't read or change anything.
+- **The app queries as a restricted role.** Each request runs as `ticketforge_app` (no `BYPASSRLS`) with the signed-in user's id set for that transaction. Policies then decide what that user can touch:
+  - projects and issues: only projects the user has access to; creating needs `project.create`, deleting needs `project.delete`.
+  - notifications: only the user's own (anyone signed in can send one).
+  - users and roles: readable by signed-in users, written only by the sign-in system.
+  - sessions, invites, password resets and settings: sign-in system only.
+- **No user, no rows.** A query without a signed-in user returns nothing.
+
+Migrations and `npm run db:push` run as the table owner. The policies are recreated on every start, and **Admin → Email & database** shows whether they're active. Set `TICKETFORGE_RLS=off` to run without the restricted role (the tables stay locked to Supabase's public roles).

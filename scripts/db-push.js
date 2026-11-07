@@ -3,7 +3,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
-import { migrate, q, dbInfo, DATA_DIR } from '../lib/db.js';
+import { migrate, q, dbInfo, DATA_DIR, useOwner } from '../lib/db.js';
 
 const localDir = path.join(DATA_DIR, 'db');
 if (!process.env.DATABASE_URL && !process.env.SUPABASE_DB_URL) { console.error('Set DATABASE_URL (your Supabase connection string) in .env first.'); process.exit(1); }
@@ -11,9 +11,10 @@ if (!fs.existsSync(localDir)) { console.error('No local database found in data/d
 
 const TABLES = [
   ['roles', ['permissions']], ['users', ['project_access']], ['projects', ['data']], ['issues', ['data']],
-  ['invites', ['project_access']], ['password_resets', []], ['app_meta', ['value']],
+  ['invites', ['project_access']], ['password_resets', []], ['app_meta', ['value']], ['notifications', []],
 ];
 
+useOwner(true); // copy as the table owner (row-level security doesn't apply)
 await migrate();
 console.log(`Target: ${dbInfo.label}`);
 const local = new PGlite(localDir);

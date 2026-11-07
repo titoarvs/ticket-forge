@@ -4,5 +4,5 @@ import { dbInfo } from '@/lib/db.js';
 
 export const GET = api(async (req) => {
   await perm('users.manage');
-  return { ...auth.emailConfig(), appUrl: appUrl(req), appUrlSet: Boolean(process.env.APP_URL), database: dbInfo.label };
+  return { ...auth.emailConfig(), appUrl: appUrl(req), appUrlSet: Boolean(process.env.APP_URL), database: dbInfo.label, rls: dbInfo.rls };
 });
