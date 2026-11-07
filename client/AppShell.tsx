@@ -31,9 +31,9 @@ export async function bootSession() {
 function connInfo() {
   const st = S.status;
   const provider = S.settings.provider || st?.defaultProvider;
-  const ok = provider === 'cli' ? st?.cli?.available : provider === 'api' ? st?.api : false;
+  const ok = provider === 'cli' ? st?.cli?.available && st?.account?.loggedIn !== false : provider === 'api' ? st?.api : false;
   const label = provider === 'cli' ? 'Claude account' : provider === 'api' ? 'Anthropic API' : 'Not connected';
-  const model = S.settings.model || (provider === 'api' ? st?.defaultModels?.api : st?.defaultModels?.cli) || '';
+  const model = !ok ? '' : S.settings.model || (provider === 'api' ? st?.defaultModels?.api : st?.defaultModels?.cli) || '';
   return { ok, label, model };
 }
 

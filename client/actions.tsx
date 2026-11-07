@@ -545,7 +545,12 @@ export function ClaudeSettingsModal() {
     } }]}>
       <div className="field"><span>Status</span>
         <div className="row small" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}><span className={`dot ${st.cli?.available ? 'ok' : 'bad'}`} style={{ marginTop: 4 }} />
-          <span>Claude account (Claude Code): {st.cli?.available ? <>{st.cli.version}{st.cli.outdated && <b> — outdated, run <code>claude update</code></b>}<br /><span className="muted" style={{ wordBreak: 'break-all' }}>{st.cli.path}</span></> : <>not found — install Claude Code and run <code>claude</code> to sign in</>}</span></div>
+          <span>Claude account: {!st.cli?.available ? 'Claude Code is not installed on the server'
+            : st.account?.loggedIn === false ? 'not signed in'
+            : <>signed in{st.account?.subscriptionType ? ` (${st.account.subscriptionType})` : ''} · Claude Code {st.cli.version}{st.cli.outdated && <b> (outdated)</b>}</>}
+            {(!st.cli?.available || st.account?.loggedIn === false) && (can('users.manage')
+              ? <><br /><a href="/admin/claude" onClick={(e) => { e.preventDefault(); closeModal(); S.nav('/admin/claude'); }}>Connect a Claude account in Administration → Claude</a></>
+              : <><br /><span className="muted">Ask an administrator to connect a Claude account.</span></>)}</span></div>
         <div className="row small"><span className={`dot ${st.api ? 'ok' : 'bad'}`} />Anthropic API key: {st.api ? 'detected' : 'not set'}</div>
       </div>
       <label className="field"><span>Use</span><SF value={provider} onChange={(e) => setProvider(e.target.value)}>

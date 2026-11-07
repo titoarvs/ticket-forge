@@ -1,13 +1,13 @@
 'use client';
 // Administration: users, invites, roles & permissions, email. Also the "Your account" dialog.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, type Any } from './core';
+import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
 import { Modal, Confirm, Ico, I, Avatar, Spinner } from './ui';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['email', 'Email & database', I.doc]];
-const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, loaded: false };
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['claude', 'Claude', I.sparkle], ['email', 'Email & database', I.doc]];
+const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, claude: null, loaded: false };
 
 const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
 const accessTitle = (a: Any) => (a === 'all' ? 'Every current and future project' : (a || []).map((id: string) => A.projects.find((p: Any) => p.id === id)?.name || id).join(', ') || 'No projects');
@@ -18,11 +18,12 @@ function inviteState(i: Any): [string, string] {
   return ['Pending', 's-inprogress'];
 }
 async function load() {
-  const [users, roles, invites, projects, email] = await Promise.all([
+  const [users, roles, invites, projects, email, claude] = await Promise.all([
     api('/api/admin/users'), api('/api/admin/roles'), api('/api/admin/invites'), api('/api/admin/projects'), api('/api/admin/email'),
+    api('/api/admin/claude').catch(() => null),
   ]);
   Object.assign(A, { users, roles, invites, projects, email, loaded: true });
-  emit();
+  if (claude) applyClaude(claude); else emit();
 }
 const reload = () => load().catch((e) => toast(e.message, 'err'));
 async function act(fn: () => Promise<Any>, ok?: string) {
@@ -46,6 +47,7 @@ export default function AdminPage({ tab }: { tab: string }) {
       {t === 'users' && <UsersTab q={q} setQ={setQ} />}
       {t === 'invites' && <InvitesTab />}
       {t === 'roles' && <RolesTab />}
+      {t === 'claude' && <ClaudeTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
   );
@@ -234,6 +236,114 @@ function DeleteRoleModal({ role }: { role: Any }) {
         <SF value={to} onChange={(e) => setTo(e.target.value)}>{others.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}</SF></>
         : <p style={{ marginTop: 0 }}>Nobody has this role. Pending invites with it are cancelled.</p>}
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------- Claude connection
+/** Stores the admin view of the Claude connection and refreshes the top-bar status for everyone's session. */
+function applyClaude(st: Any) {
+  A.claude = st;
+  const { email, orgName, authMethod, ...acct } = st.account || {};
+  S.status = { ...(S.status || {}), cli: st.cli, api: st.api, account: st.account ? acct : null, defaultProvider: st.defaultProvider, defaultModels: st.defaultModels };
+  emit();
+}
+const PLAN: Record<string, string> = { pro: 'Pro', max: 'Max', team: 'Team', enterprise: 'Enterprise', free: 'Free' };
+
+function ClaudeTab() {
+  const c = A.claude || {};
+  const [login, setLogin] = useState<Any>(null); // { id, url } while signing in
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState('');
+  const [log, setLog] = useState('');
+  const pending = useRef<string | null>(null);
+  pending.current = login?.id || null;
+  // Leaving the page cancels an unfinished sign-in on the server.
+  useEffect(() => () => { if (pending.current) api('/api/admin/claude/login', { method: 'POST', body: { action: 'cancel', id: pending.current } }).catch(() => {}); }, []);
+  const row = (k: string, v: React.ReactNode) => <tr><td className="muted" style={{ width: 200 }}>{k}</td><td>{v}</td></tr>;
+  const run = async (what: string, fn: () => Promise<void>) => {
+    setBusy(what);
+    try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
+  };
+  const start = () => run('start', async () => {
+    setCode('');
+    setLogin(await api('/api/admin/claude/login', { method: 'POST', body: { action: 'start' } }));
+  });
+  const finish = () => run('finish', async () => {
+    let st;
+    // A rejected code ends that sign-in on the server, so go back to the start either way.
+    try { st = await api('/api/admin/claude/login', { method: 'POST', body: { action: 'finish', id: login.id, code: code.trim() } }); } finally { setLogin(null); setCode(''); }
+    applyClaude(st);
+    toast(`Claude connected${st.account?.email ? ` as ${st.account.email}` : ''}`);
+  });
+  const cancel = () => { api('/api/admin/claude/login', { method: 'POST', body: { action: 'cancel', id: login?.id } }).catch(() => {}); setLogin(null); setCode(''); };
+  const refresh = () => run('refresh', async () => applyClaude(await api('/api/admin/claude?fresh=1')));
+  const install = () => run('install', async () => {
+    setLog('Starting…');
+    const res = await api('/api/admin/claude/install', { method: 'POST', raw: true, body: {} });
+    await readNdjson(res, (ev) => {
+      if (ev.type === 'log') setLog(ev.line.slice(0, 160));
+      if (ev.type === 'error') throw new Error(ev.message || ev.error);
+    });
+    setLog('');
+    applyClaude(await api('/api/admin/claude?fresh=1'));
+    toast('Claude Code installed. Now sign in with your Claude account.');
+  }).finally(() => setLog(''));
+  const signOut = () => openModal(<Confirm title="Sign out of Claude?" label="Sign out"
+    text={<>TicketForge will stop using <b>{c.account?.email || 'this Claude account'}</b>. Generating and enhancing tickets and writing test scripts won't work until someone signs in again{c.api ? ' (the API key will be used instead)' : ''}.</>}
+    onYes={() => run('logout', async () => { applyClaude(await api('/api/admin/claude/logout', { method: 'POST', body: {} })); toast('Signed out of Claude'); })} />);
+
+  const acct = c.account;
+  const installed = c.cli?.available;
+  const inUse = c.defaultProvider === 'cli' ? 'Your Claude account' : c.defaultProvider === 'api' ? 'Anthropic API key' : 'Nothing: Claude features are off';
+  return (
+    <div className="cards">
+      <div className="card"><h3>Claude account</h3>
+        <p className="sub">TicketForge uses Claude to generate and enhance tickets and to write test scripts. Everyone in this workspace uses the account signed in here.</p>
+        <table className="tbl"><tbody>
+          {row('Claude Code on the server', installed
+            ? <>{c.cli.version}{c.cli.outdated && <span className="loz t-blocked" style={{ marginLeft: 6 }}>Outdated</span>}<div className="muted small" style={{ wordBreak: 'break-all' }}>{c.cli.path}</div></>
+            : <span className="loz t-fail">Not installed</span>)}
+          {installed && row('Signed in', acct?.loggedIn
+            ? <><span className="loz t-pass">Connected</span> <b>{acct.email || 'Claude account'}</b>{acct.subscriptionType && <span className="label-chip" style={{ marginLeft: 6 }}>{PLAN[acct.subscriptionType] || acct.subscriptionType}</span>}
+                {acct.orgName && <div className="muted small">{acct.orgName}</div>}</>
+            : acct?.loggedIn === false ? <span className="loz t-fail">Not signed in</span>
+            : <span className="muted">Unknown: update Claude Code to see this</span>)}
+          {row('Claude features use', inUse)}
+        </tbody></table>
+
+        {!installed && <div className="claude-steps">
+          <p>Claude Code isn't on this server yet. TicketForge can install it into its data folder (about 200 MB, needs internet access and npm).</p>
+          <div className="row"><button className="btn primary" disabled={!!busy} onClick={install}>{busy === 'install' ? <><Spinner />Installing…</> : 'Install Claude Code'}</button>
+            {log && <span className="muted small mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{log}</span>}</div>
+        </div>}
+
+        {installed && login && <div className="claude-steps">
+          <ol>
+            <li><b>Open the Claude sign-in page</b> and approve access with the account TicketForge should use.
+              <div className="row"><a className="btn primary" href={login.url} target="_blank" rel="noopener noreferrer"><Ico svg={I.external} />Open Claude sign-in</a>
+                <button className="btn subtle" onClick={() => copyText(login.url)}><Ico svg={I.copy} />Copy link</button></div></li>
+            <li><b>Paste the code</b> Claude shows after you approve.
+              <div className="row" style={{ flexWrap: 'nowrap' }}>
+                <TF autoFocus sx={{ flex: 1, minWidth: 0 }} placeholder="Paste the code from Claude" value={code} onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && code.trim() && !busy) finish(); }} slotProps={{ htmlInput: { autoComplete: 'off', spellCheck: false } }} />
+                <button className="btn primary" disabled={!code.trim() || !!busy} onClick={finish}>{busy === 'finish' ? <><Spinner />Connecting…</> : 'Connect'}</button>
+              </div></li>
+          </ol>
+          <button className="btn subtle" disabled={busy === 'finish'} onClick={cancel}>Cancel</button>
+        </div>}
+
+        {installed && !login && <div className="row" style={{ marginTop: 12 }}>
+          <button className={`btn ${acct?.loggedIn ? '' : 'primary'}`} disabled={!!busy} onClick={start}>{busy === 'start' ? <><Spinner />Starting…</> : acct?.loggedIn ? 'Switch account' : 'Sign in with Claude'}</button>
+          {acct?.loggedIn && <button className="btn" disabled={!!busy} onClick={signOut}>Sign out</button>}
+          {c.cli?.outdated && <button className="btn" disabled={!!busy} onClick={install}>{busy === 'install' ? 'Updating…' : 'Update Claude Code'}</button>}
+          <div className="spacer" /><button className="btn subtle" disabled={!!busy} onClick={refresh}><Ico svg={I.refresh} />Check again</button>
+        </div>}
+      </div>
+
+      <div className="card"><h3>Anthropic API key</h3><p className="sub">An alternative to a Claude account, billed per use in the Anthropic Console.</p>
+        <table className="tbl"><tbody>{row('API key', c.api ? <span className="loz t-pass">Set</span> : <span className="loz">Not set</span>)}</tbody></table>
+        <p className="muted small" style={{ marginBottom: 0 }}>Add <code>ANTHROPIC_API_KEY=sk-ant-…</code> to the server's <code>.env</code> and restart TicketForge. It's used when no Claude account is signed in.</p></div>
+    </div>
   );
 }
 

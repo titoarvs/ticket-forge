@@ -36,8 +36,21 @@ automation page also has an **Install Chromium** button.)
 ### Claude connection
 
 By default the app uses **your Claude account** through the Claude Code CLI (`claude -p`), so you need no
-API key. Claude Code must be installed and signed in on this machine: run `claude` once in a terminal and
-log in.
+API key. Claude Code must be installed and signed in on the machine that runs TicketForge.
+
+**Connecting from the app (works on a server too):** open **Administration → Claude**.
+
+1. If Claude Code isn't on the server, click **Install Claude Code**. It's installed into the data folder
+   with npm, so no admin rights are needed.
+2. Click **Sign in with Claude**, open the sign-in page, approve access, and paste the code Claude shows
+   back into TicketForge.
+
+The login is kept by Claude Code itself (in `~/.claude` of the user running TicketForge, or the macOS
+keychain); TicketForge never sees or stores the token. Everyone in the workspace uses that account for
+Claude features. **Switch account** and **Sign out** are on the same page. Only administrators
+(`users.manage`) can change it.
+
+You can also sign in from a terminal: run `claude` as the user that runs TicketForge and log in.
 
 To use an Anthropic API key instead, start the server with the key set and pick
 “Anthropic API key” in the connection pill (top right):
