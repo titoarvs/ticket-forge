@@ -1,0 +1,43 @@
+import { api, perm, body, HttpError, aiOpts, ndjson, appUrl } from '@/lib/server/http';
+import { engineStatus, runAutomation } from '@/lib/automation.js';
+import { reportFailures } from '@/lib/notify.js';
+import * as store from '@/lib/store.js';
+
+export const POST = api(async (req) => {
+  const user = await perm('test.run');
+  const b = await body(req);
+  const { items, baseUrl, regenerate, project } = b;
+  if (project?.id) store.requireAccess(user, project.id);
+  if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) throw new HttpError(400, 'Set a base URL (http:// or https://) for the app under test.');
+  if (!Array.isArray(items) || !items.length) throw new HttpError(400, 'No test cases to run.');
+  if ((regenerate || items.some((i: any) => !i.tc?.script?.trim())) && !store.has(user, 'ai.use')) {
+    throw new HttpError(403, 'Some tests have no script yet, and writing scripts uses Claude, which your role does not allow (ai.use). Run tests that already have scripts, or ask an administrator.');
+  }
+  if (!(await engineStatus()).browser) throw new HttpError(400, 'The test browser is not installed yet. An administrator can install it from the Test automation page.');
+  const origin = appUrl(req);
+  return ndjson(req, async (send, signal) => {
+    // Collect failures per issue; report them once the run ends (also when it is stopped part-way).
+    const failures = new Map<string, any[]>();
+    const emit = (ev: any) => {
+      if (ev.type === 'result' && ev.result?.status !== 'Pass' && ev.ticketId) {
+        if (!failures.has(ev.ticketId)) failures.set(ev.ticketId, []);
+        failures.get(ev.ticketId)!.push({ tcId: ev.tcId, result: ev.result });
+      }
+      send(ev);
+    };
+    try {
+      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal });
+    } finally {
+      if (failures.size && project?.id) {
+        try {
+          const report = await reportFailures({ projectId: project.id, failures, runner: user, baseUrl, appUrl: origin });
+          send({ type: 'reported', ...report });
+        } catch (e: any) {
+          console.error('Failure report failed:', e);
+          send({ type: 'phase', level: 'warn', message: `Could not post failure comments: ${e.message}` });
+        }
+      }
+    }
+    send({ type: 'done' });
+  });
+});
