@@ -69,6 +69,7 @@ All settings live in `.env` (see `.env.example`):
 |---|---|
 | `DATABASE_URL` | Supabase / PostgreSQL connection string. Empty = built-in local database in `data/db` |
 | `PGSSL` | Database SSL: empty (encrypted), `verify` (also verify certificate) or `disable` |
+| `PG_POOL_MAX` | Database connections per server (default 5) |
 | `APP_URL` | Public address used in invite and password-reset links |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Email for invites and password resets |
 | `TRUST_PROXY` | Set when running behind a reverse proxy |
@@ -129,7 +130,10 @@ All settings live in `.env` (see `.env.example`):
 TicketForge stores projects, issues, users, roles and invites in PostgreSQL.
 
 1. In Supabase open **Project Settings → Database → Connection string → URI** and copy the **Session pooler**
-   string (port 5432). Replace `[YOUR-PASSWORD]` with your database password.
+   string (port 5432). Replace `[YOUR-PASSWORD]` with your database password. If more than one server uses
+   the database (say your laptop and a VPS), use the **Transaction pooler** string (port 6543) instead: the
+   Session pooler only accepts 15 connections in total, and each TicketForge server keeps up to `PG_POOL_MAX`
+   (default 5) open.
 2. Put it in `.env` as `DATABASE_URL=...` and restart. Tables are created automatically on start.
 3. Already used the built-in local database? Copy everything across once with:
 
