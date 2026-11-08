@@ -1,5 +1,12 @@
+// Playwright reads data files (browsers.json and others) at runtime, which import tracing can't see. Ship its
+// whole packages with every route that drives a browser, or serverless hosting (Vercel) fails with
+// "Cannot find module …/playwright-core/browsers.json".
+const PLAYWRIGHT_FILES = ['./node_modules/playwright-core/**/*', './node_modules/playwright/**/*', './node_modules/@playwright/test/**/*'];
+const BROWSER_ROUTES = ['/api/automation/*', '/api/admin/browser', '/api/admin/generation', '/api/projects/*/discover', '/api/projects/*/login-test', '/api/projects/*/login-detect'];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: Object.fromEntries(BROWSER_ROUTES.map((r) => [r, PLAYWRIGHT_FILES])),
   // Server-only packages with native parts, WASM or data files: load them from node_modules at runtime
   // instead of bundling them.
   serverExternalPackages: [
