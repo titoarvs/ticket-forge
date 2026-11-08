@@ -100,6 +100,14 @@ export async function api(url: string, { method = 'GET', body, raw, signal }: { 
   }
   return raw ? res : res.json();
 }
+/** PDF and Word originals are kept so the Source documents page can show them as written. */
+export const keepsOriginal = (f?: File | null) => Boolean(f && /\.(pdf|docx)$/i.test(f.name));
+export async function uploadOriginal(projectId: string, file: File, target?: 'original') {
+  const fd = new FormData();
+  fd.append('file', file);
+  if (target) fd.append('target', target);
+  return api(`/api/projects/${projectId}/files`, { method: 'POST', body: fd });
+}
 export const aiBody = (b: Any) => ({ ...b, provider: S.settings.provider || undefined, model: S.settings.model || undefined, project: b.project && slimProject(b.project) });
 export function slimProject(p: Any) {
   return {

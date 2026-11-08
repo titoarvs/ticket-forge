@@ -2,7 +2,7 @@
 // Projects list and "Create a project from a document".
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { S, emit, useStore, api, readNdjson, toast, openModal, store, can, hashColor, COLORS, closeProject, uid, type Any } from './core';
+import { S, emit, useStore, api, readNdjson, toast, openModal, store, can, hashColor, COLORS, closeProject, uid, keepsOriginal, uploadOriginal, type Any } from './core';
 import { Ico, I, TypeIcon, Confirm, Spinner, EmptyState, ErrorState } from './ui';
 import { ProjectsSkeleton } from './skeletons';
 import { BlankProjectModal, AiSettingsModal } from './actions';
@@ -91,7 +91,7 @@ export function CreateProjectPage() {
     const fd = new FormData();
     fd.append('file', file);
     setReading(true);
-    try { const r = await api('/api/parse', { method: 'POST', body: fd }); S.doc = { filename: r.filename, text: r.text }; emit(); }
+    try { const r = await api('/api/parse', { method: 'POST', body: fd }); S.doc = { filename: r.filename, text: r.text, file: keepsOriginal(file) ? file : null }; emit(); }
     catch (e: Any) { toast(e.message, 'err'); }
     finally { setReading(false); }
   };
@@ -114,6 +114,8 @@ export function CreateProjectPage() {
         else if (ev.type === 'error') throw new Error(ev.error);
       });
       if (!project) throw new Error('Generation ended without a result.');
+      // Keep the original PDF or Word file so the document can be viewed as it was written (best effort).
+      if (S.doc?.file) await uploadOriginal(project.id, S.doc.file, 'original').catch(() => toast('The project was created, but its original file couldn’t be kept. You can attach it on the Source documents page.', 'err'));
       S.gen = null; S.doc = null; emit();
       toast(`Created ${project.epics.length} epics and ${project.tickets.length} issues`);
       S.nav(`/p/${project.id}/backlog`);

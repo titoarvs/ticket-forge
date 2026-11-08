@@ -1014,3 +1014,38 @@ a.set-stat:hover { background: var(--hover); }
 .src-lists summary { cursor: pointer; margin: 4px 0; }
 .src-lists .li-list { background: var(--bg); border-radius: var(--radius); padding: 0 8px; margin-top: 4px; max-height: 360px; overflow: auto; }
 @media (max-width: 760px) { .set-lists { grid-template-columns: 1fr; } }
+
+/* ---------- document (paper) view ---------- */
+.src-tools .seg button { display: inline-flex; align-items: center; gap: 6px; }
+.src-zoom .icon-btn { font-size: 16px; font-weight: 600; width: 28px; }
+.src-file { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 20px; border-bottom: 1px solid var(--border); background: var(--bg-sunken); }
+.src-file > .ico { color: var(--text-subtle); }
+.src-file > span:not(.ico) { flex: 1; min-width: 200px; }
+.src-file a, .src-file .link-btn { color: var(--selected-text); }
+.src-body.is-page { padding: 0; max-height: calc(100vh - 300px); max-height: calc(100dvh - 300px); }
+.paper-desk { background: color-mix(in srgb, var(--bg-sunken) 70%, #000 30%); padding: 28px 20px 40px; min-height: 100%; }
+.paper-zoom { max-width: 794px; margin: 0 auto; }
+.paper { display: block; box-sizing: border-box; width: 100%; min-height: 1123px; padding: 72px 80px; background: #fff; color: #1f2328; border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25), 0 8px 28px rgba(0,0,0,.22); font: 11pt/1.55 Calibri, Carlito, "Segoe UI", "Helvetica Neue", Arial, sans-serif; overflow-wrap: anywhere; color-scheme: light; }
+.paper, .paper * { color: #1f2328; }
+.paper li::marker { color: #57606a; }
+.paper .md { font-size: inherit; line-height: inherit; }
+.paper h1, .paper h2, .paper h3, .paper h4 { color: #1f3864; line-height: 1.25; margin: 1.2em 0 .45em; font-weight: 600; letter-spacing: 0; }
+.paper h1 { font-size: 20pt; } .paper h2 { font-size: 15pt; } .paper h3 { font-size: 13pt; } .paper h4 { font-size: 11.5pt; }
+.paper > :first-child, .paper > :first-child > :first-child { margin-top: 0; }
+.paper p { margin: 0 0 .7em; color: inherit; }
+.paper ul, .paper ol { margin: 0 0 .7em; padding-left: 1.6em; } .paper li { margin: .15em 0; color: inherit; }
+.paper table, .paper .tbl { border-collapse: collapse; width: 100%; margin: .6em 0 1em; font-size: 10pt; background: #fff; }
+.paper td, .paper th, .paper .tbl td, .paper .tbl th { border: 1px solid #c8ccd1; padding: 5px 8px; color: #1f2328; background: #fff; text-align: left; }
+.paper th, .paper .tbl th { background: #f3f5f7; font-weight: 600; }
+.paper code, .paper pre { background: #f3f5f7; color: #1f2328; border-color: #d8dee4; }
+.paper blockquote { margin: .6em 0; padding-left: 1em; border-left: 3px solid #d0d7de; color: #57606a; }
+.paper a { color: #0b5cad; }
+.paper hr { border: 0; border-top: 1px solid #d0d7de; }
+.doc-frame { display: block; width: 100%; min-height: 1123px; border: 0; background: #fff; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,.25), 0 8px 28px rgba(0,0,0,.22); }
+.doc-pdf { display: block; width: 100%; height: calc(100vh - 300px); height: calc(100dvh - 300px); min-height: 480px; border: 0; background: #525659; }
+@media (max-width: 700px) {
+  .paper { padding: 32px 22px; min-height: 0; font-size: 10.5pt; }
+  .paper-desk { padding: 12px 8px 24px; }
+  .src-body.is-page { max-height: none; }
+}

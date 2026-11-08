@@ -177,9 +177,14 @@ All settings live in `.env` (see `.env.example`):
      `data/projects/`.
    - **Source documents**: the document the project was created from plus every document or description added
      later (with Add feature with AI, or **Add document** for reference). Each shows its words and reading time,
-     who added it and when, the AI's summary and open questions, and the epics and issues it produced. Read it
-     formatted (Markdown) or as plain text, find inside it, copy or download it, rename or remove it, or **Plan
+     who added it and when, the AI's summary, assumptions and open questions, and the epics and issues it produced.
+     **Document** view shows it like the original: PDFs open in the browser's PDF viewer, Word files as a
+     formatted page (headings, lists, tables, images), and text-only documents as a white A4 page with zoom and
+     **Print / PDF**. **Text** view shows the plain text with find. Copy, download, rename or remove it, or **Plan
      work from it** with AI.
+   - **Original files:** PDF and Word (.docx) uploads are kept (up to 20 MB) in the database, with the same access
+     rules as the project. Documents added before this can get theirs with **Attach original**. Word files are
+     shown in a sandboxed frame with no scripts or outside requests.
 4. **Export** from the Export menu:
 
 | Format | Contents |

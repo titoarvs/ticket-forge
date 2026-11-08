@@ -3,7 +3,7 @@
 // The AI knows the project's epics and issues, so it reuses epics and doesn't repeat issues. You review the plan and
 // pick what to add; nothing changes until you do (and it can be undone).
 import { useRef, useState } from 'react';
-import { S, P, api, toast, closeModal, mutate, readNdjson, can, newTicket, nextEpicKey, withIds, COLORS, aiBody, uid, nowIso, me, type Any } from './core';
+import { S, P, api, toast, closeModal, mutate, readNdjson, can, newTicket, nextEpicKey, withIds, COLORS, aiBody, uid, nowIso, me, keepsOriginal, uploadOriginal, type Any } from './core';
 import { Modal, Ico, I, Spinner, TypeIcon, EmptyState } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 
@@ -32,7 +32,7 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
     const fd = new FormData();
     fd.append('file', file);
     setReading(true);
-    try { const r = await api('/api/parse', { method: 'POST', body: fd }); setDoc({ filename: r.filename, text: r.text }); }
+    try { const r = await api('/api/parse', { method: 'POST', body: fd }); setDoc({ filename: r.filename, text: r.text, file: keepsOriginal(file) ? file : null }); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setReading(false); }
   };
   const generate = async () => {
@@ -64,6 +64,7 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   const newEpics = result ? result.epics.filter((e: Any) => !e.existing && chosen.some((t: Any) => t.epicId === e.id)) : [];
   const add = () => {
     const created: string[] = [], issueIds: string[] = [], epicIds = new Set<string>();
+    const newSourceId = uid();
     mutate((pp) => {
       if (canEpic) for (const e of newEpics) pp.epics.push({ id: e.id, key: nextEpicKey(), title: e.title, description: e.description, color: COLORS[pp.epics.length % COLORS.length] });
       for (const t of chosen) {
@@ -80,13 +81,22 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
       }
       // Keep the document (or description) with the project, linked to the work it produced.
       pp.sources ??= [];
+      if (sourceId === 'original') { // more work planned from the initial document: link it there
+        pp.sourceIssueIds = [...new Set([...(pp.sourceIssueIds || []), ...issueIds])];
+        pp.sourceEpicIds = [...new Set([...(pp.sourceEpicIds || []), ...epicIds])];
+        return;
+      }
       const prev = sourceId && pp.sources.find((x: Any) => x.id === sourceId);
       const run = { at: nowIso(), by: me(), summary: result.summary || '', openQuestions: result.openQuestions || [], issueIds, epicIds: [...epicIds] };
       if (prev) { prev.runs = [...(prev.runs || []), run]; prev.summary ||= run.summary; prev.openQuestions = [...new Set([...(prev.openQuestions || []), ...run.openQuestions])]; prev.issueIds = [...new Set([...(prev.issueIds || []), ...issueIds])]; prev.epicIds = [...new Set([...(prev.epicIds || []), ...epicIds])]; }
-      else pp.sources.push({ id: uid(), name: source?.filename || 'Feature description', kind: mode === 'document' ? 'document' : 'description', text: source?.text || '',
+      else pp.sources.push({ id: newSourceId, name: source?.filename || 'Feature description', kind: mode === 'document' ? 'document' : 'description', text: source?.text || '',
         addedAt: run.at, addedBy: run.by, summary: run.summary, openQuestions: run.openQuestions, issueIds, epicIds: [...epicIds], runs: [run] });
     });
     closeModal();
+    // Keep the original PDF or Word file with the new document entry (in the background).
+    const file = mode === 'document' && !sourceId ? doc?.file : null;
+    if (file) uploadOriginal(p.id, file).then((meta: Any) => mutate((pp) => { const d = (pp.sources || []).find((x: Any) => x.id === newSourceId); if (d) d.file = meta; }))
+      .catch(() => toast('The issues were added, but the original file couldn’t be kept. You can attach it on the Source documents page.', 'err'));
     toast(`Added ${created.length} issue${created.length === 1 ? '' : 's'} (${created[0]}${created.length > 1 ? `–${created[created.length - 1]}` : ''})${canEpic && newEpics.length ? ` and ${newEpics.length} new epic${newEpics.length === 1 ? '' : 's'}` : ''} to the backlog`);
   };
 
