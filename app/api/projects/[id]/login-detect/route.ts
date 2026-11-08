@@ -3,6 +3,9 @@ import * as store from '@/lib/store.js';
 import { detectLogin, engineStatus, noBrowser } from '@/lib/automation.js';
 import { savedSetup } from '@/lib/server/app-setup';
 
+// Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).
+export const maxDuration = 120;
+
 // Finds the app's login form on the saved application URL (no signing in: nothing is typed or submitted).
 export const POST = api(async (_req, p) => {
   const user = await perm('test.run');

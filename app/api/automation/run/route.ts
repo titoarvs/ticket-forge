@@ -4,6 +4,9 @@ import { reportRun } from '@/lib/notify.js';
 import * as store from '@/lib/store.js';
 import { runAppSetup } from '@/lib/server/app-setup';
 
+// Driving a browser takes a while: let this run up to 5 minutes on serverless hosting (Vercel).
+export const maxDuration = 300;
+
 export const POST = api(async (req) => {
   const user = await perm('test.run');
   const b = await body(req);

@@ -5,6 +5,9 @@ import { maskSecrets } from '@/lib/app-helpers.mjs';
 import { appWithSecrets } from '@/lib/secrets.js';
 import { savedSetup } from '@/lib/server/app-setup';
 
+// Driving a browser takes a while: let this run up to 5 minutes on serverless hosting (Vercel).
+export const maxDuration = 300;
+
 // Finds the app's pages by following links from the saved application URL, optionally signed in as a role.
 export const POST = api(async (req, p) => {
   const user = await perm('project.settings');

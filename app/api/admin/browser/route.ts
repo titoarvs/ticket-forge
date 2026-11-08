@@ -3,6 +3,9 @@ import { engineStatus } from '@/lib/automation.js';
 import { publicRemoteBrowser, saveRemoteBrowser, clearRemoteBrowser, checkBrowserUrl } from '@/lib/settings.js';
 import { launch, hideEndpoint, describeBrowser } from '@/lib/browser.mjs';
 
+// Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).
+export const maxDuration = 120;
+
 // The test browser, for administrators: what is in use, and a remote browser to connect (needed on serverless
 // hosting). The address is stored encrypted and never sent back.
 

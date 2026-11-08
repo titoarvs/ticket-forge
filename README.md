@@ -377,6 +377,9 @@ Tests run in the first browser available:
 2. Playwright's own Chromium (**Install Chromium** on the same page);
 3. **Google Chrome or Microsoft Edge** already installed on the computer.
 
+On serverless hosting the tests run inside the request (no separate process) and a run can take up to 5
+minutes, so run a few issues at a time there. Failure screenshots are stored in the database as usual.
+
 The Settings tab and each run say which browser is in use. Writing scripts uses your Claude account when it
 works, and the AI APIs connected in Administration → AI when it isn't installed, isn't signed in, its sign-in
 expired, or it hit its usage limit (Administration → AI, on by default).

@@ -4,6 +4,9 @@ import { testLogin, engineStatus, noBrowser } from '@/lib/automation.js';
 import { appWithSecrets } from '@/lib/secrets.js';
 import { savedSetup } from '@/lib/server/app-setup';
 
+// Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).
+export const maxDuration = 120;
+
 // Signs in as one role on the saved application URL and reports the result with a screenshot.
 export const POST = api(async (req, p) => {
   const user = await perm('test.run');
