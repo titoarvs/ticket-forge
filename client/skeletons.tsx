@@ -117,7 +117,7 @@ export function ViewSkeleton({ view }: { view: string }) {
 
 function SidebarSk() {
   return (
-    <div className={`side-wrap ${S.sideCollapsed ? 'mini' : ''}`}>
+    <div className={`side-wrap ${S.sideCollapsed ? 'is-collapsed' : ''}`}>
     <nav className="sidebar" aria-hidden="true">
       <div className="proj-head"><Sk w={32} h={32} r={4} /><div className="sk-stack" style={{ gap: 6 }}><Sk w="75%" h={12} /><Sk w="50%" h={10} /></div></div>
       {[5, 2, 1].map((n, g) => (

@@ -22,7 +22,7 @@ function Sidebar({ view }: { view: string }) {
       <Ico svg={icon} /><span className="side-text">{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
   );
   return (
-    <div className={`side-wrap ${mini ? 'mini' : ''}`}>
+    <div className={`side-wrap ${mini ? 'is-collapsed' : ''}`}>
     <nav className="sidebar" aria-label="Project">
       <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>

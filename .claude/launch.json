@@ -1,7 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "ticketforge", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 5173 },
-    { "name": "ticketforge-test", "runtimeExecutable": "/bin/sh", "runtimeArgs": ["/private/tmp/claude-501/-Users-arvinayson-Desktop-Practice-Automated-Tickets/834cc851-b46e-43f9-9693-1561c3f29f27/scratchpad/run-test-pg.sh"], "port": 5174 }
+    { "name": "ticketforge", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 5173 }
   ]
 }

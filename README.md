@@ -149,6 +149,7 @@ All settings live in `.env` (see `.env.example`):
    - **Claude actions** on an issue: *Enhance*, *Improve acceptance criteria*, *Regenerate test cases*,
      *Split into smaller issues*, or *Ask Claude…*. Each suggestion opens a before/after review first.
    - **Create** (top bar, or press `C`): Jira-style create dialog, or **Write with Claude**.
+   - **Sidebar:** collapse it to an icon rail with the arrow on its edge, or press `[`. TicketForge remembers your choice.
    - Undo/redo (⌘Z / ⇧⌘Z), `/` to search, `Esc` to close panels, and autosave. Projects are stored as JSON in
      `data/projects/`.
 4. **Export** from the Export menu:
