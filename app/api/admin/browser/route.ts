@@ -1,7 +1,7 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
 import { engineStatus } from '@/lib/automation.js';
 import { publicRemoteBrowser, saveRemoteBrowser, clearRemoteBrowser, checkBrowserUrl } from '@/lib/settings.js';
-import { launch, hideEndpoint, describeBrowser } from '@/lib/browser.mjs';
+import { launch, hideEndpoint, describeBrowser, normalizeRemote, explainConnectError } from '@/lib/browser.mjs';
 
 // Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).
 export const maxDuration = 120;
@@ -18,11 +18,11 @@ export const GET = api(async () => {
 export const PUT = api(async (req) => {
   const user = await perm('users.manage');
   const b = await body(req);
-  const spec = { kind: 'remote', url: checkBrowserUrl(b.url), protocol: b.protocol === 'cdp' ? 'cdp' : 'playwright' };
+  const spec = remoteSpec(b);
   const test = await tryBrowser(spec);
   if (!test.ok && !b.force) throw new HttpError(400, `Couldn’t connect: ${test.error}`);
   await saveRemoteBrowser(user, { url: spec.url, protocol: spec.protocol });
-  return { ok: true, test, engine: await engineStatus(), remote: await publicRemoteBrowser() };
+  return { ok: true, test, corrected: spec.corrected, engine: await engineStatus(), remote: await publicRemoteBrowser() };
 });
 
 export const DELETE = api(async () => {
@@ -35,10 +35,17 @@ export const DELETE = api(async () => {
 export const POST = api(async (req) => {
   await perm('users.manage');
   const b = await body(req);
-  if (b.url) return tryBrowser({ kind: 'remote', url: checkBrowserUrl(b.url), protocol: b.protocol === 'cdp' ? 'cdp' : 'playwright' });
+  if (b.url) { const spec = remoteSpec(b); return { ...(await tryBrowser(spec)), corrected: spec.corrected }; }
   const { browserSpec } = await import('@/lib/automation.js');
   return tryBrowser(await browserSpec());
 });
+
+/** The address typed in the form, corrected when it's a Browserless address copied from the wrong place. */
+function remoteSpec(b: any) {
+  const protocol = b.protocol === 'cdp' ? 'cdp' : 'playwright';
+  const n = normalizeRemote(checkBrowserUrl(b.url), protocol);
+  return { kind: 'remote', url: n.url, protocol, corrected: n.changed };
+}
 
 async function tryBrowser(spec: any) {
   const started = Date.now();
@@ -51,6 +58,6 @@ async function tryBrowser(spec: any) {
       return { ok: true, browser: describeBrowser(spec), version: browser.version(), ms: Date.now() - started };
     } finally { await browser.close().catch(() => {}); }
   } catch (e: any) {
-    return { ok: false, browser: describeBrowser(spec), error: hideEndpoint(String(e?.message || e).split('\n')[0], spec), ms: Date.now() - started };
+    return { ok: false, browser: describeBrowser(spec), error: explainConnectError(hideEndpoint(String(e?.message || e).split('\n')[0], spec), spec), ms: Date.now() - started };
   }
 }

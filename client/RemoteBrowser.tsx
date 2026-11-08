@@ -21,7 +21,7 @@ export function RemoteBrowser() {
   const testIt = () => run('test', async () => setTest(await api('/api/admin/browser', { method: 'POST', body: url ? { url, protocol } : {} })));
   const save = () => run('save', async () => {
     const d = await api('/api/admin/browser', { method: 'PUT', body: { url, protocol } });
-    setData(d); S.engine = { ...(S.engine || {}), ...d.engine }; emit(); setTest(d.test); setUrl(''); setEdit(false);
+    setData(d); S.engine = { ...(S.engine || {}), ...d.engine }; emit(); setTest({ ...d.test, corrected: d.corrected }); setUrl(''); setEdit(false);
     toast('Remote browser connected. Tests run there now.');
   });
   const remove = () => openModal(<Confirm title="Disconnect the remote browser?" label="Disconnect"
@@ -33,7 +33,8 @@ export function RemoteBrowser() {
       <div className="rb-h"><Ico svg={I.external} /><b>Remote browser</b><span className="label-chip">Administrators</span>
         <span className="muted small">{r ? 'Connected' : data?.engine?.serverless ? 'Needed on this server' : 'Optional'}</span></div>
       <p className="muted small" style={{ margin: '4px 0 10px' }}>Run tests in a hosted browser instead of on this server, for example <a href="https://www.browserless.io" target="_blank" rel="noopener noreferrer">Browserless</a>, or
-        your own machine running <code>npx playwright run-server</code>. Required on serverless hosting such as Vercel. The address is stored encrypted and never shown again.</p>
+        your own machine running <code>npx playwright run-server</code>. Required on serverless hosting such as Vercel. The address is stored encrypted and never shown again.
+        For Browserless use <code>wss://production-sfo.browserless.io/chromium/playwright?token=…</code> (other regions: <code>production-lon</code>, <code>production-ams</code>); a REST address such as <code>…/function?token=…</code> is corrected automatically.</p>
       {r && !edit && <div className="rb-current">
         <span className="dot ok" /><span><b>{r.hint}</b> · {r.protocol === 'cdp' ? 'Chrome DevTools' : 'Playwright'}{r.source === 'env' ? ' · set by TICKETFORGE_BROWSER_WS' : r.updatedAt ? ` · connected ${ago(r.updatedAt)}${r.updatedBy ? ` by ${r.updatedBy}` : ''}` : ''}</span>
         <span className="spacer" />
@@ -50,7 +51,7 @@ export function RemoteBrowser() {
         {edit && <button className="btn subtle" onClick={() => { setEdit(false); setUrl(''); setTest(null); }}>Cancel</button>}
       </div>}
       {test && (test.ok
-        ? <div className="ok-banner" style={{ marginTop: 10 }}><Ico svg={I.check} /><span>Works: {test.browser}{test.version ? ` (browser ${test.version})` : ''}, opened a page in {(test.ms / 1000).toFixed(1)} s.</span></div>
+        ? <div className="ok-banner" style={{ marginTop: 10 }}><Ico svg={I.check} /><span>Works: {test.browser}{test.version ? ` (browser ${test.version})` : ''}, opened a page in {(test.ms / 1000).toFixed(1)} s.{test.corrected ? ' The address was a Browserless REST address, so the browser connection for it was used instead (same token).' : ''}</span></div>
         : <div className="warn-banner danger" style={{ marginTop: 10 }}><Ico svg={I.warn} /><span>{test.browser ? `${test.browser}: ` : ''}{test.error}</span></div>)}
     </div>
   );
