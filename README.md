@@ -135,6 +135,11 @@ All settings live in `.env` (see `.env.example`):
    - **Board / Active sprint**: one column per workflow status; drag cards to change status; epic swimlanes;
      days remaining; switch to all issues.
    - **Epics**: progress bars per epic; create, rename, recolour or delete; **Re-organize with Claude**.
+   - **Add feature with AI** (Backlog and Epics): add a new feature or epic to an existing project. Describe it
+     or import a document (PDF, Word, Markdown and more). The AI sees the project's epics and issues, so it adds
+     to an existing epic when one fits, creates a new one when not, and skips work the project already has
+     (raised as an open question instead). Review the plan, untick anything you don't want, then add it: new
+     issues continue the project's keys (for example ALP-7…), with test cases, and ⌘Z undoes it.
    - **Reports**: velocity (committed vs completed points per sprint), sprint burndown, and a sprint report.
    - **Test cases**: every test case with its manual or automated result.
    - **Test automation**: see below.
@@ -215,12 +220,23 @@ scripts. The defaults:
   - test data prefixed "QA-"
 - **Team rules:** anything else, in plain words.
 
-The page previews exactly what the AI is told. Some rules are also enforced after generation:
+**What the AI is told** shows the instructions for each kind of generation (tickets, test cases, improving an
+issue, automation scripts), with their size in tokens. *Readable* splits them into the built-in role, your team
+standards and the generation guide; *Exact text* shows the full text with a Copy button. It updates as you edit,
+before you save.
+
+Some rules are also enforced after generation:
 - story points snap to the scale
 - only the allowed ticket types are used
 - labels are trimmed to the limit
 - extra test cases are dropped
 - test titles get the prefix
+
+**Generation guide (Markdown):** import a `.md` file, or start from the template, with your glossary, roles,
+conventions and example tickets and test cases. The AI gets it as reference context for tickets, test cases
+and/or automation scripts (your choice), so it uses your words and structure. For example, a guide that says
+"patron, never customer" is followed even when the request says "customer". You can preview, edit, download
+or replace it. The limit is 60,000 characters, about 15k tokens.
 
 **Reset to defaults** restores the standard. The create-project form uses the standard number of test cases
 unless you change it for that run.
@@ -283,6 +299,19 @@ number parsed from the URL.
 Scripts are stored with the test case: open **View** (or the *Automation script* section of a test case) to read
 or edit one, or **Rewrite with Claude** to regenerate it. Scripts run on this machine with your user's
 permissions, so only point automation at apps you trust, and review scripts you did not write.
+
+### Results, failures and screenshots
+
+The Test automation page has four tabs:
+- **Results:** run tests and see the latest result of each.
+- **Failures:** every failing test with a screenshot of the page when it failed, the error, Run again, and earlier
+  failures.
+- **App setup:** pages, roles, login and source code.
+- **Settings:** application URL, test browser, what happens when a test fails.
+
+Screenshots of **failed** tests are stored in the database (Supabase) as small JPEGs, in a `screenshots` table
+under the same row-level security as issues, so only people with access to the project can open them. The last 5
+per test case are kept; passing runs store nothing, and deleting a project deletes its screenshots.
 
 ### App setup: pages, roles and logins
 

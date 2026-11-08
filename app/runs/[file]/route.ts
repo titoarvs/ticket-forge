@@ -7,8 +7,8 @@ import { RUN_DIR } from '@/lib/automation.js';
 export const GET = api(async (_req, p) => {
   await authed();
   const name = path.basename(p.file);
-  if (!/^[\w-]+\.png$/.test(name)) throw new HttpError(404, 'Not found');
+  if (!/^[\w-]+\.(png|jpg)$/.test(name)) throw new HttpError(404, 'Not found');
   const buf = await fs.readFile(path.join(RUN_DIR, name)).catch(() => null);
   if (!buf) throw new HttpError(404, 'Not found');
-  return new Response(buf, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=3600' } });
+  return new Response(buf, { headers: { 'Content-Type': name.endsWith('.jpg') ? 'image/jpeg' : 'image/png', 'Cache-Control': 'private, max-age=3600' } });
 });

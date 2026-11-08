@@ -30,7 +30,7 @@ export const POST = api(async (req) => {
       send(ev);
     };
     try {
-      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app });
+      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user });
     } finally {
       if (failures.size && project?.id) {
         try {
