@@ -6,11 +6,15 @@ import Link from 'next/link';
 import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
-import { Summary, Backlog, Board, Epics, Reports, Tests, Automation, Source, Settings } from './views';
+import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
+import { Settings } from './ProjectSettings';
+import { Sources } from './Sources';
 import { Drawer } from './Drawer';
+import { Timeline } from './Timeline';
+import { Board } from './Board';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', backlog: 'Backlog', board: 'Board', epics: 'Epics', reports: 'Reports', tests: 'Test cases', automation: 'Test automation', source: 'Source document', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, backlog: Backlog, board: Board, epics: Epics, reports: Reports, tests: Tests, automation: Automation, source: Source, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', automation: 'Test automation', source: 'Source documents', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, automation: Automation, source: Sources, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
@@ -30,12 +34,13 @@ function Sidebar({ view }: { view: string }) {
       {item('backlog', I.backlog, 'Backlog', p.tickets.filter((t: any) => !isSub(t)).length)}
       {item('board', I.board, activeSprint() ? 'Active sprint' : 'Board')}
       {item('epics', I.epic, 'Epics', p.epics.length)}
+      {item('timeline', I.calendar, 'Timeline')}
       {item('reports', I.chart, 'Reports')}
       <div className="side-label">Quality</div>
       {item('tests', I.test, 'Test cases', tests)}
       {item('automation', I.bot, 'Test automation')}
       <div className="side-label">Requirements</div>
-      {item('source', I.doc, 'Source document')}
+      {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}
       <div className="side-foot">{item('settings', I.settings, 'Project settings')}</div>
     </nav>
     <button type="button" className="side-toggle" onClick={() => toggleSidebar()} aria-expanded={!mini} aria-label={mini ? 'Expand sidebar' : 'Collapse sidebar'}

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
   activeSprint, openSprints, tcKey, spSum, statusNames, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
-  saveUi, EMPTY_FILTER, mutate, setField, deleteIssues, historyText, openModal, toast, uid, logEvent, api, type Any,
+  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, toast, uid, logEvent, api, type Any,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea, EmptyState, Modal } from './ui';
 import {
@@ -15,38 +15,48 @@ import {
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { AppSetup } from './AppSetup';
 import { FeatureModal } from './FeatureModal';
+import { epicRange } from './Timeline';
+import { ItemText } from './ListEditor';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
-const clearDrop = () => document.querySelectorAll('.drop, .drop-before').forEach((n) => n.classList.remove('drop', 'drop-before'));
+const clearDrop = () => document.querySelectorAll('.drop, .drop-before, .no-drop').forEach((n) => n.classList.remove('drop', 'drop-before', 'no-drop'));
 const canDrag = () => can('issue.edit') || can('sprint.manage') || can('epic.manage');
-function rowDnd(t: Any, zone: Any) {
+/** The status a drop target would give the issue, if any. */
+const zoneStatus = (zone: Any) => zone?.status || (zone?.group?.startsWith('s:') ? zone.group.slice(2) : '');
+/** Whether the dragged issue may be dropped here (custom workflow transitions). */
+const dropOk = (zone: Any) => { const st = zoneStatus(zone); return !st || !dragId || canMove(ticket(dragId), st); };
+export function rowDnd(t: Any, zone: Any) {
   if (!canDrag()) return {};
   return {
     draggable: true,
-    onDragStart: (e: DragEvent<HTMLElement>) => { dragId = t.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); e.currentTarget.classList.add('dragging'); },
+    onDragStart: (e: DragEvent<HTMLElement>) => {
+      dragId = t.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); e.currentTarget.classList.add('dragging');
+      // Grey out the columns and groups this issue can't move to.
+      document.querySelectorAll<HTMLElement>('[data-drop-status]').forEach((el) => el.classList.toggle('no-drop', !canMove(t, el.dataset.dropStatus || '')));
+    },
     onDragEnd: (e: DragEvent<HTMLElement>) => { dragId = null; e.currentTarget.classList.remove('dragging'); clearDrop(); },
-    onDragOver: (e: DragEvent<HTMLElement>) => { if (dragId && dragId !== t.id) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('drop-before'); } },
+    onDragOver: (e: DragEvent<HTMLElement>) => { if (dragId && dragId !== t.id && dropOk(zone)) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('drop-before'); } },
     onDragLeave: (e: DragEvent<HTMLElement>) => e.currentTarget.classList.remove('drop-before'),
     onDrop: (e: DragEvent<HTMLElement>) => { e.preventDefault(); e.stopPropagation(); clearDrop(); if (dragId) moveTicket(dragId, zone, t.id); },
   };
 }
-function zoneDnd(zone: Any) {
+export function zoneDnd(zone: Any) {
   return {
-    onDragOver: (e: DragEvent<HTMLElement>) => { if (dragId) { e.preventDefault(); e.currentTarget.classList.add('drop'); } },
+    onDragOver: (e: DragEvent<HTMLElement>) => { if (dragId && dropOk(zone)) { e.preventDefault(); e.currentTarget.classList.add('drop'); } },
     onDragLeave: (e: DragEvent<HTMLElement>) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) e.currentTarget.classList.remove('drop'); },
     onDrop: (e: DragEvent<HTMLElement>) => { e.preventDefault(); clearDrop(); if (dragId) moveTicket(dragId, zone); },
   };
 }
 
-// ---------------------------------------------------------------- shared pieces
 export function Header({ title, right, sub }: { title: string; right?: ReactNode; sub?: ReactNode }) {
   return <>
     <div className="crumbs"><Link href="/">Projects</Link><span>/</span><Link href={`/p/${P().id}/summary`}>{P().name}</Link></div>
     <div className="page-h"><h1>{title}</h1>{sub}<div className="spacer" />{right}</div>
   </>;
 }
-function FilterBar({ status = true, group }: { status?: boolean; group?: { value: string; options: [string, string][]; onChange: (v: string) => void } }) {
+
+export function FilterBar({ status = true, group }: { status?: boolean; group?: { value: string; options: [string, string][]; onChange: (v: string) => void } }) {
   const f = S.filter;
   const setF = (k: string, v: string) => { S.filter = { ...S.filter, [k]: v }; emit(); };
   const people = peopleNames();
@@ -78,12 +88,19 @@ const Tally = ({ items }: { items: Any[] }) => {
   const c = (cat: string) => items.filter((t) => catOf(t.status) === cat).length;
   return <span className="tally" title="To do · In progress · Done"><span className="loz s-todo">{c('todo')}</span><span className="loz s-inprogress">{c('inprogress')}</span><span className="loz s-done">{c('done')}</span></span>;
 };
-const daysLeft = (s: Any) => {
+export const daysLeft = (s: Any) => {
   if (!s?.endDate) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.round((new Date(`${s.endDate}T00:00:00`).getTime() - today.getTime()) / 86400000);
 };
-const PlainList = ({ l }: { l: string[] }) => (l?.length ? <ul className="plain-list">{l.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="muted">None.</p>);
+/** Assumptions / open questions, readable: codes as tags, the first few with "Show all". */
+function ReadList({ l }: { l: string[] }) {
+  const [all, setAll] = useState(false);
+  if (!l?.length) return <p className="muted">None.</p>;
+  const shown = all ? l : l.slice(0, 6);
+  return <><ol className="li-list read">{shown.map((x, i) => <li key={i}><span className="li-n">{i + 1}</span><div className="li-body"><ItemText s={x} /></div></li>)}</ol>
+    {l.length > 6 && <button className="btn sm subtle" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${l.length}`}</button>}</>;
+}
 
 // ---------------------------------------------------------------- summary
 function Stack({ parts, total }: { parts: [string, number, string][]; total: number }) {
@@ -129,9 +146,14 @@ export function Summary() {
       <div className="card wide"><h3>Epic progress</h3><p className="sub">Done and in-progress issues per epic.</p>
         {p.epics.length ? <table className="tbl"><tbody>{p.epics.map((e: Any) => { const pr = epicProgress(e); return (
           <tr key={e.id} className="click" onClick={() => openDrawer('epic', e.id)}><td style={{ width: '40%' }}><ELoz e={e} /></td><td><ProgBar {...pr} /></td><td className="num muted" style={{ width: 110 }}>{pr.done} of {pr.total} done</td></tr>); })}</tbody></table> : <p className="muted">No epics yet.</p>}</div>
-      <div className="card wide"><h3>About this project</h3><p className="sub">From the source document{p.sourceName ? ` · ${p.sourceName}` : ''} · <Link href={`/p/${p.id}/settings`}>Edit</Link></p>
-        <p style={{ margin: '0 0 16px', whiteSpace: 'pre-wrap' }}>{p.summary || <span className="muted">No summary.</span>}</p>
-        <div className="grid2"><div><h3 style={{ fontSize: 14 }}>Assumptions</h3><PlainList l={p.assumptions} /></div><div><h3 style={{ fontSize: 14 }}>Open questions</h3><PlainList l={p.openQuestions} /></div></div></div>
+      <div className="card wide"><h3>About this project</h3>
+        {p.description ? <p className="sub" style={{ whiteSpace: 'pre-wrap', color: 'var(--text)', fontSize: 14 }}>{p.description}</p>
+          : <p className="sub">No project description yet. {can('project.settings') && <Link href={`/p/${p.id}/settings`} onClick={() => { S.setTab = 'details'; }}>Write one</Link>}</p>}</div>
+      {(p.summary || p.assumptions?.length > 0 || p.openQuestions?.length > 0) && <div className="card wide"><h3>{p.sourceName ? <>Initial feature <span className="muted" style={{ fontWeight: 400 }}>· {p.sourceName}</span></> : 'Assumptions and open questions'}</h3>
+        <p className="sub">{p.sourceName ? 'From the document this project was created from' : 'Recorded for this project'} · <Link href={`/p/${p.id}/settings`} onClick={() => { S.setTab = 'details'; }}>Edit</Link>{(p.sources || []).length > 0 && <> · <Link href={`/p/${p.id}/source`}>{p.sources.length} more document{p.sources.length === 1 ? '' : 's'}</Link></>}</p>
+        {p.summary && <p style={{ margin: '0 0 16px', whiteSpace: 'pre-wrap' }}>{p.summary}</p>}
+        <div className="grid2"><div><h3 style={{ fontSize: 14 }}>Assumptions <span className="count">{(p.assumptions || []).length}</span></h3><ReadList l={p.assumptions} /></div>
+          <div><h3 style={{ fontSize: 14 }}>Open questions <span className="count">{(p.openQuestions || []).length}</span></h3><ReadList l={p.openQuestions} /></div></div></div>}
     </div>
   </>;
 }
@@ -204,6 +226,14 @@ function BulkBar() {
     mutate(() => ids.forEach((id) => { const t = ticket(id); if (t) setField(t, field, value); }));
     S.checked.clear(); emit(); toast(`${ids.length} issues ${label}`);
   };
+  // With custom transitions, only issues allowed to move to that status change; the rest are reported.
+  const bulkStatus = (to: string) => {
+    const ok = ids.filter((id) => canMove(ticket(id), to));
+    const skipped = ids.length - ok.length;
+    if (ok.length) mutate(() => ok.forEach((id) => setField(ticket(id), 'status', to)));
+    S.checked.clear(); emit();
+    toast(skipped ? `${ok.length} issue${ok.length === 1 ? '' : 's'} set to ${to}. ${skipped} skipped: the workflow doesn’t allow moving ${skipped === 1 ? 'it' : 'them'} to ${to} from ${skipped === 1 ? 'its' : 'their'} current status.` : `${ok.length} issues set to ${to}`, skipped ? 'err' : undefined);
+  };
   return (
     <div className="bulk">{ids.length} selected
       {can('sprint.manage') && <SF filter value="" onChange={(e) => e.target.value && bulkSet('sprintId', e.target.value === '__none' ? null : e.target.value, `moved to ${p.sprints.find((s: Any) => s.id === e.target.value)?.name || 'the backlog'}`)}>
@@ -211,7 +241,7 @@ function BulkBar() {
       {(can('epic.manage') || can('issue.edit')) && <SF filter value="" onChange={(e) => e.target.value && bulkSet('epicId', e.target.value === '__none' ? null : e.target.value, `moved to ${epic(e.target.value)?.title || 'No epic'}`)}>
         <MenuItem value="">Move to epic…</MenuItem>{p.epics.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}<MenuItem value="__none">No epic</MenuItem></SF>}
       {can('issue.edit') && <>
-        <SF filter value="" onChange={(e) => e.target.value && bulkSet('status', e.target.value, `set to ${e.target.value}`)}><MenuItem value="">Set status…</MenuItem>{opts(statusNames())}</SF>
+        <SF filter value="" onChange={(e) => e.target.value && bulkStatus(e.target.value)}><MenuItem value="">Set status…</MenuItem>{opts(statusNames())}</SF>
         <SF filter value="" onChange={(e) => e.target.value && bulkSet('assignee', e.target.value === '__none' ? '' : e.target.value, e.target.value === '__none' ? 'unassigned' : `assigned to ${e.target.value}`)}>
           <MenuItem value="">Assign to…</MenuItem>{opts(peopleNames())}<MenuItem value="__none">Unassigned</MenuItem></SF>
       </>}
@@ -238,7 +268,7 @@ export function Backlog() {
       const closed = S.collapsed.has(g.id);
       const s = g.sprint;
       return (
-        <div key={g.id} className={`section ${g.kind === 'sprint' && !s ? 'backlog-sec' : ''}`} {...zoneDnd({ group: g.id })}>
+        <div key={g.id} className={`section ${g.kind === 'sprint' && !s ? 'backlog-sec' : ''}`} data-drop-status={g.kind === 'status' ? g.title : undefined} {...zoneDnd({ group: g.id })}>
           <div className={`sec-h ${closed ? 'closed' : ''}`} onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a, select')) toggle(g.id); }}>
             <Ico svg={I.chevron} />
             {g.kind === 'status' ? <StatusLoz s={g.title} /> : g.epic ? <><TypeIcon type="Epic" /><Swatch color={g.epic.color} /><b>{g.title}</b></>
@@ -275,65 +305,6 @@ export function Backlog() {
   </>;
 }
 
-// ---------------------------------------------------------------- board
-export function Board() {
-  const p = P();
-  const act = activeSprint();
-  const useSprint = act && !S.boardAll;
-  const statuses = statusNames();
-  const list = filtered(useSprint ? p.tickets.filter((t: Any) => t.sprintId === act.id) : p.tickets);
-  const Card = ({ t, showEpic, zone }: { t: Any; showEpic: boolean; zone: Any }) => {
-    const parent = isSub(t) ? ticket(t.parentId) : null;
-    return (
-      <div className={`bcard ${S.drawer?.id === t.id ? 'active' : ''}`} onClick={() => openDrawer('issue', t.id)} {...rowDnd(t, zone)}>
-        {parent && <div className="muted small"><TypeIcon type={parent.type} /> {parent.key} {parent.title.slice(0, 40)}</div>}
-        <div className="t">{t.title}</div>
-        {showEpic && epic(t.epicId) && !isSub(t) && <div><ELoz e={epic(t.epicId)} /></div>}
-        <div className="foot"><TypeIcon type={t.type} /><span className="key">{t.key}</span>{isBlocked(t) && <span className="flag" title="Blocked"><Ico svg={I.flag} /></span>}
-          {t.prs.length > 0 && <span className="mini"><Ico svg={I.pr} />{t.prs.length}</span>}
-          <span className="right"><span className="sp">{t.storyPoints ?? '–'}</span><PriorityIcon p={t.priority} /><Avatar name={t.assignee} /></span></div>
-      </div>
-    );
-  };
-  const cols = (items: Any[], laneEpic: string | null | undefined, showEpic: boolean) => statuses.map((s) => {
-    const zone = { status: s, ...(laneEpic !== undefined ? { epic: laneEpic } : {}) };
-    const cs = items.filter((t) => t.status === s);
-    return (
-      <div key={`${laneEpic ?? 'all'}-${s}`} className="col" {...zoneDnd(zone)}>
-        <div className="col-h"><span className={`dot-cat s-${catOf(s)}`} />{s} <span className="muted">{cs.length}</span></div>
-        {cs.map((t) => <Card key={t.id} t={t} showEpic={showEpic} zone={zone} />)}
-      </div>
-    );
-  });
-  let body: ReactNode;
-  if (S.boardGroup === 'epic') {
-    const lanes = [...p.epics.map((e: Any) => ({ e, items: list.filter((t: Any) => t.epicId === e.id) })), { e: null, items: list.filter((t: Any) => !epic(t.epicId)) }].filter((l) => l.items.length);
-    body = lanes.map((l: Any) => [<div key={`h-${l.e?.id || 'none'}`} className="lane-h">{l.e && <TypeIcon type="Epic" />}{l.e?.title || 'Issues without epic'} <span className="muted small">{l.items.length} issues</span></div>, ...cols(l.items, l.e?.id || null, false)]);
-  } else body = cols(list, undefined, true);
-  const left = useSprint ? daysLeft(act) : null;
-  const noSprint = p.sprints.length > 0 && !act && !S.boardAll;
-  return <>
-    <Header title={useSprint ? act.name : 'Board'} right={<>
-      {p.sprints.length > 0 && <SF filter aria-label="Board scope" value={S.boardAll ? 'all' : 'sprint'} onChange={(e) => { S.boardAll = e.target.value === 'all'; emit(); }}><MenuItem value="sprint">Active sprint</MenuItem><MenuItem value="all">All issues</MenuItem></SF>}
-      {useSprint && <><span className="muted small row" style={{ gap: 4 }}><Ico svg={I.clock} />{left === null ? 'No end date' : left >= 0 ? `${left} days remaining` : `${-left} days overdue`}</span>
-        {can('sprint.manage') && <button className="btn" onClick={() => openModal(<CompleteSprintModal s={act} />)}>Complete sprint</button>}</>}
-    </>} />
-    {useSprint && act.goal && <p className="muted" style={{ margin: '-8px 0 12px' }}><Ico svg={I.flag} /> {act.goal}</p>}
-    {noSprint ? (
-      <EmptyState icon={I.board} title="No active sprint"
-        actions={<><Link className="btn primary" href={`/p/${p.id}/backlog`}>Go to backlog</Link><button className="btn" onClick={() => { S.boardAll = true; emit(); }}>Show all issues</button></>}>
-        <p>Start a sprint from the backlog to track its issues here, or show every issue on the board.</p></EmptyState>
-    ) : <>
-      <FilterBar status={false} group={{ value: S.boardGroup, options: [['none', 'None'], ['epic', 'Epic']], onChange: (v) => { S.boardGroup = v; saveUi(); emit(); } }} />
-      <div style={{ overflowX: 'auto' }}><div className="board" style={{ gridTemplateColumns: `repeat(${statuses.length}, minmax(220px, 1fr))` }}>{body}</div></div>
-      {!list.length && (filtersActive()
-        ? <EmptyState compact icon={I.search} tone="neutral" title="No issues match your filters" actions={<button className="btn" onClick={() => { S.filter = EMPTY_FILTER(); emit(); }}>Clear filters</button>} />
-        : <EmptyState compact icon={I.board} tone="neutral" title={useSprint ? 'No issues in this sprint yet' : 'No issues yet'}
-          actions={<Link className="btn" href={`/p/${p.id}/backlog`}>Go to backlog</Link>}><p>{useSprint ? 'Drag issues into the sprint from the backlog.' : 'Create issues in the backlog to see them here.'}</p></EmptyState>)}
-    </>}
-  </>;
-}
-
 // ---------------------------------------------------------------- epics
 export function Epics() {
   const p = P();
@@ -342,15 +313,17 @@ export function Epics() {
       {can('ai.use') && can('issue.create') && <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>}
       {can('epic.manage') && <>
       {can('ai.use') && <button className="btn ai" onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize with AI</button>}
-      <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button></>}</>} />
+      <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button></>}
+      <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link></>} />
     {p.epics.length ? <>
-      <table className="tbl"><thead><tr><th>Epic</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
             <tr key={e.id} className="click" onClick={() => openDrawer('epic', e.id)}>
               <td><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b></span>
                 {e.description && <div className="muted small" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }}>{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
               <td style={{ width: 200 }}><ProgBar {...pr} /></td>
               <td className="num">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
               <td className="num">{pr.total}</td><td className="num">{spSum(pr.ts)}</td><td className="num">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>
@@ -619,105 +592,13 @@ export function Automation() {
 }
 
 // ---------------------------------------------------------------- source & settings
-export function Source() {
-  const p = P();
-  return <>
-    <Header title="Source document" />
-    {p.sourceText ? <><p className="muted" style={{ marginTop: -8 }}><Ico svg={I.doc} /> {p.sourceName} · {p.sourceText.split(/\s+/).length.toLocaleString()} words</p><div className="source">{p.sourceText}</div></>
-      : <EmptyState icon={I.doc} tone="neutral" title="No source document"><p>This project was created without a requirements document.</p></EmptyState>}
-  </>;
-}
-
 /** An input that commits on blur (used where every keystroke would cascade, e.g. renames). */
-function CommitInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & React.InputHTMLAttributes<HTMLInputElement>) {
+export function CommitInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & React.InputHTMLAttributes<HTMLInputElement>) {
   return <TF key={value} defaultValue={value} onBlur={(e) => { if (e.target.value.trim() !== value) onCommit(e.target.value.trim()); }}
     onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} {...rest} />;
 }
-const lines = (v: string) => v.split('\n').map((s) => s.trim()).filter(Boolean);
+export const lines = (v: string) => v.split('\n').map((s) => s.trim()).filter(Boolean);
 
-export function Settings() {
-  const p = P();
-  const ed = can('project.settings');
-  const counts = (name: string) => p.tickets.filter((t: Any) => t.status === name).length;
-  const assigned = (name: string) => p.tickets.filter((t: Any) => t.assignee === name).length;
-  const set = (k: string, v: Any) => mutate((pp) => { pp[k] = v; }, { tag: `p.${k}` });
-  const rekey = (key: string) => mutate((pp) => {
-    const old = pp.key;
-    pp.key = key;
-    for (const x of [...pp.tickets, ...pp.epics]) if (x.key?.startsWith(`${old}-`)) x.key = `${key}-${x.key.slice(old.length + 1)}`;
-  });
-  const renameMember = (m: Any, val: string) => mutate((pp) => {
-    if (!val) return;
-    for (const t of pp.tickets) { if (t.assignee === m.name) t.assignee = val; if (t.reporter === m.name) t.reporter = val; }
-    m.name = val;
-  });
-  const renameStatus = (i: number, name: string) => {
-    if (!name || p.workflow.some((x: Any, j: number) => j !== i && x.name.toLowerCase() === name.toLowerCase())) { toast('Status names must be unique and not empty.', 'err'); emit(); return; }
-    const w = p.workflow[i];
-    mutate((pp) => { pp.tickets.forEach((t: Any) => { if (t.status === w.name) t.status = name; }); w.name = name; });
-  };
-  const delStatus = (i: number) => {
-    const w = p.workflow[i];
-    const rest = p.workflow.filter((x: Any) => x !== w);
-    const to = rest.find((x: Any) => x.category === w.category) || rest[0];
-    const n = counts(w.name);
-    openModal(<Confirm title={`Delete status “${w.name}”?`} label="Delete status" text={n ? `${n} issues move to “${to.name}”.` : 'No issues use this status.'}
-      onYes={() => mutate((pp) => { pp.tickets.forEach((x: Any) => { if (x.status === w.name) setField(x, 'status', to.name); }); pp.workflow = rest; })} />);
-  };
-  const others = p.members.filter((m: Any) => !S.people.some((u: Any) => u.name === m.name));
-  return <>
-    <Header title="Project settings" />
-    <div style={{ maxWidth: 820 }}>
-      <h2 className="set-h">Details</h2>
-      <div className="grid2">
-        <label className="field"><span>Name</span><TF disabled={!ed} value={p.name} onChange={(e) => set('name', e.target.value)} /></label>
-        <label className="field"><span>Key — prefix for issue keys</span><CommitInput disabled={!ed} value={p.key} onCommit={(v) => { const k = v.replace(/[^a-z0-9]/gi, '').toUpperCase(); if (k) rekey(k); }} /></label>
-      </div>
-      <label className="field"><span>Summary</span><TA disabled={!ed} value={p.summary} onChange={(e) => set('summary', e.target.value)} /></label>
-      <div className="grid2">
-        <label className="field"><span>Assumptions — one per line</span><TA disabled={!ed} key={`a-${p.assumptions?.length}`} defaultValue={(p.assumptions || []).join('\n')} onBlur={(e) => set('assumptions', lines(e.target.value))} /></label>
-        <label className="field"><span>Open questions — one per line</span><TA disabled={!ed} key={`q-${p.openQuestions?.length}`} defaultValue={(p.openQuestions || []).join('\n')} onBlur={(e) => set('openQuestions', lines(e.target.value))} /></label>
-      </div>
-
-      <h2 className="set-h"><Ico svg={I.people} /> People</h2>
-      <p className="muted small">Users with access to this project come from Administration (invites, roles and project access). You can also add people without an account so they can be assigned issues.</p>
-      <table className="tbl"><thead><tr><th /><th>Name</th><th>Email</th><th>Role</th><th className="num">Assigned</th><th /></tr></thead><tbody>
-        {S.people.map((u: Any) => <tr key={u.id}><td style={{ width: 36 }}><Avatar name={u.name} /></td><td>{u.name}{u.id === S.user?.id && <span className="muted small"> (you)</span>}</td><td className="muted">{u.email}</td><td><span className="label-chip">{u.role}</span></td><td className="num">{assigned(u.name)}</td><td /></tr>)}
-        {others.map((m: Any) => (
-          <tr key={m.id}><td style={{ width: 36 }}><Avatar name={m.name} /></td>
-            <td><CommitInput disabled={!ed} value={m.name} aria-label="Name" onCommit={(v) => renameMember(m, v)} /></td>
-            <td><CommitInput disabled={!ed} value={m.email || ''} placeholder="No account" aria-label="Email" onCommit={(v) => mutate(() => { m.email = v; })} /></td>
-            <td><CommitInput disabled={!ed} value={m.role || ''} placeholder="e.g. Contractor" aria-label="Role" onCommit={(v) => mutate(() => { m.role = v; })} /></td>
-            <td className="num">{assigned(m.name)}</td>
-            <td style={{ textAlign: 'right' }}>{ed && <button className="icon-btn" title="Remove" onClick={() => mutate((pp) => { pp.tickets.forEach((x: Any) => { if (x.assignee === m.name) setField(x, 'assignee', ''); }); pp.members = pp.members.filter((x: Any) => x.id !== m.id); })}><Ico svg={I.trash} /></button>}</td></tr>
-        ))}
-      </tbody></table>
-      <div className="row" style={{ marginTop: 4 }}>
-        {ed && <button className="inline-create" style={{ width: 'auto' }} onClick={() => mutate((pp) => pp.members.push({ id: uid(), name: `Person ${pp.members.length + 1}`, email: '', role: '' }))}><Ico svg={I.plus} />Add person without an account</button>}
-        {can('users.manage') && <Link className="btn sm" href="/admin/invites"><Ico svg={I.people} />Invite users</Link>}
-      </div>
-
-      <h2 className="set-h"><Ico svg={I.board} /> Workflow</h2>
-      <p className="muted small">The statuses issues move through, in board order. The category sets the colour and what counts as done for progress, sprints and reports.</p>
-      <table className="tbl"><thead><tr><th>Status</th><th>Category</th><th className="num">Issues</th><th /></tr></thead><tbody>
-        {p.workflow.map((w: Any, i: number) => (
-          <tr key={w.id}><td><CommitInput disabled={!ed} value={w.name} aria-label="Status name" onCommit={(v) => renameStatus(i, v)} /></td>
-            <td><SF disabled={!ed} aria-label="Category" value={w.category} onChange={(e) => mutate(() => { w.category = e.target.value; })}>{CATEGORIES.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}</SF></td>
-            <td className="num">{counts(w.name)}</td>
-            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{ed && <>
-              <button className="icon-btn" disabled={i === 0} title="Move up" onClick={() => mutate((pp) => { const l = pp.workflow; [l[i], l[i - 1]] = [l[i - 1], l[i]]; })}><Ico svg={I.up} /></button>
-              <button className="icon-btn" disabled={i === p.workflow.length - 1} title="Move down" onClick={() => mutate((pp) => { const l = pp.workflow; [l[i], l[i + 1]] = [l[i + 1], l[i]]; })}><Ico svg={I.down} /></button>
-              <button className="icon-btn" disabled={p.workflow.length < 2} title="Delete status" onClick={() => delStatus(i)}><Ico svg={I.trash} /></button></>}</td></tr>
-        ))}
-      </tbody></table>
-      {ed && <button className="inline-create" style={{ width: 'auto' }} onClick={() => mutate((pp) => { let n = 'New status', k = 1; while (pp.workflow.some((w: Any) => w.name === n)) n = `New status ${++k}`; pp.workflow.splice(pp.workflow.length - 1, 0, { id: uid(), name: n, category: 'inprogress' }); })}><Ico svg={I.plus} />Add status</button>}
-
-      {can('project.delete') && <div className="danger-zone"><h3 style={{ margin: '0 0 4px', fontSize: 16 }}>Delete project</h3><p className="muted" style={{ margin: '0 0 12px' }}>Permanently removes this project and all of its epics, issues, sprints and test cases.</p>
-        <button className="btn danger" onClick={() => openModal(<Confirm title="Delete project?" label="Delete" text={`“${p.name}” and all of its issues will be permanently deleted. This can’t be undone.`}
-          onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); S.project = null; S.base = null; emit(); toast('Project deleted'); S.nav('/'); } catch (e: Any) { toast(e.message, 'err'); } }} />)}>Delete project</button></div>}
-    </div>
-  </>;
-}
 
 // ---------------------------------------------------------------- failures (Test automation → Failures)
 /** A failed test's screenshot, large. */

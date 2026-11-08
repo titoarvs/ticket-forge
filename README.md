@@ -132,9 +132,16 @@ All settings live in `.env` (see `.env.example`):
      next sprint or a new one). Filter by epic, type, priority, status or assignee avatars; create issues inline;
      select several to move to a sprint or epic, set status, assign, delete, have Claude write test cases, or run
      their automated tests.
-   - **Board / Active sprint**: one column per workflow status; drag cards to change status; epic swimlanes;
-     days remaining; switch to all issues.
+   - **Board / Active sprint** (Jira-style): one column per workflow status with sticky headers; drag cards to
+     change status; swimlanes by epic or assignee (collapsible); collapse columns to a narrow strip; column limits
+     (the header turns red when a column has too many issues); **Create issue** at the bottom of a column; days
+     remaining; switch to all issues. On a phone the columns scroll sideways one at a time.
    - **Epics**: progress bars per epic; create, rename, recolour or delete; **Re-organize with Claude**.
+   - **Timeline**: every epic on a calendar (weeks, months or quarters), with a sprints row and a today line. Each
+     epic has a start and due date (set them in the epic panel, or on the timeline: click or drag an empty row to
+     schedule, drag a bar to move it, drag its ends to change dates; arrow keys work too). Epics without dates
+     show an estimate from their issues' sprints (dashed). Bars fill with progress and turn red at the end when
+     overdue. Expand an epic to see its issues, placed by sprint. Dates are included in the Excel and Jira exports.
    - **Add feature with AI** (Backlog and Epics): add a new feature or epic to an existing project. Describe it
      or import a document (PDF, Word, Markdown and more). The AI sees the project's epics and issues, so it adds
      to an existing epic when one fits, creates a new one when not, and skips work the project already has
@@ -143,9 +150,18 @@ All settings live in `.env` (see `.env.example`):
    - **Reports**: velocity (committed vs completed points per sprint), sprint burndown, and a sprint report.
    - **Test cases**: every test case with its manual or automated result.
    - **Test automation**: see below.
-   - **Project settings**: details, **People** (team members for the assignee picker; “You are” sets the author
-     of comments and changes in this browser) and **Workflow** (add, rename, reorder or delete statuses and set
-     each one's category: to do, in progress or done).
+   - **Project settings**, in four sections (a menu on the left, tabs on a phone; changes save automatically):
+     **Details** (name and key; a **project description** in your own words; the **initial feature**, meaning
+     the summary, assumptions and open questions the AI read from the first document, as readable lists you can
+     edit, with reference codes such as A-PR-01 shown as tags and unconfirmed items flagged; other documents; and
+     the project at a glance), **People** (team
+     members with an account, and people without one you can assign issues to), **Workflow** and **Danger zone**
+     (delete the project). **Workflow**: add, rename, reorder or delete statuses, set each
+     one's category (to do, in progress or done) and column limit, and choose the **transitions**, like Jira:
+     *any status to any status* (the default), or *custom transitions* with a From → To grid, "any status can
+     move here" per status, and quick starts (step by step, allow every move, clear). A diagram shows the flow.
+     With custom transitions the issue panel only offers allowed statuses, the board greys out columns an issue
+     can't move to while you drag it, and bulk "Set status" skips (and reports) issues that can't move.
    - **Issue panel** (click any issue; expand for a full view): summary, status, details (assignee with
      “Assign to me”, reporter, labels, priority, story points, sprint, epic or parent, type), description, user
      story, acceptance criteria, **child issues** (sub-tasks), **linked issues** (blocks / is blocked by /
@@ -155,8 +171,15 @@ All settings live in `.env` (see `.env.example`):
      *Split into smaller issues*, or *Ask Claude…*. Each suggestion opens a before/after review first.
    - **Create** (top bar, or press `C`): Jira-style create dialog, or **Write with Claude**.
    - **Sidebar:** collapse it to an icon rail with the arrow on its edge, or press `[`. TicketForge remembers your choice.
+   - **Issue panel width:** drag its left edge to resize it (or focus the edge and use the arrow keys); double-click
+     the edge to reset. TicketForge remembers the width.
    - Undo/redo (⌘Z / ⇧⌘Z), `/` to search, `Esc` to close panels, and autosave. Projects are stored as JSON in
      `data/projects/`.
+   - **Source documents**: the document the project was created from plus every document or description added
+     later (with Add feature with AI, or **Add document** for reference). Each shows its words and reading time,
+     who added it and when, the AI's summary and open questions, and the epics and issues it produced. Read it
+     formatted (Markdown) or as plain text, find inside it, copy or download it, rename or remove it, or **Plan
+     work from it** with AI.
 4. **Export** from the Export menu:
 
 | Format | Contents |
@@ -188,6 +211,15 @@ npm run db:push
 
 The server talks to the database directly with the connection string; nothing is exposed to the browser.
 Without `DATABASE_URL`, TicketForge uses an embedded Postgres stored in `data/db`, so it runs with no setup.
+
+**Speed.** A hosted database is a network round trip away, so TicketForge keeps round trips down:
+- each statement goes to Postgres in one message, together with the row-level security settings and the commit;
+- the signed-in user is remembered for 15 seconds (cleared at once when users, roles or sessions change);
+- a save writes all changed issues in one statement and only reads the issues it changes;
+- the schema check on start is one message.
+
+Pick the Supabase region closest to you and your server. To see what a request costs, start the server with
+`TICKETFORGE_SQL_LOG=1`: each statement is logged with its time.
 
 ## Generation rules (team standard)
 

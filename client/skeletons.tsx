@@ -105,6 +105,8 @@ const VIEW_SKELETONS: Record<string, () => React.ReactNode> = {
   summary: () => <><HeaderSk buttons={0} /><CardsSk cards={5} /></>,
   reports: () => <><HeaderSk buttons={0} /><CardsSk cards={4} /></>,
   epics: () => <><HeaderSk buttons={1} /><TableSkeleton rows={5} cols={4} lead="square" /></>,
+  timeline: () => <><HeaderSk buttons={2} /><ToolbarSk filters={0} /><div className="sk-tl">{range(6).map((i) => (
+    <div key={i} className="sk-tl-row"><Sk w={w(i, 60)} h={12} style={{ maxWidth: 220 }} /><Sk h={22} r={6} style={{ marginLeft: `${8 + (i * 9) % 40}%`, width: `${18 + (i * 7) % 25}%` }} /></div>))}</div></>,
   tests: () => <><HeaderSk buttons={1} /><TilesSk /><ToolbarSk /><TableSkeleton rows={7} cols={5} lead="none" /></>,
   automation: () => <><HeaderSk buttons={1} /><TilesSk /><ToolbarSk filters={1} /><TableSkeleton rows={6} cols={4} lead="none" /></>,
   source: DocSk,
@@ -120,7 +122,7 @@ function SidebarSk() {
     <div className={`side-wrap ${S.sideCollapsed ? 'is-collapsed' : ''}`}>
     <nav className="sidebar" aria-hidden="true">
       <div className="proj-head"><Sk w={32} h={32} r={4} /><div className="sk-stack" style={{ gap: 6 }}><Sk w="75%" h={12} /><Sk w="50%" h={10} /></div></div>
-      {[5, 2, 1].map((n, g) => (
+      {[6, 2, 1].map((n, g) => (
         <div key={g}><Sk w={64} h={8} style={{ margin: '18px 10px 10px' }} />
           {range(n).map((i) => <div key={i} className="side-item" style={{ pointerEvents: 'none' }}><Sk w={16} h={16} r={4} /><Sk className="side-text" w={w(i + g * 2, 45)} h={12} style={{ maxWidth: 120 }} /></div>)}
         </div>
