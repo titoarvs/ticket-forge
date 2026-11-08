@@ -334,7 +334,7 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
           <label className="field"><span>Covers AC #</span><TF disabled={!edit} key={(tc.acRef || []).join(',')} defaultValue={(tc.acRef || []).join(', ')} placeholder="e.g. 1, 3"
             onBlur={(ev) => set('acRef', ev.target.value.split(/[,\s]+/).map((s) => Number(s.replace(/\D/g, ''))).filter((n) => n > 0))} /></label>
           <label className="field"><span>Run as</span>
-            <SF disabled={!edit} value={tc.roleId || ''} displayEmpty onChange={(ev) => set('roleId', ev.target.value || null)}>
+            <SF disabled={!edit} value={tc.roleId || ''} onChange={(ev) => set('roleId', ev.target.value || null)}>
               <MenuItem value="">Not signed in</MenuItem>
               {(P().automation?.app?.roles || []).filter((r: Any) => r.name).map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}
               {tc.roleId && !(P().automation?.app?.roles || []).some((r: Any) => r.id === tc.roleId) && <MenuItem value={tc.roleId}>Removed role</MenuItem>}

@@ -86,15 +86,21 @@ export function AppSetup() {
       <div className="as-sec">
         <button type="button" className={`as-h ${open.login ? '' : 'closed'}`} onClick={() => toggle('login')}>
           <Ico svg={I.chevron} /><b>Login form</b>
-          <span className="muted small">{loginSet ? 'Custom settings' : 'Found automatically. Change it only if signing in fails'}</span></button>
+          <span className="muted small">{loginSet ? `Login page ${a.login?.path || 'found automatically'}${['usernameField', 'passwordField', 'submitButton', 'success'].some((k) => a.login?.[k]) ? ' · custom fields' : ''}` : 'Found automatically. Change it only if signing in fails'}</span></button>
         {open.login && <div className="as-body">
+          <LoginFinder base={base} canEdit={canEdit} current={a.login?.path || ''} />
           <div className="grid2">
-            {([['path', 'Login page', '/login'], ['success', 'Signed in when… (a path like /dashboard, or text on the page)', 'Leaves the login page'],
-              ['usernameField', 'Username field (label or CSS selector)', 'Found automatically'], ['passwordField', 'Password field (label or CSS selector)', 'The password input'],
-              ['submitButton', 'Sign-in button (text or CSS selector)', 'Sign in / Log in button']] as [string, string, string][]).map(([k, label, ph]) => (
-              <label key={k} className="field"><span>{label}</span>
-                <TF disabled={!canEdit} value={a.login?.[k] || ''} placeholder={ph} spellCheck={false} onChange={(e) => edit((x) => { x.login = { ...(x.login || {}), [k]: e.target.value }; }, `login${k}`)} /></label>
-            ))}
+            {([['path', 'Login page', 'Found automatically (/login, /sign-in…)'], ['success', 'Signed in when… (a path like /dashboard, or text on the page)', 'Leaves the login page'],
+              ['usernameField', 'Username field: its label or a CSS selector (not the email)', 'Found automatically, e.g. Email'], ['passwordField', 'Password field: its label or a CSS selector', 'The password input'],
+              ['submitButton', 'Sign-in button: its text or a CSS selector', 'Sign in / Log in button']] as [string, string, string][]).map(([k, label, ph]) => {
+              const v = String(a.login?.[k] || '').trim();
+              const misplaced = k !== 'path' && k !== 'success' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+              return <label key={k} className="field"><span>{label}</span>
+                <TF disabled={!canEdit} value={a.login?.[k] || ''} placeholder={ph} spellCheck={false} error={misplaced} onChange={(e) => edit((x) => { x.login = { ...(x.login || {}), [k]: e.target.value }; }, `login${k}`)} />
+                {misplaced && <span className="field-warn"><Ico svg={I.warn} />This looks like an email address. This box is for the field’s label (like “Email”), and it’s ignored when signing in. Put the address in the role’s <b>Username</b> under Roles &amp; logins.
+                  {canEdit && <button type="button" className="link-btn" onClick={(e) => { e.preventDefault(); edit((x) => { x.login = { ...(x.login || {}), [k]: '' }; }); }}>Clear it</button>}</span>}
+              </label>;
+            })}
           </div>
         </div>}
       </div>
@@ -167,6 +173,7 @@ function RoleRow({ r, i, canEdit }: { r: Any; i: number; canEdit: boolean }) {
             {result.screenshot && <a href={`${result.screenshot}?t=${Date.now()}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto' }}><Ico svg={I.external} /> Screenshot</a>}</div>
         : <div className="warn-banner danger"><Ico svg={I.warn} /><span>{result.error}{result.url ? <> (on <code>{(() => { try { return new URL(result.url).pathname; } catch { return result.url; } })()}</code>)</> : ''}. Check the username and password, or the <b>Login form</b> settings.</span>
             {result.screenshot && <a href={`${result.screenshot}?t=${Date.now()}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}><Ico svg={I.external} /> Screenshot</a>}</div>}
+      {result.notes?.length > 0 && <ul className="login-notes small">{result.notes.map((n: string, i: number) => <li key={i}><Ico svg={I.warn} />{n}</li>)}</ul>}
     </td></tr>}
   </>;
 }
@@ -202,7 +209,7 @@ function DiscoverModal() {
       <p style={{ marginTop: 0 }}>TicketForge opens <b>{p.automation.baseUrl}</b> and follows its links (up to 30 pages). It only follows links: it doesn’t click buttons or submit forms, and it skips links that look like logging out or deleting.</p>
       <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'nowrap' }}>
         <label className="field" style={{ margin: 0, flex: 1 }}><span>Explore as</span>
-          <SF value={role} onChange={(e) => setRole(e.target.value)} displayEmpty>
+          <SF value={role} onChange={(e) => setRole(e.target.value)}>
             <MenuItem value="">Not signed in</MenuItem>
             {roles.map((r: Any) => <MenuItem key={r.id} value={r.name}>{r.name}</MenuItem>)}
           </SF></label>
@@ -351,5 +358,39 @@ function RoutesModal({ scan }: { scan: Any }) {
       {d.kept.length > 0 && <details style={{ marginTop: 12 }}><summary className="small muted">{d.kept.length} route{d.kept.length === 1 ? '' : 's'} already in the pages</summary>
         <div className="discover-list">{d.kept.map((r: Any) => <div key={r.path} className="check"><b>{r.name}</b><code>{r.path}</code></div>)}</div></details>}
     </Modal>
+  );
+}
+
+/** Opens the app in the test browser and finds its login form (nothing is typed or submitted). */
+function LoginFinder({ base, canEdit, current }: { base: string; canEdit: boolean; current: string }) {
+  const p = P();
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<Any>(null);
+  const run = async () => {
+    setBusy(true); setRes(null);
+    try { await saveNow(); setRes({ ok: true, ...(await api(`/api/projects/${p.id}/login-detect`, { method: 'POST' })) }); }
+    catch (e: Any) { setRes({ ok: false, error: e.message }); } finally { setBusy(false); }
+  };
+  const use = () => { edit((x) => { x.login = { ...(x.login || {}), path: res.path }; }); toast(`Login page set to ${res.path}`); };
+  const f = res?.fields || {};
+  const row = (label: string, v: Any) => v && <li><span className="muted">{label}</span> <b>{v.label || '—'}</b> <code>{v.selector}</code></li>;
+  return (
+    <div className="login-find">
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn sm" disabled={busy || !base || !can('test.run')} onClick={run} title={!base ? 'Set the application URL first' : 'Opens the app and looks for its login form. Nothing is typed or submitted.'}>
+          {busy ? <><Spinner />Looking for the login form…</> : <><Ico svg={I.search} />Find login form</>}</button>
+        <span className="muted small">{base ? <>Looks on <b>{base}</b> for a page with a password field: the login-looking pages above first, then /login, /sign-in, /sign-in/manual and other usual addresses.</> : 'Set the application URL first.'}</span>
+      </div>
+      {res && (res.ok ? <div className="login-find-res ok">
+        {res.screenshot && <a href={res.screenshot} target="_blank" rel="noopener noreferrer"><img src={`${res.screenshot}?t=${Date.now()}`} alt="The login form" /></a>}
+        <div>
+          <p style={{ margin: '0 0 6px' }}><Ico svg={I.check} /> Found the login form at <b>{res.path}</b>{res.tried?.length > 1 ? <span className="muted small"> (after trying {res.tried.slice(0, -1).join(', ')})</span> : null}</p>
+          <ul className="small">{row('Username field', f.user)}{row('Password field', f.pass)}{row('Sign-in button', f.submit)}</ul>
+          {canEdit && (current === res.path ? <span className="muted small">This is the login page in use.</span>
+            : <button className="btn sm primary" onClick={use}>Use {res.path} as the login page</button>)}
+          <p className="muted small" style={{ margin: '6px 0 0' }}>The fields and button are found the same way when signing in, so you don’t need to fill them in below.</p>
+        </div>
+      </div> : <div className="login-find-res err"><Ico svg={I.warn} /><span>{res.error}</span></div>)}
+    </div>
   );
 }

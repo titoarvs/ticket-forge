@@ -98,15 +98,19 @@ export function TA(props: Any) {
 
 /** Dropdown (MUI Select). Children are <MenuItem>s; an item with value "" acts as the placeholder/None. */
 export function SF({ children, placeholder, className, ...props }: Any) {
-  const { rest, html, sx } = split(props);
+  // Select-only options go to the Select, never onto the TextField's root element (React warns about unknown
+  // DOM props like displayEmpty). Empty values always show, so displayEmpty is on for every dropdown.
+  const { displayEmpty: _de, renderValue, MenuProps, multiple, open, onOpen, onClose, autoWidth, ...own } = props;
+  const { rest, html, sx } = split(own);
   return (
     <TextField select {...rest} className={className} sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
       slotProps={{
         htmlInput: html,
         select: {
           displayEmpty: true,
-          MenuProps: { slotProps: { paper: { sx: { maxHeight: 360 } } } },
-          renderValue: placeholder ? (v: Any) => (v === '' || v == null ? <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>{placeholder}</span> : undefined) : undefined,
+          MenuProps: { ...(MenuProps || {}), slotProps: { paper: { sx: { maxHeight: 360 } }, ...(MenuProps?.slotProps || {}) } },
+          renderValue: renderValue || (placeholder ? (v: Any) => (v === '' || v == null ? <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>{placeholder}</span> : undefined) : undefined),
+          ...(multiple !== undefined && { multiple }), ...(open !== undefined && { open }), ...(onOpen && { onOpen }), ...(onClose && { onClose }), ...(autoWidth !== undefined && { autoWidth }),
         },
       }}>
       {children}

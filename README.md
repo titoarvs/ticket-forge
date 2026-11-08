@@ -365,8 +365,13 @@ Under **Test automation → App setup**, describe the app under test once per pr
   Astro, React Router, Vue Router, Angular, Laravel, Django and Rails. Rescans show new routes and pages that
   left the code, and the Test automation page checks for changes when you open it. Private repositories need
   the `gh` CLI signed in on the server, or a GitHub token saved for the project (stored encrypted).
-- **Login form:** found automatically. Set the login page, field labels, button text or a "signed in when"
-  check only if signing in fails.
+- **Login form:** found automatically. Without a login page set, TicketForge looks for a page with a password
+  field: login-looking pages from the App setup first (a code scan lists them, e.g. `/sign-in/manual`), then
+  `/login`, `/sign-in`, `/signin`, `/sign-in/manual`, `/auth/login` and other usual addresses. It waits for forms
+  that appear after the page loads, and clicks the submit button of the password's own form (not "Sign in with
+  Google"). **Find login form** shows what it found (page, fields, button, screenshot) without typing anything,
+  and sets that page with one click. You can still set the login page, field labels, button text or a "signed
+  in when" check yourself.
 - **Notes for the AI:** test data and conventions, for example "use the product Test Mug".
 
 Each test case has a **Run as** role. Scripts read like this:
