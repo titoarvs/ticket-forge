@@ -2,12 +2,13 @@
 // Actions (Claude, automation, pull requests, sprints, exports) and the dialogs that go with them.
 import { useState, type ReactNode } from 'react';
 import {
-  S, emit, api, aiBody, readNdjson, toast, withBusy, setBusy, openModal, closeModal, mutate, saveNow, store, pullRemote, loadNotifs,
+  S, emit, api, aiBody, useStore, ago, readNdjson, toast, withBusy, setBusy, openModal, closeModal, mutate, saveNow, store, pullRemote, loadNotifs,
   P, ticket, epic, isSub, childrenOf, epicTickets, activeSprint, openSprints, tcKey, spSum, isDone, me, can, peopleNames,
   uid, clone, nowIso, dateInput, COLORS, TYPES, PRIORITIES, nextTicketKey, nextEpicKey, newTicket, withIds, applyAi,
   addMember, logEvent, setField, addLink, deleteIssues, canMove, moveError, type Any,
 } from './core';
-import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea } from './ui';
+import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea, Spinner } from './ui';
+import { refreshStatus, aiInactive } from './AppShell';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 export const findTc = (tid: string, tcid: string) => { const t = ticket(tid); return { t, tc: t?.testCases.find((x: Any) => x.id === tcid) }; };
@@ -544,8 +545,18 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
 // ---------------------------------------------------------------- AI connection
 /** Which AI this address uses. On your own computer you can also pick the Claude model. */
 export function AiSettingsModal() {
+  useStore(); // follow the status while the dialog is open
   const st = S.status || {};
   const [model, setModel] = useState(S.settings.model || '');
+  const [busy, setBusy] = useState('');
+  const inactive = aiInactive(S.status);
+  const refresh = async () => { setBusy('refresh'); await refreshStatus(0, true); setBusy(''); toast(aiInactive(S.status) ? 'Checked again: the AI is still inactive' : 'Checked again: the AI is ready'); };
+  // Administrators: forget the usage-limit pauses and use the main AI again right away.
+  const retryMain = async () => {
+    setBusy('retry');
+    try { await api('/api/admin/ai', { method: 'POST', body: { action: 'reset' } }); } catch (e: Any) { toast(e.message, 'err'); }
+    await refreshStatus(0, true); setBusy('');
+  };
   const account = st.mode === 'account';
   const models = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'];
   const admin = can('users.manage');
@@ -554,8 +565,15 @@ export function AiSettingsModal() {
     <Modal title="AI connection" actions={account
       ? [{ label: 'Cancel' }, { label: 'Save', kind: 'primary', onClick: () => { S.settings = { ...S.settings, provider: '', model: model.trim() }; store.set('tf.settings', S.settings); closeModal(); } }]
       : [{ label: 'Close' }]}>
+      <div className={`ai-check ${inactive ? 'inactive' : ''}`}>
+        <span className="small">{!S.status ? 'Not checked yet.' : inactive ? (st.ready ? <><b>On a backup:</b> the main AI is limited right now.</> : <><b>The AI is inactive.</b> Fix the cause below, then check again.</>) : <><b>Ready.</b></>}
+          {S.statusAt ? <span className="muted"> Checked {ago(new Date(S.statusAt).toISOString())}.</span> : null}</span>
+        <span className="spacer" />
+        {inactive && admin && st.switched && <button className="btn sm" disabled={!!busy} onClick={retryMain} title="Clear the usage-limit pause and use the main AI again">{busy === 'retry' ? <><Spinner />Retrying…</> : 'Try the main AI again'}</button>}
+        <button className={`btn sm ${inactive ? 'primary' : ''}`} disabled={!!busy || S.statusBusy} onClick={refresh}>{busy === 'refresh' ? <><Spinner />Checking…</> : <><Ico svg={I.refresh} />Refresh</>}</button>
+      </div>
       <div className="row small" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', marginBottom: 12 }}>
-        <span className={`dot ${st.ready ? 'ok' : 'bad'}`} style={{ marginTop: 5 }} />
+        <span className={`dot ${st.ready ? (st.switched ? 'warn' : 'ok') : 'bad'}`} style={{ marginTop: 5 }} />
         <span>{account
           ? <><b>Your Claude account</b> through Claude Code on this computer{st.account?.subscriptionType ? ` (${st.account.subscriptionType})` : ''}.
               {st.account?.cooldown && <><br />It hit its usage limit (resets {new Date(st.account.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}){st.switched ? <>, so TicketForge is using <b>{st.label}</b> until then</> : ''}.</>}

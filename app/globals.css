@@ -1144,3 +1144,10 @@ a.set-stat:hover { background: var(--hover); }
 .rb-current { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: var(--radius); background: var(--bg-sunken); }
 .rb-current .spacer { flex: 1; }
 .rb-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.ai-check { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; margin: -4px 0 14px; border-radius: var(--radius); background: var(--bg-sunken); }
+.ai-check.inactive { background: var(--warning-bg); }
+.ai-check .spacer { flex: 1; }
+.conn-refresh { margin-left: -6px; color: var(--warning); }
+.ico.spin svg, .spin > svg { animation: tf-spin .9s linear infinite; }
+@keyframes tf-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ico.spin svg { animation: none; } }

@@ -36,17 +36,21 @@ export async function bootSession() {
  * yet, it tries again shortly (3 s, 10 s, 30 s) instead of leaving the pill empty until the next poll.
  */
 let statusRetry: Any = null;
-export async function refreshStatus(attempt = 0) {
+export async function refreshStatus(attempt = 0, fresh = false) {
   clearTimeout(statusRetry);
+  if (fresh) { S.statusBusy = true; emit(); }
   try {
-    S.status = await api('/api/status');
+    // fresh: the server checks the Claude sign-in and AI settings again instead of answering from its cache.
+    S.status = await api(`/api/status${fresh ? '?fresh=1' : ''}`);
     S.statusError = null; S.statusAt = Date.now();
   } catch (e: Any) {
     S.statusError = e?.message || 'Couldn’t check the AI connection';
     if (!S.status && attempt < 3) statusRetry = setTimeout(() => refreshStatus(attempt + 1), [3000, 10000, 30000][attempt]);
-  }
+  } finally { S.statusBusy = false; }
   emit();
 }
+/** The AI can't be used right now, or is on a backup because the main one is limited. */
+export const aiInactive = (st: Any) => !st || !st.ready || Boolean(st.switched);
 
 function connInfo() {
   const st = S.status;
@@ -91,6 +95,8 @@ function TopNav() {
         title={'unknown' in c ? (S.statusError ? `Couldn’t check the AI connection (${S.statusError}). Retrying.` : 'Checking the AI connection…') : c.switched ? 'Your main AI is limited right now, so TicketForge switched to a backup' : 'AI connection'}>
         <span className={`dot ${'unknown' in c ? 'pending' : c.ok ? (c.switched ? 'warn' : 'ok') : 'bad'}`} />{c.label}{c.model ? ` · ${c.model}` : ''}{c.switched ? ' · backup' : ''}
       </button>
+      {aiInactive(S.status) && <button className="icon-btn conn-refresh" onClick={() => refreshStatus(0, true)} disabled={S.statusBusy}
+        title="Check the AI connection again" aria-label="Check the AI connection again"><Ico svg={I.refresh} className={S.statusBusy ? 'spin' : ''} /></button>}
       <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /></button>}>
         <div className="acct"><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div><hr />
         {can('users.manage') && <>
