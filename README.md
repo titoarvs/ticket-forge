@@ -384,6 +384,11 @@ The Settings tab and each run say which browser is in use. Writing scripts uses 
 works, and the AI APIs connected in Administration → AI when it isn't installed, isn't signed in, its sign-in
 expired, or it hit its usage limit (Administration → AI, on by default).
 
+**AI connection** (the pill in the top bar): when the AI is inactive (not set up, not signed in, or on a backup
+because the main one is limited), a refresh icon appears next to it. The dialog shows when it was last checked and
+has **Refresh**, which checks again right away (the Claude sign-in and the AI settings, skipping the caches);
+administrators also get **Try the main AI again**, which clears the usage-limit pause.
+
 ### App setup: pages, roles and logins
 
 Under **Test automation → App setup**, describe the app under test once per project:
