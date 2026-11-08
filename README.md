@@ -51,9 +51,23 @@ TicketForge picks how it talks to AI from the address you open it on:
   Pick the model (`opus`, `sonnet`, `haiku` or a full ID) in the connection pill at the top right.
 - **Anywhere else** (Vercel, a server, your own domain): an **AI API**, Anthropic or any OpenAI-compatible
   one. The easiest way to set it up is **Administration → AI → Set up an AI API**:
-  1. Pick the provider and paste the API key.
+  1. Click **Add provider**, pick the provider and paste the API key.
   2. Click **Load models** and choose one.
-  3. Click **Test these settings**, then **Save**.
+  3. Click **Test**, then **Add provider**.
+
+  **Add several providers to never get stuck.** TicketForge uses the first one that's available. When it hits
+  a rate limit, runs out of credits or quota, is overloaded or fails, TicketForge switches to the next one
+  for that request. It leaves the limited one alone for a while (its "retry after" time when it gives one,
+  otherwise 1 minute for rate limits and 1 hour for credits), then tries it again. Switches show up in the
+  generation log, and the top-right pill says **backup** while a backup is in use. In the list you can:
+  - reorder with the arrows or **Use first**
+  - turn a provider on or off
+  - **Test** each one
+  - **Retry now** to clear a cooldown
+
+  On your own computer, when your **Claude account hits its usage limit** (or isn't signed in), TicketForge
+  switches to these providers until it resets. Untick that option in the panel to turn it off.
+
 
   The key is stored encrypted (AES-256-GCM) in the database and never shown again; only its last 4
   characters are. Saved settings apply to every copy that uses the database (your computer and Vercel

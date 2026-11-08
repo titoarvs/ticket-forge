@@ -572,3 +572,17 @@ a.side-item:hover, a.brand:hover, a.navlink:hover { text-decoration: none; }
 .model-list .label-chip:hover { background: var(--selected-bg); color: var(--selected-text); }
 .btn.danger-text { color: var(--danger); }
 .btn.danger-text:hover { background: var(--danger-bg); }
+.prov-list { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.prov { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.prov:last-child { border-bottom: 0; }
+.prov.active { background: var(--selected-bg); }
+.prov.off .prov-info { opacity: .6; }
+.prov-main { display: flex; align-items: center; gap: 12px; }
+.prov-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--bg-neutral); color: var(--text-subtle); font-size: 12px; font-weight: 600; }
+.prov.active .prov-n { background: var(--brand); color: var(--brand-text); }
+.prov-info { flex: 1; min-width: 0; }
+.prov-info code { font-size: 12px; }
+.prov-actions { display: flex; align-items: center; gap: 4px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.prov-actions .check { margin: 0 4px; display: inline-flex; align-items: center; }
+.prov-actions .spinner { width: 12px; height: 12px; margin-right: 4px; }
+.dot.warn { background: #e2b203; }

@@ -33,11 +33,11 @@ export async function bootSession() {
 
 function connInfo() {
   const st = S.status;
-  if (!st) return { ok: false, label: 'AI', model: '' };
+  if (!st) return { ok: false, label: 'AI', model: '', switched: false };
   const ok = Boolean(st.ready);
-  const label = st.mode === 'account' ? 'Claude account' : st.api?.configured ? st.api.label : 'AI not set up';
-  const model = !ok ? '' : st.mode === 'account' ? (S.settings.model || st.model || '') : (st.model || '');
-  return { ok, label, model };
+  const label = st.label || 'AI';
+  const model = !ok ? '' : st.mode === 'account' && st.label === 'Claude account' ? (S.settings.model || st.model || '') : (st.model || '');
+  return { ok, label, model, switched: Boolean(st.switched) };
 }
 
 function TopNav() {
@@ -70,8 +70,8 @@ function TopNav() {
         )}
       </>}
       <Notifications />
-      <button className="conn" onClick={() => openModal(<AiSettingsModal />)} title="AI connection">
-        <span className={`dot ${S.status ? (c.ok ? 'ok' : 'bad') : ''}`} />{c.label}{c.model ? ` · ${c.model}` : ''}
+      <button className="conn" onClick={() => openModal(<AiSettingsModal />)} title={c.switched ? 'Your main AI is limited right now, so TicketForge switched to a backup' : 'AI connection'}>
+        <span className={`dot ${S.status ? (c.ok ? (c.switched ? 'warn' : 'ok') : 'bad') : ''}`} />{c.label}{c.model ? ` · ${c.model}` : ''}{c.switched ? ' · backup' : ''}
       </button>
       <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /></button>}>
         <div className="acct"><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div><hr />
@@ -171,11 +171,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
     };
     const onUnload = () => { if (P() && S.saveTimer) saveNow(); };
     const poll = setInterval(() => { if (document.visibilityState === 'visible') loadNotifs(); }, 30000);
+    // Keep the AI pill current (e.g. when TicketForge switches to a backup provider).
+    const statusPoll = setInterval(() => { if (document.visibilityState === 'visible' && S.user) api('/api/status').then((st) => { S.status = st; emit(); }).catch(() => {}); }, 60000);
     const onFocus = () => loadNotifs();
     window.addEventListener('focus', onFocus);
     document.addEventListener('keydown', onKey);
     window.addEventListener('beforeunload', onUnload);
-    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('beforeunload', onUnload); window.removeEventListener('focus', onFocus); clearInterval(poll); };
+    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('beforeunload', onUnload); window.removeEventListener('focus', onFocus); clearInterval(poll); clearInterval(statusPoll); };
   }, []);
 
   if (S.bootError) return <main id="app"><div className="page"><ServerDown /></div><Toasts /></main>;

@@ -548,9 +548,11 @@ export function AiSettingsModal() {
         <span className={`dot ${st.ready ? 'ok' : 'bad'}`} style={{ marginTop: 5 }} />
         <span>{account
           ? <><b>Your Claude account</b> through Claude Code on this computer{st.account?.subscriptionType ? ` (${st.account.subscriptionType})` : ''}.
+              {st.account?.cooldown && <><br />It hit its usage limit (resets {new Date(st.account.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}){st.switched ? <>, so TicketForge is using <b>{st.label}</b> until then</> : ''}.</>}
               {!st.ready && <><br />{st.account?.cli?.available ? <>Claude Code isn’t signed in: run <code>claude</code> in a terminal and sign in.</> : <>Claude Code isn’t installed: run <code>npm install -g @anthropic-ai/claude-code</code>, then <code>claude</code> to sign in.</>}</>}</>
-          : st.api?.configured
-            ? <><b>{st.api.label}</b> API, model <code>{st.api.model}</code>.</>
+          : st.ready
+            ? <><b>{st.label}</b>{st.model ? <>, model <code>{st.model}</code></> : ''}{st.switched ? ' (a backup: the first provider is limited right now)' : ''}.
+                {st.backups > 0 && <> {st.backups} more provider{st.backups > 1 ? 's' : ''} on standby.</>}</>
             : <><b>No AI API is set up</b> for this address.{admin ? <> Set it up in {goAdmin}.</> : ' Ask an administrator to set it up.'}</>}
           <br /><span className="muted">{account ? 'Used because you opened TicketForge on this computer (localhost).' : 'Used because TicketForge was opened on a web address. On your own computer it uses your Claude account instead.'}</span></span>
       </div>

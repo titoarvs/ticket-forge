@@ -275,7 +275,7 @@ const ENV_MISSING: Record<string, string> = { provider: 'AI_PROVIDER', key: 'AI_
 const join = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
 
 function TestResult({ t, onPick }: { t: Any; onPick?: (m: string) => void }) {
-  if (t.ok) return <div className="ok-banner"><Ico svg={I.check} /><span>Connected. The AI replied “{t.reply}” in {(t.ms / 1000).toFixed(1)} s.</span></div>;
+  if (t.ok) return <div className="ok-banner"><Ico svg={I.check} /><span>Connected{t.used ? <> using <b>{t.used}</b></> : ''}. The AI replied “{t.reply}” in {(t.ms / 1000).toFixed(1)} s.</span></div>;
   return (
     <div className="test-fail">
       <div className="warn-banner danger"><Ico svg={I.warn} /><span>{t.error}</span></div>
@@ -285,32 +285,29 @@ function TestResult({ t, onPick }: { t: Any; onPick?: (m: string) => void }) {
 }
 function ModelList({ models, onPick }: { models: string[]; onPick?: (m: string) => void }) {
   return <>
-    <p className="small" style={{ margin: '12px 0 6px' }}>{models.length} models your key can use{onPick ? '. Click one to use it' : ''}:</p>
+    <p className="small" style={{ margin: '12px 0 6px' }}>{models.length} models this key can use{onPick ? '. Click one to use it' : ''}:</p>
     <div className="model-list">{models.map((m) => <button key={m} type="button" className="label-chip" onClick={() => (onPick ? onPick(m) : copyText(m))}>{m}</button>)}</div>
   </>;
 }
 
-/** The AI API setup form: provider, key, model and endpoint, saved encrypted on the server. */
-function ApiSetup({ c }: { c: Any }) {
-  const saved = c.settings;
-  const env = c.api?.source === 'env' && c.api?.id ? c.api : null;
+/** Add or edit one AI provider. The key is saved encrypted and never shown again. */
+function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
+  const saved = entry ? (c.settings?.providers || []).find((x: Any) => x.id === entry.entryId) : null;
   const [f, setF] = useState(() => ({ provider: saved?.provider || 'anthropic', model: saved?.model || '', baseUrl: saved?.baseUrl || '', apiKey: '' }));
   const [busy, setBusy] = useState('');
   const [result, setResult] = useState<Any>(null);
   const [models, setModels] = useState<string[]>([]);
-  const [showEnv, setShowEnv] = useState(false);
   const p = c.providers.find((x: Any) => x.id === f.provider) || {};
   const set = (k: string, v: string) => { setF((x) => ({ ...x, [k]: v })); setResult(null); };
-  const pickProvider = (v: string) => { setF((x) => ({ ...x, provider: v, model: '', baseUrl: '', apiKey: '' })); setModels([]); setResult(null); };
-  // A saved key is reused only for the same provider and endpoint (it's never sent anywhere else).
+  const pickProvider = (v: string) => { setF({ provider: v, model: '', baseUrl: '', apiKey: '' }); setModels([]); setResult(null); };
+  // The saved key is reused only for the same provider and endpoint, so it's never sent to a different service.
   const keepsKey = Boolean(saved?.hasKey && saved.provider === f.provider && (saved.baseUrl || '') === f.baseUrl.trim().replace(/\/+$/, ''));
   const keyOptional = f.provider === 'ollama' || f.provider === 'custom';
   const needsUrl = f.provider === 'custom';
   const [advanced, setAdvanced] = useState(Boolean(saved?.baseUrl) && !needsUrl);
   const showUrl = needsUrl || f.provider === 'ollama' || advanced;
-  const dirty = !saved || saved.provider !== f.provider || (saved.model || '') !== f.model.trim() || (saved.baseUrl || '') !== f.baseUrl.trim().replace(/\/+$/, '') || Boolean(f.apiKey.trim());
   const canSave = Boolean(f.provider && (f.model.trim() || p.model) && (!needsUrl || f.baseUrl.trim()) && (keyOptional || keepsKey || f.apiKey.trim()));
-  const draft = { provider: f.provider, model: f.model.trim(), baseUrl: f.baseUrl.trim(), apiKey: f.apiKey.trim() };
+  const draft = { id: saved?.id, provider: f.provider, model: f.model.trim(), baseUrl: f.baseUrl.trim(), apiKey: f.apiKey.trim() };
   const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); try { await fn(); } catch (e: Any) { setResult({ ok: false, error: e.message }); } finally { setBusy(''); } };
   const loadModels = () => run('models', async () => {
     const r = await api('/api/admin/ai', { method: 'POST', body: { action: 'models', draft } });
@@ -319,33 +316,25 @@ function ApiSetup({ c }: { c: Any }) {
   });
   const test = () => run('test', async () => setResult(await api('/api/admin/ai', { method: 'POST', body: { action: 'test', draft } })));
   const save = () => run('save', async () => {
-    const st = await api('/api/admin/ai', { method: 'PUT', body: draft });
-    applyAi(st); setF((x) => ({ ...x, apiKey: '' })); setResult(null);
-    toast(`Saved. ${st.api?.label || 'The AI API'} is set up${st.mode === 'account' ? ' for when TicketForge isn’t opened on this computer' : ''}.`);
+    applyAi(await api('/api/admin/ai', { method: 'PUT', body: draft }));
+    closeModal();
+    toast(saved ? `${p.label} updated` : `${p.label} added`);
   });
-  const remove = () => openModal(<Confirm title="Remove the saved AI setup?" label="Remove"
-    text={<>The saved provider, model and API key are deleted. {env ? <>TicketForge falls back to the environment variables ({env.label}).</> : 'AI won’t work outside your own computer until someone sets it up again.'}</>}
-    onYes={() => run('remove', async () => { const st = await api('/api/admin/ai', { method: 'DELETE' }); applyAi(st); setF({ provider: 'anthropic', model: '', baseUrl: '', apiKey: '' }); setModels([]); toast('AI setup removed'); })} />);
-
   return (
-    <div className="card wide"><h3>Set up an AI API</h3>
-      <p className="sub">Used whenever TicketForge isn’t opened on localhost, for example on Vercel. Saved settings apply to every copy that
-        uses this database, and take priority over environment variables. The key is stored encrypted and never shown again.</p>
-      {saved && <p className="small muted" style={{ marginTop: -8 }}><Ico svg={I.check} /> Saved{saved.updatedBy ? ` by ${saved.updatedBy}` : ''}{saved.updatedAt ? ` ${ago(saved.updatedAt)}` : ''}.</p>}
-      {!saved && env && <div className="warn-banner" style={{ background: 'var(--selected-bg)', color: 'var(--text-subtle)' }}><Ico svg={I.settings} />
-        <span>Currently set with environment variables: <b>{env.label}</b>{env.model ? <>, model <code>{env.model}</code></> : ''}. Saving here overrides them.</span></div>}
-
+    <Modal title={saved ? `Edit ${p.label || 'provider'}` : 'Add an AI provider'} wide
+      left={<button className="btn" disabled={!!busy || !canSave} onClick={test}>{busy === 'test' ? <><Spinner />Testing…</> : 'Test'}</button>}
+      actions={[{ label: 'Cancel' }, { label: busy === 'save' ? 'Saving…' : saved ? 'Save' : 'Add provider', kind: 'primary', disabled: !!busy || !canSave, onClick: save }]}>
       <div className="grid2">
         <label className="field"><span>Provider</span>
           <SF value={f.provider} onChange={(e) => pickProvider(e.target.value)}>{c.providers.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.label}</MenuItem>)}</SF></label>
         <label className="field"><span>API key{keyOptional ? ' (optional)' : ''}</span>
           <TF type="password" value={f.apiKey} onChange={(e) => set('apiKey', e.target.value)} autoComplete="off"
-            placeholder={keepsKey ? `Saved, ends with ${saved.keyHint}. Leave blank to keep it` : p.site ? `Paste your key from ${p.site}` : 'Paste your API key'} />
-        </label>
+            placeholder={keepsKey ? `Saved, ends with ${saved.keyHint}. Leave blank to keep it` : p.site ? `Paste your key from ${p.site}` : 'Paste your API key'} /></label>
       </div>
-      {showUrl && <label className="field"><span>Endpoint URL{needsUrl ? '' : ' (optional)'}</span>
+      {showUrl ? <label className="field"><span>Endpoint URL{needsUrl ? '' : ' (optional)'}</span>
         <TF value={f.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder={p.base || 'https://your-endpoint.example.com/v1'} spellCheck={false} />
-        {!needsUrl && <span className="muted small" style={{ fontWeight: 400 }}>Leave blank for {p.base || 'the default'}.</span>}</label>}
+        {!needsUrl && <span className="muted small" style={{ fontWeight: 400 }}>Leave blank for {p.base || 'the default'}.</span>}</label>
+        : <p className="small" style={{ margin: '-4px 0 12px' }}><a href="#" onClick={(e) => { e.preventDefault(); setAdvanced(true); }}>Use a custom endpoint</a></p>}
       <div className="field"><span>Model</span>
         <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'stretch' }}>
           <PeopleF avatars={false} value={f.model} onChange={(v) => set('model', v)} options={models} placeholder={p.model ? `${p.model} (default)` : 'Type a model name, or load the list'} />
@@ -354,20 +343,91 @@ function ApiSetup({ c }: { c: Any }) {
         </div>
       </div>
       {models.length > 0 && !result && <ModelList models={models} onPick={(m) => set('model', m)} />}
-
-      <div className="row" style={{ marginTop: 16 }}>
-        <button className="btn primary" disabled={!!busy || !canSave || !dirty} onClick={save}>{busy === 'save' ? <><Spinner />Saving…</> : 'Save'}</button>
-        <button className="btn" disabled={!!busy || !canSave} onClick={test}>{busy === 'test' ? <><Spinner />Testing…</> : 'Test these settings'}</button>
-        {!showUrl && <button type="button" className="btn subtle" onClick={() => setAdvanced(true)}>Custom endpoint</button>}
-        <div className="spacer" />
-        {saved && <button className="btn subtle danger-text" disabled={!!busy} onClick={remove}>Remove saved setup</button>}
-      </div>
       {result && <div style={{ marginTop: 12 }}><TestResult t={result} onPick={(m) => set('model', m)} /></div>}
+    </Modal>
+  );
+}
 
-      <p className="muted small" style={{ margin: '16px 0 0' }}>
-        <a href="#" onClick={(e) => { e.preventDefault(); setShowEnv(!showEnv); }}>{showEnv ? 'Hide' : 'Prefer environment variables?'}</a>
-        {showEnv && <> On Vercel: <b>Settings → Environment Variables</b>, then redeploy. Settings saved here take priority.</>}</p>
-      {showEnv && <pre className="code" style={{ marginTop: 8 }}>{envExample(c, f.provider)}</pre>}
+/** The AI APIs in priority order, with their health and the controls to reorder, switch and test them. */
+function ProvidersCard({ c }: { c: Any }) {
+  const [busy, setBusy] = useState('');
+  const [tests, setTests] = useState<Record<string, Any>>({});
+  const list: Any[] = c.apis || [];
+  const panel = list.filter((x) => x.source === 'panel');
+  const run = async (key: string, fn: () => Promise<void>) => { setBusy(key); try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
+  const patch = (b: Any) => api('/api/admin/ai', { method: 'PATCH', body: b }).then(applyAi);
+  const move = (id: string, to: number) => run(`move:${id}`, async () => {
+    const ids = panel.map((x) => x.entryId).filter((x) => x !== id);
+    ids.splice(Math.max(0, Math.min(to, ids.length)), 0, id);
+    await patch({ order: ids });
+  });
+  const test = (x: Any) => run(`test:${x.entryId}`, async () => {
+    const r = await api('/api/admin/ai', { method: 'POST', body: { action: 'test', id: x.entryId } });
+    setTests((t) => ({ ...t, [x.entryId]: r }));
+    applyAi(await api('/api/admin/ai'));
+  });
+  const reset = (id?: string) => run(`reset:${id || 'all'}`, async () => applyAi(await api('/api/admin/ai', { method: 'POST', body: { action: 'reset', id } })));
+  const remove = (x: Any) => openModal(<Confirm title={`Remove ${x.label}?`} label="Remove"
+    text={<>{x.label}{x.model ? ` (${x.model})` : ''} and its saved API key are deleted. {list.length > 1 ? 'TicketForge keeps using the other providers.' : ''}</>}
+    onYes={() => run(`remove:${x.entryId}`, async () => { applyAi(await api(`/api/admin/ai?id=${encodeURIComponent(x.entryId)}`, { method: 'DELETE' })); toast(`${x.label} removed`); })} />);
+  const chip = (x: Any) => {
+    if (!x.enabled) return <span className="loz">Off</span>;
+    if (!x.configured) return <span className="loz t-fail" title={x.error || ''}>Incomplete</span>;
+    if (x.cooldown) return <span className="loz t-blocked" title={x.cooldown.message}>{x.cooldown.kind === 'credits' ? 'Out of credits' : x.cooldown.kind === 'auth' ? 'Key rejected' : 'Limited'} · retry {new Date(x.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>;
+    if (x.active) return <span className="loz t-pass">In use</span>;
+    return <span className="loz">Backup</span>;
+  };
+  const anyCooling = list.some((x) => x.cooldown) || c.account?.cooldown;
+  return (
+    <div className="card wide">
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}><h3>AI providers</h3>
+          <p className="sub" style={{ marginBottom: 12 }}>TicketForge uses the first provider that’s available. When one hits a rate limit, runs out of credits or fails, it
+            switches to the next one automatically and tries the first again later. Keys are stored encrypted and never shown again.</p></div>
+        <button className="btn primary" onClick={() => openModal(<ProviderModal c={c} />)}><Ico svg={I.plus} />Add provider</button>
+      </div>
+
+      {list.length ? <div className="prov-list">{list.map((x, i) => {
+        const isPanel = x.source === 'panel';
+        const pi = panel.findIndex((y) => y.entryId === x.entryId);
+        const t = tests[x.entryId];
+        return (
+          <div key={x.entryId} className={`prov ${x.active ? 'active' : ''} ${x.enabled ? '' : 'off'}`}>
+            <div className="prov-main">
+              <span className="prov-n" title="Priority">{i + 1}</span>
+              <div className="prov-info">
+                <div className="row" style={{ gap: 8 }}><b>{x.label}</b>{x.model && <code>{x.model}</code>}{chip(x)}</div>
+                <div className="muted small">{isPanel ? 'Set up in this panel' : 'From environment variables'}
+                  {x.kind === 'openai' && x.baseUrl ? ` · ${x.baseUrl}` : ''}
+                  {isPanel && (c.settings?.providers?.find((y: Any) => y.id === x.entryId)?.keyHint ? ` · key ends with ${c.settings.providers.find((y: Any) => y.id === x.entryId).keyHint}` : x.keySet ? '' : ' · no key')}
+                  {!x.configured && x.missing?.length ? ` · missing ${join(x.missing.map((m: string) => MISSING[m]))}` : ''}
+                  {x.cooldown && <> · {x.cooldown.reason}</>}</div>
+              </div>
+              <div className="prov-actions">
+                {x.cooldown && <button className="btn sm" disabled={!!busy} onClick={() => reset(x.entryId)} title="Clear the cooldown and use it again now">Retry now</button>}
+                <button className="btn sm subtle" disabled={!!busy || !x.configured} onClick={() => test(x)}>{busy === `test:${x.entryId}` ? <><Spinner />Testing</> : 'Test'}</button>
+                {isPanel && <>
+                  {pi > 0 && <button className="btn sm subtle" disabled={!!busy} onClick={() => move(x.entryId, 0)} title="Make this the provider TicketForge tries first">Use first</button>}
+                  <button className="icon-btn" disabled={!!busy || pi <= 0} onClick={() => move(x.entryId, pi - 1)} aria-label="Move up" title="Move up"><Ico svg={I.up} /></button>
+                  <button className="icon-btn" disabled={!!busy || pi >= panel.length - 1} onClick={() => move(x.entryId, pi + 1)} aria-label="Move down" title="Move down"><Ico svg={I.down} /></button>
+                  <label className="check small" title={x.enabled ? 'Turn off' : 'Turn on'}><CB checked={x.enabled} disabled={!!busy} onChange={(e: Any) => run(`toggle:${x.entryId}`, () => patch({ id: x.entryId, enabled: e.target.checked }))} />On</label>
+                  <button className="btn sm subtle" disabled={!!busy} onClick={() => openModal(<ProviderModal c={c} entry={x} />)}>Edit</button>
+                  <button className="icon-btn" disabled={!!busy} onClick={() => remove(x)} aria-label={`Remove ${x.label}`} title="Remove"><Ico svg={I.trash} /></button>
+                </>}
+              </div>
+            </div>
+            {t && <div style={{ margin: '8px 0 0 36px' }}><TestResult t={t} /></div>}
+          </div>
+        );
+      })}</div> : <EmptyState compact icon={I.sparkle} title="No AI providers yet" actions={<button className="btn primary" onClick={() => openModal(<ProviderModal c={c} />)}><Ico svg={I.plus} />Add provider</button>}>
+        <p>Add one or more AI APIs. With two or more, TicketForge switches automatically when one is limited.</p></EmptyState>}
+
+      <div className="row" style={{ marginTop: 14, justifyContent: 'space-between' }}>
+        <label className="check small" style={{ maxWidth: 620 }}><CB checked={c.accountFallback !== false} disabled={!!busy}
+          onChange={(e: Any) => run('fallback', () => patch({ accountFallback: e.target.checked }))} />
+          On your own computer, switch to these providers when your Claude account hits its usage limit</label>
+        {anyCooling && <button className="btn sm subtle" disabled={!!busy} onClick={() => reset()}>Clear all cooldowns</button>}
+      </div>
     </div>
   );
 }
@@ -376,60 +436,67 @@ function AiTab() {
   const c = A.ai;
   const [test, setTest] = useState<Any>(null);
   const [busy, setBusy] = useState('');
+  const [showEnv, setShowEnv] = useState(false);
+  const [envProv, setEnvProv] = useState('openai');
   const refresh = async () => { setBusy('refresh'); try { applyAi(await api('/api/admin/ai?fresh=1')); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
   if (!c) {
     return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await api('/api/admin/ai?fresh=1'))}>
       <p>The server didn’t report how TicketForge connects to AI.</p></ErrorState></div>;
   }
   const row = (k: string, v: React.ReactNode) => <tr><td className="muted" style={{ width: 200 }}>{k}</td><td>{v}</td></tr>;
-  const a = c.api || {}, acct = c.account;
+  const acct = c.account;
   const runTest = async () => {
     setBusy('test'); setTest(null);
-    try { setTest(await api('/api/admin/ai', { method: 'POST', body: { action: 'test' } })); } catch (e: Any) { setTest({ ok: false, error: e.message }); } finally { setBusy(''); }
+    try { setTest(await api('/api/admin/ai', { method: 'POST', body: { action: 'test' } })); applyAi(await api('/api/admin/ai')); } catch (e: Any) { setTest({ ok: false, error: e.message }); } finally { setBusy(''); }
   };
   const why = c.forced ? `Chosen with AI_MODE=${c.mode} on the server.`
     : c.mode === 'account' ? 'You opened TicketForge on this computer (localhost), so it uses your personal Claude account through Claude Code.'
-    : c.serverless ? 'This copy runs on serverless hosting, so it uses the AI API.'
-    : 'TicketForge was opened on a web address (not localhost), so it uses the AI API.';
-  const source = a.source === 'panel' ? 'Set up in this panel' : a.source === 'env' && a.id ? 'From environment variables' : null;
+    : c.serverless ? 'This copy runs on serverless hosting, so it uses the AI providers below.'
+    : 'TicketForge was opened on a web address (not localhost), so it uses the AI providers below.';
+  const now = c.mode === 'account' && !c.switched ? 'Your Claude account' : c.label;
   return (
     <div className="cards">
       <div className="card wide"><h3>AI connection</h3>
-        <p className="sub">TicketForge uses AI to write and improve tickets and test scripts. On your own computer it uses your Claude account; anywhere else, the AI API set up below.</p>
+        <p className="sub">TicketForge uses AI to write and improve tickets and test scripts. On your own computer it uses your Claude account; anywhere else, the providers below.</p>
         <table className="tbl"><tbody>
           {row('This address uses', <><span className={`loz ${c.ready ? 't-pass' : 't-fail'}`}>{c.ready ? 'Ready' : 'Not set up'}</span>{' '}
-            <b>{c.mode === 'account' ? 'Your Claude account' : a.label || 'AI API'}</b><div className="muted small">{why}</div></>)}
+            <b>{now}</b>{c.switched && <span className="loz t-blocked" style={{ marginLeft: 6 }}>Switched</span>}{c.backups > 0 && <span className="muted small"> · {c.backups} backup{c.backups > 1 ? 's' : ''}</span>}
+            <div className="muted small">{why}{c.mode === 'account' && c.switched && <> Your Claude account {acct?.cooldown ? 'hit its usage limit' : 'isn’t available'}, so the providers below stand in.</>}</div></>)}
           {c.mode === 'account' && <>
             {row('Claude Code', acct?.cli?.available
               ? <>{acct.cli.version}{acct.cli.outdated && <span className="loz t-blocked" style={{ marginLeft: 6 }}>Outdated</span>}<div className="muted small" style={{ wordBreak: 'break-all' }}>{acct.cli.path}</div></>
               : <span className="loz t-fail">Not installed</span>)}
             {acct?.cli?.available && row('Signed in', acct.loggedIn
               ? <><b>{acct.email || 'Claude account'}</b>{acct.subscriptionType && <span className="label-chip" style={{ marginLeft: 6 }}>{PLAN[acct.subscriptionType] || acct.subscriptionType}</span>}
-                  {acct.orgName && <div className="muted small">{acct.orgName}</div>}</>
+                  {acct.orgName && <div className="muted small">{acct.orgName}</div>}
+                  {acct.cooldown && <div className="small" style={{ color: 'var(--warning)' }}>Usage limit reached · resets {new Date(acct.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}{c.accountFallback ? '. Using the providers below until then.' : '.'}</div>}</>
               : acct.loggedIn === false ? <span className="loz t-fail">Not signed in</span> : <span className="muted">Unknown: update Claude Code to see this</span>)}
           </>}
-          {row(c.mode === 'account' ? 'AI API (elsewhere)' : 'AI API', a.id && !(a.error && !a.keySet)
-            ? <><b>{a.label}</b>{a.model && <> · <code>{a.model}</code></>}{a.configured ? '' : <span className="loz t-fail" style={{ marginLeft: 6 }}>Incomplete</span>}
-                {source && <div className="muted small">{source}{a.kind === 'openai' && a.baseUrl ? <> · {a.baseUrl}</> : ''}</div>}</>
-            : <span className="loz">Not set up</span>)}
+          {c.last && row('Last answered by', <>{c.last.label} <span className="muted small">· {ago(c.last.at)}</span></>)}
         </tbody></table>
 
-        {c.mode === 'account' && !c.ready && <div className="claude-steps"><p style={{ marginBottom: 0 }}>
+        {c.mode === 'account' && !acct?.signedIn && <div className="claude-steps"><p style={{ marginBottom: 0 }}>
           {acct?.cli?.available ? <>Open Terminal on this computer, run <code>claude</code> and sign in with your Claude account. Then click <b>Check again</b>.</>
             : <>Install Claude Code on this computer with <code>npm install -g @anthropic-ai/claude-code</code>, run <code>claude</code> and sign in with your Claude account. Then click <b>Check again</b>.</>}</p></div>}
-        {a.id && !a.configured && <div className="warn-banner" style={{ marginTop: 12 }}><Ico svg={I.warn} />
-          <span>{a.error || (a.source === 'env'
-            ? <>{a.label} is missing {join(a.missing.map((m: string) => ENV_MISSING[m]))} in the environment. Set it up below instead.</>
-            : <>{a.label} is missing {join(a.missing.map((m: string) => MISSING[m]))}. Complete it below.</>)}</span></div>}
 
         <div className="row" style={{ marginTop: 12 }}>
-          <button className="btn primary" disabled={!!busy || !c.ready} onClick={runTest}>{busy === 'test' ? <><Spinner />Testing…</> : c.mode === 'account' ? 'Test Claude account' : 'Test connection'}</button>
+          <button className="btn primary" disabled={!!busy || !c.ready} onClick={runTest}>{busy === 'test' ? <><Spinner />Testing…</> : 'Test connection'}</button>
           <button className="btn subtle" disabled={!!busy} onClick={refresh}><Ico svg={I.refresh} />Check again</button>
         </div>
         {test && <div style={{ marginTop: 12 }}><TestResult t={test} /></div>}
       </div>
 
-      <ApiSetup key={`${c.settings?.updatedAt || 'none'}`} c={c} />
+      <ProvidersCard c={c} />
+
+      <div className="card wide">
+        <p className="muted small" style={{ margin: 0 }}>
+          <a href="#" onClick={(e) => { e.preventDefault(); setShowEnv(!showEnv); }}>{showEnv ? 'Hide' : 'Prefer environment variables?'}</a>
+          {showEnv && <> A provider set with environment variables (on Vercel: <b>Settings → Environment Variables</b>, then redeploy) is used after the ones above.</>}</p>
+        {showEnv && <>
+          <label className="field" style={{ maxWidth: 280, marginTop: 12 }}><span>Provider</span>
+            <SF value={envProv} onChange={(e) => setEnvProv(e.target.value)}>{c.providers.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.label}</MenuItem>)}</SF></label>
+          <pre className="code">{envExample(c, envProv)}</pre></>}
+      </div>
     </div>
   );
 }
