@@ -2,6 +2,7 @@
 // Skeleton screens: shaped like each page so the layout doesn't jump when the content arrives.
 import { usePathname } from 'next/navigation';
 import { I, Sk, Loading } from './ui';
+import { S } from './core';
 
 // Fixed, varied widths so rows look like text without changing on every render.
 const W = [72, 54, 86, 63, 78, 48, 67, 81];
@@ -116,14 +117,16 @@ export function ViewSkeleton({ view }: { view: string }) {
 
 function SidebarSk() {
   return (
+    <div className={`side-wrap ${S.sideCollapsed ? 'mini' : ''}`}>
     <nav className="sidebar" aria-hidden="true">
       <div className="proj-head"><Sk w={32} h={32} r={4} /><div className="sk-stack" style={{ gap: 6 }}><Sk w="75%" h={12} /><Sk w="50%" h={10} /></div></div>
       {[5, 2, 1].map((n, g) => (
         <div key={g}><Sk w={64} h={8} style={{ margin: '18px 10px 10px' }} />
-          {range(n).map((i) => <div key={i} className="side-item" style={{ pointerEvents: 'none' }}><Sk w={16} h={16} r={4} /><Sk w={w(i + g * 2, 45)} h={12} style={{ maxWidth: 120 }} /></div>)}
+          {range(n).map((i) => <div key={i} className="side-item" style={{ pointerEvents: 'none' }}><Sk w={16} h={16} r={4} /><Sk className="side-text" w={w(i + g * 2, 45)} h={12} style={{ maxWidth: 120 }} /></div>)}
         </div>
       ))}
     </nav>
+    </div>
   );
 }
 export function WorkspaceSkeleton({ view }: { view: string }) {

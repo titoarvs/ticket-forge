@@ -51,10 +51,11 @@ export const S: Any = {
   drawer: null, full: false,
   filter: EMPTY_FILTER(), tcFilter: { q: '', status: '', type: '' },
   groupBy: 'sprint', boardAll: false, boardGroup: 'none',
-  collapsed: new Set<string>(), detailsOpen: true, actTab: 'comments',
+  collapsed: new Set<string>(), detailsOpen: true, actTab: 'comments', sideCollapsed: false,
   inlineCreate: null, subForm: false, linkForm: false, prForm: false, cmtEdit: null,
   checked: new Set<string>(), openTc: new Set<string>(),
-  doc: null, genOpts: { projectKey: '', granularity: 'balanced', includeTests: true, testsPerTicket: 4, instructions: '' }, gen: null,
+  // testsPerTicket: null = the team default (Administration → Generation)
+  doc: null, genOpts: { projectKey: '', granularity: 'balanced', includeTests: true, testsPerTicket: null, instructions: '' }, gen: null,
   busy: null, autoRun: null, autoScope: 'all', autoRegen: false,
   undo: [] as string[], redo: [] as string[], lastSnap: { tag: '', at: 0 },
   saveTimer: null, saveText: '',
@@ -74,12 +75,15 @@ export function loadPrefs() {
   const ui = store.get('tf.ui', {});
   Object.assign(S, {
     settings: store.get('tf.settings', { provider: '', model: '' }),
-    genOpts: store.get('tf.genOpts', S.genOpts),
+    // Older saves stored the old fixed default (4); only a number the user picked on purpose is kept.
+    genOpts: (({ testsPerTicket, testsPicked, ...g }: Any) => ({ ...S.genOpts, ...g, testsPerTicket: testsPicked ? testsPerTicket : null, testsPicked: Boolean(testsPicked) }))(store.get('tf.genOpts', S.genOpts)),
     groupBy: ui.groupBy || 'sprint', boardGroup: ui.boardGroup || 'none',
-    collapsed: new Set(ui.collapsed || []), detailsOpen: ui.detailsOpen ?? true, actTab: ui.actTab || 'comments',
+    collapsed: new Set(ui.collapsed || []), detailsOpen: ui.detailsOpen ?? true, actTab: ui.actTab || 'comments', sideCollapsed: Boolean(ui.sideCollapsed),
   });
 }
-export const saveUi = () => store.set('tf.ui', { groupBy: S.groupBy, boardGroup: S.boardGroup, collapsed: [...S.collapsed], detailsOpen: S.detailsOpen, actTab: S.actTab });
+export const saveUi = () => store.set('tf.ui', { groupBy: S.groupBy, boardGroup: S.boardGroup, collapsed: [...S.collapsed], detailsOpen: S.detailsOpen, actTab: S.actTab, sideCollapsed: S.sideCollapsed });
+/** Collapses the project sidebar to an icon rail, or expands it again (remembered per browser). */
+export function toggleSidebar(force?: boolean) { S.sideCollapsed = force ?? !S.sideCollapsed; saveUi(); emit(); }
 
 // ---------------------------------------------------------------- api & feedback
 export async function api(url: string, { method = 'GET', body, raw, signal }: { method?: string; body?: Any; raw?: boolean; signal?: AbortSignal } = {}): Promise<Any> {

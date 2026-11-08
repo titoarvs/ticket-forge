@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, type Any,
+  S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, type Any,
 } from './core';
 import { Ico, I, Menu, Avatar, Toasts, BusyPill, EmptyState, ErrorState } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
@@ -167,6 +167,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey && P() && location.pathname.startsWith('/p/')) {
         if (e.key === 'c') { e.preventDefault(); openCreateIssue(); }
         if (e.key === '/') { const f = document.getElementById('fq') || document.getElementById('tq'); if (f) { e.preventDefault(); f.focus(); } }
+        if (e.key === '[') { e.preventDefault(); toggleSidebar(); }
       }
     };
     const onUnload = () => { if (P() && S.saveTimer) saveNow(); };

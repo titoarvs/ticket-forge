@@ -2,6 +2,7 @@ import { api, perm, body, HttpError, aiOpts, ndjson, appUrl } from '@/lib/server
 import { engineStatus, runAutomation } from '@/lib/automation.js';
 import { reportFailures } from '@/lib/notify.js';
 import * as store from '@/lib/store.js';
+import { runAppSetup } from '@/lib/server/app-setup';
 
 export const POST = api(async (req) => {
   const user = await perm('test.run');
@@ -15,7 +16,10 @@ export const POST = api(async (req) => {
   }
   if (!(await engineStatus()).browser) throw new HttpError(400, 'The test browser is not installed yet. An administrator can install it from the Test automation page.');
   const origin = appUrl(req);
+  // Pages, roles and login settings come from the saved project; passwords only for its saved application URL.
+  const { app, warning } = await runAppSetup(project?.id, baseUrl);
   return ndjson(req, async (send, signal) => {
+    if (warning) send({ type: 'phase', level: 'warn', message: warning });
     // Collect failures per issue; report them once the run ends (also when it is stopped part-way).
     const failures = new Map<string, any[]>();
     const emit = (ev: any) => {
@@ -26,7 +30,7 @@ export const POST = api(async (req) => {
       send(ev);
     };
     try {
-      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal });
+      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app });
     } finally {
       if (failures.size && project?.id) {
         try {

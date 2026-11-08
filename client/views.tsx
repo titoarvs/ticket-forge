@@ -13,6 +13,7 @@ import {
   addEpic, bulkTests, runTests, installBrowser, ScriptModal, openCreateIssue,
 } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
+import { AppSetup } from './AppSetup';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -548,7 +549,7 @@ export function Automation() {
           : <><span className="row" style={{ gap: 6 }}><span className="dot bad" />{eng.installed ? 'Chromium is not installed yet.' : <>Playwright is not installed. Run <code>npm install</code>.</>}</span>
             {eng.installed && can('users.manage') && <button className="btn sm" style={{ marginTop: 6 }} onClick={installBrowser}>Install Chromium</button>}</>) : <span className="muted">Checking test engine…</span>}</div>
       </div>
-      <p className="muted small" style={{ margin: '12px 0 0' }}>Claude writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria and a snapshot of the page. Scripts run on this machine in a headless Chromium; you can read and edit every script. Results update each test case.</p>
+      <p className="muted small" style={{ margin: '12px 0 0' }}>The AI writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria, the App setup below and snapshots of the app&apos;s pages. Scripts run on this machine in a headless Chromium; you can read and edit every script. Results update each test case.</p>
       <div className="row" style={{ marginTop: 10, gap: 16 }}>
         <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When a test fails</span>
         <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onFail?.comment !== false}
@@ -557,6 +558,7 @@ export function Automation() {
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
       </div>
     </div>
+    <AppSetup />
     <div className="toolbar">
       <span className="muted small">Run</span>
       <SF filter aria-label="Which tests" value={S.autoScope} onChange={(e) => { S.autoScope = e.target.value; emit(); }}>

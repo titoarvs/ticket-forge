@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket } from './core';
+import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Board, Epics, Reports, Tests, Automation, Source, Settings } from './views';
@@ -15,12 +15,16 @@ const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, ba
 function Sidebar({ view }: { view: string }) {
   const p = P();
   const tests = p.tickets.reduce((s: number, t: any) => s + t.testCases.length, 0);
+  const mini = S.sideCollapsed;
   const item = (v: string, icon: string, label: string, n?: number) => (
-    <Link key={v} className={`side-item ${view === v ? 'active' : ''}`} href={`/p/${p.id}/${v}`}><Ico svg={icon} /><span>{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
+    <Link key={v} className={`side-item ${view === v ? 'active' : ''}`} href={`/p/${p.id}/${v}`} title={mini ? `${label}${n !== undefined ? ` (${n})` : ''}` : undefined}
+      aria-label={mini ? label : undefined} aria-current={view === v ? 'page' : undefined}>
+      <Ico svg={icon} /><span className="side-text">{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
   );
   return (
+    <div className={`side-wrap ${mini ? 'mini' : ''}`}>
     <nav className="sidebar" aria-label="Project">
-      <div className="proj-head"><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
+      <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}
       {item('backlog', I.backlog, 'Backlog', p.tickets.filter((t: any) => !isSub(t)).length)}
@@ -34,6 +38,9 @@ function Sidebar({ view }: { view: string }) {
       {item('source', I.doc, 'Source document')}
       <div className="side-foot">{item('settings', I.settings, 'Project settings')}</div>
     </nav>
+    <button type="button" className="side-toggle" onClick={() => toggleSidebar()} aria-expanded={!mini} aria-label={mini ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={mini ? 'Expand sidebar  [' : 'Collapse sidebar  ['}><Ico svg={I.chevron} /></button>
+    </div>
   );
 }
 

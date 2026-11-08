@@ -158,9 +158,12 @@ export function CreateProjectPage() {
             <label className="field"><span>Issue size</span><SF value={o.granularity} onChange={(e) => setOpt('granularity', e.target.value)}>
               <MenuItem value="coarse">Fewer, larger issues</MenuItem><MenuItem value="balanced">Balanced</MenuItem><MenuItem value="fine">Many small issues</MenuItem></SF></label>
             <label className="field"><span>Test cases</span><label className="check" style={{ minHeight: 32 }}><CB checked={o.includeTests} onChange={(e) => setOpt('includeTests', e.target.checked)} /> Write test cases for every issue</label></label>
-            <label className="field"><span>Test cases per issue (approx.)</span><TF type="number" min={1} max={15} value={o.testsPerTicket} onChange={(e) => setOpt('testsPerTicket', Number(e.target.value) || 4)} /></label>
+            <label className="field"><span>Test cases per issue{o.testsPicked && st?.generation && o.testsPerTicket !== st.generation.testsPerTicket
+                ? <> · <a href="#" onClick={(e) => { e.preventDefault(); S.genOpts = { ...S.genOpts, testsPerTicket: null, testsPicked: false }; store.set('tf.genOpts', { ...S.genOpts, projectKey: '' }); emit(); }}>use the team standard ({st.generation.testsPerTicket})</a></>
+                : st?.generation ? ' (team standard)' : ''}</span>
+              <TF type="number" min={1} max={15} value={o.testsPerTicket ?? st?.generation?.testsPerTicket ?? ''} onChange={(e) => { S.genOpts = { ...S.genOpts, testsPicked: true }; setOpt('testsPerTicket', Number(e.target.value) || null); }} /></label>
           </div>
-          <label className="field"><span>Instructions for Claude (optional)</span>
+          <label className="field"><span>Extra instructions for this project (optional)</span>
             <TA value={o.instructions} onChange={(e) => setOpt('instructions', e.target.value)} placeholder="e.g. We use React + Node. Label issues frontend/backend. Add an epic for analytics." /></label>
           <div className="row">
             {can('ai.use') ? <button className="btn primary" disabled={g?.running} onClick={generate}><Ico svg={I.sparkle} />Generate backlog</button>

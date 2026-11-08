@@ -183,6 +183,47 @@ npm run db:push
 The server talks to the database directly with the connection string; nothing is exposed to the browser.
 Without `DATABASE_URL`, TicketForge uses an embedded Postgres stored in `data/db`, so it runs with no setup.
 
+## Generation rules (team standard)
+
+**Administration → Generation** sets one standard for everything the AI writes. That covers new projects
+from documents, Enhance, acceptance criteria, test cases, splitting issues, new issues and automation
+scripts. The defaults:
+
+- **Reasoning: Fast & consistent.** No extended thinking; the AI follows the rules directly. Balanced and
+  Thorough think more, which is slower and costs more. Locally this is Claude Code's `--effort`; with APIs it's
+  the provider's effort setting, skipped automatically where a model doesn't support it.
+- **Stick to the document:** no extra features; unclear points become open questions.
+- **Tickets:**
+  - imperative titles of at most 10 words
+  - "As a…, I want…, so that…" user stories
+  - 3–6 Given/When/Then acceptance criteria
+  - story points 1, 2, 3, 5, 8, 13, with anything over 8 split
+  - types Story, Task, Bug, Spike
+  - Medium priority unless stated
+  - descriptions with Context / Scope / Out of scope
+  - at most 3 labels
+- **Test cases:**
+  - exactly 3 per ticket (one positive, one negative, one edge case)
+  - titles start with "Verify"
+  - one action per step, at most 8 steps
+  - preconditions always filled
+- **Automation scripts:**
+  - user-facing locators first
+  - no fixed waits
+  - only the described flow
+  - test data prefixed "QA-"
+- **Team rules:** anything else, in plain words.
+
+The page previews exactly what the AI is told. Some rules are also enforced after generation:
+- story points snap to the scale
+- only the allowed ticket types are used
+- labels are trimmed to the limit
+- extra test cases are dropped
+- test titles get the prefix
+
+**Reset to defaults** restores the standard. The create-project form uses the standard number of test cases
+unless you change it for that run.
+
 ## Accounts, invites and permissions
 
 - **Owner**: created on first run. Always has every permission and can't be removed or demoted.
@@ -241,6 +282,41 @@ number parsed from the URL.
 Scripts are stored with the test case: open **View** (or the *Automation script* section of a test case) to read
 or edit one, or **Rewrite with Claude** to regenerate it. Scripts run on this machine with your user's
 permissions, so only point automation at apps you trust, and review scripts you did not write.
+
+### App setup: pages, roles and logins
+
+Under **Test automation → App setup**, describe the app under test once per project:
+
+- **Pages:** a name, path and short description for each page. **Discover pages** finds them by following the
+  app's links, optionally signed in as a role. It only follows links: it never clicks buttons or submits
+  forms, and skips logout and delete links.
+- **Roles & logins:** one row per kind of user (Admin, Cashier…) with a test account's username and password.
+  **Test login** signs in and shows where it landed, with a screenshot.
+- **Source code:** connect the web app's code (a GitHub repository, or a folder when TicketForge runs on
+  your own computer), and **Scan routes** turns its page routes into pages, dynamic ones included
+  (`/orders/:id`). Supported: Next.js (app and pages), SvelteKit, Nuxt, Remix / React Router framework mode,
+  Astro, React Router, Vue Router, Angular, Laravel, Django and Rails. Rescans show new routes and pages that
+  left the code, and the Test automation page checks for changes when you open it. Private repositories need
+  the `gh` CLI signed in on the server, or a GitHub token saved for the project (stored encrypted).
+- **Login form:** found automatically. Set the login page, field labels, button text or a "signed in when"
+  check only if signing in fails.
+- **Notes for the AI:** test data and conventions, for example "use the product Test Mug".
+
+Each test case has a **Run as** role. Scripts read like this:
+
+```js
+await app.loginAs('Cashier');
+await app.goto('Orders');
+await expect(page).toHaveURL(new RegExp(app.url('Orders')));
+```
+
+Dynamic routes take values: `await app.goto('Orders (id)', { id: 1001 })`. `app.credentials('Role')` returns `{ username, password }` for tests of the login form itself.
+
+How passwords are protected:
+- They're stored encrypted on the server, separately from the project, so they never appear in the
+  project data, exports, the browser or the AI prompts.
+- They're masked in errors and logs.
+- They're only used with the project's saved application URL. A run against another address can't sign in.
 
 ## Project layout
 

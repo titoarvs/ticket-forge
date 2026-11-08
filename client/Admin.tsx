@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
 import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState } from './ui';
 import { AdminSkeleton } from './skeletons';
+import { GenerationTab } from './GenerationTab';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['email', 'Email & database', I.doc]];
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['email', 'Email & database', I.doc]];
 const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
 
 const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
@@ -57,6 +58,7 @@ export default function AdminPage({ tab }: { tab: string }) {
       {t === 'invites' && <InvitesTab />}
       {t === 'roles' && <RolesTab />}
       {t === 'ai' && <AiTab />}
+      {t === 'generation' && <GenerationTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
   );
