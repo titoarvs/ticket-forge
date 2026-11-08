@@ -363,9 +363,15 @@ export async function refreshPr(t: Any, prId: string) {
     toast(`${info.title}: ${info.status}`);
   } catch (err: Any) { toast(err.message, 'err'); }
 }
-export function saveComment(t: Any, body: string) {
-  if (!body.trim()) return;
-  mutate(() => { t.comments.push({ id: uid(), author: me(), authorId: S.user?.id, body: body.trim(), at: nowIso() }); t.updatedAt = nowIso(); });
+/** Adds a comment: plain text, or rich text from the comment editor ({ doc, text, attachments }). */
+export function saveComment(t: Any, v: string | { doc: Any; text: string; attachments: Any[] }) {
+  const rich = typeof v === 'string' ? null : v;
+  const body = (rich ? rich.text : String(v)).trim();
+  if (!body && !rich?.attachments?.length) return;
+  mutate(() => {
+    t.comments.push({ id: uid(), author: me(), authorId: S.user?.id, body, at: nowIso(), ...(rich && { doc: rich.doc, attachments: rich.attachments || [] }) });
+    t.updatedAt = nowIso();
+  });
 }
 
 // ---------------------------------------------------------------- sprints
@@ -500,7 +506,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
       await pullRemote({ quiet: true });
       const r = run.report;
       const bits = [r.commented.length && `commented on ${r.commented.join(', ')}`, r.notified.length && `notified ${[...new Set(r.notified)].join(', ')}`, r.emailed.length && `emailed ${r.emailed.length}`].filter(Boolean);
-      if (bits.length) { push(`Failure report: ${bits.join(' · ')}`, 'info'); toast(`Failure report: ${bits.join(' · ')}`); }
+      if (bits.length) { push(`Test report: ${bits.join(' · ')}`, 'info'); toast(`Test report: ${bits.join(' · ')}`); }
       if (r.skipped.length) push(`Not notified: ${r.skipped.join(', ')}`, 'warn');
       loadNotifs();
     }

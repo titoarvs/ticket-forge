@@ -167,6 +167,14 @@ All settings live in `.env` (see `.env.example`):
      story, acceptance criteria, **child issues** (sub-tasks), **linked issues** (blocks / is blocked by /
      relates to / duplicates / clones; blocked issues get a flag), test cases, **Development** (linked pull
      requests), dependency notes and **Activity** (comments with edit/delete, and a full change history).
+   - **Comments** are rich text, like Jira (TipTap): bold, italic, strikethrough, inline code, bulleted and
+     numbered lists, quotes, code blocks and links, from the toolbar, keyboard shortcuts or Markdown as you type
+     (`**bold**`, `- list`, `> quote`, backticks); web addresses link themselves. **Attach files** with the
+     paperclip, by dropping them on the box or by pasting (screenshots straight from the clipboard): images show
+     as thumbnails, other files as chips. Images, PDF, Office files, text, CSV, JSON, ZIP and video up to 20 MB
+     each, stored in the database with the project's access rules; web pages and SVGs are refused, and anything
+     that isn't an image, PDF or video always downloads instead of opening. ⌘↩ saves. Older plain-text comments
+     still show as before.
    - **Claude actions** on an issue: *Enhance*, *Improve acceptance criteria*, *Regenerate test cases*,
      *Split into smaller issues*, or *Ask Claude…*. Each suggestion opens a before/after review first.
    - **Create** (top bar, or press `C`): Jira-style create dialog, or **Write with Claude**.
@@ -349,6 +357,13 @@ The Test automation page has four tabs:
 Screenshots of **failed** tests are stored in the database (Supabase) as small JPEGs, in a `screenshots` table
 under the same row-level security as issues, so only people with access to the project can open them. The last 5
 per test case are kept; passing runs store nothing, and deleting a project deletes its screenshots.
+
+**Test-run comments.** After a run, each issue gets one automated comment with its results: a PASSED or FAILED
+badge, "2 of 3 tests failed", a pass/fail bar, time, who ran it and on which host, then each test (failures
+first) with the first line of its error, **Details** for the full error and the screenshot, and **Re-run failed**.
+The assignee is mentioned and notified (in-app and email) only when something failed. Settings → *When a test
+fails* and *When all of an issue's tests pass* turn the comments and notifications on or off. Automated comments
+can't be edited or changed by anyone, including through the API.
 
 ### App setup: pages, roles and logins
 

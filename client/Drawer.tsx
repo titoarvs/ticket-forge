@@ -11,8 +11,9 @@ import {
   openDrawer, runTicketAi, AskModal, duplicateIssue, confirmDeleteIssue, convertToSubtask, createSubtask, linkPr, refreshPr,
   saveComment, runTests, DeleteEpicModal, CreateIssueModal, NewWithClaudeModal,
 } from './actions';
-import { epicProgress, ProgBar, setTcStatus } from './views';
+import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
+import { CommentEditor, CommentBody } from './CommentEditor';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -94,8 +95,6 @@ function IssuePanel({ t }: { t: Any }) {
   const [link, setLink] = useState({ type: 'blocks', target: '' });
   const [pr, setPr] = useState('');
   const [prBusy, setPrBusy] = useState(false);
-  const [cmt, setCmt] = useState('');
-  const [cmtEdit, setCmtEdit] = useState('');
 
   const comments = [...t.comments].sort((a, b) => b.at.localeCompare(a.at));
   const history = [...t.history].sort((a, b) => b.at.localeCompare(a.at));
@@ -219,21 +218,16 @@ function IssuePanel({ t }: { t: Any }) {
 
           <div className="sec"><div className="sec-title"><h3>Activity</h3></div>
             <div className="seg">{[['comments', 'Comments'], ['history', 'History'], ['all', 'All']].map(([v, l]) => <button key={v} className={S.actTab === v ? 'on' : ''} onClick={() => { S.actTab = v; saveUi(); emit(); }}>{l}</button>)}</div>
-            {S.actTab !== 'history' && can('issue.comment') && <div className="composer"><Avatar name={me()} size={32} /><div style={{ flex: 1 }}>
-              <TA rows={2} placeholder="Add a comment…  (⌘↩ to save)" value={cmt} onChange={(ev) => setCmt(ev.target.value)}
-                onKeyDown={(ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); saveComment(t, cmt); setCmt(''); } }} />
-              <div className="row" style={{ marginTop: 6 }}><button className="btn sm primary" disabled={!cmt.trim()} onClick={() => { saveComment(t, cmt); setCmt(''); }}>Save</button><span className="muted small">Commenting as {me()}</span></div></div></div>}
+            {S.actTab !== 'history' && can('issue.comment') && <div className="composer"><Avatar name={me()} size={32} /><div style={{ flex: 1, minWidth: 0 }}>
+              <CommentEditor key={t.id} compactUntilFocus placeholder="Add a comment…" onSave={(v) => saveComment(t, v)} /></div></div>}
             {activity.map((a: Any) => (a.kind === 'c' ? (
               <div key={a.c.id} className={`comment ${a.c.system ? 'auto' : ''}`}>{a.c.system ? <span className="avatar bot" title="Automation"><Ico svg={I.bot} /></span> : <Avatar name={a.c.author} size={32} />}<div style={{ flex: 1, minWidth: 0 }}>
                 <div><b>{a.c.author}</b>{a.c.system && <span className="label-chip" style={{ marginLeft: 6 }}>Automated</span>} <span className="muted small">{ago(a.c.at)}{a.c.editedAt ? ' · edited' : ''}</span></div>
-                {S.cmtEdit === a.c.id ? <>
-                  <TA rows={2} autoFocus value={cmtEdit} onChange={(ev) => setCmtEdit(ev.target.value)} />
-                  <div className="row" style={{ marginTop: 6 }}>
-                    <button className="btn sm primary" disabled={!cmtEdit.trim()} onClick={() => { S.cmtEdit = null; mutate(() => { a.c.body = cmtEdit.trim(); a.c.editedAt = new Date().toISOString(); }); }}>Save</button>
-                    <button className="btn sm subtle" onClick={() => { S.cmtEdit = null; emit(); }}>Cancel</button></div></>
-                  : <>{a.c.system ? <AutoBody c={a.c} /> : <div className="cbody">{a.c.body}</div>}
+                {S.cmtEdit === a.c.id ? <CommentEditor value={a.c} autoFocus onCancel={() => { S.cmtEdit = null; emit(); }}
+                    onSave={(v) => { S.cmtEdit = null; mutate(() => { a.c.body = v.text; a.c.doc = v.doc; a.c.attachments = v.attachments; a.c.editedAt = new Date().toISOString(); }); }} />
+                  : <>{a.c.system ? <AutoBody c={a.c} t={t} /> : <CommentBody c={a.c} />}
                     {!a.c.system && (a.c.authorId ? a.c.authorId === S.user?.id : a.c.author === me()) && can('issue.comment') && <div className="row small" style={{ gap: 10, marginTop: 2 }}>
-                      <a href="#" onClick={(ev) => { ev.preventDefault(); setCmtEdit(a.c.body); S.cmtEdit = a.c.id; emit(); }}>Edit</a>
+                      <a href="#" onClick={(ev) => { ev.preventDefault(); S.cmtEdit = a.c.id; emit(); }}>Edit</a>
                       <a href="#" onClick={(ev) => { ev.preventDefault(); openModal(<Confirm title="Delete this comment?" label="Delete" text="The comment is removed from the issue." onYes={() => mutate(() => { t.comments = t.comments.filter((x: Any) => x.id !== a.c.id); })} />); }}>Delete</a></div>}</>}
               </div></div>
             ) : (
@@ -291,21 +285,62 @@ function IssuePanel({ t }: { t: Any }) {
   </>;
 }
 
-/** Body of an automated "tests failed" comment. */
-function AutoBody({ c }: { c: Any }) {
-  const f = c.failures || [];
-  const mention = (c.body.match(/^@(.+?) \d+ automated/) || [])[1];
+const fmtMs = (ms: number) => (!ms ? '' : ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`);
+const hostOf = (u: string) => { try { return new URL(u).host; } catch { return u || ''; } };
+
+/** An automated test-run comment, made readable: a pass/fail summary, then each test with its error and screenshot. */
+function AutoBody({ c, t }: { c: Any; t: Any }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Older comments only listed failures.
+  const results: Any[] = c.results || (c.failures || []).map((f: Any) => ({ ...f, status: 'Fail' }));
+  const failed = results.filter((r) => r.status !== 'Pass');
+  const passed = results.length - failed.length;
+  const ok = !failed.length;
+  const mention = !ok && (c.body.match(/^@(.+?) \d+ (?:of \d+ )?automated/) || [])[1];
+  const total = c.durationMs || results.reduce((n, r) => n + (r.durationMs || 0), 0);
+  const rerun = () => runTests(failed.map((r) => ({ t, tc: t.testCases.find((x: Any) => x.id === r.tcId) })).filter((x) => x.tc));
   return (
-    <div className="cbody">
-      <div>{mention && <span className="mention">@{mention}</span>} {f.length} automated test{f.length === 1 ? '' : 's'} failed in a run by {c.runBy || 'a teammate'}{c.baseUrl ? <> against <code>{c.baseUrl}</code></> : null}:</div>
-      <ul className="auto-fails">
-        {f.map((x: Any) => (
-          <li key={x.tcId}>
-            <a href={`#tc-${x.tcId}`} onClick={(e) => { e.preventDefault(); S.openTc.add(x.tcId); emit(); setTimeout(() => document.getElementById(`tc-${x.tcId}`)?.scrollIntoView({ block: 'center' }), 50); }}><span className="key">{x.key}</span></a> {x.title}
-            {x.error && <div className="err-box small">{x.error}</div>}
-            {x.screenshot && <a className="small" href={x.screenshot} target="_blank" rel="noopener noreferrer"><Ico svg={I.external} /> Screenshot</a>}
-          </li>
-        ))}
+    <div className={`run-card ${ok ? 'pass' : 'fail'}`}>
+      <div className="run-head">
+        <span className={`run-badge ${ok ? 'pass' : 'fail'}`}><Ico svg={ok ? I.check : I.warn} />{ok ? 'Passed' : 'Failed'}</span>
+        <b>{ok ? `All ${results.length} test${results.length === 1 ? '' : 's'} passed` : `${failed.length} of ${results.length} test${results.length === 1 ? '' : 's'} failed`}</b>
+        {mention && <span className="mention">@{mention}</span>}
+        <span className="spacer" />
+        {!ok && can('test.run') && <button className="btn sm" onClick={rerun}><Ico svg={I.play} />Re-run failed</button>}
+      </div>
+      <div className="run-bar" role="img" aria-label={`${passed} passed, ${failed.length} failed`}>
+        {passed > 0 && <i className="p" style={{ flex: passed }} />}{failed.length > 0 && <i className="f" style={{ flex: failed.length }} />}</div>
+      <div className="run-meta muted small">
+        <span><Ico svg={I.check} className="ok" /> {passed} passed</span><span><Ico svg={I.close} className="bad" /> {failed.length} failed</span>
+        {total > 0 && <span><Ico svg={I.clock} /> {fmtMs(total)}</span>}
+        <span>Run by {c.runBy || 'a teammate'}</span>
+        {c.baseUrl && <span title={c.baseUrl}>on <code>{hostOf(c.baseUrl)}</code></span>}
+      </div>
+      <ul className="run-list">
+        {[...failed, ...results.filter((r) => r.status === 'Pass')].map((r) => {
+          const bad = r.status !== 'Pass';
+          const first = String(r.error || '').split('\n')[0];
+          const more = bad && (String(r.error || '').length > first.length || r.screenshot);
+          return <li key={r.tcId} className={bad ? 'bad' : 'good'}>
+            <div className="run-row">
+              <Ico svg={bad ? I.close : I.check} className={bad ? 'bad' : 'ok'} />
+              <div className="run-main">
+                <span className="run-title" title={r.title}>{r.title}</span>
+                <span className="run-sub"><a href={`#tc-${r.tcId}`} className="key" onClick={(e) => { e.preventDefault(); S.openTc.add(r.tcId); emit(); setTimeout(() => document.getElementById(`tc-${r.tcId}`)?.scrollIntoView({ block: 'center' }), 50); }}>{r.key}</a>
+                  {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}</span>
+              </div>
+            </div>
+            {bad && <div className="run-err">
+              <code className="run-err-1">{first || 'Failed'}</code>
+              {more && <button className="link-btn small" onClick={() => setOpen({ ...open, [r.tcId]: !open[r.tcId] })}>{open[r.tcId] ? 'Hide details' : 'Details'}</button>}
+              {open[r.tcId] && <>
+                {String(r.error || '').length > first.length && <pre className="run-err-full">{r.error}</pre>}
+                {r.screenshot && <button className="run-shot" onClick={() => openModal(<ShotModal url={r.screenshot} title={`${r.key} ${r.title}`} error={r.error} at={c.at} />)}>
+                  <img src={r.screenshot} alt={`Screenshot when ${r.key} failed`} loading="lazy" /></button>}
+              </>}
+            </div>}
+          </li>;
+        })}
       </ul>
     </div>
   );

@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError, aiOpts, ndjson, appUrl } from '@/lib/server/http';
 import { engineStatus, runAutomation } from '@/lib/automation.js';
-import { reportFailures } from '@/lib/notify.js';
+import { reportRun } from '@/lib/notify.js';
 import * as store from '@/lib/store.js';
 import { runAppSetup } from '@/lib/server/app-setup';
 
@@ -20,25 +20,25 @@ export const POST = api(async (req) => {
   const { app, warning } = await runAppSetup(project?.id, baseUrl);
   return ndjson(req, async (send, signal) => {
     if (warning) send({ type: 'phase', level: 'warn', message: warning });
-    // Collect failures per issue; report them once the run ends (also when it is stopped part-way).
-    const failures = new Map<string, any[]>();
+    // Collect results per issue; report them once the run ends (also when it is stopped part-way).
+    const results = new Map<string, any[]>();
     const emit = (ev: any) => {
-      if (ev.type === 'result' && ev.result?.status !== 'Pass' && ev.ticketId) {
-        if (!failures.has(ev.ticketId)) failures.set(ev.ticketId, []);
-        failures.get(ev.ticketId)!.push({ tcId: ev.tcId, result: ev.result });
+      if (ev.type === 'result' && ev.ticketId && ev.result) {
+        if (!results.has(ev.ticketId)) results.set(ev.ticketId, []);
+        results.get(ev.ticketId)!.push({ tcId: ev.tcId, result: ev.result });
       }
       send(ev);
     };
     try {
       await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user });
     } finally {
-      if (failures.size && project?.id) {
+      if (results.size && project?.id) {
         try {
-          const report = await reportFailures({ projectId: project.id, failures, runner: user, baseUrl, appUrl: origin });
+          const report = await reportRun({ projectId: project.id, results, runner: user, baseUrl, appUrl: origin });
           send({ type: 'reported', ...report });
         } catch (e: any) {
           console.error('Failure report failed:', e);
-          send({ type: 'phase', level: 'warn', message: `Could not post failure comments: ${e.message}` });
+          send({ type: 'phase', level: 'warn', message: `Could not post test result comments: ${e.message}` });
         }
       }
     }

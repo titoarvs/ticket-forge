@@ -586,6 +586,11 @@ export function Automation() {
         <CB label="Notify the assignee (in-app and email)" disabled={!can('project.settings')} checked={p.automation.onFail?.notify !== false}
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
       </div>
+      <div className="row" style={{ marginTop: 4, gap: 16 }}>
+        <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When all of an issue’s tests pass</span>
+        <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onPass?.comment !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.onPass = { ...(pp.automation.onPass || {}), comment: e.target.checked }; })} />
+      </div>
     </div>
     </>}
   </>;

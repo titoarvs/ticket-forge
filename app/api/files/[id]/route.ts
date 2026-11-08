@@ -1,6 +1,6 @@
 import { api, authed, HttpError } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
-import { getFile, deleteFile, docxPage } from '@/lib/files.js';
+import { getFile, deleteFile, docxPage, showsInline } from '@/lib/files.js';
 
 const ID = /^[a-f0-9]{8,32}$/;
 async function load(id: string) {
@@ -26,15 +26,19 @@ export const GET = api(async (req, p) => {
       'X-Content-Type-Options': 'nosniff',
     } });
   }
+  // Images, PDFs and videos may show in the browser; anything else always downloads. Non-PDF files also get a
+  // sandbox policy, so nothing in them can run as part of the app.
+  const inline = !sp.get('download') && showsInline(f.mime);
   return new Response(f.data, { headers: {
     'Content-Type': f.mime, 'Content-Length': String(f.bytes), 'Cache-Control': 'private, max-age=3600',
-    'Content-Disposition': disposition(sp.get('download') ? 'attachment' : 'inline', f.name), 'X-Content-Type-Options': 'nosniff',
+    'Content-Disposition': disposition(inline ? 'inline' : 'attachment', f.name), 'X-Content-Type-Options': 'nosniff',
+    ...(f.mime !== 'application/pdf' && { 'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'" }),
   } });
 });
 
 export const DELETE = api(async (_req, p) => {
   const { user, f } = await load(p.id);
-  if (!['issue.create', 'project.settings'].some((x) => store.has(user, x))) throw new HttpError(403, "You don't have permission to remove documents.");
+  if (!['issue.create', 'project.settings', 'issue.comment'].some((x) => store.has(user, x))) throw new HttpError(403, "You don't have permission to remove files.");
   await deleteFile(f.id);
   return { ok: true };
 });
