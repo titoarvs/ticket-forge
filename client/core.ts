@@ -412,7 +412,8 @@ export function startSync() {
 /** Notifications for the signed-in user (bell in the top bar). */
 export async function loadNotifs() {
   if (!S.user) return;
-  try { S.notifs = await api('/api/notifications'); emit(); } catch { /* offline */ }
+  try { S.notifs = await api('/api/notifications'); S.notifsLoaded = true; S.notifsError = null; emit(); }
+  catch (e: Any) { if (!S.notifsLoaded) { S.notifsError = e; emit(); } /* else keep the last list (offline for a moment) */ }
 }
 export async function markNotifsRead(ids?: string[]) {
   await api('/api/notifications/read', { method: 'POST', body: { ids } }).catch(() => {});
@@ -423,14 +424,14 @@ export async function markNotifsRead(ids?: string[]) {
 export async function openProject(id: string) {
   if (S.project?.id === id || S.loadingProject === id) return;
   if (P()) await saveNow();
-  S.loadingProject = id; emit();
+  S.loadingProject = id; S.projectError = null; emit();
   try {
     const p = ensureProject(await api(`/api/projects/${id}`));
     Object.assign(S, { project: p, undo: [], redo: [], drawer: null, full: false, inlineCreate: null, filter: EMPTY_FILTER(), boardAll: false });
     S.checked.clear(); S.openTc.clear();
     setBase();
     S.people = await api(`/api/projects/${id}/people`).catch(() => []);
-  } catch (e: Any) { toast(`Could not open project: ${e.message}`, 'err'); S.nav('/'); }
+  } catch (e: Any) { S.projectError = { id, status: e.status, message: e.message }; }
   finally { S.loadingProject = null; emit(); }
 }
 export async function closeProject() {

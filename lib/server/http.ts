@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers';
 import * as auth from '@/lib/auth.js';
 import { migrate, asSystem, asUser, currentContext } from '@/lib/db.js';
 import * as store from '@/lib/store.js';
+import { isLocalHost } from '@/lib/claude.js';
 
 const G = globalThis as any;
 
@@ -71,7 +72,9 @@ export function api(fn: Handler) {
       }
       // Every query in this request runs as the signed-in user, so database row-level security applies.
       const user = await currentUser();
-      const out = await asUser(user?.id, () => resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({})), user);
+      // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
+      const local = isLocalHost(req.headers.get('x-forwarded-host') || req.headers.get('host'));
+      const out = await asUser(user?.id, () => resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({})), user, { local });
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);

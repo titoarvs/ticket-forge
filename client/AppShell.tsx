@@ -6,8 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, type Any,
 } from './core';
-import { Ico, I, Menu, Avatar, Toasts, BusyPill, Spinner } from './ui';
-import { loadEngine, logout, exportAs, ClaudeSettingsModal, openCreateIssue } from './actions';
+import { Ico, I, Menu, Avatar, Toasts, BusyPill, EmptyState, ErrorState } from './ui';
+import { AppSkeleton, NotifSkeleton } from './skeletons';
+import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue } from './actions';
 import { AccountModal } from './Admin';
 
 const EXPORTS: (string[] | null)[] = [
@@ -21,7 +22,9 @@ const EXPORTS: (string[] | null)[] = [
 /** Loads /api/auth/me once and the server status for signed-in users. */
 export async function bootSession() {
   loadPrefs();
-  S.auth = await api('/api/auth/me').catch(() => ({ user: null }));
+  S.bootError = null;
+  try { S.auth = await api('/api/auth/me'); }
+  catch (e: Any) { S.bootError = e; S.ready = true; emit(); return; } // server unreachable: show it, don't pretend to be signed out
   S.user = S.auth.user;
   if (S.user) { S.status = await api('/api/status').catch(() => null); loadEngine(); startSync(); loadNotifs(); }
   S.ready = true;
@@ -30,23 +33,24 @@ export async function bootSession() {
 
 function connInfo() {
   const st = S.status;
-  const provider = S.settings.provider || st?.defaultProvider;
-  const ok = provider === 'cli' ? st?.cli?.available && st?.account?.loggedIn !== false : provider === 'api' ? st?.api : false;
-  const label = provider === 'cli' ? 'Claude account' : provider === 'api' ? 'Anthropic API' : 'Not connected';
-  const model = !ok ? '' : S.settings.model || (provider === 'api' ? st?.defaultModels?.api : st?.defaultModels?.cli) || '';
+  if (!st) return { ok: false, label: 'AI', model: '' };
+  const ok = Boolean(st.ready);
+  const label = st.mode === 'account' ? 'Claude account' : st.api?.configured ? st.api.label : 'AI not set up';
+  const model = !ok ? '' : st.mode === 'account' ? (S.settings.model || st.model || '') : (st.model || '');
   return { ok, label, model };
 }
 
 function TopNav() {
   const pathname = usePathname();
   const p = P();
-  const inProject = pathname.startsWith('/p/') && p;
+  // Only once the project in the address has loaded (not the previous one while switching).
+  const inProject = pathname.startsWith('/p/') && p && p.id === decodeURIComponent(pathname.split('/')[2] || '');
   const inAdmin = pathname.startsWith('/admin');
   const c = connInfo();
   return (
     <header className="topnav">
       <Link className="brand" href="/" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} />TicketForge</Link>
-      <Link className={`navlink ${!inProject && !inAdmin ? 'active' : ''}`} href="/">Projects</Link>
+      <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/">Projects</Link>
       {inProject && <Link className="navlink active hide-sm" href={`/p/${p.id}/backlog`}>{p.name}</Link>}
       {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href="/admin/users">Administration</Link>}
       {(inProject ? can('issue.create') : can('project.create')) && (
@@ -66,7 +70,7 @@ function TopNav() {
         )}
       </>}
       <Notifications />
-      <button className="conn" onClick={() => openModal(<ClaudeSettingsModal />)} title="Claude connection settings">
+      <button className="conn" onClick={() => openModal(<AiSettingsModal />)} title="AI connection">
         <span className={`dot ${S.status ? (c.ok ? 'ok' : 'bad') : ''}`} />{c.label}{c.model ? ` · ${c.model}` : ''}
       </button>
       <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /></button>}>
@@ -95,15 +99,28 @@ function Notifications() {
       </button>}>
       <div className="notif-head"><b>Notifications</b>{unread > 0 && <button className="link-btn small" onClick={(e) => { e.stopPropagation(); markNotifsRead(); }}>Mark all as read</button>}</div>
       <div className="notif-list">
-        {items.length ? items.map((n: Any) => (
+        {!S.notifsLoaded ? (S.notifsError
+          ? <div onClick={(e) => e.stopPropagation()}><ErrorState compact title="Couldn’t load notifications" onRetry={loadNotifs} /></div>
+          : <NotifSkeleton />)
+        : items.length ? items.map((n: Any) => (
           <button key={n.id} className={`notif ${n.read_at ? '' : 'unread'}`} onClick={() => open(n)}>
             <span className="notif-ic"><Ico svg={n.kind === 'test-failed' ? I.bot : I.bell} /></span>
             <span className="notif-txt"><b>{n.title}</b><span className="muted small">{n.body}</span><span className="muted small">{ago(n.created_at)}</span></span>
             {!n.read_at && <span className="notif-dot" aria-label="Unread" />}
           </button>
-        )) : <p className="muted small" style={{ padding: '12px 16px', margin: 0 }}>You’re all caught up.</p>}
+        )) : <EmptyState compact icon={I.bell} tone="success" title="You’re all caught up"><p>Failed tests on your issues and other updates for you show up here.</p></EmptyState>}
       </div>
     </Menu>
+  );
+}
+
+/** The server didn't answer when the app started. */
+export function ServerDown() {
+  return (
+    <ErrorState title="Can’t reach TicketForge" error={S.bootError}
+      onRetry={async () => { await bootSession(); if (S.bootError) throw new Error('Still can’t reach the server.'); }}>
+      <p>The server didn’t respond. It may be restarting; try again in a moment.</p>
+    </ErrorState>
   );
 }
 
@@ -130,7 +147,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     if (!S.ready) bootSession();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!S.ready) return;
+    if (!S.ready || S.bootError) return;
     if (S.auth?.setupRequired) router.replace('/setup');
     else if (!S.user) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }, [S.ready, S.user, pathname, router]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -161,7 +178,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => { document.removeEventListener('keydown', onKey); window.removeEventListener('beforeunload', onUnload); window.removeEventListener('focus', onFocus); clearInterval(poll); };
   }, []);
 
-  if (!S.ready || !S.user) return <main id="app"><div className="auth-wrap"><Spinner /></div></main>;
+  if (S.bootError) return <main id="app"><div className="page"><ServerDown /></div><Toasts /></main>;
+  if (!S.ready || !S.user) return <AppSkeleton />;
   return (
     <>
       <TopNav />

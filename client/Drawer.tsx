@@ -6,7 +6,7 @@ import {
   statusNames, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
   clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm } from './ui';
+import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState } from './ui';
 import {
   openDrawer, runTicketAi, AskModal, duplicateIssue, confirmDeleteIssue, convertToSubtask, createSubtask, linkPr, refreshPr,
   saveComment, runTests, DeleteEpicModal, CreateIssueModal, NewWithClaudeModal,
@@ -202,7 +202,9 @@ function IssuePanel({ t }: { t: Any }) {
               <div key={a.h.id} className="hist"><Avatar name={a.h.author} size={24} /><div><b>{a.h.author}</b> {historyText(a.h)} <span className="muted small">{ago(a.h.at)}</span>
                 {a.h.from !== undefined && <div className="hist-change"><span>{a.h.from}</span> → <span>{a.h.to}</span></div>}</div></div>
             )))}
-            {!activity.length && <p className="muted small">{S.actTab === 'history' ? 'No changes yet.' : 'No comments yet.'}</p>}
+            {!activity.length && (S.actTab === 'history'
+              ? <EmptyState compact icon={I.history} tone="neutral" title="No changes yet"><p>Edits to this issue are recorded here.</p></EmptyState>
+              : <EmptyState compact icon={I.comment} tone="neutral" title="No comments yet"><p>Start the conversation about this issue below.</p></EmptyState>)}
           </div>
         </div>
 

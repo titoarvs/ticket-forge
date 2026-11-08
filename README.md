@@ -33,35 +33,58 @@ Then open http://localhost:5173. For development with hot reload use `npm run de
 invite everyone else). Any projects from earlier versions in `data/projects/` are imported automatically. (The Chromium install is only needed for test automation; the Test
 automation page also has an **Install Chromium** button.)
 
-### Claude connection
+### AI connection
 
-By default the app uses **your Claude account** through the Claude Code CLI (`claude -p`), so you need no
-API key. Claude Code must be installed and signed in on the machine that runs TicketForge.
+TicketForge picks how it talks to AI from the address you open it on:
 
-**Connecting from the app (works on a server too):** open **Administration → Claude**.
+- **On your own computer** (`http://localhost:…`): your **personal Claude account** through Claude Code
+  (`claude -p`). No API key needed. Install Claude Code and sign in once:
 
-1. If Claude Code isn't on the server, click **Install Claude Code**. It's installed into the data folder
-   with npm, so no admin rights are needed.
-2. Click **Sign in with Claude**, open the sign-in page, approve access, and paste the code Claude shows
-   back into TicketForge.
+  ```bash
+  npm install -g @anthropic-ai/claude-code
+  ```
 
-The login is kept by Claude Code itself (in `~/.claude` of the user running TicketForge, or the macOS
-keychain); TicketForge never sees or stores the token. Everyone in the workspace uses that account for
-Claude features. **Switch account** and **Sign out** are on the same page. Only administrators
-(`users.manage`) can change it.
+  ```bash
+  claude
+  ```
 
-You can also sign in from a terminal: run `claude` as the user that runs TicketForge and log in.
+  Pick the model (`opus`, `sonnet`, `haiku` or a full ID) in the connection pill at the top right.
+- **Anywhere else** (Vercel, a server, your own domain): an **AI API**, Anthropic or any OpenAI-compatible
+  one. The easiest way to set it up is **Administration → AI → Set up an AI API**:
+  1. Pick the provider and paste the API key.
+  2. Click **Load models** and choose one.
+  3. Click **Test these settings**, then **Save**.
 
-To use an Anthropic API key instead, start the server with the key set and pick
-“Anthropic API key” in the connection pill (top right):
+  The key is stored encrypted (AES-256-GCM) in the database and never shown again; only its last 4
+  characters are. Saved settings apply to every copy that uses the database (your computer and Vercel
+  alike), and take priority over environment variables. The encryption key comes from `TICKETFORGE_SECRET`
+  if you set it, otherwise it's derived from the database user and password. If those change, enter the
+  API key again.
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-... npm start
-```
+  You can also use environment variables instead:
 
-You can also choose the model there. With your Claude account, aliases such as `opus`, `sonnet` and `haiku`
-pick the newest model your Claude Code version knows (`claude update` gets the latest). The API key mode
-defaults to `claude-opus-5-5`.
+  | `AI_PROVIDER` | Key variable (or `AI_API_KEY`) | Notes |
+  |---|---|---|
+  | `anthropic` | `ANTHROPIC_API_KEY` | Default model `claude-opus-5-5` |
+  | `openai` | `OPENAI_API_KEY` | |
+  | `gemini` | `GEMINI_API_KEY` | Google's OpenAI-compatible endpoint |
+  | `openrouter` | `OPENROUTER_API_KEY` | Hundreds of models through one key |
+  | `groq`, `deepseek`, `mistral`, `xai`, `together` | `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, … | |
+  | `ollama` | none | Local models; `AI_BASE_URL` defaults to `http://localhost:11434/v1` |
+  | `custom` | `AI_API_KEY` | Any OpenAI-compatible endpoint: set `AI_BASE_URL` |
+
+  ```bash
+  AI_PROVIDER=openai
+  AI_API_KEY=your-key
+  AI_MODEL=a-model-your-key-can-use
+  ```
+
+  On Vercel, add these under **Settings → Environment Variables** and redeploy. Providers other than
+  Anthropic need a model name; there's no built-in default because model names change often, so use
+  **Load models** in the panel to see the ones your key can use.
+
+`AI_MODE=account` or `AI_MODE=api` overrides the automatic choice: for example, `AI_MODE=api` uses the API on
+your own computer too. Behind a reverse proxy, the original address comes from `X-Forwarded-Host`.
 
 All settings live in `.env` (see `.env.example`):
 
@@ -74,20 +97,11 @@ All settings live in `.env` (see `.env.example`):
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Email for invites and password resets |
 | `TRUST_PROXY` | Set when running behind a reverse proxy |
 | `PORT` | Server port (default 5173) |
-| `TICKETFORGE_PROVIDER` | Force `cli` or `api` |
-| `TICKETFORGE_CONCURRENCY` | Parallel Claude calls when writing test cases (default 3) |
+| `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` | The AI API used when TicketForge isn't opened on localhost (see AI connection) |
+| `AI_MODE` | `account` or `api` to override the automatic choice |
+| `TICKETFORGE_SECRET` | Optional: encrypts the AI key saved in Administration → AI (default: derived from the database credentials) |
+| `TICKETFORGE_CONCURRENCY` | Parallel AI calls when writing test cases (default 3) |
 | `CLAUDE_BIN` | Path to the `claude` executable if it is not on PATH |
-
-## Deploy to a free VPS
-
-Create a free Ubuntu server (Oracle Cloud Always Free works well), then from this folder:
-
-```bash
-SSH_KEY=~/Downloads/ssh-key.key bash deploy/deploy.sh ubuntu@YOUR.SERVER.IP
-```
-
-It sets the server up (Node.js, Chromium, Claude Code, a service, free HTTPS) and deploys; run it again to ship
-updates. Step-by-step guide: [deploy/README.md](deploy/README.md).
 
 ## How it works
 
@@ -141,8 +155,8 @@ updates. Step-by-step guide: [deploy/README.md](deploy/README.md).
 TicketForge stores projects, issues, users, roles and invites in PostgreSQL.
 
 1. In Supabase open **Project Settings → Database → Connection string → URI** and copy the **Session pooler**
-   string (port 5432). Replace `[YOUR-PASSWORD]` with your database password. If more than one server uses
-   the database (say your laptop and a VPS), use the **Transaction pooler** string (port 6543) instead: the
+   string (port 5432). Replace `[YOUR-PASSWORD]` with your database password. If more than one copy uses
+   the database (say your laptop and Vercel), use the **Transaction pooler** string (port 6543) instead: the
    Session pooler only accepts 15 connections in total, and each TicketForge server keeps up to `PG_POOL_MAX`
    (default 5) open.
 2. Put it in `.env` as `DATABASE_URL=...` and restart. Tables are created automatically on start.

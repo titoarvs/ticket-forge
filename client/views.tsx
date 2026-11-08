@@ -7,10 +7,10 @@ import {
   activeSprint, openSprints, tcKey, spSum, statusNames, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
   saveUi, EMPTY_FILTER, mutate, setField, deleteIssues, historyText, openModal, toast, uid, logEvent, api, type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea } from './ui';
+import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea, EmptyState } from './ui';
 import {
   openDrawer, moveTicket, inlineCreate, createSprint, deleteSprint, SprintModal, CompleteSprintModal, NewWithClaudeModal, RegroupModal,
-  addEpic, bulkTests, runTests, installBrowser, ScriptModal,
+  addEpic, bulkTests, runTests, installBrowser, ScriptModal, openCreateIssue,
 } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
@@ -114,7 +114,8 @@ export function Summary() {
     </div>
     <div className="cards">
       <div className="card"><h3>Status overview</h3><p className="sub">Issues by workflow category · {spSum(ts.filter(isDone))} of {spSum(ts)} story points done.</p>
-        {ts.length ? <Stack total={ts.length} parts={[['To do', cat('todo'), 'c-todo'], ['In progress', cat('inprogress'), 'c-prog'], ['Done', done, 'c-done']]} /> : <p className="muted">No issues yet.</p>}</div>
+        {ts.length ? <Stack total={ts.length} parts={[['To do', cat('todo'), 'c-todo'], ['In progress', cat('inprogress'), 'c-prog'], ['Done', done, 'c-done']]} />
+          : <EmptyState compact icon={I.backlog} tone="neutral" title="No issues yet" actions={can('issue.create') && <button className="btn" onClick={() => openCreateIssue()}><Ico svg={I.plus} />Create issue</button>} />}</div>
       <div className="card"><h3>Test results</h3><p className="sub">Latest result of every test case (manual or automated).</p>
         {tcs.length ? <Stack total={tcs.length} parts={[['Not run', tcBy('Not run'), 'c-todo'], ['Pass', tcBy('Pass'), 'c-done'], ['Fail', tcBy('Fail'), 'c-fail'], ['Blocked', tcBy('Blocked'), 'c-blocked']]} /> : <p className="muted">No test cases yet.</p>}</div>
       <div className="card"><h3>Priority breakdown</h3><p className="sub">How many issues sit at each priority.</p>
@@ -122,7 +123,7 @@ export function Summary() {
       <div className="card"><h3>Recent activity</h3><p className="sub">Latest changes across the project.</p>
         {recent.length ? recent.map((h: Any) => (
           <div key={`${h.t.id}-${h.id}`} className="act-mini" onClick={() => openDrawer('issue', h.t.id)}><Avatar name={h.author} size={20} /><span><b>{h.author}</b> {historyText(h)} <span className="key">{h.t.key}</span> <span className="muted small">{ago(h.at)}</span></span></div>
-        )) : <p className="muted">No activity yet.</p>}</div>
+        )) : <EmptyState compact icon={I.history} tone="neutral" title="No activity yet"><p>Changes to issues show up here.</p></EmptyState>}</div>
       <div className="card wide"><h3>Epic progress</h3><p className="sub">Done and in-progress issues per epic.</p>
         {p.epics.length ? <table className="tbl"><tbody>{p.epics.map((e: Any) => { const pr = epicProgress(e); return (
           <tr key={e.id} className="click" onClick={() => openDrawer('epic', e.id)}><td style={{ width: '40%' }}><ELoz e={e} /></td><td><ProgBar {...pr} /></td><td className="num muted" style={{ width: 110 }}>{pr.done} of {pr.total} done</td></tr>); })}</tbody></table> : <p className="muted">No epics yet.</p>}</div>
@@ -262,7 +263,10 @@ export function Backlog() {
           </>}
         </div>
       );
-    }) : <div className="empty"><h3>No issues match</h3><p>Try clearing your filters.</p></div>}
+    }) : filtersActive()
+      ? <EmptyState compact icon={I.search} tone="neutral" title="No issues match your filters" actions={<button className="btn" onClick={() => { S.filter = EMPTY_FILTER(); emit(); }}>Clear filters</button>}><p>Try a different search, or clear the filters to see every issue.</p></EmptyState>
+      : <EmptyState icon={I.backlog} title="Your backlog is empty" actions={can('issue.create') && <button className="btn primary" onClick={() => openCreateIssue()}><Ico svg={I.plus} />Create issue</button>}>
+        <p>Create issues one by one, or start a project from a requirements document and Claude writes them for you.</p></EmptyState>}
     {S.groupBy === 'epic' && !filtersActive() && can('epic.manage') && <button className="inline-create" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}
   </>;
 }
@@ -312,12 +316,16 @@ export function Board() {
     </>} />
     {useSprint && act.goal && <p className="muted" style={{ margin: '-8px 0 12px' }}><Ico svg={I.flag} /> {act.goal}</p>}
     {noSprint ? (
-      <div className="empty"><Ico svg={I.board} size={48} style={{ color: 'var(--brand)' }} /><h3>No active sprint</h3><p>Start a sprint from the backlog to see its issues here.</p>
-        <div className="row" style={{ justifyContent: 'center' }}><Link className="btn primary" href={`/p/${p.id}/backlog`}>Go to backlog</Link><button className="btn" onClick={() => { S.boardAll = true; emit(); }}>Show all issues</button></div></div>
+      <EmptyState icon={I.board} title="No active sprint"
+        actions={<><Link className="btn primary" href={`/p/${p.id}/backlog`}>Go to backlog</Link><button className="btn" onClick={() => { S.boardAll = true; emit(); }}>Show all issues</button></>}>
+        <p>Start a sprint from the backlog to track its issues here, or show every issue on the board.</p></EmptyState>
     ) : <>
       <FilterBar status={false} group={{ value: S.boardGroup, options: [['none', 'None'], ['epic', 'Epic']], onChange: (v) => { S.boardGroup = v; saveUi(); emit(); } }} />
       <div style={{ overflowX: 'auto' }}><div className="board" style={{ gridTemplateColumns: `repeat(${statuses.length}, minmax(220px, 1fr))` }}>{body}</div></div>
-      {!list.length && <div className="empty"><h3>No issues to show</h3><p>Create issues in the backlog or clear your filters.</p></div>}
+      {!list.length && (filtersActive()
+        ? <EmptyState compact icon={I.search} tone="neutral" title="No issues match your filters" actions={<button className="btn" onClick={() => { S.filter = EMPTY_FILTER(); emit(); }}>Clear filters</button>} />
+        : <EmptyState compact icon={I.board} tone="neutral" title={useSprint ? 'No issues in this sprint yet' : 'No issues yet'}
+          actions={<Link className="btn" href={`/p/${p.id}/backlog`}>Go to backlog</Link>}><p>{useSprint ? 'Drag issues into the sprint from the backlog.' : 'Create issues in the backlog to see them here.'}</p></EmptyState>)}
     </>}
   </>;
 }
@@ -345,7 +353,8 @@ export function Epics() {
         })}
       </tbody></table>
       {noEpic().length > 0 && <p className="muted small" style={{ marginTop: 12 }}>{noEpic().length} issues have no epic. <a href="#" onClick={(e) => { e.preventDefault(); S.filter = { ...EMPTY_FILTER(), epic: 'none' }; S.groupBy = 'epic'; S.nav(`/p/${p.id}/backlog`); }}>View them in the backlog</a></p>}
-    </> : <div className="empty"><Ico svg={I.epic} size={48} style={{ color: '#904ee2' }} /><h3>No epics yet</h3><p>Epics group related issues into larger pieces of work.</p>{can('epic.manage') && <button className="btn primary" onClick={addEpic}>Create epic</button>}</div>}
+    </> : <EmptyState icon={I.epic} tone="epic" title="No epics yet" actions={can('epic.manage') && <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}>
+      <p>Epics group related issues into larger pieces of work, so you can track progress feature by feature.</p></EmptyState>}
   </>;
 }
 
@@ -411,7 +420,11 @@ export function Tests() {
           <td><TcStatusSelect t={t} tc={tc} /></td>
         </tr>
       ))}
-    </tbody></table> : <div className="empty"><h3>No test cases found</h3><p>{all.length ? 'Try changing the filters.' : 'Open an issue and use “Regenerate test cases”, or select issues in the backlog and choose “Write test cases”.'}</p></div>}
+    </tbody></table> : all.length
+      ? <EmptyState compact icon={I.search} tone="neutral" title="No test cases match your filters"
+        actions={<button className="btn" onClick={() => { S.tcFilter = { q: '', status: '', type: '' }; emit(); }}>Clear filters</button>} />
+      : <EmptyState icon={I.test} tone="success" title="No test cases yet" actions={<Link className="btn primary" href={`/p/${p.id}/backlog`}>Go to backlog</Link>}>
+        <p>Select issues in the backlog and choose <b>Write test cases</b>, or open an issue and use <b>Regenerate test cases</b>. Claude plans them from the acceptance criteria.</p></EmptyState>}
   </>;
 }
 
@@ -487,7 +500,8 @@ export function Reports() {
               <td className="muted">{s.startDate ? `${fmtDate(s.startDate)} – ${fmtDate(s.endDate)}` : '–'}</td>
               <td className="num">{p.tickets.filter((t: Any) => t.sprintId === s.id && !isSub(t)).length}</td>
               <td className="num">{s.committedPoints ?? '–'}</td><td className="num">{s.completedPoints ?? '–'}</td></tr>
-          ))}</tbody></table> : <p className="muted">No sprints yet. Create one from the backlog.</p>}</div>
+          ))}</tbody></table> : <EmptyState compact icon={I.chart} tone="neutral" title="No sprints yet"
+            actions={<Link className="btn" href={`/p/${p.id}/backlog`}>Go to backlog</Link>}><p>Create and complete sprints in the backlog to see velocity here.</p></EmptyState>}</div>
     </div>
   </>;
 }
@@ -529,6 +543,8 @@ export function Automation() {
           <TF value={p.automation.baseUrl || ''} disabled={!can('project.settings')} placeholder="e.g. http://localhost:3000 or https://staging.example.com"
             onChange={(e) => mutate((pp) => { pp.automation.baseUrl = e.target.value.trim(); }, { tag: 'baseUrl' })} /></label>
         <div className="small">{eng ? (eng.browser ? <span className="row" style={{ gap: 6 }}><span className="dot ok" />Playwright {eng.version} with Chromium is ready.</span>
+          : eng.serverless ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}><span className="dot bad" style={{ marginTop: 5 }} />
+              <span>Test runs need a regular server: serverless hosting (like Vercel) can’t run a browser. Run TicketForge on your own computer to use automation.</span></span>
           : <><span className="row" style={{ gap: 6 }}><span className="dot bad" />{eng.installed ? 'Chromium is not installed yet.' : <>Playwright is not installed. Run <code>npm install</code>.</>}</span>
             {eng.installed && can('users.manage') && <button className="btn sm" style={{ marginTop: 6 }} onClick={installBrowser}>Install Chromium</button>}</>) : <span className="muted">Checking test engine…</span>}</div>
       </div>
@@ -572,7 +588,9 @@ export function Automation() {
             {tc.lastRun.screenshot && <a href={tc.lastRun.screenshot} target="_blank" rel="noopener noreferrer" className="small"><Ico svg={I.external} /> Screenshot</a>}</td></tr>,
         ];
       })}
-    </tbody></table> : <div className="empty"><h3>No test cases in this selection</h3><p>Pick a different set above, or add test cases to your issues.</p></div>}
+    </tbody></table> : <EmptyState compact icon={I.bot} tone="neutral" title="No test cases in this selection"
+      actions={S.autoScope !== 'all' && <button className="btn" onClick={() => { S.autoScope = 'all'; emit(); }}>Show all test cases</button>}>
+      <p>{S.autoScope === 'all' ? 'Add test cases to your issues first: select issues in the backlog and choose Write test cases.' : 'Pick a different set above.'}</p></EmptyState>}
   </>;
 }
 
@@ -582,7 +600,7 @@ export function Source() {
   return <>
     <Header title="Source document" />
     {p.sourceText ? <><p className="muted" style={{ marginTop: -8 }}><Ico svg={I.doc} /> {p.sourceName} · {p.sourceText.split(/\s+/).length.toLocaleString()} words</p><div className="source">{p.sourceText}</div></>
-      : <div className="empty"><h3>No source document</h3><p>This project was created without a document.</p></div>}
+      : <EmptyState icon={I.doc} tone="neutral" title="No source document"><p>This project was created without a requirements document.</p></EmptyState>}
   </>;
 }
 

@@ -531,37 +531,38 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
   );
 }
 
-// ---------------------------------------------------------------- Claude connection settings
-export function ClaudeSettingsModal() {
+// ---------------------------------------------------------------- AI connection
+/** Which AI this address uses. On your own computer you can also pick the Claude model. */
+export function AiSettingsModal() {
   const st = S.status || {};
-  const [provider, setProvider] = useState(S.settings.provider || '');
   const [model, setModel] = useState(S.settings.model || '');
+  const account = st.mode === 'account';
   const models = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'];
+  const admin = can('users.manage');
+  const goAdmin = <a href="/admin/ai" onClick={(e) => { e.preventDefault(); closeModal(); S.nav('/admin/ai'); }}>Administration → AI</a>;
   return (
-    <Modal title="Claude connection" actions={[{ label: 'Cancel' }, { label: 'Save', kind: 'primary', onClick: () => {
-      S.settings = { provider, model: model.trim() };
-      store.set('tf.settings', S.settings);
-      closeModal();
-    } }]}>
-      <div className="field"><span>Status</span>
-        <div className="row small" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}><span className={`dot ${st.cli?.available ? 'ok' : 'bad'}`} style={{ marginTop: 4 }} />
-          <span>Claude account: {!st.cli?.available ? 'Claude Code is not installed on the server'
-            : st.account?.loggedIn === false ? 'not signed in'
-            : <>signed in{st.account?.subscriptionType ? ` (${st.account.subscriptionType})` : ''} · Claude Code {st.cli.version}{st.cli.outdated && <b> (outdated)</b>}</>}
-            {(!st.cli?.available || st.account?.loggedIn === false) && (can('users.manage')
-              ? <><br /><a href="/admin/claude" onClick={(e) => { e.preventDefault(); closeModal(); S.nav('/admin/claude'); }}>Connect a Claude account in Administration → Claude</a></>
-              : <><br /><span className="muted">Ask an administrator to connect a Claude account.</span></>)}</span></div>
-        <div className="row small"><span className={`dot ${st.api ? 'ok' : 'bad'}`} />Anthropic API key: {st.api ? 'detected' : 'not set'}</div>
+    <Modal title="AI connection" actions={account
+      ? [{ label: 'Cancel' }, { label: 'Save', kind: 'primary', onClick: () => { S.settings = { ...S.settings, provider: '', model: model.trim() }; store.set('tf.settings', S.settings); closeModal(); } }]
+      : [{ label: 'Close' }]}>
+      <div className="row small" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', marginBottom: 12 }}>
+        <span className={`dot ${st.ready ? 'ok' : 'bad'}`} style={{ marginTop: 5 }} />
+        <span>{account
+          ? <><b>Your Claude account</b> through Claude Code on this computer{st.account?.subscriptionType ? ` (${st.account.subscriptionType})` : ''}.
+              {!st.ready && <><br />{st.account?.cli?.available ? <>Claude Code isn’t signed in: run <code>claude</code> in a terminal and sign in.</> : <>Claude Code isn’t installed: run <code>npm install -g @anthropic-ai/claude-code</code>, then <code>claude</code> to sign in.</>}</>}</>
+          : st.api?.configured
+            ? <><b>{st.api.label}</b> API, model <code>{st.api.model}</code>.</>
+            : <><b>No AI API is set up</b> for this address.{admin ? <> Set it up in {goAdmin}.</> : ' Ask an administrator to set it up.'}</>}
+          <br /><span className="muted">{account ? 'Used because you opened TicketForge on this computer (localhost).' : 'Used because TicketForge was opened on a web address. On your own computer it uses your Claude account instead.'}</span></span>
       </div>
-      <label className="field"><span>Use</span><SF value={provider} onChange={(e) => setProvider(e.target.value)}>
-        <MenuItem value="">Automatic ({st.defaultProvider === 'api' ? 'API key' : 'Claude account'})</MenuItem>
-        <MenuItem value="cli">My Claude account (Claude Code)</MenuItem>
-        <MenuItem value="api">Anthropic API key</MenuItem></SF></label>
-      <label className="field"><span>Model — leave blank for the default</span><PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={(provider || st.defaultProvider) === 'api' ? st.defaultModels?.api : st.defaultModels?.cli} /></label>
-      <p className="small muted">With your Claude account, aliases like <code>opus</code> or <code>sonnet</code> use the newest model your Claude Code version knows.</p>
+      {account
+        ? <><label className="field"><span>Claude model — leave blank for the default</span><PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={st.model || 'opus'} /></label>
+            <p className="small muted" style={{ marginBottom: 0 }}>Aliases like <code>opus</code> or <code>sonnet</code> use the newest model your Claude Code knows (<code>claude update</code> gets the latest).</p></>
+        : <p className="small muted" style={{ marginBottom: 0 }}>The provider and model are set with environment variables on the server{admin ? <>; see {goAdmin}</> : ''}.</p>}
     </Modal>
   );
 }
+/** Older name, kept for existing imports. */
+export const ClaudeSettingsModal = AiSettingsModal;
 
 export function BlankProjectModal() {
   const [name, setName] = useState('');

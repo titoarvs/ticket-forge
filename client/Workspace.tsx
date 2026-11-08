@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket } from './core';
-import { Ico, I, Spinner } from './ui';
+import { Ico, I, EmptyState, ErrorState } from './ui';
+import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Board, Epics, Reports, Tests, Automation, Source, Settings } from './views';
 import { Drawer } from './Drawer';
 
@@ -36,6 +37,25 @@ function Sidebar({ view }: { view: string }) {
   );
 }
 
+/** The project couldn't be opened: missing, no access, or a failed request. */
+function ProjectError({ id }: { id: string }) {
+  const e = S.projectError;
+  const back = <Link className="btn" href="/">Back to projects</Link>;
+  if (e.status === 404 || e.status === 403) {
+    return (
+      <EmptyState icon={I.folder} tone="neutral" title="Project not found" actions={<Link className="btn primary" href="/">Back to projects</Link>}>
+        <p>It may have been deleted, or you don’t have access to it. If you think you should, ask an administrator to add you.</p>
+      </EmptyState>
+    );
+  }
+  return (
+    <ErrorState title="Couldn’t open this project" error={e.message} actions={back}
+      onRetry={async () => { S.projectError = null; emit(); await openProject(id); }}>
+      <p>Something went wrong while loading it. Your saved work isn’t affected.</p>
+    </ErrorState>
+  );
+}
+
 export default function Workspace({ id, view }: { id: string; view: string }) {
   useStore();
   useEffect(() => { openProject(id); }, [id]);
@@ -49,8 +69,9 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
     if (ticket(issueParam)) { Object.assign(S, { drawer: { kind: 'issue', id: issueParam }, menu: null }); emit(); }
     router.replace(`/p/${id}/${view || 'backlog'}`, { scroll: false });
   }, [loaded, issueParam]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!P() || P().id !== id) return <div className="page"><Spinner /></div>;
   const v = VIEWS[view] ? view : 'backlog';
+  if (S.projectError?.id === id) return <div className="page"><ProjectError id={id} /></div>;
+  if (!P() || P().id !== id) return <WorkspaceSkeleton view={v} />;
   const View = COMPONENTS[v];
   return (
     <div className="shell">

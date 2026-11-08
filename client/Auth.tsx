@@ -4,8 +4,9 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { S, emit, useStore, api, toast, type Any } from './core';
-import { Ico, I, Toasts, Spinner } from './ui';
-import { bootSession } from './AppShell';
+import { Ico, I, Toasts, Sk, Loading } from './ui';
+import { bootSession, ServerDown } from './AppShell';
+import { AuthSkeleton } from './skeletons';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 type Mode = 'setup' | 'login' | 'forgot' | 'reset' | 'invite';
@@ -37,7 +38,7 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
 
   useEffect(() => { if (!S.ready) bootSession(); }, []);
   useEffect(() => {
-    if (!S.ready) return;
+    if (!S.ready || S.bootError) return;
     if (S.auth?.setupRequired && mode !== 'setup') router.replace('/setup');
     else if (!S.auth?.setupRequired && mode === 'setup') router.replace('/login');
     else if (S.user && mode === 'login') router.replace(params.get('next') || '/');
@@ -69,7 +70,8 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
     finally { setBusy(false); }
   };
 
-  if (!S.ready) return <main id="app"><div className="auth-wrap"><Spinner /></div><Toasts /></main>;
+  if (S.bootError) return <main id="app"><div className="auth-wrap"><div style={{ width: 'min(460px, 100%)' }}><ServerDown /></div></div><Toasts /></main>;
+  if (!S.ready) return <main id="app"><AuthSkeleton /><Toasts /></main>;
   const form = (children: ReactNode, button: string) => (
     <form onSubmit={submit} noValidate>{children}
       <button className="btn primary wide" type="submit" disabled={busy}>{button}</button>
@@ -96,7 +98,11 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
         <Field label="Confirm new password" type="password" autoComplete="new-password" value={f.pass2} onChange={set('pass2')} />
       </>, 'Save password and sign in')}</Card>;
   } else if (mode === 'invite') {
-    if (!invite) body = <Card title="Checking your invite…"><Spinner /></Card>;
+    if (!invite) body = <Card title="Checking your invite…"><Loading label="Checking your invite…">
+      <Sk w="80%" h={10} style={{ margin: '0 auto 24px' }} />
+      {[48, 140].map((x) => <div key={x} className="sk-field"><Sk w={x} h={10} style={{ marginBottom: 8 }} /><Sk h={40} /></div>)}
+      <Sk h={36} />
+    </Loading></Card>;
     else if (invite.error) body = <Card title="Invite unavailable" sub={invite.error} foot={<Link href="/login">Go to sign in</Link>} />;
     else body = <Card title="Join your team on TicketForge" sub={<><b>{invite.inviter}</b> invited <b>{invite.email}</b> as <b>{invite.role}</b>.</>}>
       {form(<>

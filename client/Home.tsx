@@ -3,11 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { S, emit, useStore, api, readNdjson, toast, openModal, store, can, hashColor, COLORS, closeProject, uid, type Any } from './core';
-import { Ico, I, TypeIcon, Confirm, Spinner } from './ui';
-import { BlankProjectModal, ClaudeSettingsModal } from './actions';
+import { Ico, I, TypeIcon, Confirm, Spinner, EmptyState, ErrorState } from './ui';
+import { ProjectsSkeleton } from './skeletons';
+import { BlankProjectModal, AiSettingsModal } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-async function loadProjects() { S.projects = await api('/api/projects').catch(() => []); S.projectsLoaded = true; emit(); }
+async function loadProjects() {
+  try { S.projects = await api('/api/projects'); S.projectsLoaded = true; S.projectsError = null; }
+  catch (e: Any) { if (!S.projectsLoaded) S.projectsError = e; else toast(`Couldn’t refresh projects: ${e.message}`, 'err'); }
+  emit();
+}
 
 export function ProjectsPage() {
   useStore();
@@ -35,7 +40,10 @@ export function ProjectsPage() {
           <Link className="btn primary" href="/new">Create project</Link>
         </>}
       </div>
-      {!S.projectsLoaded ? <Spinner /> : S.projects.length ? <>
+      {!S.projectsLoaded ? (S.projectsError
+        ? <ErrorState title="Couldn’t load your projects" error={S.projectsError} onRetry={loadProjects}><p>Check your connection and try again.</p></ErrorState>
+        : <ProjectsSkeleton />)
+      : S.projects.length ? <>
         <div className="toolbar"><TF search sx={{ width: 220 }} placeholder="Search projects" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <table className="tbl"><thead><tr><th>Name</th><th>Key</th><th className="num">Epics</th><th className="num">Issues</th><th>Last updated</th><th /></tr></thead><tbody>
           {list.map((p: Any) => (
@@ -47,15 +55,15 @@ export function ProjectsPage() {
             </tr>
           ))}
         </tbody></table>
-        {!list.length && <div className="empty">No projects match your search.</div>}
+        {!list.length && <EmptyState compact icon={I.search} tone="neutral" title={<>No projects match “{q}”</>}
+          actions={<button className="btn" onClick={() => setQ('')}>Clear search</button>}><p>Check the spelling or search by project key.</p></EmptyState>}
       </> : (
-        <div className="empty" style={{ padding: '80px 20px' }}>
-          <Ico svg={I.folder} size={56} style={{ color: 'var(--brand)' }} />
-          <h3>{can('project.create') ? 'Create your first project' : 'No projects yet'}</h3>
-          <p>{can('project.create') ? 'Upload a requirements document and Claude turns it into epics, issues, acceptance criteria and test cases.' : 'Ask an administrator to give you access to a project.'}</p>
-          {can('project.create') && <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
-            <Link className="btn primary" href="/new">Create project from a document</Link><button className="btn" onClick={() => openModal(<BlankProjectModal />)}>Blank project</button></div>}
-        </div>
+        <EmptyState icon={I.folder} title={can('project.create') ? 'Create your first project' : 'No projects yet'}
+          actions={can('project.create') && <>
+            <Link className="btn primary" href="/new"><Ico svg={I.sparkle} />Create from a document</Link>
+            <button className="btn" onClick={() => openModal(<BlankProjectModal />)}>Blank project</button></>}>
+          <p>{can('project.create') ? 'Upload a requirements document and Claude turns it into epics, issues, acceptance criteria and test cases.' : 'You don’t have access to any projects yet. Ask an administrator to add you to one.'}</p>
+        </EmptyState>
       )}
     </div></div>
   );
@@ -64,8 +72,9 @@ export function ProjectsPage() {
 // ---------------------------------------------------------------- create from a document
 function connLabel() {
   const st = S.status;
-  const provider = S.settings.provider || st?.defaultProvider;
-  return { label: provider === 'cli' ? 'Claude account' : provider === 'api' ? 'Anthropic API' : 'Not connected', model: S.settings.model || (provider === 'api' ? st?.defaultModels?.api : st?.defaultModels?.cli) || '' };
+  if (!st) return { label: 'AI', model: '' };
+  if (st.mode === 'account') return { label: 'your Claude account', model: S.settings.model || st.model || '' };
+  return { label: st.api?.configured ? `${st.api.label} API` : 'AI (not set up)', model: st.model || '' };
 }
 
 export function CreateProjectPage() {
@@ -116,7 +125,7 @@ export function CreateProjectPage() {
       emit();
     }
   };
-  const providerOk = st && (st.cli?.available || st.api);
+  const providerOk = Boolean(st?.ready);
   const c = connLabel();
   return (
     <div className="page"><div className="page-inner">
@@ -124,7 +133,9 @@ export function CreateProjectPage() {
       <div className="page-h"><h1>Create a project from a document</h1></div>
       <div className="create-grid">
         <div>
-          {!providerOk && st && <div className="warn-banner"><Ico svg={I.warn} /><span>No Claude connection found. Install Claude Code and run <code>claude</code> once to sign in, or set <code>ANTHROPIC_API_KEY</code>.</span></div>}
+          {!providerOk && st && <div className="warn-banner"><Ico svg={I.warn} /><span>{st.mode === 'account'
+            ? <>AI isn’t ready: {st.account?.cli?.available ? <>Claude Code isn’t signed in. Run <code>claude</code> in a terminal and sign in with your Claude account.</> : <>Claude Code isn’t installed on this computer. Run <code>npm install -g @anthropic-ai/claude-code</code>, then <code>claude</code> to sign in.</>}</>
+            : <>No AI API is set up for this address. {can('users.manage') ? <>Set it up in <Link href="/admin/ai">Administration → AI</Link>.</> : 'Ask an administrator to set it up.'}</>}</span></div>}
           <div className={`dropzone ${over ? 'over' : ''}`} onClick={() => fileRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
             onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; if (f) upload(f); }}>
@@ -170,7 +181,7 @@ export function CreateProjectPage() {
           <div className="step"><TypeIcon type="Story" /><div><b>Issues</b>Stories, tasks, spikes and bugs with user stories, estimates and labels.</div></div>
           <div className="step"><TypeIcon type="Task" /><div><b>Acceptance criteria</b>Testable Given / When / Then criteria for every issue.</div></div>
           <div className="step"><TypeIcon type="Test" /><div><b>Test cases</b>Steps and expected results that cover each criterion, ready to automate.</div></div>
-          <p className="small muted" style={{ margin: '16px 0 0' }}>Using <b>{c.label}</b>{c.model ? ` (${c.model})` : ''}. Large documents take a few minutes. <a href="#" onClick={(e) => { e.preventDefault(); openModal(<ClaudeSettingsModal />); }}>Change</a></p>
+          <p className="small muted" style={{ margin: '16px 0 0' }}>Using <b>{c.label}</b>{c.model ? ` (${c.model})` : ''}. Large documents take a few minutes. <a href="#" onClick={(e) => { e.preventDefault(); openModal(<AiSettingsModal />); }}>Change</a></p>
         </aside>
       </div>
     </div></div>

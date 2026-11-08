@@ -1,8 +1,8 @@
 'use client';
 // Small shared React components.
-import { useEffect, useLayoutEffect, useRef, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { I, typeIcon, priorityIcon } from './icons';
-import { S, emit, closeModal, hashColor, initials, sCls, type Any } from './core';
+import { S, emit, closeModal, hashColor, initials, sCls, toast, type Any } from './core';
 
 export { I };
 const sized = (svg: string, size?: number) => (size ? svg.replace('width="16" height="16"', `width="${size}" height="${size}"`) : svg);
@@ -93,3 +93,48 @@ export function Toasts() {
 }
 export const BusyPill = () => (S.busy ? <div id="busy"><span className="spinner" />{S.busy}</div> : null);
 export const Spinner = ({ style }: { style?: Any }) => <span className="spinner" style={{ color: 'var(--brand)', ...style }} />;
+
+// ---------------------------------------------------------------- loading, empty and error states
+/** A placeholder block that shimmers while content loads. Size it like the content it stands in for. */
+export const Sk = ({ w, h = 12, r, style, className = '' }: { w?: number | string; h?: number | string; r?: number | string; style?: Any; className?: string }) => (
+  <span className={`sk ${className}`} style={{ width: w ?? '100%', height: h, borderRadius: r, ...style }} aria-hidden="true" />
+);
+/** Wraps skeletons: tells screen readers something is loading, and fades in after a moment so quick loads don't flash. */
+export function Loading({ label = 'Loading…', children, className = '', style }: { label?: string; children: ReactNode; className?: string; style?: Any }) {
+  return <div className={`sk-wrap ${className}`} role="status" aria-busy="true" style={style}><span className="sr-only">{label}</span>{children}</div>;
+}
+
+export type Tone = 'brand' | 'ai' | 'danger' | 'neutral' | 'success' | 'epic';
+/** A centred message for "nothing here yet" or "nothing matches", with an icon and the next thing to do. */
+export function EmptyState({ icon, tone = 'brand', title, children, actions, compact = false, className = '' }: {
+  icon?: string; tone?: Tone; title: ReactNode; children?: ReactNode; actions?: ReactNode; compact?: boolean; className?: string;
+}) {
+  return (
+    <div className={`state ${compact ? 'compact' : ''} ${className}`}>
+      {icon && <span className={`state-ic ${tone}`}><Ico svg={icon} size={compact ? 20 : 28} /></span>}
+      <h3>{title}</h3>
+      {children && <div className="state-body">{children}</div>}
+      {actions && <div className="state-actions">{actions}</div>}
+    </div>
+  );
+}
+
+/** Something failed to load: says what, offers "Try again", and notices when the browser is offline. */
+export function ErrorState({ title = 'Couldn’t load this', error, children, onRetry, actions, compact = false }: {
+  title?: ReactNode; error?: Any; children?: ReactNode; onRetry?: () => unknown; actions?: ReactNode; compact?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const detail = typeof error === 'string' ? error : error?.message;
+  const retry = async () => { setBusy(true); try { await onRetry?.(); } catch (e: Any) { toast(e?.message || String(e), 'err'); } finally { setBusy(false); } };
+  return (
+    <EmptyState icon={I.warn} tone="danger" compact={compact} title={offline ? 'You’re offline' : title}
+      actions={(onRetry || actions) && <>
+        {onRetry && <button className="btn primary" disabled={busy} onClick={retry}>{busy ? <><span className="spinner" />Trying again…</> : <><Ico svg={I.refresh} />Try again</>}</button>}
+        {actions}
+      </>}>
+      {offline ? <p>Check your internet connection, then try again.</p> : children}
+      {!offline && detail && <p className="state-detail">{detail}</p>}
+    </EmptyState>
+  );
+}

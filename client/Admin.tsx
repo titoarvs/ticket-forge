@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
-import { Modal, Confirm, Ico, I, Avatar, Spinner } from './ui';
+import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState } from './ui';
+import { AdminSkeleton } from './skeletons';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['claude', 'Claude', I.sparkle], ['email', 'Email & database', I.doc]];
-const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, claude: null, loaded: false };
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['email', 'Email & database', I.doc]];
+const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
 
 const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
 const accessTitle = (a: Any) => (a === 'all' ? 'Every current and future project' : (a || []).map((id: string) => A.projects.find((p: Any) => p.id === id)?.name || id).join(', ') || 'No projects');
@@ -18,14 +19,15 @@ function inviteState(i: Any): [string, string] {
   return ['Pending', 's-inprogress'];
 }
 async function load() {
-  const [users, roles, invites, projects, email, claude] = await Promise.all([
+  const [users, roles, invites, projects, email, ai] = await Promise.all([
     api('/api/admin/users'), api('/api/admin/roles'), api('/api/admin/invites'), api('/api/admin/projects'), api('/api/admin/email'),
-    api('/api/admin/claude').catch(() => null),
+    api('/api/admin/ai').catch(() => null),
   ]);
-  Object.assign(A, { users, roles, invites, projects, email, loaded: true });
-  if (claude) applyClaude(claude); else emit();
+  Object.assign(A, { users, roles, invites, projects, email, loaded: true, error: null });
+  if (ai) applyAi(ai); else emit();
 }
-const reload = () => load().catch((e) => toast(e.message, 'err'));
+// The first load shows an error screen; later refreshes keep the page and show a toast.
+const reload = () => load().catch((e) => { if (A.loaded) toast(e.message, 'err'); else { A.error = e; emit(); } });
 async function act(fn: () => Promise<Any>, ok?: string) {
   try { const r = await fn(); await load(); if (ok) toast(ok); return r; } catch (e: Any) { toast(e.message, 'err'); await reload(); return null; }
 }
@@ -34,8 +36,15 @@ export default function AdminPage({ tab }: { tab: string }) {
   useStore();
   const [q, setQ] = useState('');
   useEffect(() => { closeProject(); reload(); }, []);
-  const t = TABS.some(([k]) => k === tab) ? tab : 'users';
-  if (!A.loaded) return <div className="page"><div className="page-inner"><Spinner /></div></div>;
+  const tt = tab === 'claude' ? 'ai' : tab;
+  const t = TABS.some(([k]) => k === tt) ? tt : 'users';
+  if (!A.loaded) {
+    if (!A.error) return <AdminSkeleton />;
+    return <div className="page"><div className="page-inner">
+      <ErrorState title="Couldn’t load Administration" error={A.error} onRetry={async () => { A.error = null; emit(); await reload(); }}
+        actions={<Link className="btn" href="/">Back to projects</Link>}><p>Users, roles and invites couldn’t be loaded.</p></ErrorState>
+    </div></div>;
+  }
   const pending = A.invites.filter((i: Any) => inviteState(i)[0] === 'Pending').length;
   return (
     <div className="page"><div className="page-inner">
@@ -47,7 +56,7 @@ export default function AdminPage({ tab }: { tab: string }) {
       {t === 'users' && <UsersTab q={q} setQ={setQ} />}
       {t === 'invites' && <InvitesTab />}
       {t === 'roles' && <RolesTab />}
-      {t === 'claude' && <ClaudeTab />}
+      {t === 'ai' && <AiTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
   );
@@ -64,9 +73,9 @@ function UsersTab({ q, setQ }: { q: string; setQ: (v: string) => void }) {
       {list.map((u: Any) => (
         <tr key={u.id}>
           <td><div className="row" style={{ flexWrap: 'nowrap' }}><Avatar name={u.name} size={32} /><div><b style={{ fontWeight: 500 }}>{u.name}</b>{u.isOwner && <> <span className="loz s-inprogress">Owner</span></>}{u.id === S.user.id && <span className="muted small"> (you)</span>}<div className="muted small">{u.email}</div></div></div></td>
-          <td><SF filter value={u.roleId} disabled={u.isOwner} title={u.isOwner ? 'The owner is always an Administrator' : ''} aria-label="Role"
+          <td><span title={u.isOwner ? 'The owner is always an Administrator' : undefined} style={{ display: 'inline-block' }}><SF filter value={u.roleId} disabled={u.isOwner} aria-label="Role"
             onChange={(e) => act(() => api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: { roleId: e.target.value } }), `${u.name} is now ${A.roles.find((r: Any) => r.id === e.target.value)?.name}`)}>
-            {A.roles.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}</SF></td>
+            {A.roles.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}</SF></span></td>
           <td><button className="btn sm" disabled={u.isOwner} title={accessTitle(u.projectAccess)} onClick={() => openModal(<AccessModal u={u} />)}><Ico svg={I.folder} />{accessText(u.projectAccess)}</button></td>
           <td><span className={`loz ${u.status === 'active' ? 's-done' : 's-todo'}`}>{u.status === 'active' ? 'Active' : 'Disabled'}</span></td>
           <td className="muted">{u.lastLoginAt ? ago(u.lastLoginAt) : 'Never'}</td>
@@ -81,6 +90,8 @@ function UsersTab({ q, setQ }: { q: string; setQ: (v: string) => void }) {
         </tr>
       ))}
     </tbody></table>
+    {!list.length && <EmptyState compact icon={I.search} tone="neutral" title={<>No users match “{q}”</>}
+      actions={<button className="btn" onClick={() => setQ('')}>Clear search</button>}><p>Search by name, email or role.</p></EmptyState>}
   </>;
 }
 
@@ -139,7 +150,8 @@ function InvitesTab() {
           </tr>
         );
       })}
-    </tbody></table> : <div className="empty"><h3>No invites yet</h3><p>Invite teammates by email and choose their role and projects.</p><button className="btn primary" onClick={() => openModal(<InviteModal />)}>Invite people</button></div>}
+    </tbody></table> : <EmptyState icon={I.people} title="No invites yet" actions={<button className="btn primary" onClick={() => openModal(<InviteModal />)}><Ico svg={I.plus} />Invite people</button>}>
+      <p>Invite teammates by email and choose their role and which projects they can open.</p></EmptyState>}
   </>;
 }
 function InviteModal() {
@@ -239,110 +251,185 @@ function DeleteRoleModal({ role }: { role: Any }) {
   );
 }
 
-// ---------------------------------------------------------------- Claude connection
-/** Stores the admin view of the Claude connection and refreshes the top-bar status for everyone's session. */
-function applyClaude(st: Any) {
-  A.claude = st;
-  const { email, orgName, authMethod, ...acct } = st.account || {};
-  S.status = { ...(S.status || {}), cli: st.cli, api: st.api, account: st.account ? acct : null, defaultProvider: st.defaultProvider, defaultModels: st.defaultModels };
+// ---------------------------------------------------------------- AI connection
+/** Stores the admin view of the AI connection and refreshes the top-bar status. */
+function applyAi(st: Any) {
+  A.ai = st;
+  const acct = st.account;
+  S.status = { ...(S.status || {}), ...st, account: acct && { cli: acct.cli, signedIn: acct.signedIn, loggedIn: acct.loggedIn, subscriptionType: acct.subscriptionType } };
   emit();
 }
 const PLAN: Record<string, string> = { pro: 'Pro', max: 'Max', team: 'Team', enterprise: 'Enterprise', free: 'Free' };
 
-function ClaudeTab() {
-  const c = A.claude || {};
-  const [login, setLogin] = useState<Any>(null); // { id, url } while signing in
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState('');
-  const [log, setLog] = useState('');
-  const pending = useRef<string | null>(null);
-  pending.current = login?.id || null;
-  // Leaving the page cancels an unfinished sign-in on the server.
-  useEffect(() => () => { if (pending.current) api('/api/admin/claude/login', { method: 'POST', body: { action: 'cancel', id: pending.current } }).catch(() => {}); }, []);
-  const row = (k: string, v: React.ReactNode) => <tr><td className="muted" style={{ width: 200 }}>{k}</td><td>{v}</td></tr>;
-  const run = async (what: string, fn: () => Promise<void>) => {
-    setBusy(what);
-    try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
-  };
-  const start = () => run('start', async () => {
-    setCode('');
-    setLogin(await api('/api/admin/claude/login', { method: 'POST', body: { action: 'start' } }));
-  });
-  const finish = () => run('finish', async () => {
-    let st;
-    // A rejected code ends that sign-in on the server, so go back to the start either way.
-    try { st = await api('/api/admin/claude/login', { method: 'POST', body: { action: 'finish', id: login.id, code: code.trim() } }); } finally { setLogin(null); setCode(''); }
-    applyClaude(st);
-    toast(`Claude connected${st.account?.email ? ` as ${st.account.email}` : ''}`);
-  });
-  const cancel = () => { api('/api/admin/claude/login', { method: 'POST', body: { action: 'cancel', id: login?.id } }).catch(() => {}); setLogin(null); setCode(''); };
-  const refresh = () => run('refresh', async () => applyClaude(await api('/api/admin/claude?fresh=1')));
-  const install = () => run('install', async () => {
-    setLog('Starting…');
-    const res = await api('/api/admin/claude/install', { method: 'POST', raw: true, body: {} });
-    await readNdjson(res, (ev) => {
-      if (ev.type === 'log') setLog(ev.line.slice(0, 160));
-      if (ev.type === 'error') throw new Error(ev.message || ev.error);
-    });
-    setLog('');
-    applyClaude(await api('/api/admin/claude?fresh=1'));
-    toast('Claude Code installed. Now sign in with your Claude account.');
-  }).finally(() => setLog(''));
-  const signOut = () => openModal(<Confirm title="Sign out of Claude?" label="Sign out"
-    text={<>TicketForge will stop using <b>{c.account?.email || 'this Claude account'}</b>. Generating and enhancing tickets and writing test scripts won't work until someone signs in again{c.api ? ' (the API key will be used instead)' : ''}.</>}
-    onYes={() => run('logout', async () => { applyClaude(await api('/api/admin/claude/logout', { method: 'POST', body: {} })); toast('Signed out of Claude'); })} />);
+function envExample(c: Any, id: string) {
+  const p = c.providers.find((x: Any) => x.id === id) || {};
+  const lines = [`AI_PROVIDER=${id}`];
+  if (id === 'ollama') lines.push(`AI_BASE_URL=${p.base}`);
+  else if (id === 'custom') lines.push('AI_BASE_URL=https://your-endpoint.example.com/v1', 'AI_API_KEY=your-key');
+  else lines.push(`AI_API_KEY=your-key        # or ${p.keys?.[0]}`);
+  lines.push(p.model ? `AI_MODEL=${p.model}` : 'AI_MODEL=a-model-your-key-can-use');
+  return lines.join('\n');
+}
+const MISSING: Record<string, string> = { provider: 'a provider', key: 'the API key', model: 'the model', baseUrl: 'the endpoint URL' };
+const ENV_MISSING: Record<string, string> = { provider: 'AI_PROVIDER', key: 'AI_API_KEY', model: 'AI_MODEL', baseUrl: 'AI_BASE_URL' };
+const join = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
 
-  const acct = c.account;
-  const installed = c.cli?.available;
-  const inUse = c.defaultProvider === 'cli' ? 'Your Claude account' : c.defaultProvider === 'api' ? 'Anthropic API key' : 'Nothing: Claude features are off';
+function TestResult({ t, onPick }: { t: Any; onPick?: (m: string) => void }) {
+  if (t.ok) return <div className="ok-banner"><Ico svg={I.check} /><span>Connected. The AI replied “{t.reply}” in {(t.ms / 1000).toFixed(1)} s.</span></div>;
+  return (
+    <div className="test-fail">
+      <div className="warn-banner danger"><Ico svg={I.warn} /><span>{t.error}</span></div>
+      {t.models?.length > 0 && <ModelList models={t.models} onPick={onPick} />}
+    </div>
+  );
+}
+function ModelList({ models, onPick }: { models: string[]; onPick?: (m: string) => void }) {
+  return <>
+    <p className="small" style={{ margin: '12px 0 6px' }}>{models.length} models your key can use{onPick ? '. Click one to use it' : ''}:</p>
+    <div className="model-list">{models.map((m) => <button key={m} type="button" className="label-chip" onClick={() => (onPick ? onPick(m) : copyText(m))}>{m}</button>)}</div>
+  </>;
+}
+
+/** The AI API setup form: provider, key, model and endpoint, saved encrypted on the server. */
+function ApiSetup({ c }: { c: Any }) {
+  const saved = c.settings;
+  const env = c.api?.source === 'env' && c.api?.id ? c.api : null;
+  const [f, setF] = useState(() => ({ provider: saved?.provider || 'anthropic', model: saved?.model || '', baseUrl: saved?.baseUrl || '', apiKey: '' }));
+  const [busy, setBusy] = useState('');
+  const [result, setResult] = useState<Any>(null);
+  const [models, setModels] = useState<string[]>([]);
+  const [showEnv, setShowEnv] = useState(false);
+  const p = c.providers.find((x: Any) => x.id === f.provider) || {};
+  const set = (k: string, v: string) => { setF((x) => ({ ...x, [k]: v })); setResult(null); };
+  const pickProvider = (v: string) => { setF((x) => ({ ...x, provider: v, model: '', baseUrl: '', apiKey: '' })); setModels([]); setResult(null); };
+  // A saved key is reused only for the same provider and endpoint (it's never sent anywhere else).
+  const keepsKey = Boolean(saved?.hasKey && saved.provider === f.provider && (saved.baseUrl || '') === f.baseUrl.trim().replace(/\/+$/, ''));
+  const keyOptional = f.provider === 'ollama' || f.provider === 'custom';
+  const needsUrl = f.provider === 'custom';
+  const [advanced, setAdvanced] = useState(Boolean(saved?.baseUrl) && !needsUrl);
+  const showUrl = needsUrl || f.provider === 'ollama' || advanced;
+  const dirty = !saved || saved.provider !== f.provider || (saved.model || '') !== f.model.trim() || (saved.baseUrl || '') !== f.baseUrl.trim().replace(/\/+$/, '') || Boolean(f.apiKey.trim());
+  const canSave = Boolean(f.provider && (f.model.trim() || p.model) && (!needsUrl || f.baseUrl.trim()) && (keyOptional || keepsKey || f.apiKey.trim()));
+  const draft = { provider: f.provider, model: f.model.trim(), baseUrl: f.baseUrl.trim(), apiKey: f.apiKey.trim() };
+  const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); try { await fn(); } catch (e: Any) { setResult({ ok: false, error: e.message }); } finally { setBusy(''); } };
+  const loadModels = () => run('models', async () => {
+    const r = await api('/api/admin/ai', { method: 'POST', body: { action: 'models', draft } });
+    setModels(r.models || []);
+    if (!r.models?.length) setResult({ ok: false, error: 'The provider didn’t list any models. Type the model name instead.' });
+  });
+  const test = () => run('test', async () => setResult(await api('/api/admin/ai', { method: 'POST', body: { action: 'test', draft } })));
+  const save = () => run('save', async () => {
+    const st = await api('/api/admin/ai', { method: 'PUT', body: draft });
+    applyAi(st); setF((x) => ({ ...x, apiKey: '' })); setResult(null);
+    toast(`Saved. ${st.api?.label || 'The AI API'} is set up${st.mode === 'account' ? ' for when TicketForge isn’t opened on this computer' : ''}.`);
+  });
+  const remove = () => openModal(<Confirm title="Remove the saved AI setup?" label="Remove"
+    text={<>The saved provider, model and API key are deleted. {env ? <>TicketForge falls back to the environment variables ({env.label}).</> : 'AI won’t work outside your own computer until someone sets it up again.'}</>}
+    onYes={() => run('remove', async () => { const st = await api('/api/admin/ai', { method: 'DELETE' }); applyAi(st); setF({ provider: 'anthropic', model: '', baseUrl: '', apiKey: '' }); setModels([]); toast('AI setup removed'); })} />);
+
+  return (
+    <div className="card wide"><h3>Set up an AI API</h3>
+      <p className="sub">Used whenever TicketForge isn’t opened on localhost, for example on Vercel. Saved settings apply to every copy that
+        uses this database, and take priority over environment variables. The key is stored encrypted and never shown again.</p>
+      {saved && <p className="small muted" style={{ marginTop: -8 }}><Ico svg={I.check} /> Saved{saved.updatedBy ? ` by ${saved.updatedBy}` : ''}{saved.updatedAt ? ` ${ago(saved.updatedAt)}` : ''}.</p>}
+      {!saved && env && <div className="warn-banner" style={{ background: 'var(--selected-bg)', color: 'var(--text-subtle)' }}><Ico svg={I.settings} />
+        <span>Currently set with environment variables: <b>{env.label}</b>{env.model ? <>, model <code>{env.model}</code></> : ''}. Saving here overrides them.</span></div>}
+
+      <div className="grid2">
+        <label className="field"><span>Provider</span>
+          <SF value={f.provider} onChange={(e) => pickProvider(e.target.value)}>{c.providers.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.label}</MenuItem>)}</SF></label>
+        <label className="field"><span>API key{keyOptional ? ' (optional)' : ''}</span>
+          <TF type="password" value={f.apiKey} onChange={(e) => set('apiKey', e.target.value)} autoComplete="off"
+            placeholder={keepsKey ? `Saved, ends with ${saved.keyHint}. Leave blank to keep it` : p.site ? `Paste your key from ${p.site}` : 'Paste your API key'} />
+        </label>
+      </div>
+      {showUrl && <label className="field"><span>Endpoint URL{needsUrl ? '' : ' (optional)'}</span>
+        <TF value={f.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder={p.base || 'https://your-endpoint.example.com/v1'} spellCheck={false} />
+        {!needsUrl && <span className="muted small" style={{ fontWeight: 400 }}>Leave blank for {p.base || 'the default'}.</span>}</label>}
+      <div className="field"><span>Model</span>
+        <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'stretch' }}>
+          <PeopleF avatars={false} value={f.model} onChange={(v) => set('model', v)} options={models} placeholder={p.model ? `${p.model} (default)` : 'Type a model name, or load the list'} />
+          <button type="button" className="btn" disabled={!!busy || (!keyOptional && !keepsKey && !f.apiKey.trim()) || (needsUrl && !f.baseUrl.trim())} onClick={loadModels}>
+            {busy === 'models' ? <><Spinner />Loading…</> : 'Load models'}</button>
+        </div>
+      </div>
+      {models.length > 0 && !result && <ModelList models={models} onPick={(m) => set('model', m)} />}
+
+      <div className="row" style={{ marginTop: 16 }}>
+        <button className="btn primary" disabled={!!busy || !canSave || !dirty} onClick={save}>{busy === 'save' ? <><Spinner />Saving…</> : 'Save'}</button>
+        <button className="btn" disabled={!!busy || !canSave} onClick={test}>{busy === 'test' ? <><Spinner />Testing…</> : 'Test these settings'}</button>
+        {!showUrl && <button type="button" className="btn subtle" onClick={() => setAdvanced(true)}>Custom endpoint</button>}
+        <div className="spacer" />
+        {saved && <button className="btn subtle danger-text" disabled={!!busy} onClick={remove}>Remove saved setup</button>}
+      </div>
+      {result && <div style={{ marginTop: 12 }}><TestResult t={result} onPick={(m) => set('model', m)} /></div>}
+
+      <p className="muted small" style={{ margin: '16px 0 0' }}>
+        <a href="#" onClick={(e) => { e.preventDefault(); setShowEnv(!showEnv); }}>{showEnv ? 'Hide' : 'Prefer environment variables?'}</a>
+        {showEnv && <> On Vercel: <b>Settings → Environment Variables</b>, then redeploy. Settings saved here take priority.</>}</p>
+      {showEnv && <pre className="code" style={{ marginTop: 8 }}>{envExample(c, f.provider)}</pre>}
+    </div>
+  );
+}
+
+function AiTab() {
+  const c = A.ai;
+  const [test, setTest] = useState<Any>(null);
+  const [busy, setBusy] = useState('');
+  const refresh = async () => { setBusy('refresh'); try { applyAi(await api('/api/admin/ai?fresh=1')); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
+  if (!c) {
+    return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await api('/api/admin/ai?fresh=1'))}>
+      <p>The server didn’t report how TicketForge connects to AI.</p></ErrorState></div>;
+  }
+  const row = (k: string, v: React.ReactNode) => <tr><td className="muted" style={{ width: 200 }}>{k}</td><td>{v}</td></tr>;
+  const a = c.api || {}, acct = c.account;
+  const runTest = async () => {
+    setBusy('test'); setTest(null);
+    try { setTest(await api('/api/admin/ai', { method: 'POST', body: { action: 'test' } })); } catch (e: Any) { setTest({ ok: false, error: e.message }); } finally { setBusy(''); }
+  };
+  const why = c.forced ? `Chosen with AI_MODE=${c.mode} on the server.`
+    : c.mode === 'account' ? 'You opened TicketForge on this computer (localhost), so it uses your personal Claude account through Claude Code.'
+    : c.serverless ? 'This copy runs on serverless hosting, so it uses the AI API.'
+    : 'TicketForge was opened on a web address (not localhost), so it uses the AI API.';
+  const source = a.source === 'panel' ? 'Set up in this panel' : a.source === 'env' && a.id ? 'From environment variables' : null;
   return (
     <div className="cards">
-      <div className="card"><h3>Claude account</h3>
-        <p className="sub">TicketForge uses Claude to generate and enhance tickets and to write test scripts. Everyone in this workspace uses the account signed in here.</p>
+      <div className="card wide"><h3>AI connection</h3>
+        <p className="sub">TicketForge uses AI to write and improve tickets and test scripts. On your own computer it uses your Claude account; anywhere else, the AI API set up below.</p>
         <table className="tbl"><tbody>
-          {row('Claude Code on the server', installed
-            ? <>{c.cli.version}{c.cli.outdated && <span className="loz t-blocked" style={{ marginLeft: 6 }}>Outdated</span>}<div className="muted small" style={{ wordBreak: 'break-all' }}>{c.cli.path}</div></>
-            : <span className="loz t-fail">Not installed</span>)}
-          {installed && row('Signed in', acct?.loggedIn
-            ? <><span className="loz t-pass">Connected</span> <b>{acct.email || 'Claude account'}</b>{acct.subscriptionType && <span className="label-chip" style={{ marginLeft: 6 }}>{PLAN[acct.subscriptionType] || acct.subscriptionType}</span>}
-                {acct.orgName && <div className="muted small">{acct.orgName}</div>}</>
-            : acct?.loggedIn === false ? <span className="loz t-fail">Not signed in</span>
-            : <span className="muted">Unknown: update Claude Code to see this</span>)}
-          {row('Claude features use', inUse)}
+          {row('This address uses', <><span className={`loz ${c.ready ? 't-pass' : 't-fail'}`}>{c.ready ? 'Ready' : 'Not set up'}</span>{' '}
+            <b>{c.mode === 'account' ? 'Your Claude account' : a.label || 'AI API'}</b><div className="muted small">{why}</div></>)}
+          {c.mode === 'account' && <>
+            {row('Claude Code', acct?.cli?.available
+              ? <>{acct.cli.version}{acct.cli.outdated && <span className="loz t-blocked" style={{ marginLeft: 6 }}>Outdated</span>}<div className="muted small" style={{ wordBreak: 'break-all' }}>{acct.cli.path}</div></>
+              : <span className="loz t-fail">Not installed</span>)}
+            {acct?.cli?.available && row('Signed in', acct.loggedIn
+              ? <><b>{acct.email || 'Claude account'}</b>{acct.subscriptionType && <span className="label-chip" style={{ marginLeft: 6 }}>{PLAN[acct.subscriptionType] || acct.subscriptionType}</span>}
+                  {acct.orgName && <div className="muted small">{acct.orgName}</div>}</>
+              : acct.loggedIn === false ? <span className="loz t-fail">Not signed in</span> : <span className="muted">Unknown: update Claude Code to see this</span>)}
+          </>}
+          {row(c.mode === 'account' ? 'AI API (elsewhere)' : 'AI API', a.id && !(a.error && !a.keySet)
+            ? <><b>{a.label}</b>{a.model && <> · <code>{a.model}</code></>}{a.configured ? '' : <span className="loz t-fail" style={{ marginLeft: 6 }}>Incomplete</span>}
+                {source && <div className="muted small">{source}{a.kind === 'openai' && a.baseUrl ? <> · {a.baseUrl}</> : ''}</div>}</>
+            : <span className="loz">Not set up</span>)}
         </tbody></table>
 
-        {!installed && <div className="claude-steps">
-          <p>Claude Code isn't on this server yet. TicketForge can install it into its data folder (about 200 MB, needs internet access and npm).</p>
-          <div className="row"><button className="btn primary" disabled={!!busy} onClick={install}>{busy === 'install' ? <><Spinner />Installing…</> : 'Install Claude Code'}</button>
-            {log && <span className="muted small mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{log}</span>}</div>
-        </div>}
+        {c.mode === 'account' && !c.ready && <div className="claude-steps"><p style={{ marginBottom: 0 }}>
+          {acct?.cli?.available ? <>Open Terminal on this computer, run <code>claude</code> and sign in with your Claude account. Then click <b>Check again</b>.</>
+            : <>Install Claude Code on this computer with <code>npm install -g @anthropic-ai/claude-code</code>, run <code>claude</code> and sign in with your Claude account. Then click <b>Check again</b>.</>}</p></div>}
+        {a.id && !a.configured && <div className="warn-banner" style={{ marginTop: 12 }}><Ico svg={I.warn} />
+          <span>{a.error || (a.source === 'env'
+            ? <>{a.label} is missing {join(a.missing.map((m: string) => ENV_MISSING[m]))} in the environment. Set it up below instead.</>
+            : <>{a.label} is missing {join(a.missing.map((m: string) => MISSING[m]))}. Complete it below.</>)}</span></div>}
 
-        {installed && login && <div className="claude-steps">
-          <ol>
-            <li><b>Open the Claude sign-in page</b> and approve access with the account TicketForge should use.
-              <div className="row"><a className="btn primary" href={login.url} target="_blank" rel="noopener noreferrer"><Ico svg={I.external} />Open Claude sign-in</a>
-                <button className="btn subtle" onClick={() => copyText(login.url)}><Ico svg={I.copy} />Copy link</button></div></li>
-            <li><b>Paste the code</b> Claude shows after you approve.
-              <div className="row" style={{ flexWrap: 'nowrap' }}>
-                <TF autoFocus sx={{ flex: 1, minWidth: 0 }} placeholder="Paste the code from Claude" value={code} onChange={(e) => setCode(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && code.trim() && !busy) finish(); }} slotProps={{ htmlInput: { autoComplete: 'off', spellCheck: false } }} />
-                <button className="btn primary" disabled={!code.trim() || !!busy} onClick={finish}>{busy === 'finish' ? <><Spinner />Connecting…</> : 'Connect'}</button>
-              </div></li>
-          </ol>
-          <button className="btn subtle" disabled={busy === 'finish'} onClick={cancel}>Cancel</button>
-        </div>}
-
-        {installed && !login && <div className="row" style={{ marginTop: 12 }}>
-          <button className={`btn ${acct?.loggedIn ? '' : 'primary'}`} disabled={!!busy} onClick={start}>{busy === 'start' ? <><Spinner />Starting…</> : acct?.loggedIn ? 'Switch account' : 'Sign in with Claude'}</button>
-          {acct?.loggedIn && <button className="btn" disabled={!!busy} onClick={signOut}>Sign out</button>}
-          {c.cli?.outdated && <button className="btn" disabled={!!busy} onClick={install}>{busy === 'install' ? 'Updating…' : 'Update Claude Code'}</button>}
-          <div className="spacer" /><button className="btn subtle" disabled={!!busy} onClick={refresh}><Ico svg={I.refresh} />Check again</button>
-        </div>}
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn primary" disabled={!!busy || !c.ready} onClick={runTest}>{busy === 'test' ? <><Spinner />Testing…</> : c.mode === 'account' ? 'Test Claude account' : 'Test connection'}</button>
+          <button className="btn subtle" disabled={!!busy} onClick={refresh}><Ico svg={I.refresh} />Check again</button>
+        </div>
+        {test && <div style={{ marginTop: 12 }}><TestResult t={test} /></div>}
       </div>
 
-      <div className="card"><h3>Anthropic API key</h3><p className="sub">An alternative to a Claude account, billed per use in the Anthropic Console.</p>
-        <table className="tbl"><tbody>{row('API key', c.api ? <span className="loz t-pass">Set</span> : <span className="loz">Not set</span>)}</tbody></table>
-        <p className="muted small" style={{ marginBottom: 0 }}>Add <code>ANTHROPIC_API_KEY=sk-ant-…</code> to the server's <code>.env</code> and restart TicketForge. It's used when no Claude account is signed in.</p></div>
+      <ApiSetup key={`${c.settings?.updatedAt || 'none'}`} c={c} />
     </div>
   );
 }
