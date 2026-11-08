@@ -51,7 +51,7 @@ export const S: Any = {
   drawer: null, full: false,
   filter: EMPTY_FILTER(), tcFilter: { q: '', status: '', type: '' },
   groupBy: 'sprint', boardAll: false, boardGroup: 'none',
-  collapsed: new Set<string>(), detailsOpen: true, actTab: 'comments', sideCollapsed: false, autoTab: 'results',
+  collapsed: new Set<string>(), detailsOpen: true, actTab: 'comments', sideCollapsed: false, autoTab: 'results', drawerW: null as number | null, tlZoom: 'months', tlOpen: new Set<string>(), boardCollapsed: new Set<string>(), sourceDoc: null as string | null, setTab: 'details',
   inlineCreate: null, subForm: false, linkForm: false, prForm: false, cmtEdit: null,
   checked: new Set<string>(), openTc: new Set<string>(),
   // testsPerTicket: null = the team default (Administration → Generation)
@@ -78,10 +78,10 @@ export function loadPrefs() {
     // Older saves stored the old fixed default (4); only a number the user picked on purpose is kept.
     genOpts: (({ testsPerTicket, testsPicked, ...g }: Any) => ({ ...S.genOpts, ...g, testsPerTicket: testsPicked ? testsPerTicket : null, testsPicked: Boolean(testsPicked) }))(store.get('tf.genOpts', S.genOpts)),
     groupBy: ui.groupBy || 'sprint', boardGroup: ui.boardGroup || 'none',
-    collapsed: new Set(ui.collapsed || []), detailsOpen: ui.detailsOpen ?? true, actTab: ui.actTab || 'comments', sideCollapsed: Boolean(ui.sideCollapsed), autoTab: ui.autoTab || 'results',
+    collapsed: new Set(ui.collapsed || []), detailsOpen: ui.detailsOpen ?? true, actTab: ui.actTab || 'comments', sideCollapsed: Boolean(ui.sideCollapsed), autoTab: ui.autoTab || 'results', drawerW: Number(ui.drawerW) || null, tlZoom: ui.tlZoom || 'months', tlOpen: new Set(ui.tlOpen || []), boardCollapsed: new Set(ui.boardCollapsed || []), setTab: ui.setTab || 'details',
   });
 }
-export const saveUi = () => store.set('tf.ui', { groupBy: S.groupBy, boardGroup: S.boardGroup, collapsed: [...S.collapsed], detailsOpen: S.detailsOpen, actTab: S.actTab, sideCollapsed: S.sideCollapsed, autoTab: S.autoTab });
+export const saveUi = () => store.set('tf.ui', { groupBy: S.groupBy, boardGroup: S.boardGroup, collapsed: [...S.collapsed], detailsOpen: S.detailsOpen, actTab: S.actTab, sideCollapsed: S.sideCollapsed, autoTab: S.autoTab, drawerW: S.drawerW, tlZoom: S.tlZoom, tlOpen: [...S.tlOpen], boardCollapsed: [...S.boardCollapsed], setTab: S.setTab });
 /** Collapses the project sidebar to an icon rail, or expands it again (remembered per browser). */
 export function toggleSidebar(force?: boolean) { S.sideCollapsed = force ?? !S.sideCollapsed; saveUi(); emit(); }
 
@@ -103,7 +103,7 @@ export async function api(url: string, { method = 'GET', body, raw, signal }: { 
 export const aiBody = (b: Any) => ({ ...b, provider: S.settings.provider || undefined, model: S.settings.model || undefined, project: b.project && slimProject(b.project) });
 export function slimProject(p: Any) {
   return {
-    ...p, sourceText: undefined,
+    ...p, sourceText: undefined, sources: undefined,
     tickets: p.tickets.map((t: Any) => ({ ...t, history: undefined, comments: undefined, testCases: t.testCases.map((tc: Any) => ({ ...tc, script: undefined, lastRun: undefined })) })),
   };
 }
@@ -161,6 +161,24 @@ export const tcKey = (t: Any, i: number) => `TC-${t.key}-${String(i + 1).padStar
 export const spSum = (list: Any[]) => list.reduce((s, t) => s + (Number(t.storyPoints) || 0), 0);
 export const statusNames = (): string[] => P().workflow.map((w: Any) => w.name);
 export const catOf = (status: string) => P()?.workflow.find((w: Any) => w.name === status)?.category || 'todo';
+
+// ---- workflow transitions (Project settings → Workflow). flowMode 'free' (default): any status to any status.
+// 'custom': each status lists the statuses it can move to (next: [ids]); fromAny lets every status move to it.
+export const statusOf = (name: string) => P()?.workflow.find((w: Any) => w.name === name);
+export const customFlow = () => P()?.flowMode === 'custom';
+/** Whether an issue may move from its status to `to` under the project's workflow. */
+export function canMove(t: Any, to: string): boolean {
+  if (!t || t.status === to || !customFlow()) return true;
+  const from = statusOf(t.status), dest = statusOf(to);
+  if (!from || !dest) return true;
+  return Boolean(dest.fromAny) || (from.next || []).includes(dest.id);
+}
+/** Statuses this issue can move to now, in workflow order (its current status first). */
+export const allowedStatuses = (t: Any): string[] => P().workflow.map((w: Any) => w.name).filter((n: string) => n === t.status || canMove(t, n));
+export const moveError = (t: Any, to: string) => {
+  const ok = allowedStatuses(t).filter((n) => n !== t.status);
+  return `${t.key} can’t move from “${t.status}” to “${to}” in this project’s workflow.${ok.length ? ` It can move to ${ok.map((n) => `“${n}”`).join(', ')}.` : ''}`;
+};
 export const isDone = (t: Any) => catOf(t.status) === 'done';
 export const sCls = (status: string) => `s-${catOf(status)}`;
 export const tCls = (s: string) => `t-${String(s).toLowerCase().replace(/\s/g, '')}`;
@@ -209,6 +227,10 @@ export function applyAi(base: Any, ai: Any) {
 export function ensureProject(p: Any) {
   p.members ??= [];
   p.workflow = p.workflow?.length ? p.workflow : clone(DEFAULT_WORKFLOW);
+  for (const w of p.workflow) w.id ??= uid();
+  p.flowMode ??= 'free';
+  const ids = new Set(p.workflow.map((w: Any) => w.id));
+  for (const w of p.workflow) if (w.next) w.next = w.next.filter((id: string) => ids.has(id) && id !== w.id);
   p.sprints ??= [];
   p.automation ??= { baseUrl: '' };
   const names = new Set(p.workflow.map((w: Any) => w.name));

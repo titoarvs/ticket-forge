@@ -139,3 +139,13 @@ export function ErrorState({ title = 'Couldn’t load this', error, children, on
     </EmptyState>
   );
 }
+
+/** A settings card: title, one-line explanation, optional actions on the right, then the content. */
+export function SetCard({ title, desc, right, children, tone, id }: { title: React.ReactNode; desc?: React.ReactNode; right?: React.ReactNode; children?: React.ReactNode; tone?: 'danger'; id?: string }) {
+  return (
+    <section className={`set-card ${tone ? `tone-${tone}` : ''}`} id={id} aria-labelledby={id ? `${id}-h` : undefined}>
+      <header className="set-card-h"><div style={{ minWidth: 0 }}><h3 id={id ? `${id}-h` : undefined}>{title}</h3>{desc && <p>{desc}</p>}</div>{right && <div className="set-card-right">{right}</div>}</header>
+      {children}
+    </section>
+  );
+}

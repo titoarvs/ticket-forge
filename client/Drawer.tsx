@@ -2,7 +2,7 @@
 // Issue and epic detail panels.
 import { useState } from 'react';
 import {
-  S, emit, P, ago, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
+  S, emit, P, ago, fmtDate, allowedStatuses, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
   statusNames, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
   clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, type Any,
 } from './core';
@@ -12,6 +12,7 @@ import {
   saveComment, runTests, DeleteEpicModal, CreateIssueModal, NewWithClaudeModal,
 } from './actions';
 import { epicProgress, ProgBar, setTcStatus } from './views';
+import { epicRange, setEpicDates } from './Timeline';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -36,8 +37,45 @@ export function Drawer() {
   if (!t && !e) return null;
   return <>
     {S.full && <div className="drawer-blanket" onClick={close} />}
-    <aside className={`drawer ${S.full ? 'full' : ''}`}>{t ? <IssuePanel key={t.id} t={t} /> : <EpicPanel key={e.id} e={e} />}</aside>
+    <aside className={`drawer ${S.full ? 'full' : ''} ${S.drawerW ? 'sized' : ''}`} style={S.drawerW ? { ['--drawer-w' as string]: `${S.drawerW}px` } : undefined}>
+      {!S.full && <ResizeHandle />}
+      {t ? <IssuePanel key={t.id} t={t} /> : <EpicPanel key={e.id} e={e} />}</aside>
   </>;
+}
+
+const DRAWER_MIN = 380;
+/** Widest the panel may be: leave room for the list beside it. */
+const drawerMax = (el: HTMLElement) => Math.max(DRAWER_MIN, (el.parentElement?.clientWidth || window.innerWidth) - 360);
+const setDrawerW = (w: number | null) => { S.drawerW = w; saveUi(); emit(); };
+
+/** Drag the panel's left edge to resize it; double-click resets. Arrow keys work too when it has focus. */
+function ResizeHandle() {
+  const start = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    const handle = ev.currentTarget, aside = handle.parentElement as HTMLElement;
+    const right = aside.getBoundingClientRect().right, max = drawerMax(aside);
+    let w = aside.offsetWidth;
+    handle.setPointerCapture(ev.pointerId);
+    document.body.classList.add('resizing-x');
+    aside.classList.add('sized');
+    const move = (e: PointerEvent) => { w = Math.round(Math.min(max, Math.max(DRAWER_MIN, right - e.clientX))); aside.style.setProperty('--drawer-w', `${w}px`); };
+    const end = () => {
+      handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', end); handle.removeEventListener('pointercancel', end);
+      document.body.classList.remove('resizing-x');
+      setDrawerW(w);
+    };
+    handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', end); handle.addEventListener('pointercancel', end);
+  };
+  const key = (ev: React.KeyboardEvent<HTMLDivElement>) => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    ev.preventDefault();
+    const aside = ev.currentTarget.parentElement as HTMLElement;
+    const step = ev.shiftKey ? 80 : 20;
+    setDrawerW(Math.min(drawerMax(aside), Math.max(DRAWER_MIN, aside.offsetWidth + (ev.key === 'ArrowLeft' ? step : -step))));
+  };
+  return <div className="drawer-resize" role="separator" aria-orientation="vertical" aria-label="Resize panel" tabIndex={0}
+    title="Drag to resize · double-click to reset" onPointerDown={start} onDoubleClick={() => setDrawerW(null)} onKeyDown={key} />;
 }
 
 // ---------------------------------------------------------------- issue
@@ -79,7 +117,7 @@ function IssuePanel({ t }: { t: Any }) {
     <div className="dr-scroll">
       <TA title rows={1} aria-label="Summary" disabled={!edit} value={t.title} onChange={(ev) => field('title', ev.target.value.replace(/\n/g, ' '))} />
       <div className="dr-actions">
-        <SF tone={catOf(t.status)} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(statusNames())}</SF>
+        <SF tone={catOf(t.status)} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(allowedStatuses(t))}</SF>
         {can('ai.use') && edit && <>
           <button className="btn ai" title="Improve the whole issue" onClick={() => runTicketAi(t, 'enhance')}><Ico svg={I.sparkle} />Enhance</button>
           <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More Claude actions<Ico svg={I.chevron} /></button>}>
@@ -234,7 +272,7 @@ function IssuePanel({ t }: { t: Any }) {
                   {p.tickets.filter((x: Any) => !isSub(x)).map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.key} — {x.title.slice(0, 40)}</MenuItem>)}</SF>
               </> : <>
                 <span className="label">Epic</span>
-                <span className="with-icon">{e && <Swatch color={e.color} style={{ marginLeft: 4 }} />}<SF disabled={!edit && !can('epic.manage')} value={t.epicId || ''} onChange={(ev) => field('epicId', ev.target.value || null)}>
+                <span className="with-icon" title={e?.title || undefined}>{e && <Swatch color={e.color} style={{ marginLeft: 4 }} />}<SF disabled={!edit && !can('epic.manage')} value={t.epicId || ''} onChange={(ev) => field('epicId', ev.target.value || null)}>
                   <MenuItem value="">None</MenuItem>{p.epics.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</SF></span>
                 <span className="label">Issue type</span>
                 <span className="with-icon"><TypeIcon type={t.type} /><SF disabled={!edit} value={t.type} onChange={(ev) => field('type', ev.target.value)}>{opts(TYPES)}</SF></span>
@@ -328,6 +366,7 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
 function EpicPanel({ e }: { e: Any }) {
   const pr = epicProgress(e);
   const ed = can('epic.manage');
+  const range = epicRange(e);
   return <>
     <Head crumb={<Crumb type="Epic" keyText={e.key} />} menu={ed ? <button style={{ color: 'var(--danger)' }} onClick={() => openModal(<DeleteEpicModal ep={e} />)}><Ico svg={I.trash} />Delete epic</button> : <span className="muted small" style={{ padding: '8px 16px', display: 'block' }}>No actions available</span>} />
     <div className="dr-scroll">
@@ -338,6 +377,13 @@ function EpicPanel({ e }: { e: Any }) {
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
+      <div className="sec"><div className="sec-title"><h3>Dates</h3>
+        {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>
+        <div className="grid2 epic-dates">
+          <label className="field"><span>Start date</span><DateF disabled={!ed} value={e.startDate || ''} onChange={(v) => setEpicDates(e, v, e.dueDate && v && e.dueDate < v ? v : e.dueDate || '')} /></label>
+          <label className="field"><span>Due date</span><DateF disabled={!ed} value={e.dueDate || ''} onChange={(v) => setEpicDates(e, e.startDate && v && e.startDate > v ? v : e.startDate || '', v)} /></label>
+        </div>
+        <p className="muted small" style={{ margin: '6px 0 0' }}>Shown as a bar on the <a href={`/p/${P().id}/timeline`}>Timeline</a>.</p></div>
       <div className="sec"><div className="sec-title"><h3>Colour</h3></div>
         <div className="row">{COLORS.map((c) => <button key={c} className="icon-btn" disabled={!ed} aria-label={`Colour ${c}`} onClick={() => mutate(() => { e.color = c; })}
           style={{ width: 24, height: 24, borderRadius: 4, background: c, boxShadow: c === e.color ? '0 0 0 2px var(--bg), 0 0 0 4px var(--border-focus)' : 'none' }} />)}</div></div>

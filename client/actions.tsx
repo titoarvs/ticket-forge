@@ -5,7 +5,7 @@ import {
   S, emit, api, aiBody, readNdjson, toast, withBusy, setBusy, openModal, closeModal, mutate, saveNow, store, pullRemote, loadNotifs,
   P, ticket, epic, isSub, childrenOf, epicTickets, activeSprint, openSprints, tcKey, spSum, isDone, me, can, peopleNames,
   uid, clone, nowIso, dateInput, COLORS, TYPES, PRIORITIES, nextTicketKey, nextEpicKey, newTicket, withIds, applyAi,
-  addMember, logEvent, setField, addLink, deleteIssues, type Any,
+  addMember, logEvent, setField, addLink, deleteIssues, canMove, moveError, type Any,
 } from './core';
 import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea } from './ui';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -43,8 +43,11 @@ export async function exportAs(fmt: string) {
 }
 
 // ---------------------------------------------------------------- issues
-export function moveTicket(id: string, zone: { group?: string; status?: string; epic?: string | null }, beforeId?: string) {
+export function moveTicket(id: string, zone: { group?: string; status?: string; epic?: string | null; assignee?: string | null }, beforeId?: string) {
   if (!id) return;
+  const to = zone.status || (zone.group?.startsWith('s:') ? zone.group.slice(2) : '');
+  const cur = P().tickets.find((x: Any) => x.id === id);
+  if (to && cur && !canMove(cur, to)) { toast(moveError(cur, to), 'err'); return; }
   mutate((p) => {
     const t = p.tickets.find((x: Any) => x.id === id);
     const g = zone.group;
@@ -53,6 +56,7 @@ export function moveTicket(id: string, zone: { group?: string; status?: string; 
     if (g?.startsWith('sp:')) setField(t, 'sprintId', g === 'sp:none' ? null : g.slice(3));
     if (zone.status) setField(t, 'status', zone.status);
     if (zone.epic !== undefined && !isSub(t)) setField(t, 'epicId', zone.epic || null);
+    if (zone.assignee !== undefined) setField(t, 'assignee', zone.assignee || '');
     if (beforeId && beforeId !== id) {
       const before = p.tickets.find((x: Any) => x.id === beforeId);
       p.tickets.splice(p.tickets.indexOf(t), 1);
