@@ -51,7 +51,7 @@ export const S: Any = {
   drawer: null, full: false,
   filter: EMPTY_FILTER(), tcFilter: { q: '', status: '', type: '' },
   groupBy: 'sprint', boardAll: false, boardGroup: 'none',
-  collapsed: new Set<string>(), detailsOpen: true, actTab: 'comments', sideCollapsed: false,
+  collapsed: new Set<string>(), detailsOpen: true, actTab: 'comments', sideCollapsed: false, autoTab: 'results',
   inlineCreate: null, subForm: false, linkForm: false, prForm: false, cmtEdit: null,
   checked: new Set<string>(), openTc: new Set<string>(),
   // testsPerTicket: null = the team default (Administration → Generation)
@@ -78,10 +78,10 @@ export function loadPrefs() {
     // Older saves stored the old fixed default (4); only a number the user picked on purpose is kept.
     genOpts: (({ testsPerTicket, testsPicked, ...g }: Any) => ({ ...S.genOpts, ...g, testsPerTicket: testsPicked ? testsPerTicket : null, testsPicked: Boolean(testsPicked) }))(store.get('tf.genOpts', S.genOpts)),
     groupBy: ui.groupBy || 'sprint', boardGroup: ui.boardGroup || 'none',
-    collapsed: new Set(ui.collapsed || []), detailsOpen: ui.detailsOpen ?? true, actTab: ui.actTab || 'comments', sideCollapsed: Boolean(ui.sideCollapsed),
+    collapsed: new Set(ui.collapsed || []), detailsOpen: ui.detailsOpen ?? true, actTab: ui.actTab || 'comments', sideCollapsed: Boolean(ui.sideCollapsed), autoTab: ui.autoTab || 'results',
   });
 }
-export const saveUi = () => store.set('tf.ui', { groupBy: S.groupBy, boardGroup: S.boardGroup, collapsed: [...S.collapsed], detailsOpen: S.detailsOpen, actTab: S.actTab, sideCollapsed: S.sideCollapsed });
+export const saveUi = () => store.set('tf.ui', { groupBy: S.groupBy, boardGroup: S.boardGroup, collapsed: [...S.collapsed], detailsOpen: S.detailsOpen, actTab: S.actTab, sideCollapsed: S.sideCollapsed, autoTab: S.autoTab });
 /** Collapses the project sidebar to an icon rail, or expands it again (remembered per browser). */
 export function toggleSidebar(force?: boolean) { S.sideCollapsed = force ?? !S.sideCollapsed; saveUi(); emit(); }
 

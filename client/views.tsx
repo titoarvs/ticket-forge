@@ -7,13 +7,14 @@ import {
   activeSprint, openSprints, tcKey, spSum, statusNames, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
   saveUi, EMPTY_FILTER, mutate, setField, deleteIssues, historyText, openModal, toast, uid, logEvent, api, type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea, EmptyState } from './ui';
+import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea, EmptyState, Modal } from './ui';
 import {
   openDrawer, moveTicket, inlineCreate, createSprint, deleteSprint, SprintModal, CompleteSprintModal, NewWithClaudeModal, RegroupModal,
   addEpic, bulkTests, runTests, installBrowser, ScriptModal, openCreateIssue,
 } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { AppSetup } from './AppSetup';
+import { FeatureModal } from './FeatureModal';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -228,7 +229,9 @@ export function Backlog() {
   const act = activeSprint();
   const toggle = (id: string) => { if (S.collapsed.has(id)) S.collapsed.delete(id); else S.collapsed.add(id); saveUi(); emit(); };
   return <>
-    <Header title="Backlog" right={can('ai.use') && can('issue.create') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal />)}><Ico svg={I.sparkle} />Write issue with Claude</button>} />
+    <Header title="Backlog" right={can('ai.use') && can('issue.create') && <>
+      <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>
+      <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal />)}><Ico svg={I.sparkle} />Write issue with AI</button></>} />
     <FilterBar group={{ value: S.groupBy, options: [['sprint', 'Sprint'], ['epic', 'Epic'], ['status', 'Status'], ['none', 'None']], onChange: (v) => { S.groupBy = v; saveUi(); emit(); } }} />
     <BulkBar />
     {groups.length ? groups.map((g: Any) => {
@@ -335,9 +338,11 @@ export function Board() {
 export function Epics() {
   const p = P();
   return <>
-    <Header title="Epics" right={can('epic.manage') && <>
-      {can('ai.use') && <button className="btn ai" onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize with Claude</button>}
-      <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button></>} />
+    <Header title="Epics" right={<>
+      {can('ai.use') && can('issue.create') && <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>}
+      {can('epic.manage') && <>
+      {can('ai.use') && <button className="btn ai" onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize with AI</button>}
+      <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button></>}</>} />
     {p.epics.length ? <>
       <table className="tbl"><thead><tr><th>Epic</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
@@ -523,42 +528,33 @@ export function automationItems(scope: string) {
   }
   return out;
 }
+const AUTO_TABS: [string, string, string][] = [['results', 'Results', I.play], ['failures', 'Failures', I.warn], ['setup', 'App setup', I.doc], ['settings', 'Settings', I.settings]];
+
 export function Automation() {
   const p = P();
   const eng = S.engine, run = S.autoRun, act = activeSprint();
+  const tab = AUTO_TABS.some(([k]) => k === S.autoTab) ? S.autoTab : 'results';
+  const setTab = (k: string) => { S.autoTab = k; saveUi(); emit(); };
+  const failing = p.tickets.reduce((n: number, t: Any) => n + t.testCases.filter((x: Any) => x.lastRun && x.lastRun.status !== 'Pass').length, 0);
   const items = automationItems(S.autoScope);
   const all = p.tickets.flatMap((t: Any) => t.testCases);
   const ran = all.filter((x: Any) => x.lastRun);
   return <>
     <Header title="Test automation" right={can('test.run') && (run?.running ? <button className="btn danger" onClick={() => run.ctrl?.abort()}><Ico svg={I.stop} />Stop</button>
       : <button className="btn primary" disabled={!items.length || !eng?.browser} onClick={() => runTests(items, { regenerate: S.autoRegen })}><Ico svg={I.play} />Run {items.length} test{items.length === 1 ? '' : 's'}</button>)} />
+    <div className="tabbar auto-tabs" role="tablist" aria-label="Test automation">{AUTO_TABS.map(([k, label, icon]) => (
+      <button key={k} type="button" role="tab" aria-selected={tab === k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
+        <Ico svg={icon} />{label}{k === 'failures' && failing > 0 ? <span className="count bad">{failing}</span> : k === 'setup' ? <span className="count">{(p.automation.app?.pages || []).length}</span> : null}
+      </button>))}</div>
+    {tab === 'results' && <>
+    {!p.automation.baseUrl && <div className="warn-banner" style={{ marginBottom: 12 }}><Ico svg={I.warn} /><span>Set the application URL so tests know where to run.</span>
+      <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setTab('settings')}>Open Settings</button></div>}
     <div className="tiles">
       <Tile icon={I.bot} value={`${all.filter((x: Any) => x.script).length} / ${all.length}`} label="test cases automated" />
       <Tile icon={I.check} value={ran.filter((x: Any) => x.lastRun.status === 'Pass').length} label="passed last run" color="#22a06b" />
       <Tile icon={I.close} value={ran.filter((x: Any) => x.lastRun.status === 'Fail').length} label="failed last run" color="var(--danger)" />
       <Tile icon={I.clock} value={ran.length ? ago(ran.map((x: Any) => x.lastRun.at).sort().pop()) : 'Never'} label="last automated run" />
     </div>
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="grid2" style={{ alignItems: 'end' }}>
-        <label className="field" style={{ margin: 0 }}><span>Application URL — where the tests run</span>
-          <TF value={p.automation.baseUrl || ''} disabled={!can('project.settings')} placeholder="e.g. http://localhost:3000 or https://staging.example.com"
-            onChange={(e) => mutate((pp) => { pp.automation.baseUrl = e.target.value.trim(); }, { tag: 'baseUrl' })} /></label>
-        <div className="small">{eng ? (eng.browser ? <span className="row" style={{ gap: 6 }}><span className="dot ok" />Playwright {eng.version} with Chromium is ready.</span>
-          : eng.serverless ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}><span className="dot bad" style={{ marginTop: 5 }} />
-              <span>Test runs need a regular server: serverless hosting (like Vercel) can’t run a browser. Run TicketForge on your own computer to use automation.</span></span>
-          : <><span className="row" style={{ gap: 6 }}><span className="dot bad" />{eng.installed ? 'Chromium is not installed yet.' : <>Playwright is not installed. Run <code>npm install</code>.</>}</span>
-            {eng.installed && can('users.manage') && <button className="btn sm" style={{ marginTop: 6 }} onClick={installBrowser}>Install Chromium</button>}</>) : <span className="muted">Checking test engine…</span>}</div>
-      </div>
-      <p className="muted small" style={{ margin: '12px 0 0' }}>The AI writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria, the App setup below and snapshots of the app&apos;s pages. Scripts run on this machine in a headless Chromium; you can read and edit every script. Results update each test case.</p>
-      <div className="row" style={{ marginTop: 10, gap: 16 }}>
-        <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When a test fails</span>
-        <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onFail?.comment !== false}
-          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), comment: e.target.checked }; })} />
-        <CB label="Notify the assignee (in-app and email)" disabled={!can('project.settings')} checked={p.automation.onFail?.notify !== false}
-          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
-      </div>
-    </div>
-    <AppSetup />
     <div className="toolbar">
       <span className="muted small">Run</span>
       <SF filter aria-label="Which tests" value={S.autoScope} onChange={(e) => { S.autoScope = e.target.value; emit(); }}>
@@ -587,12 +583,38 @@ export function Automation() {
             <td style={{ textAlign: 'right' }}>{can('test.run') && <button className="icon-btn" title="Run this test" disabled={run?.running} onClick={(e) => { e.stopPropagation(); runTests([{ t, tc }]); }}><Ico svg={I.play} /></button>}</td>
           </tr>,
           tc.lastRun?.status === 'Fail' && <tr key={`${tc.id}-err`} className="err-row"><td /><td colSpan={6}><div className="err-box">{tc.lastRun.error.split('\n').slice(0, 4).join('\n')}</div>
-            {tc.lastRun.screenshot && <a href={tc.lastRun.screenshot} target="_blank" rel="noopener noreferrer" className="small"><Ico svg={I.external} /> Screenshot</a>}</td></tr>,
+            {tc.lastRun.screenshot && <button type="button" className="shot-thumb sm" onClick={() => openModal(<ShotModal url={tc.lastRun.screenshot} title={`${tcKey(t, i)} ${tc.title}`} error={tc.lastRun.error} at={tc.lastRun.at} />)}>
+              <img src={tc.lastRun.screenshot} alt={`Screenshot of the failed test ${tc.title}`} loading="lazy" /></button>}</td></tr>,
         ];
       })}
     </tbody></table> : <EmptyState compact icon={I.bot} tone="neutral" title="No test cases in this selection"
       actions={S.autoScope !== 'all' && <button className="btn" onClick={() => { S.autoScope = 'all'; emit(); }}>Show all test cases</button>}>
       <p>{S.autoScope === 'all' ? 'Add test cases to your issues first: select issues in the backlog and choose Write test cases.' : 'Pick a different set above.'}</p></EmptyState>}
+    </>}
+    {tab === 'failures' && <Failures />}
+    {tab === 'setup' && <AppSetup />}
+    {tab === 'settings' && <>
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="grid2" style={{ alignItems: 'end' }}>
+        <label className="field" style={{ margin: 0 }}><span>Application URL — where the tests run</span>
+          <TF value={p.automation.baseUrl || ''} disabled={!can('project.settings')} placeholder="e.g. http://localhost:3000 or https://staging.example.com"
+            onChange={(e) => mutate((pp) => { pp.automation.baseUrl = e.target.value.trim(); }, { tag: 'baseUrl' })} /></label>
+        <div className="small">{eng ? (eng.browser ? <span className="row" style={{ gap: 6 }}><span className="dot ok" />Playwright {eng.version} with Chromium is ready.</span>
+          : eng.serverless ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}><span className="dot bad" style={{ marginTop: 5 }} />
+              <span>Test runs need a regular server: serverless hosting (like Vercel) can’t run a browser. Run TicketForge on your own computer to use automation.</span></span>
+          : <><span className="row" style={{ gap: 6 }}><span className="dot bad" />{eng.installed ? 'Chromium is not installed yet.' : <>Playwright is not installed. Run <code>npm install</code>.</>}</span>
+            {eng.installed && can('users.manage') && <button className="btn sm" style={{ marginTop: 6 }} onClick={installBrowser}>Install Chromium</button>}</>) : <span className="muted">Checking test engine…</span>}</div>
+      </div>
+      <p className="muted small" style={{ margin: '12px 0 0' }}>The AI writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria, the App setup and snapshots of the app&apos;s pages. Scripts run on this machine in a headless Chromium; you can read and edit every script. Results update each test case.</p>
+      <div className="row" style={{ marginTop: 10, gap: 16 }}>
+        <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When a test fails</span>
+        <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onFail?.comment !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), comment: e.target.checked }; })} />
+        <CB label="Notify the assignee (in-app and email)" disabled={!can('project.settings')} checked={p.automation.onFail?.notify !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
+      </div>
+    </div>
+    </>}
   </>;
 }
 
@@ -694,5 +716,68 @@ export function Settings() {
         <button className="btn danger" onClick={() => openModal(<Confirm title="Delete project?" label="Delete" text={`“${p.name}” and all of its issues will be permanently deleted. This can’t be undone.`}
           onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); S.project = null; S.base = null; emit(); toast('Project deleted'); S.nav('/'); } catch (e: Any) { toast(e.message, 'err'); } }} />)}>Delete project</button></div>}
     </div>
+  </>;
+}
+
+// ---------------------------------------------------------------- failures (Test automation → Failures)
+/** A failed test's screenshot, large. */
+export function ShotModal({ url, title, error, at }: { url: string; title: string; error?: string; at?: string }) {
+  return (
+    <Modal title={title} wide actions={[{ label: 'Close' }]} left={<a className="btn subtle" href={url} target="_blank" rel="noopener noreferrer"><Ico svg={I.external} />Open full size</a>}>
+      {at && <p className="muted small" style={{ marginTop: 0 }}>Failed {ago(at)} · {new Date(at).toLocaleString()}</p>}
+      <a href={url} target="_blank" rel="noopener noreferrer" className="shot-big"><img src={url} alt={`Screenshot: ${title}`} /></a>
+      {error && <pre className="err-box" style={{ marginTop: 12 }}>{error.split('\n').slice(0, 12).join('\n')}</pre>}
+    </Modal>
+  );
+}
+
+function FailureCard({ t, tc, i }: { t: Any; tc: Any; i: number }) {
+  const p = P();
+  const r = tc.lastRun;
+  const [hist, setHist] = useState<Any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const title = `${tcKey(t, i)} ${tc.title}`;
+  const loadHistory = async () => {
+    if (hist) { setHist(null); return; }
+    setLoading(true);
+    try { setHist((await api(`/api/projects/${p.id}/screenshots?tc=${encodeURIComponent(tc.id)}`)).filter((x: Any) => x.url !== r.screenshot)); }
+    catch (e: Any) { toast(e.message, 'err'); } finally { setLoading(false); }
+  };
+  return (
+    <div className="fail-card">
+      {r.screenshot
+        ? <button type="button" className="shot-thumb" onClick={() => openModal(<ShotModal url={r.screenshot} title={title} error={r.error} at={r.at} />)}><img src={r.screenshot} alt={`Screenshot of the failed test ${tc.title}`} loading="lazy" /></button>
+        : <div className="shot-thumb none"><Ico svg={I.warn} /><span className="small muted">No screenshot</span></div>}
+      <div className="fail-body">
+        <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><RunLoz tc={tc} /><span className="key">{tcKey(t, i)}</span><span className="muted small" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>{ago(r.at)}</span></div>
+        <b className="fail-title" title={tc.title}>{tc.title}</b>
+        <button type="button" className="link-btn small fail-issue" onClick={() => openDrawer('issue', t.id)}><TypeIcon type={t.type} /> {t.key} {t.title}</button>
+        {r.error && <pre className="err-box">{r.error.split('\n').slice(0, 5).join('\n')}</pre>}
+        <div className="row" style={{ gap: 6, marginTop: 'auto' }}>
+          {can('test.run') && <button className="btn sm" disabled={S.autoRun?.running} onClick={() => runTests([{ t, tc }])}><Ico svg={I.play} />Run again</button>}
+          {tc.script && <button className="btn sm subtle" onClick={() => openModal(<ScriptModal tid={t.id} tcid={tc.id} />)}><Ico svg={I.bot} />Script</button>}
+          <button className="btn sm subtle" style={{ marginLeft: 'auto' }} disabled={loading} onClick={loadHistory}>{loading ? <Spinner /> : hist ? 'Hide history' : 'Earlier failures'}</button>
+        </div>
+        {hist && (hist.length
+          ? <div className="shot-strip">{hist.map((h) => (
+              <button key={h.id} type="button" className="shot-thumb xs" title={`Failed ${new Date(h.created_at).toLocaleString()}`}
+                onClick={() => openModal(<ShotModal url={h.url} title={title} error={h.error} at={h.created_at} />)}><img src={h.url} alt={`Earlier failure, ${new Date(h.created_at).toLocaleString()}`} loading="lazy" /></button>))}</div>
+          : <p className="muted small" style={{ margin: '6px 0 0' }}>No earlier failures saved.</p>)}
+      </div>
+    </div>
+  );
+}
+
+function Failures() {
+  const p = P();
+  const fails = p.tickets.flatMap((t: Any) => t.testCases.map((tc: Any, i: number) => ({ t, tc, i })))
+    .filter((x: Any) => x.tc.lastRun && x.tc.lastRun.status !== 'Pass')
+    .sort((a: Any, b: Any) => String(b.tc.lastRun.at).localeCompare(String(a.tc.lastRun.at)));
+  if (!fails.length) {
+    return <EmptyState icon={I.check} tone="success" title="No failing tests"><p>Tests that fail show up here with a screenshot of the page at the moment they failed.</p></EmptyState>;
+  }
+  return <>
+    <p className="muted small" style={{ marginTop: 0 }}>{fails.length} test{fails.length === 1 ? '' : 's'} failed on the last run. Screenshots are saved in the database for people with access to this project (the last 5 per test).</p>
+    <div className="fail-grid">{fails.map(({ t, tc, i }: Any) => <FailureCard key={tc.id} t={t} tc={tc} i={i} />)}</div>
   </>;
 }

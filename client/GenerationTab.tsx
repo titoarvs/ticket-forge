@@ -6,6 +6,8 @@ import { S, api, toast, openModal, ago, type Any } from './core';
 import { Ico, I, Confirm, Spinner, ErrorState } from './ui';
 import { TF, TA, SF, CB, RB, MenuItem } from './fields';
 import { Loading, Sk } from './ui';
+import { GuideCard } from './GuideCard';
+import { AiTold } from './AiTold';
 
 const TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 const REASONING: [string, string, string][] = [
@@ -20,14 +22,16 @@ export function GenerationTab() {
   const [err, setErr] = useState<Any>(null);
   const [busy, setBusy] = useState('');
   const [preview, setPreview] = useState<Any>(null);
+  const [prompts, setPrompts] = useState<Any>(null);
   const timer = useRef<Any>(null);
-  const load = async () => { setErr(null); try { const d = await api('/api/admin/generation'); setData(d); setR(d.rules); setPreview(d.preview); } catch (e: Any) { setErr(e); } };
+  const load = async () => { setErr(null); try { const d = await api('/api/admin/generation'); setData(d); setR(d.rules); setPreview(d.preview); setPrompts(d.prompts); } catch (e: Any) { setErr(e); } };
+  const refreshPrompts = () => { if (r) api('/api/admin/generation', { method: 'PUT', body: { rules: r, preview: true } }).then((x) => { setPreview(x.preview); setPrompts(x.prompts); }).catch(() => {}); };
   useEffect(() => { load(); }, []);
   // Live preview of what the AI will be told, as you edit.
   useEffect(() => {
     if (!r || !data) return;
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => { api('/api/admin/generation', { method: 'PUT', body: { rules: r, preview: true } }).then((x) => setPreview(x.preview)).catch(() => {}); }, 350);
+    timer.current = setTimeout(() => { api('/api/admin/generation', { method: 'PUT', body: { rules: r, preview: true } }).then((x) => { setPreview(x.preview); setPrompts(x.prompts); }).catch(() => {}); }, 350);
   }, [r]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (err) return <div className="card"><ErrorState compact title="Couldn’t load the generation rules" error={err} onRetry={load} /></div>;
@@ -56,12 +60,12 @@ export function GenerationTab() {
   const check = (path: string, label: string) => <CB label={<>{label}{def(path)}</>} checked={Boolean(get(path))} onChange={(e: Any) => set(path, e.target.checked)} />;
   const save = async () => {
     setBusy('save');
-    try { const d = await api('/api/admin/generation', { method: 'PUT', body: { rules: r } }); setData(d); setR(d.rules); setPreview(d.preview); toast('Generation rules saved. New generations follow them.'); }
+    try { const d = await api('/api/admin/generation', { method: 'PUT', body: { rules: r } }); setData(d); setR(d.rules); setPreview(d.preview); setPrompts(d.prompts); toast('Generation rules saved. New generations follow them.'); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
   };
   const reset = () => openModal(<Confirm title="Reset to the default rules?" label="Reset"
     text="Every generation rule goes back to its default. Tickets and test cases that were already generated don’t change."
-    onYes={async () => { const d = await api('/api/admin/generation', { method: 'DELETE' }); setData(d); setR(d.rules); setPreview(d.preview); toast('Generation rules reset to the defaults'); }} />);
+    onYes={async () => { const d = await api('/api/admin/generation', { method: 'DELETE' }); setData(d); setR(d.rules); setPreview(d.preview); setPrompts(d.prompts); toast('Generation rules reset to the defaults'); }} />);
   const scaleText = (r.tickets.pointScale || []).join(', ');
 
   return (
@@ -136,16 +140,9 @@ export function GenerationTab() {
           <TA value={r.custom} placeholder={'e.g. Write for a non-technical reader. Use “customer”, not “user”. Mention the API endpoint in technical tasks.'} onChange={(e) => set('custom', e.target.value)} />
         </div>
 
-        <div className="card wide"><h3>What the AI is told</h3>
-          <p className="sub">Generated from the rules above and added to every request, with “follow them exactly and answer directly”.</p>
-          {preview ? <div className="gen-preview">
-            <div><b className="small">Tickets</b><pre className="code">{preview.tickets}</pre></div>
-            <div><b className="small">Test cases</b><pre className="code">{preview.tests}</pre></div>
-            <div><b className="small">Automation scripts</b><pre className="code">{preview.automation || '(no extra rules)'}</pre></div>
-          </div> : <Spinner />}
-          <p className="muted small" style={{ marginBottom: 0 }}>Also enforced after generation: story points snap to the scale, only the allowed ticket types, labels trimmed to the limit,
-            at most {r.tests.perTicket} test case{r.tests.perTicket === 1 ? '' : 's'} per ticket{r.tests.titlePrefix ? `, and test titles start with “${r.tests.titlePrefix}”` : ''}.</p>
-        </div>
+        <GuideCard onChange={refreshPrompts} />
+
+        <AiTold prompts={prompts} />
       </div>
 
       <div className={`gen-bar ${dirty ? 'dirty' : ''}`}>
