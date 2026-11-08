@@ -460,7 +460,7 @@ const askBaseUrl = () => new Promise<string | null>((resolve) => openModal(<Base
 export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false } = {}) {
   if (!list.length) return toast('No test cases to run.', 'err');
   if (S.autoRun?.running) return toast('Tests are already running.', 'err');
-  if (!S.engine?.browser) { await loadEngine(); if (!S.engine?.browser) { toast('The test browser isn’t installed yet (Test automation page).', 'err'); S.nav(`/p/${P().id}/automation`); return; } }
+  if (!S.engine?.browser) { await loadEngine(); if (!S.engine?.browser) { toast(S.engine?.serverless ? 'This server can’t run a browser. Connect a remote browser in Test automation → Settings.' : 'No test browser yet. See Test automation → Settings.', 'err'); S.autoTab = 'settings'; S.nav(`/p/${P().id}/automation`); return; } }
   const baseUrl = P().automation.baseUrl || await askBaseUrl();
   if (!baseUrl) return;
   const ctrl = new AbortController();

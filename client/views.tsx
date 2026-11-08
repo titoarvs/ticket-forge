@@ -15,6 +15,7 @@ import {
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { AppSetup } from './AppSetup';
 import { FeatureModal } from './FeatureModal';
+import { RemoteBrowser } from './RemoteBrowser';
 import { epicRange } from './Timeline';
 import { ItemText } from './ListEditor';
 
@@ -572,13 +573,13 @@ export function Automation() {
         <label className="field" style={{ margin: 0 }}><span>Application URL — where the tests run</span>
           <TF value={p.automation.baseUrl || ''} disabled={!can('project.settings')} placeholder="e.g. http://localhost:3000 or https://staging.example.com"
             onChange={(e) => mutate((pp) => { pp.automation.baseUrl = e.target.value.trim(); }, { tag: 'baseUrl' })} /></label>
-        <div className="small">{eng ? (eng.browser ? <span className="row" style={{ gap: 6 }}><span className="dot ok" />Playwright {eng.version} with Chromium is ready.</span>
+        <div className="small">{eng ? (eng.browser ? <span className="row" style={{ gap: 6 }}><span className="dot ok" />Ready: {eng.label} (Playwright {eng.version}).</span>
           : eng.serverless ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}><span className="dot bad" style={{ marginTop: 5 }} />
-              <span>Test runs need a regular server: serverless hosting (like Vercel) can’t run a browser. Run TicketForge on your own computer to use automation.</span></span>
-          : <><span className="row" style={{ gap: 6 }}><span className="dot bad" />{eng.installed ? 'Chromium is not installed yet.' : <>Playwright is not installed. Run <code>npm install</code>.</>}</span>
+              <span>This server can’t run a browser (serverless hosting such as Vercel). {can('users.manage') ? 'Connect a remote browser below.' : 'Ask an administrator to connect a remote browser.'}</span></span>
+          : <><span className="row" style={{ gap: 6 }}><span className="dot bad" />{eng.installed ? 'No test browser yet: Chromium isn’t installed, and Chrome or Edge wasn’t found.' : <>Playwright is not installed. Run <code>npm install</code>.</>}</span>
             {eng.installed && can('users.manage') && <button className="btn sm" style={{ marginTop: 6 }} onClick={installBrowser}>Install Chromium</button>}</>) : <span className="muted">Checking test engine…</span>}</div>
       </div>
-      <p className="muted small" style={{ margin: '12px 0 0' }}>The AI writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria, the App setup and snapshots of the app&apos;s pages. Scripts run on this machine in a headless Chromium; you can read and edit every script. Results update each test case.</p>
+      <p className="muted small" style={{ margin: '12px 0 0' }}>The AI writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria, the App setup and snapshots of the app&apos;s pages, using your Claude account or, when that isn’t set up, the AI APIs connected in Administration. Scripts run headless in the test browser; you can read and edit every script. Results update each test case.</p>
       <div className="row" style={{ marginTop: 10, gap: 16 }}>
         <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When a test fails</span>
         <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onFail?.comment !== false}
@@ -591,6 +592,7 @@ export function Automation() {
         <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onPass?.comment !== false}
           onChange={(e: Any) => mutate((pp) => { pp.automation.onPass = { ...(pp.automation.onPass || {}), comment: e.target.checked }; })} />
       </div>
+      {can('users.manage') && <RemoteBrowser />}
     </div>
     </>}
   </>;

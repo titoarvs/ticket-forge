@@ -1,5 +1,5 @@
 import { api, perm, body, HttpError, aiOpts, ndjson, appUrl } from '@/lib/server/http';
-import { engineStatus, runAutomation } from '@/lib/automation.js';
+import { engineStatus, runAutomation, noBrowser } from '@/lib/automation.js';
 import { reportRun } from '@/lib/notify.js';
 import * as store from '@/lib/store.js';
 import { runAppSetup } from '@/lib/server/app-setup';
@@ -14,7 +14,7 @@ export const POST = api(async (req) => {
   if ((regenerate || items.some((i: any) => !i.tc?.script?.trim())) && !store.has(user, 'ai.use')) {
     throw new HttpError(403, 'Some tests have no script yet, and writing scripts uses Claude, which your role does not allow (ai.use). Run tests that already have scripts, or ask an administrator.');
   }
-  if (!(await engineStatus()).browser) throw new HttpError(400, 'The test browser is not installed yet. An administrator can install it from the Test automation page.');
+  if (!(await engineStatus()).browser) throw new HttpError(400, noBrowser());
   const origin = appUrl(req);
   // Pages, roles and login settings come from the saved project; passwords only for its saved application URL.
   const { app, warning } = await runAppSetup(project?.id, baseUrl);

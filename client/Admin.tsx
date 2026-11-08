@@ -427,7 +427,7 @@ function ProvidersCard({ c }: { c: Any }) {
       <div className="row" style={{ marginTop: 14, justifyContent: 'space-between' }}>
         <label className="check small" style={{ maxWidth: 620 }}><CB checked={c.accountFallback !== false} disabled={!!busy}
           onChange={(e: Any) => run('fallback', () => patch({ accountFallback: e.target.checked }))} />
-          On your own computer, switch to these providers when your Claude account hits its usage limit</label>
+          On your own computer, use these providers when your Claude account can’t: not installed, not signed in, sign-in expired, or usage limit reached</label>
         {anyCooling && <button className="btn sm subtle" disabled={!!busy} onClick={() => reset()}>Clear all cooldowns</button>}
       </div>
     </div>

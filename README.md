@@ -365,6 +365,22 @@ The assignee is mentioned and notified (in-app and email) only when something fa
 fails* and *When all of an issue's tests pass* turn the comments and notifications on or off. Automated comments
 can't be edited or changed by anyone, including through the API.
 
+### Test browser
+
+Tests run in the first browser available:
+1. a **remote browser** an administrator connected in Test automation → Settings → Remote browser (for example
+   [Browserless](https://www.browserless.io), or another machine running `npx playwright run-server`). Use the
+   Playwright address (`wss://…/playwright?token=…`) or a Chrome DevTools one. It's tested before it's saved, stored
+   encrypted and never shown again; `TICKETFORGE_BROWSER_WS` (and `TICKETFORGE_BROWSER_PROTOCOL=cdp`) set it from
+   the environment instead. This is the way to run tests on **serverless hosting such as Vercel**, which can't run a
+   browser itself;
+2. Playwright's own Chromium (**Install Chromium** on the same page);
+3. **Google Chrome or Microsoft Edge** already installed on the computer.
+
+The Settings tab and each run say which browser is in use. Writing scripts uses your Claude account when it
+works, and the AI APIs connected in Administration → AI when it isn't installed, isn't signed in, its sign-in
+expired, or it hit its usage limit (Administration → AI, on by default).
+
 ### App setup: pages, roles and logins
 
 Under **Test automation → App setup**, describe the app under test once per project:

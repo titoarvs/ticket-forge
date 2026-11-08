@@ -26,14 +26,31 @@ export async function bootSession() {
   try { S.auth = await api('/api/auth/me'); }
   catch (e: Any) { S.bootError = e; S.ready = true; emit(); return; } // server unreachable: show it, don't pretend to be signed out
   S.user = S.auth.user;
-  if (S.user) { S.status = await api('/api/status').catch(() => null); loadEngine(); startSync(); loadNotifs(); }
+  if (S.user) { await refreshStatus(); loadEngine(); startSync(); loadNotifs(); }
   S.ready = true;
+  emit();
+}
+
+/**
+ * Reloads the AI connection status. A failed request never clears a status we already have; when there is none
+ * yet, it tries again shortly (3 s, 10 s, 30 s) instead of leaving the pill empty until the next poll.
+ */
+let statusRetry: Any = null;
+export async function refreshStatus(attempt = 0) {
+  clearTimeout(statusRetry);
+  try {
+    S.status = await api('/api/status');
+    S.statusError = null; S.statusAt = Date.now();
+  } catch (e: Any) {
+    S.statusError = e?.message || 'Couldn’t check the AI connection';
+    if (!S.status && attempt < 3) statusRetry = setTimeout(() => refreshStatus(attempt + 1), [3000, 10000, 30000][attempt]);
+  }
   emit();
 }
 
 function connInfo() {
   const st = S.status;
-  if (!st) return { ok: false, label: 'AI', model: '', switched: false };
+  if (!st) return { ok: false, label: S.statusError ? 'AI status unavailable' : 'Checking AI…', model: '', switched: false, unknown: true };
   const ok = Boolean(st.ready);
   const label = st.label || 'AI';
   const model = !ok ? '' : st.mode === 'account' && st.label === 'Claude account' ? (S.settings.model || st.model || '') : (st.model || '');
@@ -70,8 +87,9 @@ function TopNav() {
         )}
       </>}
       <Notifications />
-      <button className="conn" onClick={() => openModal(<AiSettingsModal />)} title={c.switched ? 'Your main AI is limited right now, so TicketForge switched to a backup' : 'AI connection'}>
-        <span className={`dot ${S.status ? (c.ok ? (c.switched ? 'warn' : 'ok') : 'bad') : ''}`} />{c.label}{c.model ? ` · ${c.model}` : ''}{c.switched ? ' · backup' : ''}
+      <button className="conn" onClick={() => openModal(<AiSettingsModal />)}
+        title={'unknown' in c ? (S.statusError ? `Couldn’t check the AI connection (${S.statusError}). Retrying.` : 'Checking the AI connection…') : c.switched ? 'Your main AI is limited right now, so TicketForge switched to a backup' : 'AI connection'}>
+        <span className={`dot ${'unknown' in c ? 'pending' : c.ok ? (c.switched ? 'warn' : 'ok') : 'bad'}`} />{c.label}{c.model ? ` · ${c.model}` : ''}{c.switched ? ' · backup' : ''}
       </button>
       <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /></button>}>
         <div className="acct"><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div><hr />
@@ -173,8 +191,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
     const onUnload = () => { if (P() && S.saveTimer) saveNow(); };
     const poll = setInterval(() => { if (document.visibilityState === 'visible') loadNotifs(); }, 30000);
     // Keep the AI pill current (e.g. when TicketForge switches to a backup provider).
-    const statusPoll = setInterval(() => { if (document.visibilityState === 'visible' && S.user) api('/api/status').then((st) => { S.status = st; emit(); }).catch(() => {}); }, 60000);
-    const onFocus = () => loadNotifs();
+    const statusPoll = setInterval(() => { if (document.visibilityState === 'visible' && S.user) refreshStatus(); }, 60000);
+    // Coming back to the tab: refresh what may be stale (status at most every 20 s).
+    const onFocus = () => { loadNotifs(); if (S.user && Date.now() - (S.statusAt || 0) > 20000) refreshStatus(); };
     window.addEventListener('focus', onFocus);
     document.addEventListener('keydown', onKey);
     window.addEventListener('beforeunload', onUnload);

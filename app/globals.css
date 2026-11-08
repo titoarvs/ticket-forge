@@ -1136,3 +1136,11 @@ a.set-stat:hover { background: var(--hover); }
 .att-file a { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
 .att-x { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; line-height: 16px; padding: 0; }
 .att-x.inline { position: static; border: 0; background: none; width: auto; height: auto; color: var(--text-subtle); font-size: 16px; }
+.dot.pending { background: var(--text-subtlest); animation: dot-pulse 1.2s ease-in-out infinite; }
+@keyframes dot-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dot.pending { animation: none; } }
+.rb { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.rb-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rb-current { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: var(--radius); background: var(--bg-sunken); }
+.rb-current .spacer { flex: 1; }
+.rb-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
