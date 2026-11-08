@@ -23,6 +23,29 @@ automation, and Claude Code ready to sign in from **Administration → Claude**.
    **Add Ingress Rules**: source `0.0.0.0/0`, TCP, destination port `80,443`.
 4. Copy the instance's **Public IP address**. The user name is `ubuntu`.
 
+### AWS Free Plan (alternative: free credits, about 6 months)
+
+New AWS accounts (since July 2025) get $100–200 in credits on the **Free plan** for up to 6 months. Instances
+use up the credits. A `t4g.small` (2 vCPUs, 2 GB) with its disk and public IP costs roughly $15–20 of credits a month.
+At the end you upgrade to a paid plan or the account closes, so treat it as a trial.
+
+1. Sign up at [aws.amazon.com/free](https://aws.amazon.com/free/) and choose the **Free plan**. A card is needed
+   for verification.
+2. Top right, pick the region **Asia Pacific (Singapore)** (or the one closest to you).
+3. **EC2 → Launch instance**
+   - **Name:** `ticketforge`
+   - **AMI:** Ubuntu Server 24.04 LTS, **64-bit (Arm)**
+   - **Instance type:** `t4g.small` (*Free tier eligible*). On an x86 AMI, use `t3.small`.
+   - **Key pair:** *Create new key pair* → name `ticketforge`, type ED25519, format `.pem` → it downloads.
+   - **Network settings:** allow SSH from **My IP**, and tick **Allow HTTPS traffic** and **Allow HTTP traffic**
+     from the internet.
+   - **Storage:** 30 GB gp3.
+4. **Launch**. When it's *Running*, copy the **Public IPv4 address**. The user name is `ubuntu`.
+
+Optional: allocate an **Elastic IP** and associate it, so the address doesn't change if you stop the instance.
+
+Deploy with: `SSH_KEY=~/Downloads/ticketforge.pem bash deploy/deploy.sh ubuntu@YOUR.SERVER.IP`
+
 ### Google Cloud free tier (alternative)
 
 `e2-micro` in `us-west1`, `us-central1` or `us-east1` is free. It has 1 GB RAM, which is enough because the setup adds swap.
