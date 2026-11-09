@@ -15,6 +15,7 @@ import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody } from './CommentEditor';
 import { PsdSection } from './Psd';
+import { codeReady, openCode } from './DevCode';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -196,7 +197,10 @@ function IssuePanel({ t }: { t: Any }) {
           </div>
 
           <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span>
-            {edit && <div className="tools"><button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button></div>}</div>
+            {edit && <div className="tools">
+              {can('ai.use') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
+                : can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>)}
+              <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button></div>}</div>
             {t.prs.map((r: Any) => (
               <div key={r.id} className="pr-row"><Ico svg={I.pr} /><div className="pr-main"><a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
                 <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div></div>

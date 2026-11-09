@@ -330,6 +330,34 @@ be a verified Sender Identity or on an authenticated domain in SendGrid. Check i
 Administration → **Email & database** → **Send a test email to me**. Set `APP_URL` to the address your team
 uses so links in emails work outside your machine.
 
+## Code with AI and pull requests
+
+Set up once per project in **Project settings → Code & GitHub**:
+- **Local folder**: a clone of the project's GitHub repository on the computer running TicketForge. **Browse…** opens a
+  folder picker (Home, Desktop, Documents…; git repositories are marked) and checks the folder you choose. You can
+  also type it: `~/code/app`, or `/desktop/app`, which is read as `~/Desktop/app`. **Check** confirms it's a git
+  repository and fills in the GitHub repository and base branch from it.
+- **Branch prefix** (default `tf/`), **Claude model**, **Open pull requests as drafts**.
+- **Check command** (optional, e.g. `npm test`): the only command the agent may run, to check its work.
+- **Team conventions**: how your team writes code, given to the agent every time.
+- **GitHub access**: a token saved for the project (encrypted; fine-grained tokens need Contents and Pull requests
+  read/write), `GITHUB_TOKEN` on the server, or your `gh` CLI sign-in.
+
+Then on an issue: **Development → Write code with AI**.
+1. TicketForge creates a branch (`tf/pay-12-short-title`) from the base branch in its **own git worktree**, so your
+   checkout and uncommitted work are never touched.
+2. Claude Code (your account) implements the issue from its story, acceptance criteria and test cases, plus any
+   extra instructions. You watch its steps live; it can read and edit files and run the check command, but it can't
+   commit, push or browse the web. It runs in the background, so you can close the dialog.
+3. Review: its summary and the diff of every file. **Ask for changes** runs another round on the same branch.
+4. **Commit, push and open PR**: one commit (title, story, "Refs PAY-12" and a link back), the branch is pushed with
+   the token for that command only (never written to the repository's config), and the pull request opens with the
+   story, an acceptance-criteria checklist and the agent's summary. It's linked to the issue automatically.
+   **Discard** removes the worktree and local branch instead.
+
+Writing code needs TicketForge running on your computer (opened at localhost); on a deployed server the settings can
+be edited but code can't be written. Jobs are kept in memory: if the server restarts, start the job again.
+
 ## Pull requests (Development panel)
 
 In an issue, **Link pull request** and paste a GitHub, GitLab or Bitbucket URL. For GitHub the app reads the

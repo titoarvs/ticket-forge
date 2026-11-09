@@ -8,12 +8,14 @@ import { TF, TA } from './fields';
 import { Header, CommitInput } from './views';
 import { ListEditor } from './ListEditor';
 import { WorkflowSettings } from './WorkflowEditor';
+import { DevSettings } from './DevCode';
 import { allSources } from './Sources';
 
 const SECTIONS: [string, string, string, string][] = [
   ['details', 'Details', 'settings', 'Name, key and what the project is about'],
   ['people', 'People', 'people', 'Who can be assigned issues'],
   ['workflow', 'Workflow', 'board', 'Statuses, board columns and transitions'],
+  ['code', 'Code & GitHub', 'pr', 'Repository, coding agent and pull requests'],
   ['danger', 'Danger zone', 'trash', 'Delete the project'],
 ];
 
@@ -153,6 +155,7 @@ export function Settings() {
         {cur === 'details' && <Details ed={ed} />}
         {cur === 'people' && <People ed={ed} />}
         {cur === 'workflow' && <WorkflowSettings />}
+        {cur === 'code' && <DevSettings ed={ed} />}
         {cur === 'danger' && <Danger />}
       </div>
     </div>
