@@ -357,6 +357,14 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), sh
 | Release | Demo · Sign-Off · Deploy · Release Certification | Guided release steps (a person deploys) | Documents / worktree |
 | General | **Free Worker** | Any task you describe, same safety rules as Build | Own git worktree |
 
+**Hiring agents.** Every agent can be hired. Open an epic: its **Agents** section lists the feature's lifecycle by
+phase, shows how far each step is, and has **Hire** on each row. Or use **Hire** on a card in Administration → Agents
+and pick the project and epic. Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
+run TicketForge's existing writers with the agent's instructions. Epic, Kick Off, Demo, Sign-Off and Manual, Deploy,
+Release Certification and Review a Submission write a Markdown document from the epic, its documents, issues, test
+results and pull requests, saved on the epic (`lib/agentdocs.js`). Code agents ask which issue to work on. In the code
+window, **Review panel** runs three Review agents in parallel (correctness, security, tests & acceptance).
+
 The agents in bold (and Architecture Record) run as real Claude Code agents: TicketForge passes them to
 `claude -p --agents <json> --agent <id>`, so each one gets its own system prompt and an enforced tool list, and Build
 can delegate to Feature Tests and Review as subagents. Follow-up rounds resume the same Claude Code session

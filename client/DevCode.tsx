@@ -116,10 +116,11 @@ function DiffView({ jobId, file }: { jobId: string; file: string }) {
 }
 
 /** Issue panel → Write code with AI: start, watch, review, ask for changes, open the pull request. */
-export function CodeModal({ t }: { t: Any }) {
+export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agentId?: string }) {
   const [job, setJob] = useState<Any>(null);
   const [agents, setAgents] = useState<Any[]>([]);
-  const [agentId, setAgentId] = useState('build');
+  const [agentId, setAgentId] = useState(initialAgent);
+  const [reviewTab, setReviewTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [follow, setFollow] = useState('');
@@ -156,10 +157,16 @@ export function CodeModal({ t }: { t: Any }) {
   return (
     <Modal title={`Write code · ${t.key}`} wide persistent={running} actions={[{ label: running ? 'Close (keeps running)' : 'Close' }]}>
       {loading ? <div className="muted"><Spinner /> Loading…</div> : !job || ['discarded'].includes(job.status) ? <>
-        {agents.length > 0 && <div className="agent-pick" role="radiogroup" aria-label="Agent">{agents.map((a: Any) => (
-          <button key={a.id} role="radio" aria-checked={agentId === a.id} className={agentId === a.id ? 'on' : ''} disabled={!a.enabled} onClick={() => setAgentId(a.id)} title={a.does.join(' ')}>
-            <b>{a.icon} {a.name}</b><div className="muted small">{a.summary}{!a.enabled ? ' (turned off)' : ''}</div></button>))}</div>}
-        <p className="muted small" style={{ marginTop: 0 }}>The <b>{agents.find((a: Any) => a.id === agentId)?.name || 'Build'}</b> agent runs as a Claude Code agent on <b>{t.title}</b> from its story, {t.acceptanceCriteria?.length || 0} acceptance criteria and {t.testCases?.length || 0} test cases, in a new branch <code>{(d.branchPrefix ?? 'tf/')}{String(t.key).toLowerCase()}-…</code> from <code>{d.baseBranch || 'the default branch'}</code> of <b>{d.repo || d.localPath}</b>, in its own worktree. Nothing is pushed until you review the changes and open the pull request.</p>
+        {agents.length > 0 && <>
+          <div className="pick-label small">Which agent?</div>
+          <div className="agent-pick" role="radiogroup" aria-label="Agent">{agents.filter((a: Any) => !['review', 'review-panel'].includes(a.id)).map((a: Any) => (
+            <button key={a.id} role="radio" aria-checked={agentId === a.id} className={`${agentId === a.id ? 'on' : ''} ph-${String(a.phase).toLowerCase()}`} disabled={!a.enabled} onClick={() => setAgentId(a.id)} title={a.does.join(' ')}>
+              <span className="agent-icon sm" aria-hidden>{a.icon}</span>
+              <span className="ap-text"><b>{a.name}</b><span className="muted small">{a.summary}{!a.enabled ? ' (turned off)' : ''}</span>
+                <span className="ap-meta">{a.workspaceLabel} · {a.model}{a.effort ? ` · ${a.effort}` : ''}</span></span></button>))}</div>
+          {(() => { const a = agents.find((x: Any) => x.id === agentId); return a ? <ul className="ap-does small">{a.does.map((x: string) => <li key={x}>{x}</li>)}</ul> : null; })()}
+        </>}
+        <p className="muted small" style={{ marginTop: 0 }}>It runs as a Claude Code agent on <b>{t.title}</b> from its story, {t.acceptanceCriteria?.length || 0} acceptance criteria and {t.testCases?.length || 0} test cases, in a new branch <code>{(d.branchPrefix ?? 'tf/')}{String(t.key).toLowerCase()}-…</code> from <code>{d.baseBranch || 'the default branch'}</code> of <b>{d.repo || d.localPath}</b>, in its own worktree. Nothing is pushed until you review the changes and open the pull request.</p>
         <label className="field"><span>Extra instructions (optional)</span><TA rows={4} value={text} placeholder="e.g. Put the API in app/api/payslips. Reuse the PayslipTable component. Add a Vitest test." onChange={(e) => setText(e.target.value)} /></label>
         <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{agentId === 'architecture-record' ? 'Write the record' : agentId === 'feature-tests' ? 'Write the tests' : 'Start the agent'}</>}</button>
       </> : <>
@@ -182,10 +189,14 @@ export function CodeModal({ t }: { t: Any }) {
             {open === f.path && job.status !== 'pr' && <DiffView jobId={job.id} file={f.path} />}
           </div>)}
         </div>}
-        {job.reviews?.length > 0 && <details className="code-summary" open={!running}><summary className="small"><b>Review agent’s findings</b> · round {job.reviews[job.reviews.length - 1].round}</summary>
-          <div className="small code-md"><Markdown text={job.reviews[job.reviews.length - 1].text} /></div>
-          {job.status === 'review' && <button className="btn sm ai" disabled={!!busy} onClick={() => act('follow', { action: 'follow', text: `Fix these review findings (skip any you disagree with and say why):\n\n${job.reviews[job.reviews.length - 1].text}` })}><Ico svg={I.sparkle} />Fix the findings</button>}</details>}
-        {job.status === 'review' && !job.pr && <div style={{ margin: '8px 0' }}><button className="btn sm" disabled={!!busy} onClick={() => act('review', { action: 'review' })}><Ico svg={I.search} />{job.reviews?.length ? 'Review again' : 'Review changes with the Review agent'}</button></div>}
+        {job.reviews?.length > 0 && (() => { const rv = job.reviews[job.reviews.length - 1]; const lens = rv.lenses?.[Math.min(reviewTab, rv.lenses.length - 1)]; return <details className="code-summary" open={!running}><summary className="small"><b>{rv.panel ? 'Review Panel' : 'Review agent'}’s findings</b> · round {rv.round}</summary>
+          {rv.panel && <div className="review-tabs" role="tablist">{rv.lenses.map((l: Any, i: number) => <button key={l.id} role="tab" aria-selected={reviewTab === i} className={reviewTab === i ? 'on' : ''} onClick={() => setReviewTab(i)}>{l.name}</button>)}</div>}
+          <div className="small code-md"><Markdown text={rv.panel ? lens?.text || '' : rv.text} /></div>
+          {job.status === 'review' && <button className="btn sm ai" disabled={!!busy} onClick={() => act('follow', { action: 'follow', text: `Fix these review findings (skip any you disagree with and say why):\n\n${job.reviews[job.reviews.length - 1].text}` })}><Ico svg={I.sparkle} />Fix the findings</button>}</details>; })()}
+        {job.status === 'review' && !job.pr && <div className="review-actions">
+          <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'review')?.enabled === false} onClick={() => act('review', { action: 'review' })}>🔍 {job.reviews?.length ? 'Review again' : 'Review changes'}</button>
+          <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'review-panel')?.enabled === false} onClick={() => { setReviewTab(0); act('review', { action: 'review', panel: true }); }} title="Three Review agents in parallel: correctness, security, tests & acceptance">🤝 Review panel</button>
+          <span className="muted small">Read-only Claude Code reviewers. They never edit files.</span></div>}
         {['review', 'report', 'empty', 'failed', 'cancelled'].includes(job.status) && <div className="code-follow">
           <TA rows={2} value={follow} placeholder="Ask for changes: e.g. also handle the empty state, and rename the hook to usePayslips" onChange={(e) => setFollow(e.target.value)} />
           <button className="btn ai" disabled={!follow.trim() || !!busy} onClick={async () => { if (await act('follow', { action: 'follow', text: follow })) setFollow(''); }}><Ico svg={I.sparkle} />Make changes</button>

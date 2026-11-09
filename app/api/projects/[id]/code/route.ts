@@ -23,7 +23,7 @@ export const GET = api(async (req, p) => {
   if (id && sp.get('diff')) return new Response(await jobDiff(id, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   if (id) { const j = getJob(id, Number(sp.get('since') || 0)); if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).'); return j; }
   const { agents } = await publicAgents();
-  return { job: jobForTicket(p.id, String(sp.get('ticketId') || '')), agents: agents.filter((a: any) => CODE_AGENT_IDS.includes(a.id)) };
+  return { job: jobForTicket(p.id, String(sp.get('ticketId') || '')), agents: agents.filter((a: any) => CODE_AGENT_IDS.includes(a.id) || a.id === 'review-panel') };
 });
 
 export const POST = api(async (req, p) => {
@@ -39,7 +39,7 @@ export const POST = api(async (req, p) => {
     return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user, agentId: String(b.agentId || 'build') });
   }
   if (b.action === 'follow') { await guard(p, ['ai.use', 'issue.edit']); own(b.jobId); return followUp(b.jobId, String(b.text || '').slice(0, 4000)); }
-  if (b.action === 'review') { await guard(p, ['ai.use']); own(b.jobId); return reviewJob(b.jobId); }
+  if (b.action === 'review') { await guard(p, ['ai.use']); own(b.jobId); return reviewJob(b.jobId, { panel: Boolean(b.panel) }); }
   if (b.action === 'cancel') { await guard(p, ['issue.edit']); own(b.jobId); return cancelJob(b.jobId); }
   if (b.action === 'discard') { await guard(p, ['issue.edit']); own(b.jobId); return discardJob(b.jobId); }
   if (b.action === 'pr') {
