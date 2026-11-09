@@ -1220,3 +1220,13 @@ a.set-stat:hover { background: var(--hover); }
 .fp-item:hover { background: var(--hover); }
 .fp-item > .ico { color: var(--text-subtle); }
 .fp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Feature Brief (FBD) ---------- */
+.fbd-doc .md { font-size: 14px; line-height: 1.55; }
+.fbd-doc .md h1, .fbd-doc .md h2, .fbd-doc .md h3 { color: var(--text); }
+.fbd-doc .md-tbl { font-size: 13px; margin: 6px 0 12px; }
+.fbd-doc .md-tbl th { background: #0c2a50; color: #fff; }
+.fbd-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 60vh; }
+.fbd-edit textarea { font: 12.5px/1.55 var(--mono) !important; }
+.fbd-preview { max-height: 64vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px; }
+@media (max-width: 900px) { .fbd-edit { grid-template-columns: 1fr; } }

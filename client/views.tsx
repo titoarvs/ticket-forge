@@ -17,6 +17,7 @@ import { AppSetup } from './AppSetup';
 import { FeatureModal } from './FeatureModal';
 import { RemoteBrowser } from './RemoteBrowser';
 import { epicRange } from './Timeline';
+import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy } from './Fbd';
 import { openPsd, openWritePsd, downloadPsd, writeMissingPsds, psdBusy } from './Psd';
 import { ItemText } from './ListEditor';
 
@@ -344,11 +345,12 @@ export function Epics() {
       {can('ai.use') && can('issue.create') && <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>}
       {can('epic.manage') && <>
       {can('ai.use') && <button className="btn ai" onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize with AI</button>}
+      {can('ai.use') && p.epics.some((x: Any) => !x.fbd) && <button className="btn ai" onClick={writeMissingFbds} title="Write a Feature Brief for every epic that doesn’t have one"><Ico svg={I.doc} />Write missing FBDs</button>}
       {can('ai.use') && p.epics.some((x: Any) => !x.psd) && <button className="btn ai" onClick={writeMissingPsds} title="Write a Problem Statement for every epic that doesn’t have one"><Ico svg={I.doc} />Write missing PSDs</button>}
       <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button></>}
       <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link></>} />
     {p.epics.length ? <>
-      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
@@ -360,6 +362,10 @@ export function Epics() {
                 : e.psd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openPsd(e)}>{e.psd.version || 'v1.0'} · {e.psd.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Problem Statement for ${e.title}`} onClick={() => downloadPsd(e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWritePsd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{fbdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
+                : e.fbd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openFbd(e)}>{e.fbd.version || 'v1.0'} · {e.fbd.status || 'Draft'}</button>
+                  {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Feature Brief for ${e.title}`} onClick={() => downloadFbdDocx(e)}><Ico svg={I.download} /></button>}</span>
+                : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteFbd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
               <td style={{ width: 200 }}><ProgBar {...pr} /></td>
               <td className="num">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
               <td className="num">{pr.total}</td><td className="num">{spSum(pr.ts)}</td><td className="num">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>

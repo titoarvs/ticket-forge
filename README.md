@@ -147,6 +147,15 @@ All settings live in `.env` (see `.env.example`):
      styles, fonts, header and footer are kept; the product and feature name, version and status are replaced;
      sign-off names, signatures and dates are left empty to fill in. Unused bold font files are dropped on upload
      so templates and PSDs stay under serverless size limits. Without a template, PSDs use a plain layout.
+   - **Feature Brief (FBD) per epic**: in the epic panel (or **Write missing FBDs** on the Epics page) the AI fills
+     the team's Markdown Feature Brief template: At a Glance, Problem and Evidence, Proposed User Experience,
+     Scope and Requirements (FR-01…), Acceptance Criteria in Given / When / Then, Success Measures, Dependencies
+     and Risks, Rollout, Document Control, Sign-Off and Revision History. It builds on the epic's issues and their
+     acceptance criteria, the epic's PSD when there is one, and the source documents; anything unknown becomes a
+     *[To confirm: …]* point for the team, and sign-off names, signatures and dates stay empty. View it, edit the
+     Markdown, set its version and status (the Document Control row follows), rewrite it with instructions, and
+     download it as **.md** or **.docx**. The bundled template is the default; an administrator can replace it under
+     Administration → Generation → Feature Brief template (any Markdown with `## ` sections) or reset it.
    - **Timeline**: every epic on a calendar (weeks, months or quarters), with a sprints row and a today line. Each
      epic has a start and due date (set them in the epic panel, or on the timeline: click or drag an empty row to
      schedule, drag a bar to move it, drag its ends to change dates; arrow keys work too). Epics without dates
