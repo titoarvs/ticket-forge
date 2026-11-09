@@ -4,7 +4,7 @@ import { useState, type DragEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
-  activeSprint, openSprints, tcKey, spSum, statusNames, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
+  activeSprint, openSprints, tcKey, spSum, statusNames, allowedStatuses, sCls, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
   saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, toast, uid, logEvent, api, type Any,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea, EmptyState, Modal } from './ui';
@@ -194,12 +194,41 @@ export function IssueRow({ t, showEpic = true, zone, compact = false }: { t: Any
         {kids.length > 0 && <span className="mini" title={`${kids.filter(isDone).length} of ${kids.length} sub-tasks done`}><Ico svg={I.subtask} />{kids.filter(isDone).length}/{kids.length}</span>}
         {t.prs.length > 0 && <span className="mini" title={`${t.prs.length} pull request(s)`}><Ico svg={I.pr} />{t.prs.length}</span>}
         {showEpic && e && <ELoz e={e} />}
-        <StatusLoz s={t.status} />
-        <Avatar name={t.assignee} />
+        {!compact && can('issue.edit') ? <RowStatus t={t} /> : <StatusLoz s={t.status} />}
+        {!compact && can('issue.edit') ? <RowAssignee t={t} /> : <Avatar name={t.assignee} />}
         <span className="sp" title="Story points">{t.storyPoints ?? '–'}</span>
         <PriorityIcon p={t.priority} />
       </span>
     </div>
+  );
+}
+
+/** Status lozenge that opens a menu of the statuses this issue may move to (respects custom workflow transitions). */
+const RowStatus = ({ t }: { t: Any }) => (
+  <SF loz className={`loz ${sCls(t.status)}`} aria-label={`Status of ${t.key}`} value={t.status}
+    onClick={(e: Any) => e.stopPropagation()} onMouseDown={(e: Any) => e.stopPropagation()} draggable={false}
+    onChange={(e: Any) => { if (e.target.value !== t.status) mutate(() => setField(t, 'status', e.target.value), { tag: `t.status${t.id}` }); }}>
+    {opts(allowedStatuses(t))}
+  </SF>
+);
+
+/** Assignee avatar that opens a menu of project people (plus Unassigned). */
+const avatarSelect = { '&&': {
+  width: 'auto', minWidth: 0,
+  '& .MuiOutlinedInput-root': { height: 'auto', borderRadius: '50%' },
+  '& .MuiSelect-select': { padding: '0 !important', minHeight: '0 !important', display: 'flex' },
+  '& .MuiSelect-icon': { display: 'none' },
+} };
+function RowAssignee({ t }: { t: Any }) {
+  const people = peopleNames();
+  const list = t.assignee && !people.includes(t.assignee) ? [t.assignee, ...people] : people;
+  const set = (v: string) => { if (v !== (t.assignee || '')) mutate(() => setField(t, 'assignee', v), { tag: `t.assignee${t.id}` }); };
+  return (
+    <SF bare sx={avatarSelect} aria-label={`Assignee of ${t.key}`} value={t.assignee || ''} renderValue={() => <Avatar name={t.assignee} />}
+      onClick={(e: Any) => e.stopPropagation()} onMouseDown={(e: Any) => e.stopPropagation()} draggable={false} onChange={(e: Any) => set(e.target.value)}>
+      <MenuItem value=""><Avatar size={20} /><span style={{ marginLeft: 8 }}>Unassigned</span></MenuItem>
+      {list.map((n) => <MenuItem key={n} value={n}><Avatar name={n} size={20} /><span style={{ marginLeft: 8 }}>{n}</span></MenuItem>)}
+    </SF>
   );
 }
 
