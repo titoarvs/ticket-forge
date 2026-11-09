@@ -339,6 +339,30 @@ be a verified Sender Identity or on an authenticated domain in SendGrid. Check i
 Administration → **Email & database** → **Send a test email to me**. Set `APP_URL` to the address your team
 uses so links in emails work outside your machine.
 
+## Agents
+
+TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), shown in **Administration → Agents**:
+
+| Phase | Agent | What it does | Works in |
+| --- | --- | --- | --- |
+| Prepare | Problem Statement | Drafts the Problem Statement from the epic’s What and Why | Documents |
+| Prepare | Feature Brief | Fills the Feature Brief template from the approved Problem Statement | Documents |
+| Prepare | Epic | Creates the epic for JIRA from the Feature Brief | Documents |
+| Plan | Architecture Record | Explores the codebase and writes the Architecture Decision Record (read-only) | Repo, read-only |
+| Plan | Test Plan · Working Tickets · Kick Off | Test cases, sized tickets, kick-off notes | Documents |
+| Build | **Build a Ticket** | Plans, codes and unit-tests one issue; runs the check command | Own git worktree |
+| Build | **Feature Tests** | Turns the issue’s test cases into automated tests and runs them | Own git worktree |
+| Build | Feature Verification | Manual / browser test runs | Documents |
+| Review | **Review a Pull Request** | Reviews the job’s diff against the acceptance criteria; never edits | Repo, read-only |
+| Release | Demo · Sign-Off · Deploy · Release Certification | Guided release steps (a person deploys) | Documents / worktree |
+| General | **Free Worker** | Any task you describe, same safety rules as Build | Own git worktree |
+
+The agents in bold (and Architecture Record) run as real Claude Code agents: TicketForge passes them to
+`claude -p --agents <json> --agent <id>`, so each one gets its own system prompt and an enforced tool list, and Build
+can delegate to Feature Tests and Review as subagents. Follow-up rounds resume the same Claude Code session
+(`--resume`), so the agent keeps its context. Administrators can turn each agent off and set its model, effort and
+extra instructions; a project’s model in Code & GitHub overrides the agent’s for jobs in that project.
+
 ## Code with AI and pull requests
 
 Set up once per project in **Project settings → Code & GitHub**:

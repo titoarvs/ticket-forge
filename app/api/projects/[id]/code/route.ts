@@ -1,10 +1,12 @@
 import { api, authed, body, HttpError, appUrl } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { startJob, getJob, jobForTicket, jobDiff, followUp, cancelJob, discardJob, openPullRequest } from '@/lib/devagent.js';
+import { startJob, getJob, jobForTicket, jobDiff, followUp, cancelJob, discardJob, openPullRequest, reviewJob } from '@/lib/devagent.js';
+import { publicAgents, CODE_AGENT_IDS } from '@/lib/agents.js';
 import { getProjectSecret } from '@/lib/secrets.js';
 
-// Code generation and pull requests for an issue (local only): Claude Code in a git worktree of the project's repo.
+// Code generation and pull requests for an issue (local only): TicketForge agents (lib/agents.js) run as Claude Code
+// agents in a git worktree of the project's repo.
 async function guard(p: any, perms: string[]) {
   const user = await authed();
   store.requireAccess(user, p.id);
@@ -20,7 +22,8 @@ export const GET = api(async (req, p) => {
   const id = sp.get('jobId');
   if (id && sp.get('diff')) return new Response(await jobDiff(id, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   if (id) { const j = getJob(id, Number(sp.get('since') || 0)); if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).'); return j; }
-  return { job: jobForTicket(p.id, String(sp.get('ticketId') || '')) };
+  const { agents } = await publicAgents();
+  return { job: jobForTicket(p.id, String(sp.get('ticketId') || '')), agents: agents.filter((a: any) => CODE_AGENT_IDS.includes(a.id)) };
 });
 
 export const POST = api(async (req, p) => {
@@ -33,9 +36,10 @@ export const POST = api(async (req, p) => {
     if (!dev.localPath) throw new HttpError(400, 'Set the local repository folder in Project settings → Code & GitHub first.');
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
-    return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user });
+    return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user, agentId: String(b.agentId || 'build') });
   }
   if (b.action === 'follow') { await guard(p, ['ai.use', 'issue.edit']); own(b.jobId); return followUp(b.jobId, String(b.text || '').slice(0, 4000)); }
+  if (b.action === 'review') { await guard(p, ['ai.use']); own(b.jobId); return reviewJob(b.jobId); }
   if (b.action === 'cancel') { await guard(p, ['issue.edit']); own(b.jobId); return cancelJob(b.jobId); }
   if (b.action === 'discard') { await guard(p, ['issue.edit']); own(b.jobId); return discardJob(b.jobId); }
   if (b.action === 'pr') {
