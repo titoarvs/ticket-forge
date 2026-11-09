@@ -6,3 +6,5 @@ data/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+package-lock.json
