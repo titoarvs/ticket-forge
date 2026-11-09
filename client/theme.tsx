@@ -1,15 +1,16 @@
 'use client';
-// MUI theme matched to the Jira-style design tokens in globals.css (light and dark follow the system setting).
+// MUI theme matched to the design tokens in globals.css. Dark is the default; people can switch to light
+// (stored per browser). The mode is the data-theme attribute on <html>, which globals.css also keys off.
 import type { ReactNode } from 'react';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider, createTheme, useColorScheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
-const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif';
+const FONT = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif';
 
 export const theme = createTheme({
-  cssVariables: { colorSchemeSelector: 'media' },
+  cssVariables: { colorSchemeSelector: 'data-theme' },
   colorSchemes: {
     light: {
       palette: {
@@ -23,16 +24,16 @@ export const theme = createTheme({
     },
     dark: {
       palette: {
-        primary: { main: '#579dff', dark: '#85b8ff', contrastText: '#1d2125' },
-        error: { main: '#f87168' },
-        success: { main: '#7ee2b8' },
-        background: { default: '#1d2125', paper: '#282e33' },
-        text: { primary: '#b6c2cf', secondary: '#8c9bab', disabled: '#596773' },
-        divider: 'rgba(166, 197, 226, 0.16)',
+        primary: { main: '#3b82f6', dark: '#2563eb', contrastText: '#ffffff' },
+        error: { main: '#f0857a' },
+        success: { main: '#4ade80' },
+        background: { default: '#0e1013', paper: '#1a1d23' },
+        text: { primary: '#f5f7fa', secondary: '#9aa3b2', disabled: '#5a616d' },
+        divider: '#252930',
       },
     },
   },
-  shape: { borderRadius: 3 },
+  shape: { borderRadius: 6 },
   typography: { fontFamily: FONT, fontSize: 14, button: { textTransform: 'none' } },
   components: {
     MuiTextField: { defaultProps: { size: 'small', fullWidth: true, variant: 'outlined' } },
@@ -64,10 +65,10 @@ export const theme = createTheme({
       styleOverrides: { select: { minHeight: 20, display: 'flex', alignItems: 'center', gap: 6 } },
     },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
-    MuiPopover: { styleOverrides: { paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', borderRadius: 3 } } },
+    MuiPopover: { styleOverrides: { paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', border: '1px solid var(--border)', borderRadius: 8 } } },
     MuiAutocomplete: {
       styleOverrides: {
-        paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', borderRadius: 3, fontSize: 14 },
+        paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 14 },
         inputRoot: { padding: '2px 8px !important' },
         input: { padding: '4px 0 !important' },
         option: { gap: 8, minHeight: 32 },
@@ -88,10 +89,19 @@ export const theme = createTheme({
   },
 });
 
+export const MODE_KEY = 'tf-theme';
+
+/** Switches between the dark (default) and light themes. */
+export function useThemeMode() {
+  const { mode, systemMode, setMode } = useColorScheme();
+  const current = (mode === 'system' ? systemMode : mode) || 'dark';
+  return { mode: current, toggle: () => setMode(current === 'dark' ? 'light' : 'dark') };
+}
+
 export default function ThemeRegistry({ children }: { children: ReactNode }) {
   return (
     <AppRouterCacheProvider options={{ key: 'mui' }}>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={theme} defaultMode="dark" modeStorageKey={MODE_KEY} disableTransitionOnChange>
         <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
       </ThemeProvider>
     </AppRouterCacheProvider>

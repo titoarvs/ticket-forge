@@ -1,6 +1,8 @@
 'use client';
 // Project settings → Workflow: the statuses (board columns) and, like Jira, which status can move to which.
-import { P, CATEGORIES, can, mutate, setField, openModal, toast, uid, emit, type Any } from './core';
+import { useState } from 'react';
+import Popover from '@mui/material/Popover';
+import { P, CATEGORIES, can, mutate, setField, openModal, toast, uid, emit, statusColor, wCls, type Any } from './core';
 import { Ico, I, Confirm, SetCard } from './ui';
 import { SF, TF, CB, MenuItem } from './fields';
 
@@ -40,8 +42,8 @@ function FlowDiagram({ wf, free }: { wf: Any[]; free: boolean }) {
         {edges.map((e, k) => <path key={k} d={path(e)} className={`wf-edge ${e.b > e.a ? 'fwd' : 'back'}`} markerEnd="url(#wf-arrow)" />)}
         {wf.map((w, i) => <g key={w.id}>
           {!free && w.fromAny && <g className="wf-any"><text x={cx(i)} y={top - up - 12} textAnchor="middle">ALL</text><path d={`M${cx(i)},${top - up - 7} L${cx(i)},${top - 3}`} markerEnd="url(#wf-arrow)" /></g>}
-          <rect x={cx(i) - NODE_W / 2} y={top} width={NODE_W} height={NODE_H} rx={6} className={`wf-node c-${w.category}`} />
-          <text x={cx(i)} y={top + NODE_H / 2 + 4} textAnchor="middle" className={`wf-label c-${w.category}`}>{short(w.name.toUpperCase())}</text>
+          <rect x={cx(i) - NODE_W / 2} y={top} width={NODE_W} height={NODE_H} rx={6} className={`wf-node c-${w.category} ${wCls(w)}`} />
+          <text x={cx(i)} y={top + NODE_H / 2 + 4} textAnchor="middle" className={`wf-label c-${w.category} ${wCls(w)}`}>{short(w.name.toUpperCase())}</text>
           <title>{w.name}</title>
         </g>)}
       </svg>
@@ -100,9 +102,10 @@ export function WorkflowSettings() {
     <SetCard id="statuses" title="Statuses" desc="The steps issues move through, left to right on the board. Each status is one board column."
       right={<span className="muted small">{wf.length} statuses</span>}>
     <div className="set-legend small">{CATEGORIES.map(([v, l]) => <span key={v}><span className={`dot-cat s-${v}`} /><b>{l}</b> {v === 'todo' ? 'not started' : v === 'inprogress' ? 'being worked on' : 'counts as finished in progress, sprints and reports'}</span>)}</div>
-    <div className="tbl-scroll"><table className="tbl set-tbl"><thead><tr><th>Name</th><th>Category</th><th className="num">Column limit</th><th className="num">Issues</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
+    <div className="tbl-scroll"><table className="tbl set-tbl"><thead><tr><th>Name</th><th>Color</th><th>Category</th><th className="num">Column limit</th><th className="num">Issues</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
       {wf.map((w: Any, i: number) => (
         <tr key={w.id}><td><CommitName disabled={!ed} value={w.name} onCommit={(v) => renameStatus(i, v)} /></td>
+          <td><StatusColorPicker w={w} disabled={!ed} /></td>
           <td><SF disabled={!ed} aria-label="Category" value={w.category} onChange={(e) => mutate(() => { w.category = e.target.value; })}>{CATEGORIES.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}</SF></td>
           <td className="num" style={{ width: 120 }}><TF disabled={!ed} type="number" min={0} aria-label={`Column limit for ${w.name}`} placeholder="None" value={w.wip ?? ''}
             onChange={(e) => mutate(() => { const v = e.target.value === '' ? null : Math.max(0, Math.round(Number(e.target.value))); if (v) w.wip = v; else delete w.wip; }, { tag: `wip${w.id}` })} /></td>
@@ -114,7 +117,7 @@ export function WorkflowSettings() {
       ))}
     </tbody></table></div>
     {ed && <button className="inline-create" style={{ width: 'auto' }} onClick={addStatus}><Ico svg={I.plus} />Add status</button>}
-    <p className="muted small set-note">Column limit: the board column turns red when it holds more issues than this. Leave empty for no limit.</p>
+    <p className="muted small set-note">Color: how the status looks on issues, the backlog and the board. Default uses its category’s color. Column limit: the board column turns red when it holds more issues than this. Leave empty for no limit.</p>
     </SetCard>
 
     <SetCard id="transitions" title="Transitions" desc={free ? 'Issues can move from any status to any other. Switch to custom transitions to control the order, like a Jira workflow.'
@@ -133,11 +136,11 @@ export function WorkflowSettings() {
       </div>}
       <div className="wf-matrix-wrap">
         <table className="tbl wf-matrix">
-          <thead><tr><th className="wf-corner"><span>From ↓ · To →</span></th>{wf.map((to) => <th key={to.id} className="num"><span className={`dot-cat s-${to.category}`} />{to.name}</th>)}</tr></thead>
+          <thead><tr><th className="wf-corner"><span>From ↓ · To →</span></th>{wf.map((to) => <th key={to.id} className="num"><span className={`dot-cat ${wCls(to)}`} />{to.name}</th>)}</tr></thead>
           <tbody>
             <tr className="wf-any-row"><th scope="row">Any status <span className="muted small">(always allowed)</span></th>{wf.map((to) => (
               <td key={to.id} className="num"><CB label="" checked={Boolean(to.fromAny)} disabled={!ed} aria-label={`Any status can move to ${to.name}`} onChange={() => mutate(() => { to.fromAny = !to.fromAny; })} /></td>))}</tr>
-            {wf.map((from) => <tr key={from.id}><th scope="row"><span className={`dot-cat s-${from.category}`} />{from.name}</th>
+            {wf.map((from) => <tr key={from.id}><th scope="row"><span className={`dot-cat ${wCls(from)}`} />{from.name}</th>
               {wf.map((to) => from.id === to.id ? <td key={to.id} className="num muted">–</td> : (
                 <td key={to.id} className={`num ${to.fromAny ? 'wf-implied' : ''}`}>
                   <CB label="" checked={to.fromAny || (from.next || []).includes(to.id)} disabled={!ed || to.fromAny}
@@ -156,4 +159,31 @@ function CommitName({ value, onCommit, disabled }: { value: string; onCommit: (v
   return <TF key={value} disabled={disabled} defaultValue={value} aria-label="Status name"
     onBlur={(e) => { const v = e.target.value.trim(); if (v !== value) onCommit(v); }}
     onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { (e.target as HTMLInputElement).value = value; (e.target as HTMLInputElement).blur(); } }} />;
+}
+
+const PRESETS = ['#626f86', '#0c66e4', '#1d7afc', '#206a83', '#1f845a', '#5b7f24', '#b38600', '#e06c00', '#c9372c', '#ae2e24', '#943d73', '#6e5dc6'];
+
+/** A status's colour: preset swatches, any custom colour, or back to its category's default. */
+function StatusColorPicker({ w, disabled }: { w: Any; disabled?: boolean }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const cur = statusColor(w);
+  const set = (c: string) => mutate(() => { if (c) w.color = c; else delete w.color; }, { tag: `color${w.id}` });
+  return <>
+    <button type="button" className="color-btn" disabled={disabled} aria-label={`Color of ${w.name}: ${cur || 'default'}`} title={disabled ? undefined : 'Change color'}
+      onClick={(e) => setAnchor(e.currentTarget)}>
+      <span className={`loz ${wCls(w)}`}>{w.name}</span>
+    </button>
+    <Popover open={Boolean(anchor)} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+      <div className="color-pop" role="dialog" aria-label={`Color of ${w.name}`}>
+        <div className="color-grid">{PRESETS.map((c) => (
+          <button key={c} type="button" className={`color-sw ${cur.toLowerCase() === c ? 'on' : ''}`} style={{ background: c }} title={c} aria-label={c} aria-pressed={cur.toLowerCase() === c} onClick={() => set(c)} />))}
+        </div>
+        <label className="color-custom small"><input type="color" value={cur || '#0c66e4'} onChange={(e) => set(e.target.value)} />Custom color{cur && <span className="muted"> · {cur}</span>}</label>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <span className={`loz ${wCls(w)}`}>{w.name}</span>
+          <button type="button" className="btn sm subtle" disabled={!cur} onClick={() => set('')}>Use default</button>
+        </div>
+      </div>
+    </Popover>
+  </>;
 }

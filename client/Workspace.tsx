@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar } from './core';
+import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
@@ -87,6 +87,7 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   const View = COMPONENTS[v];
   return (
     <div className="shell">
+      <style>{statusColorCss()}</style>
       <Sidebar view={v} />
       <div className="main">
         <section className="view"><View /></section>

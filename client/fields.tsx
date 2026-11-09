@@ -12,7 +12,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import { I, typeIcon } from './icons';
-import { hashColor, initials, type Any } from './core';
+import { hashColor, initials, readableOn, type Any } from './core';
 
 export { MenuItem };
 
@@ -55,8 +55,8 @@ const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   inprogress: { bg: 'var(--brand)', fg: 'var(--brand-text)' },
   done: { bg: '#1f845a', fg: '#ffffff' },
 };
-const statusLook = (tone: string) => {
-  const c = STATUS_TONE[tone] || STATUS_TONE.todo;
+const statusLook = (tone: string, color?: string) => {
+  const c = color ? { bg: color, fg: readableOn(color) } : STATUS_TONE[tone] || STATUS_TONE.todo;
   return {
     width: 'auto',
     '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': { backgroundColor: c.bg, color: c.fg, fontWeight: 600, height: 32 },
@@ -66,11 +66,11 @@ const statusLook = (tone: string) => {
 };
 // "&&" doubles the class so these looks win over the theme's default input styles.
 const look = (p: Any) => [
-  p.ghost && ghost, p.title && titleLook, p.bare && bare, p.mono && mono, p.filter && filterLook, p.loz && lozLook, p.tone && statusLook(p.tone),
+  p.ghost && ghost, p.title && titleLook, p.bare && bare, p.mono && mono, p.filter && filterLook, p.loz && lozLook, p.tone && statusLook(p.tone, p.toneColor),
 ].filter(Boolean).map((x) => ({ '&&': x }));
 
 function split(props: Any) {
-  const { ghost: _g, title: _t, bare: _b, mono: _m, filter: _f, loz: _l, tone: _tn, search, min, max, maxLength, readOnly, spellCheck, rows, maxRows,
+  const { ghost: _g, title: _t, bare: _b, mono: _m, filter: _f, loz: _l, tone: _tn, toneColor: _tc, search, min, max, maxLength, readOnly, spellCheck, rows, maxRows,
     'aria-label': ariaLabel, sx, autoComplete, list: _list, ...rest } = props;
   return { rest, search, html: { min, max, maxLength, readOnly, spellCheck, 'aria-label': ariaLabel, autoComplete }, rows, maxRows, sx };
 }

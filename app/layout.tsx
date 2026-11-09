@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
 import ThemeRegistry from '@/client/theme';
 
 export const metadata: Metadata = {
@@ -10,8 +11,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body><ThemeRegistry>{children}</ThemeRegistry></body>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+      </head>
+      <body>
+        {/* Applies the saved theme (dark by default) before the page paints, so there is no flash. */}
+        <InitColorSchemeScript attribute="data-theme" defaultMode="dark" modeStorageKey="tf-theme" />
+        <ThemeRegistry>{children}</ThemeRegistry></body>
     </html>
   );
 }

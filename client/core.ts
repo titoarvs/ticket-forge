@@ -188,7 +188,20 @@ export const moveError = (t: Any, to: string) => {
   return `${t.key} can’t move from “${t.status}” to “${to}” in this project’s workflow.${ok.length ? ` It can move to ${ok.map((n) => `“${n}”`).join(', ')}.` : ''}`;
 };
 export const isDone = (t: Any) => catOf(t.status) === 'done';
-export const sCls = (status: string) => `s-${catOf(status)}`;
+/** A status's own colour (Project settings → Workflow), if it has one. Only #rrggbb is accepted. */
+export const statusColor = (w: Any): string => (typeof w?.color === 'string' && /^#[0-9a-f]{6}$/i.test(w.color) ? w.color : '');
+const scId = (w: Any) => String(w.id).replace(/[^\w-]/g, '');
+/** Class for a status: its category colours, plus its own colour when set (see statusColorCss). */
+export const sCls = (status: string) => { const w = statusOf(status); return `s-${catOf(status)}${w && statusColor(w) ? ` sc sc-${scId(w)}` : ''}`; };
+/** Class for a workflow entry (by object, for settings and board columns). */
+export const wCls = (w: Any) => `s-${w.category}${statusColor(w) ? ` sc sc-${scId(w)}` : ''}`;
+/** CSS giving each coloured status its colour variable. */
+export const statusColorCss = () => (P()?.workflow || []).filter(statusColor).map((w: Any) => `.sc-${scId(w)}{--sc:${statusColor(w)}}`).join('');
+/** Black or white, whichever reads better on this background. */
+export function readableOn(hex: string) {
+  const n = parseInt(hex.slice(1), 16), [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#172b4d' : '#ffffff';
+}
 export const tCls = (s: string) => `t-${String(s).toLowerCase().replace(/\s/g, '')}`;
 export const openIssue = () => (S.drawer?.kind === 'issue' ? ticket(S.drawer.id) : null);
 export const openEpic = () => (S.drawer?.kind === 'epic' ? epic(S.drawer.id) : null);
