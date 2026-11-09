@@ -8,6 +8,7 @@ import { TF, TA, SF, CB, RB, MenuItem } from './fields';
 import { Loading, Sk } from './ui';
 import { GuideCard } from './GuideCard';
 import { AiTold } from './AiTold';
+import { PsdTemplateCard } from './Psd';
 
 const TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 const REASONING: [string, string, string][] = [
@@ -141,6 +142,8 @@ export function GenerationTab() {
         </div>
 
         <GuideCard onChange={refreshPrompts} />
+
+        <PsdTemplateCard />
 
         <AiTold prompts={prompts} />
       </div>

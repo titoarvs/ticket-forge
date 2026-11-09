@@ -137,6 +137,16 @@ All settings live in `.env` (see `.env.example`):
      (the header turns red when a column has too many issues); **Create issue** at the bottom of a column; days
      remaining; switch to all issues. On a phone the columns scroll sideways one at a time.
    - **Epics**: progress bars per epic; create, rename, recolour or delete; **Re-organize with Claude**.
+   - **Problem Statement (PSD) per epic**: in the epic panel (or **Write missing PSDs** on the Epics page) the AI
+     writes the feature's Problem Statement in your template's sections: At a Glance, Background and Current
+     Situation, Problem Statement (with the gaps table), Who Is Affected, Impact on the business, Impact on Users
+     (one table per role), Cost of Inaction and Evidence Needed. It works from the epic, its issues, the project
+     description and the source documents, and marks claims to confirm as *[To validate …]*. View it in the app,
+     set its version and status, rewrite it with instructions, and **Download .docx**. An administrator uploads
+     the team's PSD template once (Administration → Generation → Problem Statement template): its cover, logo,
+     styles, fonts, header and footer are kept; the product and feature name, version and status are replaced;
+     sign-off names, signatures and dates are left empty to fill in. Unused bold font files are dropped on upload
+     so templates and PSDs stay under serverless size limits. Without a template, PSDs use a plain layout.
    - **Timeline**: every epic on a calendar (weeks, months or quarters), with a sprints row and a today line. Each
      epic has a start and due date (set them in the epic panel, or on the timeline: click or drag an empty row to
      schedule, drag a bar to move it, drag its ends to change dates; arrow keys work too). Epics without dates
