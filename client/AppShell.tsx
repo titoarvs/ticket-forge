@@ -10,6 +10,7 @@ import { Ico, I, Menu, Avatar, Toasts, BusyPill, EmptyState, ErrorState } from '
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue } from './actions';
 import { AccountModal } from './Admin';
+import { useThemeMode } from './theme';
 
 const EXPORTS: (string[] | null)[] = [
   ['xlsx', 'Excel workbook', '.xlsx'], ['docx', 'Word document', '.docx'], ['pdf', 'PDF report', '.pdf'], ['html', 'HTML report', '.html'],
@@ -90,6 +91,7 @@ function TopNav() {
           </Menu>
         )}
       </>}
+      <ThemeToggle />
       <Notifications />
       <button className="conn" onClick={() => openModal(<AiSettingsModal />)}
         title={'unknown' in c ? (S.statusError ? `Couldn’t check the AI connection (${S.statusError}). Retrying.` : 'Checking the AI connection…') : c.switched ? 'Your main AI is limited right now, so TicketForge switched to a backup' : 'AI connection'}>
@@ -218,4 +220,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <RunPill />
     </>
   );
+}
+
+function ThemeToggle() {
+  const { mode, toggle } = useThemeMode();
+  const next = mode === 'dark' ? 'light' : 'dark';
+  return <button className="icon-btn theme-btn" onClick={toggle} title={`Switch to ${next} theme`} aria-label={`Switch to ${next} theme`}>
+    <Ico svg={mode === 'dark' ? I.sun : I.moon} /></button>;
 }

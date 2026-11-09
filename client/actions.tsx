@@ -10,6 +10,7 @@ import {
 import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea, Spinner } from './ui';
 import { refreshStatus, aiInactive } from './AppShell';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
+import { RichTextField, type RichValue } from './CommentEditor';
 
 export const findTc = (tid: string, tcid: string) => { const t = ticket(tid); return { t, tc: t?.testCases.find((x: Any) => x.id === tcid) }; };
 export const openDrawer = (kind: 'issue' | 'epic', id: string) => {
@@ -139,6 +140,8 @@ export function convertToSubtask(t: Any) {
 // ---------------------------------------------------------------- create issue
 export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
   const p = P();
+  const [rich, setRich] = useState<RichValue | null>(null);
+  const [n, setN] = useState(0); // remounts the description editor after "Create another"
   const [f, setF] = useState({ type: 'Story', title: '', description: '', epicId, sprintId: '', priority: 'Medium', storyPoints: '', assignee: '', another: false });
   const set = (k: string) => (e: Any) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const isEpic = f.type === 'Epic';
@@ -149,11 +152,11 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
       created = { id: uid(), key: nextEpicKey(), title: f.title.trim(), description: f.description.trim(), color: COLORS[P().epics.length % COLORS.length] };
       mutate((pp) => pp.epics.push(created));
     } else {
-      created = newTicket({ title: f.title.trim(), type: f.type, description: f.description.trim(), epicId: f.epicId || null, sprintId: f.sprintId || null, priority: f.priority, storyPoints: f.storyPoints === '' ? null : Number(f.storyPoints), assignee: f.assignee.trim() });
+      created = newTicket({ title: f.title.trim(), type: f.type, description: f.description.trim(), ...(rich?.text && rich.text === f.description.trim() && { descriptionRich: rich }), epicId: f.epicId || null, sprintId: f.sprintId || null, priority: f.priority, storyPoints: f.storyPoints === '' ? null : Number(f.storyPoints), assignee: f.assignee.trim() });
       mutate((pp) => { pp.tickets.push(created); addMember(f.assignee); });
     }
     toast(`Created ${created.key}`);
-    if (f.another) { setF({ ...f, title: '', description: '' }); return; }
+    if (f.another) { setF({ ...f, title: '', description: '' }); setRich(null); setN((x) => x + 1); return; }
     closeModal();
     openDrawer(isEpic ? 'epic' : 'issue', created.id);
   };
@@ -172,7 +175,9 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
         <label className="field"><span>Issue type <span className="req">*</span></span><SF value={f.type} onChange={set('type')}>{opts([...TYPES, ...(can('epic.manage') ? ['Epic'] : [])])}</SF></label>
       </div>
       <label className="field"><span>Summary <span className="req">*</span></span><TF autoFocus value={f.title} onChange={set('title')} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } }} /></label>
-      <label className="field"><span>Description</span><TA value={f.description} onChange={set('description')} placeholder="Describe the work. Claude can turn this into a full issue with acceptance criteria and test cases." /></label>
+      <div className="field"><span>Description</span><RichTextField key={n} text={f.description} rich={rich} ariaLabel="Description"
+        placeholder="Describe the work. Claude can turn this into a full issue with acceptance criteria and test cases."
+        onChange={(v) => { setRich(v); setF((x) => ({ ...x, description: v.text })); }} /></div>
       {!isEpic && <div className="grid2">
         <label className="field"><span>Epic</span><SF value={f.epicId} onChange={set('epicId')}><MenuItem value="">None</MenuItem>{p.epics.map((e: Any) => <MenuItem key={e.id} value={e.id}>{e.title}</MenuItem>)}</SF></label>
         <label className="field"><span>Sprint</span><SF value={f.sprintId} onChange={set('sprintId')}><MenuItem value="">Backlog</MenuItem>{openSprints().map((s: Any) => <MenuItem key={s.id} value={s.id}>{s.name}{s.state === 'active' ? ' (active)' : ''}</MenuItem>)}</SF></label>

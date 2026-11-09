@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   S, emit, P, ago, fmtDate, allowedStatuses, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
-  statusNames, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
+  statusNames, statusOf, statusColor, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
   clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, type Any,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState } from './ui';
@@ -13,7 +13,7 @@ import {
 } from './actions';
 import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
-import { CommentEditor, CommentBody } from './CommentEditor';
+import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
 import { FbdSection } from './Fbd';
 import { codeReady, openCode } from './DevCode';
@@ -119,7 +119,7 @@ function IssuePanel({ t }: { t: Any }) {
     <div className="dr-scroll">
       <TA title rows={1} aria-label="Summary" disabled={!edit} value={t.title} onChange={(ev) => field('title', ev.target.value.replace(/\n/g, ' '))} />
       <div className="dr-actions">
-        <SF tone={catOf(t.status)} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(allowedStatuses(t))}</SF>
+        <SF tone={catOf(t.status)} toneColor={statusColor(statusOf(t.status))} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(allowedStatuses(t))}</SF>
         {can('ai.use') && edit && <>
           <button className="btn ai" title="Improve the whole issue" onClick={() => runTicketAi(t, 'enhance')}><Ico svg={I.sparkle} />Enhance</button>
           <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More Claude actions<Ico svg={I.chevron} /></button>}>
@@ -134,7 +134,8 @@ function IssuePanel({ t }: { t: Any }) {
       <div className="dr-cols">
         <div className="dr-main">
           <div className="sec"><div className="sec-title"><h3>Description</h3></div>
-            <TA ghost disabled={!edit} value={t.description} placeholder="Add a description…" onChange={(ev) => field('description', ev.target.value)} /></div>
+            <RichTextField key={t.id} ghost disabled={!edit} text={t.description} rich={t.descriptionRich} placeholder="Add a description…"
+              onChange={(v) => mutate(() => { setField(t, 'description', v.text); t.descriptionRich = v; }, { tag: `t.description${t.id}` })} /></div>
           <div className="sec"><div className="sec-title"><h3>User story</h3></div>
             <TA ghost disabled={!edit} value={t.userStory} placeholder="As a …, I want …, so that …" onChange={(ev) => field('userStory', ev.target.value)} /></div>
 

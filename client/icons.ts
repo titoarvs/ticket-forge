@@ -68,6 +68,8 @@ export const I = {
   calendar: s('<rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6.5h12M5.5 1.8v2.4M10.5 1.8v2.4"/>'),
   chart: s('<path d="M2.5 13.5h11"/><rect x="3.5" y="8" width="2" height="4" rx=".5"/><rect x="7" y="5" width="2" height="7" rx=".5"/><rect x="10.5" y="2.5" width="2" height="9.5" rx=".5"/>'),
   people: s('<circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13c.5-2.2 2.2-3.5 4.2-3.5s3.7 1.3 4.2 3.5"/><path d="M10.5 3.4a2.2 2.2 0 010 4.3M12 9.8c1.2.4 2 1.6 2.2 3.2"/>'),
+  sun: s('<circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/>'),
+  moon: s('<path d="M13.2 9.6A5.5 5.5 0 016.4 2.8a5.5 5.5 0 106.8 6.8z"/>'),
   bell: s('<path d="M4 11.5V7.2a4 4 0 018 0v4.3l1.3 1.3H2.7z"/><path d="M6.6 13.8a1.5 1.5 0 002.8 0"/>'),
   flag: s('<path d="M3.5 14V2.5M3.5 3h8.5l-1.8 3 1.8 3H3.5"/>'),
 };

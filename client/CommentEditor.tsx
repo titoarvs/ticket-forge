@@ -39,7 +39,7 @@ async function upload(file: File): Promise<Attachment> {
   return api(`/api/projects/${P().id}/files`, { method: 'POST', body: fd });
 }
 
-function Toolbar({ editor, onAttach, busy }: { editor: Editor; onAttach: () => void; busy: boolean }) {
+function Toolbar({ editor, onAttach, busy = false, headings = false }: { editor: Editor; onAttach?: () => void; busy?: boolean; headings?: boolean }) {
   const [, force] = useState(0);
   useEffect(() => { const f = () => force((n) => n + 1); editor.on('transaction', f); return () => { editor.off('transaction', f); }; }, [editor]);
   const b = (label: string, active: boolean, run: () => void, content: React.ReactNode, key?: string) => (
@@ -56,6 +56,10 @@ function Toolbar({ editor, onAttach, busy }: { editor: Editor; onAttach: () => v
   };
   return (
     <div className="ce-bar" role="toolbar" aria-label="Formatting">
+      {headings && <>
+        {b('Heading', editor.isActive('heading', { level: 3 }), () => c().toggleHeading({ level: 3 }).run(), <b>H</b>, '⌘⌥3')}
+        {b('Subheading', editor.isActive('heading', { level: 4 }), () => c().toggleHeading({ level: 4 }).run(), <b style={{ fontSize: 11 }}>H2</b>, '⌘⌥4')}
+        <span className="ce-sep" /></>}
       {b('Bold', editor.isActive('bold'), () => c().toggleBold().run(), <b>B</b>, '⌘B')}
       {b('Italic', editor.isActive('italic'), () => c().toggleItalic().run(), <i style={{ fontFamily: 'Georgia, serif' }}>I</i>, '⌘I')}
       {b('Strikethrough', editor.isActive('strike'), () => c().toggleStrike().run(), <s>S</s>, '⌘⇧S')}
@@ -66,8 +70,8 @@ function Toolbar({ editor, onAttach, busy }: { editor: Editor; onAttach: () => v
       {b('Quote', editor.isActive('blockquote'), () => c().toggleBlockquote().run(), <span>❝</span>, '⌘⇧B')}
       {b('Code block', editor.isActive('codeBlock'), () => c().toggleCodeBlock().run(), <code>{'{ }'}</code>, '⌘⌥C')}
       {b('Link', editor.isActive('link'), link, <Ico svg={I.link} />, '')}
-      <span className="ce-sep" />
-      {b(busy ? 'Uploading…' : 'Attach files', false, onAttach, busy ? <Spinner /> : <Ico svg={I.upload} />, '')}
+      {onAttach && <><span className="ce-sep" />
+      {b(busy ? 'Uploading…' : 'Attach files', false, onAttach, busy ? <Spinner /> : <Ico svg={I.upload} />, '')}</>}
     </div>
   );
 }
@@ -133,6 +137,70 @@ export function CommentEditor({ value, onSave, onCancel, saveLabel = 'Save', pla
         {onCancel && <button className="btn sm subtle" onClick={onCancel}>Cancel</button>}
         <span className="muted small ce-hint">⌘↩ to save · drop or paste files to attach · **bold**, _italic_, - list, &gt; quote, ``` code</span>
       </div>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- rich text fields (issue descriptions)
+// The field's plain text stays the source of truth (exports, search, AI prompts read it). The formatted
+// document is saved beside it as { text, doc } and is only used while its text still matches, so a change
+// made elsewhere (Claude rewriting the description, an import) falls back to the plain text.
+export type RichValue = { text: string; doc: Any };
+
+/** A TipTap document as readable plain text: blank lines between blocks, "- " and "1. " list markers, "> " quotes. */
+export function docToText(doc: Any): string {
+  const inline = (n: Any): string => (n.content || []).map((c: Any) => (c.type === 'text' ? c.text : c.type === 'hardBreak' ? '\n' : inline(c))).join('');
+  const item = (li: Any, marker: string) => marker + (li.content || []).map(block).join('\n').split('\n').join(`\n${' '.repeat(marker.length)}`);
+  const blocks = (n: Any, sep: string) => (n.content || []).map(block).join(sep);
+  function block(n: Any): string {
+    switch (n.type) {
+      case 'paragraph': case 'heading': case 'codeBlock': return inline(n);
+      case 'bulletList': return (n.content || []).map((li: Any) => item(li, '- ')).join('\n');
+      case 'orderedList': { const s = Number(n.attrs?.start) || 1; return (n.content || []).map((li: Any, i: number) => item(li, `${s + i}. `)).join('\n'); }
+      case 'blockquote': return blocks(n, '\n\n').split('\n').map((l) => `> ${l}`).join('\n');
+      case 'horizontalRule': return '---';
+      default: return n.content ? blocks(n, '\n\n') : '';
+    }
+  }
+  return blocks(doc || {}, '\n\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+/** The document to show for a field: its saved formatting if still current, else its plain text. */
+export const docFor = (text: string, rich?: RichValue | null) => (rich?.doc && rich.text === (text || '') ? rich.doc : textToDoc(text || ''));
+
+/** A rich text input with a formatting toolbar. `ghost` hides the border and toolbar until it is focused. */
+export function RichTextField({ text, rich, onChange, placeholder = '', disabled, ghost, autoFocus, ariaLabel = 'Description' }: {
+  text: string; rich?: RichValue | null; onChange: (v: RichValue) => void; placeholder?: string; disabled?: boolean; ghost?: boolean; autoFocus?: boolean; ariaLabel?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const changeRef = useRef(onChange);
+  changeRef.current = onChange;
+  const want = docFor(text, rich);
+  const wantJson = JSON.stringify(want);
+  const seen = useRef(wantJson); // the last document this field loaded or produced
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: extensions(placeholder),
+    content: want,
+    editable: !disabled,
+    autofocus: autoFocus ? 'end' : false,
+    editorProps: { attributes: { class: 'ce-content rich', 'aria-label': ariaLabel, role: 'textbox', 'aria-multiline': 'true' } },
+    onUpdate: ({ editor: ed }) => { const doc = ed.getJSON(); seen.current = JSON.stringify(doc); changeRef.current({ text: ed.isEmpty ? '' : docToText(doc), doc }); },
+    onFocus: () => setFocused(true),
+    onBlur: () => setFocused(false),
+  });
+  // Follow changes made elsewhere (undo, Claude, another tab) without disturbing what is being typed here.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || seen.current === wantJson) return;
+    seen.current = wantJson;
+    editor.commands.setContent(JSON.parse(wantJson), { emitUpdate: false });
+  }, [editor, wantJson]);
+  useEffect(() => { if (editor && !editor.isDestroyed) editor.setEditable(!disabled); }, [editor, disabled]);
+  if (!editor) return <div className="ce ce-loading muted small"><Spinner /> Loading editor…</div>;
+  const showBar = !disabled && (!ghost || focused);
+  return (
+    <div className={`ce rtf ${ghost ? 'ghost' : ''} ${focused ? 'active' : ''} ${disabled ? 'disabled' : ''}`}>
+      {showBar && <Toolbar editor={editor} headings />}
+      <EditorContent editor={editor} />
     </div>
   );
 }
