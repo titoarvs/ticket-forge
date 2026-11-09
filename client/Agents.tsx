@@ -36,7 +36,7 @@ export function AgentCard({ a, onDetails, onHire, hireLabel = 'Hire' }: { a: Any
     <article className={`agent-card ${phaseClass(a.phase)} ${a.enabled ? '' : 'off'}`}>
       <header className="agent-head">
         <span className="agent-icon" aria-hidden>{a.icon}</span>
-        <div className="agent-title"><h4>{a.name}</h4><span>{a.phase}{a.enabled ? '' : ' · Off'}</span></div>
+        <div className="agent-title"><h4>{a.name}</h4><span>{a.phase}{a.team ? ` · ${a.team}` : ''}{a.enabled ? '' : ' · Off'}</span></div>
       </header>
       <p className="agent-sum">{a.summary}</p>
       <div className="agent-chips">
@@ -131,6 +131,11 @@ export function hireAgent(a: Any, epic: Any) {
       if (!issues.length) return toast('This epic has no issues to write test cases for.', 'err');
       S.checked = new Set(issues.map((t: Any) => t.id)); emit();
       return bulkTests().finally(() => { S.checked.clear(); emit(); });
+    case 'automation': {
+      const list = issues.flatMap((t: Any) => (t.testCases || []).map((tc: Any) => ({ t, tc })));
+      if (!list.length) return toast('Write the test cases first (hire Test Plan).', 'err');
+      return runTests(list, { regenerate: true });
+    }
     case 'verify': {
       const list = issues.flatMap((t: Any) => (t.testCases || []).map((tc: Any) => ({ t, tc })));
       if (!list.length) return toast('Write the test cases first (hire Test Plan).', 'err');
@@ -151,6 +156,7 @@ function progress(a: Any, epic: Any): { state: 'done' | 'partial' | 'todo' | 'na
     case 'fbd': return epic.fbd ? { state: 'done', text: `${epic.fbd.status || 'Draft'} · ${ago(epic.fbd.generatedAt)}`, view: () => openFbd(epic) } : { state: 'todo', text: 'Not written yet' };
     case 'tickets': return issues.length ? { state: 'done', text: `${issues.length} issues` } : { state: 'todo', text: 'No issues yet' };
     case 'tests': { const w = issues.filter((t: Any) => t.testCases?.length).length; return !issues.length ? { state: 'na', text: 'No issues yet' } : { state: w === issues.length ? 'done' : w ? 'partial' : 'todo', text: `${w} of ${issues.length} issues have test cases` }; }
+    case 'automation': { const sc = tests.filter((tc: Any) => tc.script).length; return !tests.length ? { state: 'na', text: 'No test cases yet' } : { state: sc === tests.length ? 'done' : sc ? 'partial' : 'todo', text: `${sc} of ${tests.length} test cases have a script` }; }
     case 'verify': { const run = tests.filter((tc: Any) => tc.status && tc.status !== 'Not run').length; const pass = tests.filter((tc: Any) => tc.status === 'Passed').length; return !tests.length ? { state: 'na', text: 'No test cases yet' } : { state: pass === tests.length ? 'done' : run ? 'partial' : 'todo', text: `${pass} of ${tests.length} passed · ${tests.length - run} not run` }; }
   }
   return { state: 'na', text: '' };

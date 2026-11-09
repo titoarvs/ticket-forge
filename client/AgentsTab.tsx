@@ -79,6 +79,7 @@ export function AgentsTab() {
   const [data, setData] = useState<Any>(null);
   const [err, setErr] = useState<Any>(null);
   const [phase, setPhase] = useState('All');
+  const [team, setTeam] = useState('All');
   const [q, setQ] = useState('');
   const load = async () => { setErr(null); try { const d = await api('/api/admin/agents'); setData(d); setAgentsCache(d); } catch (e: Any) { setErr(e); } };
   useEffect(() => { load(); }, []);
@@ -94,7 +95,7 @@ export function AgentsTab() {
   const hire = (a: Any) => openModal(<HireModal a={a} />);
   const details = (a: Any) => openModal(<AgentDetails a={a} data={data} onSave={save} onHire={() => hire(a)} />);
   const qq = q.trim().toLowerCase();
-  const list = data.agents.filter((a: Any) => (phase === 'All' || a.phase === phase) && (!qq || `${a.name} ${a.summary} ${a.step || ''}`.toLowerCase().includes(qq)));
+  const list = data.agents.filter((a: Any) => (phase === 'All' || a.phase === phase) && (team === 'All' || a.team === team) && (!qq || `${a.name} ${a.summary} ${a.step || ''} ${a.team || ''}`.toLowerCase().includes(qq)));
   const on = data.agents.filter((a: Any) => a.enabled).length;
   return <>
     <div className="agents-top">
@@ -104,9 +105,13 @@ export function AgentsTab() {
       </div>
       <input className="agents-search" type="search" placeholder="Search agents" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search agents" />
     </div>
-    <div className="agent-filter" role="tablist">{['All', ...data.phases].map((p: string) => {
+    <div className="agent-filter" role="tablist" aria-label="Phase">{['All', ...data.phases].map((p: string) => {
       const n = p === 'All' ? data.agents.length : data.agents.filter((a: Any) => a.phase === p).length;
       return <button key={p} role="tab" aria-selected={phase === p} className={`${phase === p ? 'on' : ''} ${p === 'All' ? 'ph-all' : phaseClass(p)}`} onClick={() => setPhase(p)}>{p}<span>{n}</span></button>;
+    })}</div>
+    <div className="agent-filter teams" role="tablist" aria-label="Team">{['All', ...(data.teams || [])].map((tm: string) => {
+      const n = tm === 'All' ? data.agents.length : data.agents.filter((a: Any) => a.team === tm).length;
+      return <button key={tm} role="tab" aria-selected={team === tm} className={`${team === tm ? 'on' : ''} ph-all`} onClick={() => setTeam(tm)}>{tm === 'All' ? 'All teams' : tm}<span>{n}</span></button>;
     })}</div>
     <div className="agent-grid">
       {list.map((a: Any) => <AgentCard key={a.id} a={a} onDetails={() => details(a)} onHire={() => hire(a)} />)}

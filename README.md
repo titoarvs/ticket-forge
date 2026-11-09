@@ -355,6 +355,13 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), sh
 | Build | Feature Verification | Manual / browser test runs | Documents |
 | Review | **Review a Pull Request** | Reviews the job’s diff against the acceptance criteria; never edits | Repo, read-only |
 | Release | Demo · Sign-Off · Deploy · Release Certification | Guided release steps (a person deploys) | Documents / worktree |
+| Plan | UX Design Spec (UI/UX) | User flows, screens, copy, every state, accessibility and responsive rules | Documents |
+| Build | **Frontend Developer** (Coding) | Builds screens and components with every state, accessible and responsive | Own git worktree |
+| Build | **Backend Developer** (Coding) | Builds APIs, data, migrations and business rules with tests | Own git worktree |
+| Build | **Fix a Bug** (Coding) | Failing test first, root cause, smallest fix | Own git worktree |
+| Build | **Test Automation** (Automation) | End-to-end tests in the repo (Playwright or the repo's framework) | Own git worktree |
+| Build | Automation Scripts (Automation) | Rewrites and runs TicketForge's browser scripts for the epic's test cases | Documents |
+| Review | **UI/UX Review** (UI/UX) | Audits usability, accessibility, states, copy and layout; never edits | Repo, read-only |
 | General | **Free Worker** | Any task you describe, same safety rules as Build | Own git worktree |
 
 **Hiring agents.** Every agent can be hired. Open an epic: its **Agents** section lists the feature's lifecycle by

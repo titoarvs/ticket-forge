@@ -189,13 +189,14 @@ export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agen
             {open === f.path && job.status !== 'pr' && <DiffView jobId={job.id} file={f.path} />}
           </div>)}
         </div>}
-        {job.reviews?.length > 0 && (() => { const rv = job.reviews[job.reviews.length - 1]; const lens = rv.lenses?.[Math.min(reviewTab, rv.lenses.length - 1)]; return <details className="code-summary" open={!running}><summary className="small"><b>{rv.panel ? 'Review Panel' : 'Review agent'}’s findings</b> · round {rv.round}</summary>
+        {job.reviews?.length > 0 && (() => { const rv = job.reviews[job.reviews.length - 1]; const lens = rv.lenses?.[Math.min(reviewTab, rv.lenses.length - 1)]; return <details className="code-summary" open={!running}><summary className="small"><b>{rv.panel ? 'Review Panel' : rv.agent || 'Review agent'}’s findings</b> · round {rv.round}</summary>
           {rv.panel && <div className="review-tabs" role="tablist">{rv.lenses.map((l: Any, i: number) => <button key={l.id} role="tab" aria-selected={reviewTab === i} className={reviewTab === i ? 'on' : ''} onClick={() => setReviewTab(i)}>{l.name}</button>)}</div>}
           <div className="small code-md"><Markdown text={rv.panel ? lens?.text || '' : rv.text} /></div>
           {job.status === 'review' && <button className="btn sm ai" disabled={!!busy} onClick={() => act('follow', { action: 'follow', text: `Fix these review findings (skip any you disagree with and say why):\n\n${job.reviews[job.reviews.length - 1].text}` })}><Ico svg={I.sparkle} />Fix the findings</button>}</details>; })()}
         {job.status === 'review' && !job.pr && <div className="review-actions">
           <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'review')?.enabled === false} onClick={() => act('review', { action: 'review' })}>🔍 {job.reviews?.length ? 'Review again' : 'Review changes'}</button>
           <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'review-panel')?.enabled === false} onClick={() => { setReviewTab(0); act('review', { action: 'review', panel: true }); }} title="Three Review agents in parallel: correctness, security, tests & acceptance">🤝 Review panel</button>
+          <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'ui-review')?.enabled === false} onClick={() => act('review', { action: 'review', agent: 'ui-review' })} title="Usability, accessibility, states, copy and responsive layout">🧐 UI/UX review</button>
           <span className="muted small">Read-only Claude Code reviewers. They never edit files.</span></div>}
         {['review', 'report', 'empty', 'failed', 'cancelled'].includes(job.status) && <div className="code-follow">
           <TA rows={2} value={follow} placeholder="Ask for changes: e.g. also handle the empty state, and rename the hook to usePayslips" onChange={(e) => setFollow(e.target.value)} />

@@ -1416,3 +1416,7 @@ a.set-stat:hover { background: var(--hover); }
   .agents-search { width: 100%; }
   .ea-more { padding-left: 0; }
 }
+
+.agent-filter.teams { margin-top: -8px; }
+.agent-filter.teams button { height: 26px; font-size: 12.5px; border-style: dashed; }
+.agent-filter.teams button.on { border-style: solid; }
