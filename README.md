@@ -137,6 +137,25 @@ All settings live in `.env` (see `.env.example`):
      (the header turns red when a column has too many issues); **Create issue** at the bottom of a column; days
      remaining; switch to all issues. On a phone the columns scroll sideways one at a time.
    - **Epics**: progress bars per epic; create, rename, recolour or delete; **Re-organize with Claude**.
+   - **Problem Statement (PSD) per epic**: in the epic panel (or **Write missing PSDs** on the Epics page) the AI
+     writes the feature's Problem Statement in your template's sections: At a Glance, Background and Current
+     Situation, Problem Statement (with the gaps table), Who Is Affected, Impact on the business, Impact on Users
+     (one table per role), Cost of Inaction and Evidence Needed. It works from the epic, its issues, the project
+     description and the source documents, and marks claims to confirm as *[To validate …]*. View it in the app,
+     set its version and status, rewrite it with instructions, and **Download .docx**. An administrator uploads
+     the team's PSD template once (Administration → Generation → Problem Statement template): its cover, logo,
+     styles, fonts, header and footer are kept; the product and feature name, version and status are replaced;
+     sign-off names, signatures and dates are left empty to fill in. Unused bold font files are dropped on upload
+     so templates and PSDs stay under serverless size limits. Without a template, PSDs use a plain layout.
+   - **Feature Brief (FBD) per epic**: in the epic panel (or **Write missing FBDs** on the Epics page) the AI fills
+     the team's Markdown Feature Brief template: At a Glance, Problem and Evidence, Proposed User Experience,
+     Scope and Requirements (FR-01…), Acceptance Criteria in Given / When / Then, Success Measures, Dependencies
+     and Risks, Rollout, Document Control, Sign-Off and Revision History. It builds on the epic's issues and their
+     acceptance criteria, the epic's PSD when there is one, and the source documents; anything unknown becomes a
+     *[To confirm: …]* point for the team, and sign-off names, signatures and dates stay empty. View it, edit the
+     Markdown, set its version and status (the Document Control row follows), rewrite it with instructions, and
+     download it as **.md** or **.docx**. The bundled template is the default; an administrator can replace it under
+     Administration → Generation → Feature Brief template (any Markdown with `## ` sections) or reset it.
    - **Timeline**: every epic on a calendar (weeks, months or quarters), with a sprints row and a today line. Each
      epic has a start and due date (set them in the epic panel, or on the timeline: click or drag an empty row to
      schedule, drag a bar to move it, drag its ends to change dates; arrow keys work too). Epics without dates
@@ -319,6 +338,34 @@ SendGrid uses `smtp.sendgrid.net`, user `apikey` and your API key as the passwor
 be a verified Sender Identity or on an authenticated domain in SendGrid. Check it with
 Administration → **Email & database** → **Send a test email to me**. Set `APP_URL` to the address your team
 uses so links in emails work outside your machine.
+
+## Code with AI and pull requests
+
+Set up once per project in **Project settings → Code & GitHub**:
+- **Local folder**: a clone of the project's GitHub repository on the computer running TicketForge. **Browse…** opens a
+  folder picker (Home, Desktop, Documents…; git repositories are marked) and checks the folder you choose. You can
+  also type it: `~/code/app`, or `/desktop/app`, which is read as `~/Desktop/app`. **Check** confirms it's a git
+  repository and fills in the GitHub repository and base branch from it.
+- **Branch prefix** (default `tf/`), **Claude model**, **Open pull requests as drafts**.
+- **Check command** (optional, e.g. `npm test`): the only command the agent may run, to check its work.
+- **Team conventions**: how your team writes code, given to the agent every time.
+- **GitHub access**: a token saved for the project (encrypted; fine-grained tokens need Contents and Pull requests
+  read/write), `GITHUB_TOKEN` on the server, or your `gh` CLI sign-in.
+
+Then on an issue: **Development → Write code with AI**.
+1. TicketForge creates a branch (`tf/pay-12-short-title`) from the base branch in its **own git worktree**, so your
+   checkout and uncommitted work are never touched.
+2. Claude Code (your account) implements the issue from its story, acceptance criteria and test cases, plus any
+   extra instructions. You watch its steps live; it can read and edit files and run the check command, but it can't
+   commit, push or browse the web. It runs in the background, so you can close the dialog.
+3. Review: its summary and the diff of every file. **Ask for changes** runs another round on the same branch.
+4. **Commit, push and open PR**: one commit (title, story, "Refs PAY-12" and a link back), the branch is pushed with
+   the token for that command only (never written to the repository's config), and the pull request opens with the
+   story, an acceptance-criteria checklist and the agent's summary. It's linked to the issue automatically.
+   **Discard** removes the worktree and local branch instead.
+
+Writing code needs TicketForge running on your computer (opened at localhost); on a deployed server the settings can
+be edited but code can't be written. Jobs are kept in memory: if the server restarts, start the job again.
 
 ## Pull requests (Development panel)
 
