@@ -6,5 +6,5 @@ export const POST = api(async (req) => {
   const u = await perm('ai.use');
   const b = await body(req);
   if (b.project?.id) store.requireAccess(u, b.project.id);
-  return newTicket({ epicId: b.epicId, project: b.project, idea: b.idea, ai: aiOpts(b) });
+  return newTicket({ epicId: b.epicId, project: b.project, idea: b.idea, answers: b.answers, ai: aiOpts(b) });
 });

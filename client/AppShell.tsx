@@ -4,9 +4,9 @@ import { useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, type Any,
+  S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, hashColor, COLORS, type Any,
 } from './core';
-import { Ico, I, Menu, Avatar, Toasts, BusyPill, EmptyState, ErrorState } from './ui';
+import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue } from './actions';
 import { AccountModal } from './Admin';
@@ -62,52 +62,103 @@ function connInfo() {
   return { ok, label, model, switched: Boolean(st.switched) };
 }
 
-function TopNav() {
+/** The AI the app is using right now, why (when it's a backup), and a way to check again. */
+function AiStatus() {
+  const st = S.status;
+  const c = connInfo();
+  const unknown = 'unknown' in c;
+  const cool = st?.account?.cooldown;
+  const at = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '');
+  const why = c.switched ? (cool ? `Claude ${/weekly/.test(cool.reason || '') ? 'weekly limit' : /daily/.test(cool.reason || '') ? 'daily limit' : 'limit'}${cool.until ? ` · back ${at(cool.until)}` : ''}` : 'Main AI unavailable') : '';
+  const tone = unknown ? 'pending' : !c.ok ? 'bad' : c.switched ? 'warn' : 'ok';
+  const title = unknown ? (S.statusError ? `Couldn’t check the AI connection (${S.statusError}). Retrying.` : 'Checking the AI connection…')
+    : !c.ok ? 'The AI isn’t connected. Open AI settings.'
+    : c.switched ? `Your Claude account ${cool?.reason || 'is unavailable'}${cool?.until ? ` until ${at(cool.until)}` : ''}, so TicketForge is using ${c.label}${c.model ? ` (${c.model})` : ''}. It switches back by itself.`
+    : `AI: ${c.label}${c.model ? ` · ${c.model}` : ''}`;
+  return (
+    <div className={`ai-pill t-${tone}`}>
+      <button className="ai-main" onClick={() => openModal(<AiSettingsModal />)} title={title} aria-label={title}>
+        <span className={`dot ${tone}`} />
+        <span className="ai-tag">AI</span>
+        <span className="ai-name">{unknown ? (S.statusError ? 'Status unavailable' : 'Checking…') : !c.ok ? 'Not connected' : c.label}</span>
+        {c.model && <span className="ai-model">{c.model}</span>}
+        {c.switched && <span className="ai-backup" title={why}>Backup{why ? <span className="ai-why">· {why}</span> : null}</span>}
+      </button>
+      {aiInactive(S.status) && <button className="ai-refresh" onClick={() => refreshStatus(0, true)} disabled={S.statusBusy}
+        title="Check the AI connection again" aria-label="Check the AI connection again"><Ico svg={I.refresh} className={S.statusBusy ? 'spin' : ''} /></button>}
+    </div>
+  );
+}
+
+/** Inside a project: its name, and a menu to jump to another project. */
+export function ProjectSwitcher({ p }: { p: Any }) {
+  const open = S.menu === 'projects';
+  const load = async () => { if (!S.projectsLoaded) { try { S.projects = await api('/api/projects'); S.projectsLoaded = true; emit(); } catch { /* the menu shows what it has */ } } };
+  const others = (S.projects || []).filter((x: Any) => x.id !== p.id);
+  return (
+    <Menu id="projects" left button={
+      <button className={`proj-switch ${open ? 'on' : ''}`} onClick={() => { setMenu('projects'); load(); }} title="Switch project" aria-haspopup="menu" aria-expanded={open}>
+        <span className="proj-avatar xs" style={{ background: hashColor(p.key, COLORS) }} aria-hidden>{String(p.key).slice(0, 2)}</span>
+        <span className="proj-name">{p.name}</span><Ico svg={I.chevron} className="proj-chev" />
+      </button>}>
+      <div className="mh">Current project</div>
+      <button onClick={() => S.nav(`/p/${p.id}/backlog`)}><span className="proj-avatar xs" style={{ background: hashColor(p.key, COLORS) }}>{String(p.key).slice(0, 2)}</span>{p.name}<small>{p.key}</small></button>
+      {others.length > 0 && <><hr /><div className="mh">Switch to</div>
+        {others.slice(0, 8).map((x: Any) => <button key={x.id} onClick={() => S.nav(`/p/${x.id}/backlog`)}><span className="proj-avatar xs" style={{ background: hashColor(x.key, COLORS) }}>{String(x.key).slice(0, 2)}</span>{x.name}<small>{x.key}</small></button>)}</>}
+      <hr /><button onClick={() => S.nav('/')}><Ico svg={I.folder} />All projects</button>
+    </Menu>
+  );
+}
+
+export function TopNav() {
   const pathname = usePathname();
   const p = P();
   // Only once the project in the address has loaded (not the previous one while switching).
   const inProject = pathname.startsWith('/p/') && p && p.id === decodeURIComponent(pathname.split('/')[2] || '');
   const inAdmin = pathname.startsWith('/admin');
-  const c = connInfo();
   return (
     <header className="topnav">
-      <Link className="brand" href="/" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} />TicketForge</Link>
-      <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/">Projects</Link>
-      {inProject && <Link className="navlink active hide-sm" href={`/p/${p.id}/backlog`}>{p.name}</Link>}
-      {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href="/admin/users">Administration</Link>}
-      {(inProject ? can('issue.create') : can('project.create')) && (
-        <button className="btn primary" style={{ marginLeft: 8 }} title={inProject ? 'Create issue (C)' : 'Create project'}
-          onClick={() => (inProject ? openCreateIssue() : S.nav('/new'))}><Ico svg={I.plus} />Create</button>
-      )}
-      <div className="spacer" />
-      {inProject && <>
-        <span className="save-state">{S.saveText}</span>
-        <button className="icon-btn" title="Undo (⌘Z)" disabled={!S.undo.length} onClick={undo}><Ico svg={I.undo} /></button>
-        <button className="icon-btn" title="Redo (⇧⌘Z)" disabled={!S.redo.length} onClick={redo}><Ico svg={I.redo} /></button>
-        {can('export') && (
-          <Menu id="export" style={{ margin: '0 4px' }} button={<button className="btn" onClick={() => setMenu('export')}><Ico svg={I.download} />Export</button>}>
-            <div className="mh">Download as</div>
-            {EXPORTS.map((x, i) => (x ? <button key={x[0]} onClick={() => exportAs(x[0])}>{x[1]}<small>{x[2]}</small></button> : <hr key={i} />))}
-          </Menu>
+      <div className="tn-left">
+        <Link className="brand" href="/" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} /><span className="hide-sm">TicketForge</span></Link>
+        <nav className="tn-nav" aria-label="Main">
+          <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/"><Ico svg={I.folder} />Projects</Link>
+          {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href="/admin/users"><Ico svg={I.settings} />Administration</Link>}
+        </nav>
+        {inProject && <><span className="tn-sep" aria-hidden>/</span><ProjectSwitcher p={p} /></>}
+        {(inProject ? can('issue.create') : can('project.create')) && (
+          <button className="btn primary tn-create" title={inProject ? 'Create issue (C)' : 'Create project'}
+            onClick={() => (inProject ? openCreateIssue() : S.nav('/new'))}><Ico svg={I.plus} /><span className="hide-sm">{inProject ? 'Create' : 'New project'}</span></button>
         )}
-      </>}
-      <ThemeToggle />
-      <Notifications />
-      <button className="conn" onClick={() => openModal(<AiSettingsModal />)}
-        title={'unknown' in c ? (S.statusError ? `Couldn’t check the AI connection (${S.statusError}). Retrying.` : 'Checking the AI connection…') : c.switched ? 'Your main AI is limited right now, so TicketForge switched to a backup' : 'AI connection'}>
-        <span className={`dot ${'unknown' in c ? 'pending' : c.ok ? (c.switched ? 'warn' : 'ok') : 'bad'}`} />{c.label}{c.model ? ` · ${c.model}` : ''}{c.switched ? ' · backup' : ''}
-      </button>
-      {aiInactive(S.status) && <button className="icon-btn conn-refresh" onClick={() => refreshStatus(0, true)} disabled={S.statusBusy}
-        title="Check the AI connection again" aria-label="Check the AI connection again"><Ico svg={I.refresh} className={S.statusBusy ? 'spin' : ''} /></button>}
-      <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /></button>}>
-        <div className="acct"><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div><hr />
-        {can('users.manage') && <>
-          <button onClick={() => S.nav('/admin/users')}><Ico svg={I.people} />Administration</button>
-          <button onClick={() => S.nav('/admin/invites')}><Ico svg={I.plus} />Invite people</button>
-        </>}
-        <button onClick={() => openModal(<AccountModal />)}><Ico svg={I.settings} />Your account &amp; password</button><hr />
-        <button onClick={logout}><Ico svg={I.external} />Log out</button>
-      </Menu>
+      </div>
+      <div className="spacer" />
+      <div className="tn-right">
+        {inProject && <div className="tn-group tn-edit">
+          <span className="save-state hide-sm">{S.saveText}</span>
+          <button className="icon-btn" title="Undo (⌘Z)" aria-label="Undo" disabled={!S.undo.length} onClick={undo}><Ico svg={I.undo} /></button>
+          <button className="icon-btn" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!S.redo.length} onClick={redo}><Ico svg={I.redo} /></button>
+          {can('export') && (
+            <Menu id="export" button={<button className="btn sm tn-export" onClick={() => setMenu('export')}><Ico svg={I.download} /><span className="hide-sm">Export</span></button>}>
+              <div className="mh">Download as</div>
+              {EXPORTS.map((x, i) => (x ? <button key={x[0]} onClick={() => exportAs(x[0])}>{x[1]}<small>{x[2]}</small></button> : <hr key={i} />))}
+            </Menu>
+          )}
+        </div>}
+        <AiStatus />
+        <div className="tn-group">
+          <ThemeToggle />
+          <Notifications />
+        </div>
+        <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /><span className="me-name hide-md">{S.user.name.split(' ')[0]}</span><Ico svg={I.chevron} className="me-chev hide-md" /></button>}>
+          <div className="acct"><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div><hr />
+          {can('users.manage') && <>
+            <button onClick={() => S.nav('/admin/users')}><Ico svg={I.people} />Administration</button>
+            <button onClick={() => S.nav('/admin/invites')}><Ico svg={I.plus} />Invite people</button>
+          </>}
+          <button onClick={() => openModal(<AiSettingsModal />)}><Ico svg={I.bot} />AI connection</button>
+          <button onClick={() => openModal(<AccountModal />)}><Ico svg={I.settings} />Your account &amp; password</button><hr />
+          <button onClick={logout}><Ico svg={I.external} />Log out</button>
+        </Menu>
+      </div>
     </header>
   );
 }
@@ -216,7 +267,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <main id="app">{children}</main>
       {S.modal as Any}
       <Toasts />
-      <BusyPill />
+      <TaskTray />
       <RunPill />
     </>
   );

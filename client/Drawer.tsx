@@ -15,7 +15,8 @@ import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
-import { FbdSection } from './Fbd';
+import { FbdSection, ArdSection } from './Fbd';
+import { openSplitIssues } from './Split';
 import { EpicAgents } from './Agents';
 import { codeReady, openCode } from './DevCode';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -264,6 +265,9 @@ function IssuePanel({ t }: { t: Any }) {
               <span className="with-icon"><PriorityIcon p={t.priority} /><SF disabled={!edit} value={t.priority} onChange={(ev) => field('priority', ev.target.value)}>{opts(PRIORITIES)}</SF></span>
               <span className="label">Story points</span>
               <TF type="number" min={0} disabled={!edit} value={t.storyPoints ?? ''} placeholder="None" onChange={(ev) => field('storyPoints', ev.target.value === '' ? null : Number(ev.target.value))} />
+              <span className="label">Implementation</span>
+              <SF disabled={!edit} value={t.layer || ''} onChange={(ev) => field('layer', ev.target.value || undefined)} aria-label="Implementation">
+                <MenuItem value="">Not set</MenuItem><MenuItem value="frontend">Frontend</MenuItem><MenuItem value="backend">Backend</MenuItem><MenuItem value="both">Frontend + Backend</MenuItem></SF>
               <span className="label">Sprint</span>
               {isSub(t) ? <span className="muted" style={{ padding: '6px 8px' }}>{sprint(t.sprintId)?.name || 'None'} <span className="small">(from parent)</span></span>
                 : <SF disabled={!edit && !can('sprint.manage')} value={t.sprintId || ''} onChange={(ev) => field('sprintId', ev.target.value || null)}><MenuItem value="">None</MenuItem>
@@ -417,11 +421,13 @@ function EpicPanel({ e }: { e: Any }) {
       <div className="dr-actions">
         {can('issue.create') && <button className="btn" onClick={() => openModal(<CreateIssueModal epicId={e.id} />)}><Ico svg={I.plus} />Create issue</button>}
         {can('issue.create') && can('ai.use') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
+        {can('issue.create') && can('ai.use') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
       <PsdSection epic={e} />
       <FbdSection epic={e} />
+      <ArdSection epic={e} />
       <EpicAgents epic={e} />
       <div className="sec"><div className="sec-title"><h3>Dates</h3>
         {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>

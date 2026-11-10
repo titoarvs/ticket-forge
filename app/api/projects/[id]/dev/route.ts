@@ -11,7 +11,7 @@ export const GET = api(async (_req, p) => {
   const user = await authed();
   store.requireAccess(user, p.id);
   const saved = await getProjectSecret(p.id, 'githubToken');
-  return { local: localOnly(), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN) };
+  return { local: localOnly(), hasGitlabToken: await hasProjectSecret(p.id, 'gitlabToken'), envGitlabToken: Boolean(process.env.GITLAB_TOKEN), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN) };
 });
 
 export const POST = api(async (req, p) => {
@@ -33,6 +33,13 @@ export const POST = api(async (req, p) => {
     await setProjectSecret(p.id, 'githubToken', token, user);
     return { hasToken: true };
   }
+  if (b.action === 'saveGitlabToken') {
+    const token = String(b.token || '').trim();
+    if (!/^[\w.-]{20,200}$/.test(token)) throw new HttpError(400, 'That doesn’t look like a GitLab access token (they usually start with glpat-).');
+    await setProjectSecret(p.id, 'gitlabToken', token, user);
+    return { hasGitlabToken: true };
+  }
+  if (b.action === 'clearGitlabToken') { await setProjectSecret(p.id, 'gitlabToken', '', user); return { hasGitlabToken: false }; }
   if (b.action === 'clearToken') { await setProjectSecret(p.id, 'githubToken', '', user); return { hasToken: false }; }
   throw new HttpError(400, 'Unknown action');
 });

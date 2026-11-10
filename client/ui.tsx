@@ -2,7 +2,7 @@
 // Small shared React components.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { I, typeIcon, priorityIcon } from './icons';
-import { S, emit, closeModal, hashColor, initials, sCls, toast, type Any } from './core';
+import { S, emit, closeModal, hashColor, initials, sCls, toast, dismissToast, type Any } from './core';
 
 export { I };
 const sized = (svg: string, size?: number) => (size ? svg.replace('width="16" height="16"', `width="${size}" height="${size}"`) : svg);
@@ -19,6 +19,10 @@ export function Avatar({ name, size = 24 }: { name?: string; size?: number }) {
 }
 export const ELoz = ({ e }: { e: Any }) => (e ? <span className="eloz" style={{ ['--ec' as Any]: e.color }} title={e.title}>{e.title}</span> : null);
 export const StatusLoz = ({ s }: { s: string }) => <span className={`loz ${sCls(s)}`}>{s}</span>;
+/** Where an issue's implementation lives: frontend, backend or both (projects with a separate backend repository). */
+export const LAYER_LABEL: Record<string, string> = { frontend: 'Frontend', backend: 'Backend', both: 'Frontend + Backend' };
+export const LayerChip = ({ layer, short = false }: { layer?: string; short?: boolean }) => (layer && LAYER_LABEL[layer]
+  ? <span className={`layer-chip l-${layer}`} title={`Implementation: ${LAYER_LABEL[layer]}`}>{short ? { frontend: 'FE', backend: 'BE', both: 'FE+BE' }[layer] : LAYER_LABEL[layer]}</span> : null);
 export const Swatch = ({ color, style }: { color: string; style?: Any }) => <span className="bar-swatch" style={{ background: color, ...style }} />;
 export { opts, MenuItem } from './fields';
 
@@ -80,19 +84,79 @@ export function Confirm({ title, text, label, onYes }: { title: string; text: Re
   return <Modal title={title} actions={[{ label: 'Cancel' }, { label, kind: 'danger', onClick: async () => { closeModal(); await onYes(); } }]}><p style={{ marginTop: 0 }}>{text}</p></Modal>;
 }
 
-export function Toasts() {
+const TOAST_ICON: Record<string, [string, string]> = { ok: ['check', 'Done'], err: ['warn', 'Error'], warn: ['warn', 'Warning'], info: ['bot', 'Note'] };
+function ToastItem({ t }: { t: Any }) {
+  const [ic, label] = TOAST_ICON[t.kind] || TOAST_ICON.ok;
   return (
-    <div id="toasts" role="status" aria-live="polite">
-      {S.toasts.map((t: Any) => (
-        <div key={t.id} className={`toast ${t.kind}`}>
-          {t.kind === 'err' ? <Ico svg={I.warn} style={{ color: 'var(--danger)' }} /> : <Ico svg={I.check} style={{ color: '#22a06b' }} />}
-          <span>{t.msg}</span>
-        </div>
-      ))}
+    <div className={`toast ${t.kind}`} role={t.kind === 'err' ? 'alert' : 'status'}>
+      <span className="toast-ic" aria-hidden><Ico svg={(I as Any)[ic]} /></span>
+      <div className="toast-body">
+        {t.title && <b className="toast-title">{t.title}</b>}
+        <span className="toast-msg"><span className="sr-only">{label}: </span>{t.msg}</span>
+        {t.action && <button className="toast-action" onClick={() => { t.action.onClick(); dismissToast(t.id); }}>{t.action.label}</button>}
+      </div>
+      {t.count > 1 && <span className="toast-count" title={`Shown ${t.count} times`}>×{t.count}</span>}
+      <button className="toast-x" aria-label="Dismiss" onClick={() => dismissToast(t.id)}><Ico svg={I.close} /></button>
+      {/* The bar empties over the toast's lifetime (paused while hovered); when it ends the toast goes. */}
+      <span key={t.shownAt} className="toast-time" style={{ animationDuration: `${t.duration}ms` }} onAnimationEnd={() => dismissToast(t.id)} />
     </div>
   );
 }
-export const BusyPill = () => (S.busy ? <div id="busy"><span className="spinner" />{S.busy}</div> : null);
+export function Toasts() {
+  return <div id="toasts" aria-live="polite">{S.toasts.map((t: Any) => <ToastItem key={t.id} t={t} />)}</div>;
+}
+
+const clock = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+/** Re-renders every second while `on`, for elapsed times. */
+export function useTick(on = true) {
+  const [, set] = useState(0);
+  useEffect(() => { if (!on) return undefined; const h = setInterval(() => set((n) => n + 1), 1000); return () => clearInterval(h); }, [on]);
+}
+/** "1:24" since `since` (ms or ISO), updating every second. */
+export function Elapsed({ since }: { since: number | string }) {
+  useTick();
+  return <span className="elapsed">{clock(Date.now() - new Date(since).getTime())}</span>;
+}
+
+/** The "Working on…" tray: AI work running in the background (lib: startTask / withBusy). */
+export function TaskTray() {
+  const [open, setOpen] = useState(true);
+  const tasks: Any[] = S.tasks || [];
+  const running = tasks.filter((t) => t.status === 'running');
+  useTick(running.length > 0);
+  if (!tasks.length) return null;
+  const head = running.length ? `Working on ${running.length} task${running.length > 1 ? 's' : ''}` : 'All done';
+  return (
+    <section id="task-tray" className={open ? '' : 'closed'} aria-label="Background work">
+      <button className="tray-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {running.length ? <span className="spinner" /> : <Ico svg={I.check} className="tray-ok" />}
+        <b>{head}</b><span className="spacer" />
+        {!open && running[0] && <span className="muted small tray-peek">{running[0].label}</span>}
+        <Ico svg={I.chevron} className={`tray-chev ${open ? "up" : ""}`} />
+      </button>
+      {open && <ul className="tray-list">{tasks.map((t) => {
+        const pct = t.total ? Math.min(100, Math.round(((t.status === 'ok' ? t.total : t.done) / t.total) * 100)) : 0;
+        return (
+          <li key={t.id} className={`tray-item ${t.status}`}>
+            <div className="tray-row">
+              {t.status === 'ok' ? <Ico svg={I.check} className="tray-ok" /> : <span className="spinner" />}
+              <div className="tray-text"><b>{t.label}</b>
+                <span className="muted small">{t.status === 'ok' ? (t.message || 'Done') : t.detail || 'Starting…'}</span></div>
+              <span className="muted small tray-time">{t.status === 'ok' ? clock((t.endedAt || Date.now()) - t.startedAt) : clock(Date.now() - t.startedAt)}</span>
+              {t.cancel && t.status === 'running' && <button className="link-btn small" onClick={t.cancel}>Cancel</button>}
+            </div>
+            <div className={`tray-bar ${t.total ? '' : 'indeterminate'} ${t.status}`} role="progressbar" aria-label={t.label}
+              aria-valuemin={0} aria-valuemax={t.total || undefined} aria-valuenow={t.total ? t.done : undefined}>
+              <span style={t.total ? { width: `${t.status === 'ok' ? 100 : Math.max(pct, 4)}%` } : undefined} /></div>
+            {t.total > 0 && t.status === 'running' && <span className="muted small tray-count">{t.done} of {t.total} done</span>}
+          </li>
+        );
+      })}</ul>}
+    </section>
+  );
+}
+/** Kept for older imports: running work now shows in the tray. */
+export const BusyPill = () => null;
 export const Spinner = ({ style }: { style?: Any }) => <span className="spinner" style={{ color: 'var(--brand)', ...style }} />;
 
 // ---------------------------------------------------------------- loading, empty and error states

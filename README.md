@@ -563,3 +563,74 @@ On Postgres (Supabase), every table has row-level security switched on:
 - **No user, no rows.** A query without a signed-in user returns nothing.
 
 Migrations and `npm run db:push` run as the table owner. The policies are recreated on every start, and **Admin → Email & database** shows whether they're active. Set `TICKETFORGE_RLS=off` to run without the restricted role (the tables stay locked to Supabase's public roles).
+
+## Document templates and questions before the AI writes
+
+- **Per-epic documents:** each epic can have a Problem Statement (PSD), a Feature Brief (FBD) and an Architecture Record Design (ARD), written by the AI from the epic, its issues, the earlier documents and the source documents. View, edit, or download each as .md or .docx from the epic panel or the Epics page.
+- **Templates:**
+  - Administration → Generation sets the team's templates.
+  - Project settings → Templates gives one project its own templates. Its PSD, FBD and ARD then use those instead.
+  - Without either, the built-in defaults are used.
+- **Questions first:** before the AI writes anything, it reads what it was given and asks up to 5 questions, each with suggested answers. You answer what you can or skip; your answers go to the AI as instructions. This applies to:
+  - generating a project or adding a feature;
+  - writing, enhancing or splitting an issue;
+  - acceptance criteria and test cases;
+  - the PSD, FBD and ARD.
+
+## Test automation: repository sync and run settings
+
+**Find built features** (Test automation → App setup → Repository) reads every page, the repository's `.md` documents (feature notes, change records, release notes, READMEs) and the git history.
+- It organizes everything already built into **epics**: existing ones where they fit, new ones otherwise. Each feature is a **Done** issue with a user story, a description of what exists, acceptance criteria and its sources.
+- Folder names like `docs/features/done/<area>/` guide the grouping.
+- Epics are broad product areas (usually 4–10), each holding at least 3 features. Smaller ones are folded into the closest area.
+- Each feature is split into small tickets: one testable behaviour each, 1–3 story points, sized on your team's point scale. Existing issues stay as they are; they're moved into their epic and sized if they have no points.
+- Existing issues are reused: marked Done when they aren't, and moved into their epic when they have none.
+- Everything is shown for review first.
+
+- **Sync with the repository** (Test automation → App setup). TicketForge must be running on your computer for this. It reads the project's local repository (Project settings → Code & GitHub):
+  - It finds the app's pages from its routes. TanStack Router is supported, alongside Next.js, Remix, React Router and the others.
+  - It works out which pages changed since the last sync: commits, uncommitted edits and new files. The first sync looks at the last 30 commits.
+  - The AI updates the test cases those changes affect and adds test cases for new behaviour. Updated cases lose their old script, so the next run writes a fresh one.
+  - It reads the git history: issues it shows were delivered are marked Done, and delivered features with no issue are added to the backlog as Done, labelled `delivered`.
+
+  Everything comes back as a review, and only what you tick is applied.
+- **Run settings** (Test automation → Settings):
+  - retries, with tests that pass only on a retry marked *flaky*;
+  - time limits per test, per action, per page load and per check;
+  - screen size (desktop, laptop, tablet, phone);
+  - locale and time zone, and whether self-signed HTTPS certificates are accepted;
+  - reduced motion.
+
+  Failed network requests and 5xx responses appear in each test's log.
+
+### Signing in: login form, SSO, MFA and saved sessions
+
+Each role in Test automation → App setup → Roles & logins has a **Sign-in** method. Scripts always call `await app.loginAs('Role')`.
+
+- **Login form:** fills the app's own form.
+- **Single sign-on (SSO):** clicks the app's SSO button ("Continue with Google", "Sign in with Microsoft"…). It then fills the identity provider's pages with the role's username and password: Microsoft Entra, Google, Okta, Auth0, Keycloak or a generic page. It handles account pickers, "Stay signed in?" and pop-up windows.
+- **Saved session:** "Sign in in a browser" opens a real Chrome or Edge window on your computer. You sign in by hand, any way the app allows, and the cookies and local storage are saved encrypted for the role. Use this when a provider blocks automated browsers (Google often does), or for passkeys and push approvals. When the session expires, the run tells you to save a new one.
+- **MFA:** save the role's authenticator secret (the text under the QR code, or the `otpauth://` link). Form and SSO sign-ins then fill the 6-digit code automatically. `app.mfaCode('Role')` returns it for tests of the MFA step itself.
+
+Passwords, MFA secrets and sessions are only used with the project's saved application URL.
+
+## Separate backend repository
+
+Project settings → Code & GitHub → **Backend repository**: tick "This project has a separate backend repository", pick its local folder and click **Check**. Check finds where the repository is hosted.
+
+- **Issues** have an **Implementation** field: Frontend, Backend or Frontend + Backend. It shows as FE / BE / FE+BE in the backlog.
+  - The AI fills it when it writes issues.
+  - **Mark unmarked with AI** in the same card fills it for existing issues. ⌘Z undoes it.
+- **Write code with AI** shows **Frontend** and **Backend** tabs, one job per repository. Each agent is told which half of the app it is in, and the backend agent lists the APIs it added.
+- A Frontend + Backend issue starts on Backend. The frontend job then receives the backend job's summary, so it builds on the real API.
+- **Pull requests from either repository:** "Commit, push and open PR/MR" opens a **GitHub pull request** or a **GitLab merge request** (gitlab.com or self-hosted), depending on the repository's origin.
+  - GitLab needs an access token (scopes `api` and `write_repository`), saved in the Backend card or set as `GITLAB_TOKEN`.
+  - Without a token, the branch is pushed with your own git sign-in and you get a link that opens the merge request on GitLab.
+  - **Commit locally only** commits the changes on the branch without pushing.
+
+## Splitting issues into smaller ones
+
+On the Epics page (**AI actions → Split issues**) or in an epic's panel (**Split issues**):
+- **Pick the issues.** Big ones are ticked for you: over 3 points, or unestimated with many acceptance criteria, many test cases or a long description.
+- **The AI proposes** small tickets for each issue: one testable behaviour each, 1–3 points, following your team's acceptance-criteria rules, and covering exactly the original scope. It shares the issue's test cases out to the part each one tests. Issues that are already small are kept, with the reason.
+- **On apply**, the first part keeps the original issue (key, history, comments, pull requests, links). The other parts become new issues next to it, in the same epic, sprint and status, linked with "relates to". Parts that no test case covers are flagged so you can write tests for them. ⌘Z undoes it.

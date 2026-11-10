@@ -6,8 +6,9 @@ import { useRef, useState } from 'react';
 import { S, P, api, toast, closeModal, mutate, readNdjson, can, newTicket, nextEpicKey, withIds, COLORS, aiBody, uid, nowIso, me, keepsOriginal, uploadOriginal, type Any } from './core';
 import { Modal, Ico, I, Spinner, TypeIcon, EmptyState } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
+import { useQuestions, QuestionsView } from './Clarify';
 
-type Step = 'input' | 'running' | 'review';
+type Step = 'input' | 'ask' | 'running' | 'review';
 
 export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename: string; text: string }; sourceId?: string } = {}) {
   const p = P();
@@ -35,13 +36,13 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
     try { const r = await api('/api/parse', { method: 'POST', body: fd }); setDoc({ filename: r.filename, text: r.text, file: keepsOriginal(file) ? file : null }); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setReading(false); }
   };
-  const generate = async () => {
+  const generate = async (answers = '') => {
     if (!source || source.text.length < 15) { toast('Describe the feature in a sentence or two, or add a document.', 'err'); return; }
     ctrl.current = new AbortController();
     setStep('running'); setLog([{ message: `Sending “${source.filename}” to the AI…` }]); setChars(0);
     const push = (message: string, level?: string) => setLog((l) => [...l.map((x) => ({ ...x, done: true })), { message, level }]);
     try {
-      const res = await api(`/api/projects/${p.id}/feature`, { method: 'POST', raw: true, signal: ctrl.current.signal, body: aiBody({ text: source.text, sourceName: source.filename, options: opts }) });
+      const res = await api(`/api/projects/${p.id}/feature`, { method: 'POST', raw: true, signal: ctrl.current.signal, body: aiBody({ text: source.text, sourceName: source.filename, options: { ...opts, instructions: [opts.instructions, answers].filter(Boolean).join('\n\n') } }) });
       let out: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'progress') { if (ev.progressChars) setChars(ev.progressChars); if (ev.message) { setChars(0); push(ev.message, ev.level); } }
@@ -101,6 +102,7 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   };
 
   // ---------------------------------------------------------------- views
+  if (step === 'ask' && source) return <FeatureQuestions text={source.text} instructions={opts.instructions} onBack={() => setStep('input')} onGo={generate} />;
   if (step === 'running') {
     return (
       <Modal title="Add feature with AI" wide persistent actions={[{ label: 'Cancel', onClick: () => ctrl.current?.abort() }]}>
@@ -160,7 +162,7 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   }
 
   return (
-    <Modal title="Add feature with AI" wide actions={[{ label: 'Cancel' }, { label: '✨ Plan the work', kind: 'primary', disabled: !source || reading, onClick: generate }]}>
+    <Modal title="Add feature with AI" wide actions={[{ label: 'Cancel' }, { label: '✨ Plan the work', kind: 'primary', disabled: !source || reading, onClick: () => { if (!source || source.text.length < 15) toast('Describe the feature in a sentence or two, or add a document.', 'err'); else setStep('ask'); } }]}>
       <p style={{ marginTop: 0 }}>Describe a new feature, or import a document. The AI plans epics and issues{opts.includeTests ? ' with test cases' : ''} that fit <b>{p.name}</b>: it knows its {p.epics.length} epic{p.epics.length === 1 ? '' : 's'} and {p.tickets.length} issue{p.tickets.length === 1 ? '' : 's'}, adds to existing epics where they fit and doesn’t repeat work. You review everything before it’s added.</p>
       <div className="seg" role="tablist" style={{ marginBottom: 12 }}>
         <button role="tab" aria-selected={mode === 'describe'} className={mode === 'describe' ? 'on' : ''} onClick={() => setMode('describe')}>Describe it</button>
@@ -188,6 +190,19 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
       </div>
       <label className="field"><span>Extra instructions (optional)</span>
         <TA style={{ minHeight: 44 }} value={opts.instructions} onChange={(e) => setOpts({ ...opts, instructions: e.target.value })} placeholder="e.g. Put everything in the Checkout epic. Label backend work api." /></label>
+    </Modal>
+  );
+}
+
+/** Add feature, step 2: the AI's questions before it plans the work. */
+function FeatureQuestions({ text, instructions, onBack, onGo }: { text: string; instructions: string; onBack: () => void; onGo: (answers: string) => void }) {
+  const q = useQuestions({ kind: 'feature', subject: 'the epics and issues', text, instructions }, () => onGo(''));
+  return (
+    <Modal title="Add feature with AI" wide persistent left={<button className="btn subtle" onClick={onBack}>Back</button>} actions={[
+      { label: q.err ? 'Continue without' : 'Skip questions', onClick: () => onGo('') },
+      { label: q.continueLabel, kind: 'ai', disabled: !q.qs, onClick: () => onGo(q.text()) },
+    ]}>
+      <QuestionsView q={q} subject="the epics and issues" />
     </Modal>
   );
 }

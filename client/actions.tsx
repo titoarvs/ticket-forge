@@ -7,6 +7,7 @@ import {
   uid, clone, nowIso, dateInput, COLORS, TYPES, PRIORITIES, nextTicketKey, nextEpicKey, newTicket, withIds, applyAi,
   addMember, logEvent, setField, addLink, deleteIssues, canMove, moveError, type Any,
 } from './core';
+import { askFirst } from './Clarify';
 import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea, Spinner } from './ui';
 import { refreshStatus, aiInactive } from './AppShell';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -196,7 +197,9 @@ export function openCreateIssue(epicId?: string) {
 }
 
 export async function writeWithClaude({ idea, fields = {}, type }: { idea: string; fields?: Any; type?: string | null }) {
-  const res = await withBusy('Claude is writing the issue…', () => api('/api/ai/new-ticket', { method: 'POST', body: aiBody({ epicId: fields.epicId, idea, project: P() }) }));
+  const answers = await askFirst({ kind: 'new-ticket', subject: 'the new issue', epicId: fields.epicId, text: idea });
+  if (answers === null) return;
+  const res = await withBusy('Claude is writing the issue…', () => api('/api/ai/new-ticket', { method: 'POST', body: aiBody({ epicId: fields.epicId, idea, answers, project: P() }) }));
   if (!res) return;
   const nt = applyAi(newTicket({ ...fields }), res.ticket);
   if (type) nt.type = type;
@@ -221,8 +224,11 @@ export function NewWithClaudeModal({ epicId = '' }: { epicId?: string }) {
 const AI_LABEL: Record<string, string> = { enhance: 'Claude is enhancing the issue…', ac: 'Claude is improving acceptance criteria…', tests: 'Claude is writing test cases…', split: 'Claude is splitting the issue…', custom: 'Claude is applying your instruction…' };
 const AI_DONE: Record<string, string> = { enhance: 'enhanced the issue with Claude', ac: 'improved acceptance criteria with Claude', tests: 'regenerated test cases with Claude', custom: 'updated the issue with Claude' };
 
+const ASK_SUBJECT: Record<string, string> = { enhance: 'the enhanced issue', ac: 'the acceptance criteria', tests: 'the test cases', split: 'the smaller issues', custom: 'the change' };
 export async function runTicketAi(t: Any, op: string, instruction?: string) {
-  const res = await withBusy(AI_LABEL[op], () => api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: op, ticket: { ...t, history: [], comments: [] }, project: P(), instruction }) }));
+  const answers = await askFirst({ kind: op, subject: `${ASK_SUBJECT[op] || 'the issue'} for ${t.key}`, ticket: t, instructions: instruction });
+  if (answers === null) return;
+  const res = await withBusy(AI_LABEL[op], () => api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: op, ticket: { ...t, history: [], comments: [] }, project: P(), instruction, answers }) }));
   if (!res) return;
   if (op === 'split') {
     if (!res.tickets?.length) return toast('Claude did not return any issues.', 'err');
@@ -330,19 +336,21 @@ function ReviewRegroup({ proposed }: { proposed: Any[] }) {
 export async function bulkTests() {
   const ids = [...S.checked].filter((id: string) => ticket(id));
   if (!ids.length) return;
+  const answers = await askFirst({ kind: 'bulk-tests', subject: `test cases for ${ids.length} issue${ids.length > 1 ? 's' : ''}`, ticketIds: ids });
+  if (answers === null) return;
   let done = 0;
   await withBusy(`Claude is writing test cases for ${ids.length} issues…`, async () => {
     for (const id of ids) {
       const t = ticket(id);
       setBusy(`Writing test cases ${done + 1} of ${ids.length}: ${t.key}`);
       try {
-        const res = await api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: 'tests', ticket: { ...t, history: [], comments: [] }, project: P() }) });
+        const res = await api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: 'tests', ticket: { ...t, history: [], comments: [] }, project: P(), answers }) });
         mutate(() => { const x = ticket(id); x.testCases = withIds(res.ticket.testCases.map(({ id: _i, ...tc }: Any) => tc)); logEvent(x, 'regenerated test cases with Claude'); });
       } catch (e: Any) { toast(`${t.key}: ${e.message}`, 'err'); }
       done += 1;
     }
   });
-  toast(`Test cases written for ${done} issues`);
+  toast(`${done} issue${done === 1 ? "" : "s"} now have new test cases.`, "ok", { title: "Test cases written" });
 }
 
 // ---------------------------------------------------------------- pull requests & comments
@@ -469,6 +477,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
   if (!S.engine?.browser) { await loadEngine(); if (!S.engine?.browser) { toast(S.engine?.serverless ? 'This server can’t run a browser. Connect a remote browser in Test automation → Settings.' : 'No test browser yet. See Test automation → Settings.', 'err'); S.autoTab = 'settings'; S.nav(`/p/${P().id}/automation`); return; } }
   const baseUrl = P().automation.baseUrl || await askBaseUrl();
   if (!baseUrl) return;
+  // Running tests starts straight away: no questions first (scripts that are missing are written from the App setup).
   const ctrl = new AbortController();
   const run: Any = { running: true, ctrl, total: list.length, done: 0, pass: 0, fail: 0, current: null, log: [{ message: `Running ${list.length} test${list.length > 1 ? 's' : ''} against ${baseUrl}` }] };
   S.autoRun = run; emit();
