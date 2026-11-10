@@ -40,6 +40,7 @@ export function AppSetup() {
   const [step, setStepState] = useState<string>(() => { try { return sessionStorage.getItem('tf.setupStep') || 'overview'; } catch { return 'overview'; } });
   const setStep = (k: string) => { setStepState(k); try { sessionStorage.setItem('tf.setupStep', k); } catch { /* private mode */ } };
   useEffect(() => { loadCreds(); }, [p.id]);
+  const [srcOpen, setSrcOpen] = useState(false);
   const base = String(p.automation.baseUrl || '').replace(/\/+$/, '');
   const loginSet = Object.values(a.login || {}).some(Boolean);
   const status = setupStatus(p);
@@ -64,7 +65,8 @@ export function AppSetup() {
       <div className="set-main">
         <div className="set-section-h"><h2>{cur[1]}</h2><p className="muted">{cur[3]}.</p></div>
         {cur[0] === 'overview' && <SetupOverview status={status} go={setStep} />}
-        {cur[0] === 'repo' && <div className="card"><RepoSyncCard /><SourceSection canEdit={canEdit} open toggle={() => {}} /></div>}
+        {cur[0] === 'repo' && <><div className="card"><RepoSyncCard /></div>
+          <div className="card repo-source"><SourceSection canEdit={canEdit} open={Boolean(srcOpen)} toggle={() => setSrcOpen(!srcOpen)} /></div></>}
         {cur[0] === 'pages' && <PagesSection canEdit={canEdit} base={base} />}
         {cur[0] === 'roles' && <div className="card">
           <p className="sub" style={{ marginTop: 0 }}>One role per kind of user, each with a test account. Choose how each signs in: the login form, single sign-on, or a saved session. Passwords, MFA secrets and sessions are stored encrypted and never shown again.</p>
@@ -380,7 +382,7 @@ function SourceSection({ canEdit, open, toggle }: { canEdit: boolean; open: bool
   return (
     <div className="as-sec">
       <button type="button" className={`as-h ${open ? '' : 'closed'}`} onClick={toggle}>
-        <Ico svg={I.chevron} /><b>Source code</b><span className="muted small">{summary}</span></button>
+        <Ico svg={I.chevron} /><b>Where routes are read from</b><span className="muted small">{summary}</span></button>
       {changes && <div className="warn-banner as-change"><Ico svg={I.doc} />
         <span>The code changed: {changes.added.length > 0 && <b>{changes.added.length} new route{changes.added.length === 1 ? '' : 's'}</b>}{changes.added.length > 0 && changes.removed.length > 0 && ', '}
           {changes.removed.length > 0 && <b>{changes.removed.length} page{changes.removed.length === 1 ? '' : 's'} no longer in the code</b>}.</span>

@@ -107,7 +107,7 @@ export function DevSettings({ ed }: { ed: boolean }) {
   </>;
 }
 
-/** Project settings → Code & GitHub: a separate backend repository (local only for now) and the frontend/backend split of issues. */
+/** Project settings → Code & GitHub: a separate backend repository (pull requests on GitHub, merge requests on GitLab) and the frontend/backend split of issues. */
 function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boolean; env: Any; setEnv: (e: Any) => void }) {
   const d = be();
   const [check, setCheck] = useState<Any>(null);
@@ -142,7 +142,7 @@ function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boole
     } catch (e: Any) { task.fail(`Couldn’t mark the issues: ${e.message}`); } finally { setBusy(''); }
   };
   return (
-    <SetCard id="backend" title="Backend repository" desc="For projects whose backend lives in its own repository. Issues marked Backend run their code agents there, Frontend in the repository above, and Frontend + Backend in both: backend first, then the frontend builds on its API.">
+    <SetCard id="backend" title="Backend repository" desc="For projects whose backend lives in its own repository (GitHub or GitLab). Issues marked Backend run their code agents there, Frontend in the repository above, and Frontend + Backend in both: backend first, then the frontend builds on its API.">
       <CB label="This project has a separate backend repository" disabled={!ed} checked={Boolean(d.enabled)} onChange={(e: Any) => setBe('enabled', e.target.checked)} />
       {d.enabled && <>
         <div className="dev-path">

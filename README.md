@@ -579,6 +579,14 @@ Migrations and `npm run db:push` run as the table owner. The policies are recrea
 
 ## Test automation: repository sync and run settings
 
+**Find built features** (Test automation → App setup → Repository) reads every page, the repository's `.md` documents (feature notes, change records, release notes, READMEs) and the git history.
+- It organizes everything already built into **epics**: existing ones where they fit, new ones otherwise. Each feature is a **Done** issue with a user story, a description of what exists, acceptance criteria and its sources.
+- Folder names like `docs/features/done/<area>/` guide the grouping.
+- Epics are broad product areas (usually 4–10), each holding at least 3 features. Smaller ones are folded into the closest area.
+- Each feature is split into small tickets: one testable behaviour each, 1–3 story points, sized on your team's point scale. Existing issues stay as they are; they're moved into their epic and sized if they have no points.
+- Existing issues are reused: marked Done when they aren't, and moved into their epic when they have none.
+- Everything is shown for review first.
+
 - **Sync with the repository** (Test automation → App setup). TicketForge must be running on your computer for this. It reads the project's local repository (Project settings → Code & GitHub):
   - It finds the app's pages from its routes. TanStack Router is supported, alongside Next.js, Remix, React Router and the others.
   - It works out which pages changed since the last sync: commits, uncommitted edits and new files. The first sync looks at the last 30 commits.
@@ -606,13 +614,23 @@ Each role in Test automation → App setup → Roles & logins has a **Sign-in** 
 
 Passwords, MFA secrets and sessions are only used with the project's saved application URL.
 
-## Separate backend repository (local only for now)
+## Separate backend repository
 
-Project settings → Code & GitHub → **Backend repository**: tick "This project has a separate backend repository" and pick its local folder.
+Project settings → Code & GitHub → **Backend repository**: tick "This project has a separate backend repository", pick its local folder and click **Check**. Check finds where the repository is hosted.
 
 - **Issues** have an **Implementation** field: Frontend, Backend or Frontend + Backend. It shows as FE / BE / FE+BE in the backlog.
   - The AI fills it when it writes issues.
-  - **Mark unmarked with AI** in the same settings card fills it for existing issues. ⌘Z undoes it.
+  - **Mark unmarked with AI** in the same card fills it for existing issues. ⌘Z undoes it.
 - **Write code with AI** shows **Frontend** and **Backend** tabs, one job per repository. Each agent is told which half of the app it is in, and the backend agent lists the APIs it added.
 - A Frontend + Backend issue starts on Backend. The frontend job then receives the backend job's summary, so it builds on the real API.
-- **Local only:** backend changes are committed to a new branch in your local backend repository (**Commit to local branch**). Nothing is pushed and no pull request is opened. The frontend repository keeps opening GitHub pull requests as before.
+- **Pull requests from either repository:** "Commit, push and open PR/MR" opens a **GitHub pull request** or a **GitLab merge request** (gitlab.com or self-hosted), depending on the repository's origin.
+  - GitLab needs an access token (scopes `api` and `write_repository`), saved in the Backend card or set as `GITLAB_TOKEN`.
+  - Without a token, the branch is pushed with your own git sign-in and you get a link that opens the merge request on GitLab.
+  - **Commit locally only** commits the changes on the branch without pushing.
+
+## Splitting issues into smaller ones
+
+On the Epics page (**AI actions → Split issues**) or in an epic's panel (**Split issues**):
+- **Pick the issues.** Big ones are ticked for you: over 3 points, or unestimated with many acceptance criteria, many test cases or a long description.
+- **The AI proposes** small tickets for each issue: one testable behaviour each, 1–3 points, following your team's acceptance-criteria rules, and covering exactly the original scope. It shares the issue's test cases out to the part each one tests. Issues that are already small are kept, with the reason.
+- **On apply**, the first part keeps the original issue (key, history, comments, pull requests, links). The other parts become new issues next to it, in the same epic, sprint and status, linked with "relates to". Parts that no test case covers are flagged so you can write tests for them. ⌘Z undoes it.

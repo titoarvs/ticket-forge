@@ -14,6 +14,7 @@ import {
 } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { AppSetup } from './AppSetup';
+import { openSplitIssues, isBig } from './Split';
 import { RunSettingsCard } from './RepoSync';
 import { FeatureModal } from './FeatureModal';
 import { RemoteBrowser } from './RemoteBrowser';
@@ -357,6 +358,7 @@ function EpicsAiMenu() {
         <button onClick={() => openModal(<FeatureModal />)}><Ico svg={I.plus} />Add feature<small>New epics and issues</small></button></>}
       {manage && <>
         <button onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize epics<small>Regroup issues</small></button>
+        {plan && <button onClick={() => openSplitIssues()}><Ico svg={I.subtask} />Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small></button>}
         {p.epics.length > 0 && <><hr /><div className="mh">Write for epics without one</div>
           {doc('psd', 'Problem Statements', writeMissingPsds)}
           {doc('fbd', 'Feature Briefs', writeMissingFbds)}

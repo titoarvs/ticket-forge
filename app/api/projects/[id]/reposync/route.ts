@@ -1,7 +1,7 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { readRepo, testCaseUpdates, builtFeatures, pageTestCases } from '@/lib/reposync.js';
+import { readRepo, testCaseUpdates, builtFeatures, pageTestCases, builtFeatureMap } from '@/lib/reposync.js';
 
 export const maxDuration = 300;
 
@@ -18,6 +18,14 @@ export const POST = api(async (req, p) => {
   if (!dir) throw new HttpError(400, 'Set the local repository folder in Project settings → Code & GitHub first.');
   const wantTests = b.testCases !== false && store.has(user, 'ai.use');
   const wantBacklog = b.backlog !== false && store.has(user, 'ai.use') && store.has(user, 'issue.create');
+  if (b.mode === 'features') {
+    // Everything already built (pages, Markdown docs, history), organized into epics, for review.
+    if (!store.has(user, 'ai.use') || !store.has(user, 'issue.create')) throw new HttpError(403, 'Mapping built features uses the AI and creates issues, which your role does not allow.');
+    return ndjson(req, async (send, signal) => {
+      const say = (message: string) => send({ type: 'progress', message });
+      send({ type: 'done', result: await builtFeatureMap({ project, dir, ai: { ...aiOpts(b), signal }, emit: say }) });
+    });
+  }
   if (b.mode === 'pageTests') {
     // Test cases for the existing pages, written from their code.
     if (!store.has(user, 'ai.use')) throw new HttpError(403, 'Writing test cases uses the AI, which your role does not allow.');

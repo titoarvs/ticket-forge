@@ -3,7 +3,7 @@
 // Sync reads the project's local repository: its pages, what changed since the last sync, the test cases those changes
 // affect, and features already delivered. Everything comes back as a review; nothing changes until you apply it.
 import { useState } from 'react';
-import { S, P, api, mutate, toast, openModal, closeModal, can, uid, ago, readNdjson, aiBody, startTask, setField, logEvent, newTicket, newTest, me, type Any } from './core';
+import { S, P, api, nextEpicKey, COLORS, isDone, mutate, toast, openModal, closeModal, can, uid, ago, readNdjson, aiBody, startTask, setField, logEvent, newTicket, newTest, me, type Any } from './core';
 import { Ico, I, Modal, Spinner } from './ui';
 import { TF, SF, CB, MenuItem } from './fields';
 import { appSetup } from './AppSetup';
@@ -66,29 +66,167 @@ export function RepoSyncCard() {
       else task.fail(`Couldn’t write test cases from the code: ${e.message}`);
     } finally { running = false; setBusy(false); }
   };
+  const findFeatures = async () => {
+    if (running) { toast('A repository job is already running. See the tray.', 'info'); return; }
+    running = true; setBusy(true); setLog([]);
+    const ctrl = new AbortController();
+    const task = startTask('Finding built features', { detail: dir, kind: 'ai', cancel: () => ctrl.abort() });
+    try {
+      const res = await api(`/api/projects/${p.id}/reposync`, { method: 'POST', raw: true, signal: ctrl.signal, body: aiBody({ mode: 'features' }) });
+      let out: Any = null;
+      await readNdjson(res, (ev) => {
+        if (ev.type === 'progress') {
+          setLog((l) => [...l.filter((x) => !/^Writing the features of/.test(x)), ev.message]);
+          const m = ev.message.match(/(\d+)\/(\d+)$/);
+          task.update({ detail: ev.message.replace(/ \d+\/\d+$/, '').replace(/…$/, ''), ...(m ? { done: Number(m[1]), total: Number(m[2]) } : {}) });
+        } else if (ev.type === 'done') out = ev.result;
+        else if (ev.type === 'error') throw new Error(ev.error);
+      });
+      if (!out) throw new Error('Nothing came back.');
+      task.finish(`${out.epics.reduce((n: number, e: Any) => n + e.features.length, 0)} features in ${out.epics.length} epics`);
+      openModal(<FeatureMapReview r={out} />);
+    } catch (e: Any) {
+      if (e.name === 'AbortError') { task.fail(''); toast('Nothing was changed.', 'info', { title: 'Stopped finding features' }); }
+      else task.fail(`Couldn’t map the built features: ${e.message}`);
+    } finally { running = false; setBusy(false); }
+  };
+  const aiOk = can('ai.use');
+  const pagesCount = appSetup(p).pages.length;
   return (
-    <div className="as-sec repo-sync">
-      <div className="repo-sync-h">
-        <Ico svg={I.pr} />
+    <div className="repo-panel">
+      <div className="repo-head">
+        <span className="repo-ic"><Ico svg={I.pr} /></span>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <b>Sync with the repository</b>
-          <div className="muted small">{dir
-            ? <>{dir}{last ? <> · last synced {ago(last.at)} at <code>{String(last.sha).slice(0, 7)}</code> on {last.branch}{last.pages != null ? ` · ${last.pages} pages` : ''}</> : ' · never synced'}</>
-            : <>Set the local repository folder in <b>Project settings → Code &amp; GitHub</b> first.</>}</div>
+          {dir ? <><b className="repo-path" title={dir}>{dir.split('/').slice(-1)[0]}</b> <span className="muted small repo-full">{dir}</span>
+            <div className="repo-meta small">
+              {last ? <><span><Ico svg={I.check} /> Synced {ago(last.at)}</span><span>branch <b>{last.branch}</b> at <code>{String(last.sha).slice(0, 7)}</code></span></> : <span className="warn-text">Never synced</span>}
+              <span>{pagesCount} page{pagesCount === 1 ? '' : 's'} in App setup</span>
+            </div></>
+            : <><b>No repository yet</b><div className="muted small">Set the local repository folder in <b>Project settings → Code &amp; GitHub</b>.</div></>}
         </div>
-        <button className="btn ai sm" disabled={!dir || !can('ai.use') || !can('issue.edit') || busy} onClick={writeTests} title="Write test cases for every existing page from its code, for review">
-          <Ico svg={I.sparkle} />Write test cases from the code</button>
-        <button className="btn primary sm" disabled={!dir || !canRun || busy} onClick={run}>{busy ? <><Spinner />Working…</> : last ? 'Sync again' : 'Sync now'}</button>
       </div>
-      <p className="muted small" style={{ margin: '6px 0' }}>Reads the code on this computer: adds the app’s pages, finds the pages that changed since the last sync, updates the test cases those changes affect, and puts features that are already built in the backlog as {doneStatus()}. You review everything before it’s applied.</p>
-      <div className="row" style={{ gap: 16 }}>
-        <CB label="Update test cases for changed pages" disabled={!can('ai.use') || busy} checked={opts.testCases} onChange={(e: Any) => setOpts({ ...opts, testCases: e.target.checked })} />
-        <CB label={`Add already-built features to the backlog as ${doneStatus()}`} disabled={!can('ai.use') || !can('issue.create') || busy} checked={opts.backlog} onChange={(e: Any) => setOpts({ ...opts, backlog: e.target.checked })} />
+      <div className="repo-actions">
+        <div className="repo-tile">
+          <div className="rt-h"><Ico svg={I.refresh} /><b>Sync changes</b></div>
+          <p className="muted small">Adds new pages, finds the pages that changed since the last sync, and proposes the test-case updates and backlog changes that follow.</p>
+          <div className="rt-opts">
+            <CB label="Update affected test cases" disabled={!aiOk || busy} checked={opts.testCases} onChange={(e: Any) => setOpts({ ...opts, testCases: e.target.checked })} />
+            <CB label={`Mark delivered issues ${doneStatus()}`} disabled={!aiOk || !can('issue.create') || busy} checked={opts.backlog} onChange={(e: Any) => setOpts({ ...opts, backlog: e.target.checked })} />
+          </div>
+          <button className="btn primary sm" disabled={!dir || !canRun || busy} onClick={run}>{busy ? <><Spinner />Working…</> : last ? 'Sync again' : 'Sync now'}</button>
+        </div>
+        <div className="repo-tile">
+          <div className="rt-h"><Ico svg={I.epic} /><b>Find built features</b></div>
+          <p className="muted small">Reads every page, the <code>.md</code> documents (feature notes, release notes, READMEs) and the history, and organizes everything already built into <b>epics</b>, as {doneStatus()} issues.</p>
+          <button className="btn ai sm" disabled={!dir || !aiOk || !can('issue.create') || busy} onClick={findFeatures}><Ico svg={I.sparkle} />Find built features</button>
+        </div>
+        <div className="repo-tile">
+          <div className="rt-h"><Ico svg={I.test} /><b>Test cases from the code</b></div>
+          <p className="muted small">Writes test cases for every existing page from its code, using its real labels and messages, on the issue each page implements.</p>
+          <button className="btn ai sm" disabled={!dir || !aiOk || !can('issue.edit') || busy} onClick={writeTests}><Ico svg={I.sparkle} />Write test cases</button>
+        </div>
       </div>
       {log.length > 0 && <ol className="sync-log small">{log.map((l, i) => <li key={i} className={i === log.length - 1 && busy ? 'now' : ''}>{i === log.length - 1 && busy ? <Spinner /> : <Ico svg={I.check} />}{l}</li>)}</ol>}
+      <p className="muted small repo-note">Everything is read on this computer and comes back as a review: nothing changes until you apply it.</p>
     </div>
   );
 }
+
+// ---------------------------------------------------------------- built features, by epic
+export function FeatureMapReview({ r }: { r: Any }) {
+  const p = P();
+  const done = doneStatus();
+  const key = (ei: number, fi: number) => `${ei}:${fi}`;
+  const isDoneF = (f: Any) => f.alreadyDone || (f.existingKey && f.existingStatus === done) || (f.existingId && isDone(P().tickets.find((t: Any) => t.id === f.existingId) || {}));
+  const cur = (f: Any) => P().tickets.find((t: Any) => t.id === f.existingId);
+  // Done, already in an epic and already sized: nothing to change.
+  const settled = (f: Any) => isDoneF(f) && (f.existingEpicId || cur(f)?.epicId) && (cur(f)?.storyPoints != null || !f.storyPoints);
+  const [pick, setPick] = useState<Record<string, boolean>>(() => Object.fromEntries(r.epics.flatMap((e: Any, ei: number) => e.features.map((f: Any, fi: number) => [key(ei, fi), !settled(f)]))));
+  const [open, setOpen] = useState<string | null>(null);
+  const [closed, setClosed] = useState<Record<number, boolean>>({});
+  const all = r.epics.flatMap((e: Any) => e.features);
+  const chosen = Object.values(pick).filter(Boolean).length;
+  const setEpic = (ei: number, v: boolean) => setPick({ ...pick, ...Object.fromEntries(r.epics[ei].features.map((f: Any, fi: number) => [key(ei, fi), v && !settled(f)])) });
+  const apply = () => {
+    let newEpics = 0, created = 0, marked = 0, moved = 0, sized = 0;
+    mutate((pp: Any) => {
+      r.epics.forEach((e: Any, ei: number) => {
+        const feats = e.features.filter((f: Any, fi: number) => pick[key(ei, fi)] && !settled(f));
+        if (!feats.length) return;
+        let epicId = e.epicId;
+        if (!epicId) {
+          const ne = { id: uid(), key: nextEpicKey(), title: e.title, description: e.description || '', color: COLORS[pp.epics.length % COLORS.length] };
+          pp.epics.push(ne); epicId = ne.id; newEpics++;
+        }
+        for (const f of feats) {
+          if (f.existingId) {
+            const t = pp.tickets.find((x: Any) => x.id === f.existingId);
+            if (!t) continue;
+            if (!t.epicId) { setField(t, 'epicId', epicId, 'Repository sync'); moved++; }
+            if (t.storyPoints == null && f.storyPoints) { setField(t, 'storyPoints', f.storyPoints, 'Repository sync'); sized++; } // size issues that had none
+            if (!isDoneF(f)) {
+              setField(t, 'status', done, 'Repository sync');
+              logEvent(t, `marked ${done}: already built (${f.sources.slice(0, 3).join(', ') || 'found in the code'})`, 'Repository sync');
+              marked++;
+            }
+          } else {
+            const t = newTicket({ title: f.title, type: f.type, epicId, userStory: f.userStory, acceptanceCriteria: f.acceptanceCriteria, status: done, labels: ['delivered'], storyPoints: f.storyPoints ?? null,
+              description: [f.description, f.pages.length && `Pages: ${f.pages.join(', ')}`, f.sources.length && `Sources: ${f.sources.join(', ')}`].filter(Boolean).join('\n\n') });
+            logEvent(t, 'added from the repository: already built', 'Repository sync');
+            pp.tickets.push(t); created++;
+          }
+        }
+      });
+    });
+    closeModal();
+    toast([`${created} small ticket${created === 1 ? '' : 's'} added as ${done}`, marked && `${marked} existing issue${marked > 1 ? 's' : ''} marked ${done}`, moved && `${moved} existing issue${moved > 1 ? 's' : ''} moved into their epic`, sized && `${sized} sized`, newEpics && `${newEpics} new epic${newEpics > 1 ? 's' : ''}`].filter(Boolean).join(' · ') + '.', 'ok',
+      { title: 'Backlog organized', action: { label: 'Open Epics', onClick: () => S.nav(`/p/${P().id}/epics`) } });
+  };
+  return (
+    <Modal title="Built features, by epic" wide persistent actions={[{ label: 'Cancel' }, { label: (() => { const sel = r.epics.flatMap((e: Any, ei: number) => e.features.filter((_: Any, fi: number) => pick[key(ei, fi)])); const nNew = sel.filter((f: Any) => !f.existingId).length;
+      return nNew === sel.length ? `Add ${nNew} ticket${nNew === 1 ? '' : 's'}` : nNew ? `Add ${nNew}, update ${sel.length - nNew}` : `Apply ${sel.length} change${sel.length === 1 ? '' : 's'}`; })(), kind: 'primary', disabled: !chosen, onClick: apply }]}>
+      <div className="sync-sum"><span><Ico svg={I.pr} /> <b>{r.repo.branch}</b> at <code>{String(r.repo.head).slice(0, 7)}</code></span>
+        <span>Read {r.pages} pages, {r.docs.length} .md document{r.docs.length === 1 ? '' : 's'} and {r.commits} commits</span>
+        <span>{all.length} small tickets · {new Set(all.map((f: Any) => f.group || f.title)).size} features · {r.epics.length} epics ({r.epics.filter((e: Any) => e.isNew).length} new)</span></div>
+      <div className="sync-pane">
+        {r.epics.map((e: Any, ei: number) => {
+          const n = e.features.filter((f: Any, fi: number) => pick[key(ei, fi)]).length;
+          const selectable = e.features.filter((f: Any) => !settled(f)).length;
+          return (
+            <div key={ei} className="pt-page fm-epic">
+              <div className="pt-head">
+                <CB checked={n > 0 && n === selectable} indeterminate={n > 0 && n < selectable} disabled={!selectable} onChange={(ev: Any) => setEpic(ei, ev.target.checked)} aria-label={`All features of ${e.title}`} />
+                <button type="button" className={`as-h ${closed[ei] ? 'closed' : ''}`} style={{ flex: 1, width: 'auto' }} onClick={() => setClosed({ ...closed, [ei]: !closed[ei] })}>
+                  <Ico svg={I.chevron} /><TypeIconEpic />{e.epicKey && <span className="key">{e.epicKey}</span>}<b>{e.title}</b>
+                  <span className={`pg-badge ${e.isNew ? 'dyn' : ''}`}>{e.isNew ? 'New epic' : 'Existing epic'}</span></button>
+                <span className="muted small fm-sum">{new Set(e.features.map((f: Any) => f.group || f.title)).size} features · {e.features.length} tickets · {e.features.reduce((x: number, f: Any) => x + (f.storyPoints || 0), 0)} pts · {n} selected</span>
+              </div>
+              {e.description && !closed[ei] && <p className="muted small fm-desc">{e.description}</p>}
+              {e.error && <p className="warn-text small fm-desc">Couldn’t write the details: {e.error}</p>}
+              {!closed[ei] && e.features.map((f: Any, fi: number) => { const k = key(ei, fi); const g = f.group || f.title; const size = e.features.filter((x: Any) => (x.group || x.title) === g).length;
+                const head = size > 1 && g !== (fi > 0 ? (e.features[fi - 1].group || e.features[fi - 1].title) : null); return (
+                <div key={k}>
+                {head && <div className="fm-group small"><Ico svg={I.chevron} /> {g}<span className="muted"> · split into {size} tickets</span></div>}
+                <div className={`sync-item pt-tc fm-ticket ${size > 1 ? 'in-group' : ''} ${pick[k] ? '' : 'off'}`}>
+                  <CB checked={Boolean(pick[k])} disabled={settled(f)} onChange={() => setPick({ ...pick, [k]: !pick[k] })} aria-label="Include" />
+                  <div className="sync-body">
+                    <div><span className="sp" title="Story points">{f.storyPoints ?? '–'}</span> <b>{f.title}</b> {settled(f) ? <span className="pg-badge">{f.existingKey} · already {f.existingStatus}</span>
+                      : isDoneF(f) ? <span className="pg-badge dyn">{f.existingKey} · {[!(f.existingEpicId || cur(f)?.epicId) && 'move into this epic', cur(f)?.storyPoints == null && f.storyPoints && `size ${f.storyPoints} pts`].filter(Boolean).join(' · ')}</span>
+                      : f.existingKey ? <span className="pg-badge dyn">{f.existingKey}: {f.existingStatus} → {done}</span> : <span className="pg-badge">New · {done}</span>}</div>
+                    {!f.existingKey && <button className="link-btn small" onClick={() => setOpen(open === k ? null : k)}>{open === k ? 'Hide details' : `${f.acceptanceCriteria.length} acceptance criteria`}</button>}
+                    {open === k && <div className="pt-steps small">{f.userStory && <p><i>{f.userStory}</i></p>}{f.description && <p>{f.description}</p>}<ol>{f.acceptanceCriteria.map((a: string, i: number) => <li key={i}>{a}</li>)}</ol>
+                      {(f.pages.length > 0 || f.sources.length > 0) && <p className="muted">{[f.pages.length && `Pages: ${f.pages.join(', ')}`, f.sources.length && `Sources: ${f.sources.join(', ')}`].filter(Boolean).join(' · ')}</p>}</div>}
+                  </div>
+                </div>
+                </div>); })}
+            </div>);
+        })}
+        {!r.epics.length && <p className="muted small">Nothing built was found.</p>}
+      </div>
+    </Modal>
+  );
+}
+const TypeIconEpic = () => <span className="fm-epic-ic" aria-hidden><Ico svg={I.epic} /></span>;
 
 // ---------------------------------------------------------------- review
 function SyncReview({ r }: { r: Any }) {
