@@ -95,7 +95,7 @@ export function DevSettings({ ed }: { ed: boolean }) {
         <small className="muted">The only command it may run, to check its work. Leave empty and it only reads and edits code.</small></label>
       <label className="field"><span>Team conventions</span><TA disabled={!ed} rows={4} value={d.notes || ''} placeholder="e.g. Next.js App Router, server actions for writes, Tailwind, tests with Vitest next to the file. Don’t touch the payments module." onChange={(e) => setDev('notes', e.target.value)} /></label>
     </SetCard>
-    <BackendRepoCard ed={ed} local={env?.local !== false} />
+    <BackendRepoCard ed={ed} local={env?.local !== false} env={env} setEnv={setEnv} />
     <SetCard id="gh-token" title="GitHub access" desc="To push the branch and open the pull request. A fine-grained token needs Contents and Pull requests (read and write) on this repository.">
       <p className="small" style={{ margin: '0 0 8px' }}><span className={`dot ${env?.hasToken || env?.envToken || env?.ghSignedIn ? 'ok' : 'bad'}`} style={{ marginRight: 6 }} />{env ? tokenLine : 'Checking…'}</p>
       {ed && <div className="dev-path">
@@ -108,9 +108,16 @@ export function DevSettings({ ed }: { ed: boolean }) {
 }
 
 /** Project settings → Code & GitHub: a separate backend repository (local only for now) and the frontend/backend split of issues. */
-function BackendRepoCard({ ed, local }: { ed: boolean; local: boolean }) {
+function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boolean; env: Any; setEnv: (e: Any) => void }) {
   const d = be();
   const [check, setCheck] = useState<Any>(null);
+  const [glToken, setGlToken] = useState('');
+  const gitlab = (check?.provider || d.provider) === 'GitLab';
+  const saveGl = async (clear = false) => {
+    setBusy('gl');
+    try { const r = await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: clear ? { action: 'clearGitlabToken' } : { action: 'saveGitlabToken', token: glToken } }); setEnv({ ...env, hasGitlabToken: r.hasGitlabToken }); setGlToken(''); toast(clear ? 'GitLab token removed' : 'GitLab token saved'); }
+    catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
+  };
   const [busy, setBusy] = useState('');
   const issues = P().tickets.filter((t: Any) => !t.parentId);
   const marked = issues.filter((t: Any) => t.layer).length;
@@ -119,7 +126,7 @@ function BackendRepoCard({ ed, local }: { ed: boolean; local: boolean }) {
     try {
       const r = await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: { action: 'inspect', localPath: localPath ?? be().localPath } });
       setCheck({ ok: true, ...r });
-      mutate((pp) => { pp.devBackend = { ...(pp.devBackend || {}), enabled: true, localPath: r.path, repo: pp.devBackend?.repo || r.repo || '', baseBranch: pp.devBackend?.baseBranch || r.defaultBranch }; });
+      mutate((pp) => { pp.devBackend = { ...(pp.devBackend || {}), enabled: true, localPath: r.path, repo: r.repo || pp.devBackend?.repo || '', provider: r.provider || '', baseBranch: pp.devBackend?.baseBranch || r.defaultBranch }; });
     } catch (e: Any) { setCheck({ ok: false, error: e.message }); } finally { setBusy(''); }
   };
   const classify = async (all: boolean) => {
@@ -138,7 +145,6 @@ function BackendRepoCard({ ed, local }: { ed: boolean; local: boolean }) {
     <SetCard id="backend" title="Backend repository" desc="For projects whose backend lives in its own repository. Issues marked Backend run their code agents there, Frontend in the repository above, and Frontend + Backend in both: backend first, then the frontend builds on its API.">
       <CB label="This project has a separate backend repository" disabled={!ed} checked={Boolean(d.enabled)} onChange={(e: Any) => setBe('enabled', e.target.checked)} />
       {d.enabled && <>
-        <div className="warn-banner info-banner" style={{ margin: '8px 0' }}><Ico svg={I.pr} /><span><b>Local only for now.</b> Backend changes are committed to a new branch in your local backend repository. Nothing is pushed and no pull request is opened.</span></div>
         <div className="dev-path">
           <label className="field" style={{ flex: 1, margin: 0 }}><span>Local folder</span>
             <TF disabled={!ed} value={d.localPath || ''} placeholder="/Users/you/code/my-app-api" spellCheck={false} onChange={(e) => setBe('localPath', e.target.value)} /></label>
@@ -146,15 +152,25 @@ function BackendRepoCard({ ed, local }: { ed: boolean; local: boolean }) {
           <button className="btn" disabled={!ed || !d.localPath || !!busy || !local} onClick={() => inspect()}>{busy === 'check' ? <><Spinner />Checking…</> : 'Check'}</button>
         </div>
         {check && (check.ok
-          ? <div className="ok-banner" style={{ marginTop: 8 }}><Ico svg={I.check} /><span>Git repository{check.remote ? <> · <code>{check.remote}</code></> : ''} · default branch <code>{check.defaultBranch}</code> · you’re on <code>{check.currentBranch}</code>{check.uncommitted ? ` · ${check.uncommitted} uncommitted file${check.uncommitted > 1 ? 's' : ''} (left untouched)` : ''}</span></div>
+          ? <div className="ok-banner" style={{ marginTop: 8 }}><Ico svg={I.check} /><span>{check.provider || 'Git'} repository{check.remote ? <> · <code>{check.remote}</code></> : ''} · default branch <code>{check.defaultBranch}</code> · you’re on <code>{check.currentBranch}</code>{check.uncommitted ? ` · ${check.uncommitted} uncommitted file${check.uncommitted > 1 ? 's' : ''} (left untouched)` : ''}</span></div>
           : <div className="warn-banner danger" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>{check.error}</span></div>)}
         <div className="grid2" style={{ marginTop: 12 }}>
-          <label className="field"><span>Repository name (for reference)</span><TF disabled={!ed} value={d.repo || ''} placeholder="group/my-app-api" spellCheck={false} onChange={(e) => setBe('repo', e.target.value.trim())} /></label>
+          <label className="field"><span>{gitlab ? 'GitLab project (group/name)' : 'GitHub repository (owner/name)'}</span><TF disabled={!ed} value={d.repo || ''} placeholder={gitlab ? 'tito-solutions/hris/tito-hris-api' : 'owner/my-app-api'} spellCheck={false} onChange={(e) => setBe('repo', e.target.value.trim())} />
+            <small className="muted">Found from the folder’s origin when you click Check. Pull requests open {gitlab ? 'as GitLab merge requests' : 'on GitHub'}.</small></label>
           <label className="field"><span>Base branch</span><TF disabled={!ed} value={d.baseBranch || ''} placeholder="develop" spellCheck={false} onChange={(e) => setBe('baseBranch', e.target.value.trim())} /></label>
           <label className="field"><span>Branch prefix</span><TF disabled={!ed} value={d.branchPrefix ?? dev().branchPrefix ?? 'tf/'} spellCheck={false} onChange={(e) => setBe('branchPrefix', e.target.value.trim())} /></label>
           <label className="field"><span>Check command (optional)</span><TF disabled={!ed} value={d.checkCommand || ''} placeholder="e.g. npm test" spellCheck={false} onChange={(e) => setBe('checkCommand', e.target.value)} /></label>
         </div>
         <label className="field"><span>Backend conventions</span><TA disabled={!ed} rows={3} value={d.notes || ''} placeholder="e.g. Express + Drizzle, routes in src/routes, migrations with drizzle-kit, Vitest tests next to the file. Never edit existing migrations." onChange={(e) => setBe('notes', e.target.value)} /></label>
+        {gitlab ? <div className="field" style={{ marginTop: 4 }}><span>GitLab access token</span>
+          <p className="small" style={{ margin: '0 0 6px' }}><span className={`dot ${env?.hasGitlabToken || env?.envGitlabToken ? 'ok' : 'bad'}`} style={{ marginRight: 6 }} />
+            {env?.hasGitlabToken ? 'A token is saved for this project (encrypted).' : env?.envGitlabToken ? 'Using GITLAB_TOKEN from the server.' : 'No token: the branch is pushed with your own git sign-in, and you open the merge request on GitLab from the link given.'}</p>
+          {ed && <div className="dev-path">
+            <TF type="password" autoComplete="off" value={glToken} placeholder={env?.hasGitlabToken ? 'Replace the saved token' : 'glpat-… (scopes: api, write_repository)'} onChange={(e) => setGlToken(e.target.value)} />
+            <button className="btn" disabled={!glToken.trim() || !!busy} onClick={() => saveGl()}>Save token</button>
+            {env?.hasGitlabToken && <button className="btn subtle" disabled={!!busy} onClick={() => saveGl(true)}>Remove</button>}
+          </div>}</div>
+          : <p className="small muted" style={{ margin: '4px 0 0' }}>Pull requests use the project’s GitHub access below.</p>}
         <div className="be-classify">
           <span className="small"><b>Issues:</b> {marked} of {issues.length} marked frontend, backend or both.</span>
           {can('ai.use') && can('issue.edit') && <>
@@ -261,7 +277,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agen
         <label className="field"><span>Extra instructions (optional)</span><TA rows={4} value={text} placeholder="e.g. Put the API in app/api/payslips. Reuse the PayslipTable component. Add a Vitest test." onChange={(e) => setText(e.target.value)} /></label>
         {backend && side === 'frontend' && t.layer === 'both' && !['committed', 'review'].includes(jobs.backend?.status) && <div className="warn-banner" style={{ marginBottom: 8 }}><Ico svg={I.warn} /><span>The backend part isn’t done yet. You can start the frontend now, but it won’t know the final API.</span>
           <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('backend')}>Go to Backend</button></div>}
-        {backend && side === 'backend' && <p className="small muted" style={{ marginTop: 0 }}>Runs in <code>{be().localPath}</code>. When you’re happy with the changes, they’re committed to a local branch: nothing is pushed.</p>}
+        {backend && side === 'backend' && <p className="small muted" style={{ marginTop: 0 }}>Runs in <code>{be().localPath}</code>{be().repo ? <> · {be().provider === 'GitLab' ? 'merge request on GitLab' : 'pull request on GitHub'} <code>{be().repo}</code></> : ''}.</p>}
         <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId, side })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{agentId === 'architecture-record' ? 'Write the record' : agentId === 'feature-tests' ? 'Write the tests' : 'Start the agent'}</>}</button>
       </> : <>
         <div className="code-head">
@@ -300,18 +316,15 @@ export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agen
           <TA rows={2} value={follow} placeholder="Ask for changes: e.g. also handle the empty state, and rename the hook to usePayslips" onChange={(e) => setFollow(e.target.value)} />
           <button className="btn ai" disabled={!follow.trim() || !!busy} onClick={async () => { if (await act('follow', { action: 'follow', text: follow })) setFollow(''); }}><Ico svg={I.sparkle} />Make changes</button>
         </div>}
-        {job.status === 'review' && can('issue.edit') && job.localOnly && <div className="code-pr">
-          <label className="field" style={{ flex: 1, margin: 0 }}><span>Commit message</span><TF value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-          <button className="btn primary" disabled={!!busy || !title.trim()} onClick={commitLocal}>{busy === 'commit' ? <><Spinner />Committing…</> : <><Ico svg={I.check} />Commit to local branch</>}</button>
-        </div>}
-        {job.status === 'committed' && <div className="ok-banner"><Ico svg={I.check} /><span>Committed on the local branch <code>{job.branch}</code> in <code>{job.repoPath}</code>. Nothing was pushed: push or merge it from there when you’re ready.{side === 'backend' && t.layer === 'both' ? ' Next: the Frontend tab, which builds on this API.' : ''}</span>
+        {job.status === 'committed' && <div className="ok-banner"><Ico svg={I.check} /><span>Committed on the local branch <code>{job.branch}</code> in <code>{job.repoPath}</code>. Nothing was pushed.{side === 'backend' && t.layer === 'both' ? ' Next: the Frontend tab, which builds on this API.' : ''}</span>
           {side === 'backend' && t.layer === 'both' && <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('frontend')}>Go to Frontend</button>}</div>}
-        {job.status === 'review' && can('issue.edit') && !job.localOnly && <div className="code-pr">
+        {job.status === 'review' && can('issue.edit') && <div className="code-pr">
           <label className="field" style={{ flex: 1, margin: 0 }}><span>Pull request title</span><TF value={title} onChange={(e) => setTitle(e.target.value)} /></label>
           <CB label="Draft" checked={draft} onChange={(e: Any) => setDraft(e.target.checked)} />
-          <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />Commit, push and open PR</>}</button>
+          <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</button>
+          <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>
         </div>}
-        {job.pr && <div className="ok-banner"><Ico svg={I.check} /><span>Pull request <a href={job.pr.url} target="_blank" rel="noopener noreferrer">#{job.pr.number} {job.pr.title}</a> is open{job.pr.draft ? ' as a draft' : ''} and linked to this issue.</span></div>}
+        {job.pr && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> is open{job.pr.draft ? ' as a draft' : ''} and linked to this issue.</span></div>}
       </>}
     </Modal>
   );
