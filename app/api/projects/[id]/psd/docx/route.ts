@@ -25,5 +25,5 @@ export const POST = api(async (req, p) => {
   try { buf = tpl ? await buildPsdDocx(tpl.data, psd, meta) : await buildPlainPsdDocx(psd, meta); }
   catch (e: any) { throw new HttpError(500, `Couldn’t build the document from the template: ${e.message}`); }
   const name = `Problem Statement - ${psd.title} - ${meta.version}.docx`.replace(/[\\/:*?"<>|]+/g, ' ');
-  return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'X-Content-Type-Options': 'nosniff' } });
+  return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'Content-Length': String(buf.length), 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' } });
 });

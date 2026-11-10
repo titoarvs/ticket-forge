@@ -2,7 +2,7 @@
 // Feature Brief documents (FBD), one per epic: the AI fills the team's Markdown template. Saved on the epic as
 // Markdown, viewable and editable in the app, downloadable as .md or .docx.
 import { useEffect, useRef, useState } from 'react';
-import { P, api, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, type Any } from './core';
+import { P, api, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA, TF, SF, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
@@ -33,17 +33,13 @@ export async function writeFbd(epic: Any, instructions = ''): Promise<boolean> {
   finally { busy.delete(epic.id); emit(); }
 }
 
-function download(blob: Blob, name: string) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-}
+const download = (blob: Blob, name: string) => saveBlob(blob, name);
 export const downloadFbdMd = (epic: Any) => download(new Blob([epic.fbd.markdown], { type: 'text/markdown' }), fileName(epic, 'md'));
 export async function downloadFbdDocx(epic: Any) {
   try {
-    const res = await api(`/api/projects/${P().id}/fbd/docx`, { method: 'POST', raw: true, body: { epicId: epic.id } });
-    download(await res.blob(), fileName(epic, 'docx'));
-  } catch (e: Any) { toast(e.message, 'err'); }
+    const name = await downloadFrom(`/api/projects/${P().id}/fbd/docx`, { body: { epicId: epic.id }, fallbackName: fileName(epic, 'docx') });
+    toast(`Downloaded ${name}`);
+  } catch (e: Any) { toast(`Couldn’t download the Feature Brief: ${e.message}`, 'err'); }
 }
 
 function WriteModal({ epic }: { epic: Any }) {
