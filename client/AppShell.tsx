@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, type Any,
 } from './core';
-import { Ico, I, Menu, Avatar, Toasts, BusyPill, EmptyState, ErrorState } from './ui';
+import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue } from './actions';
 import { AccountModal } from './Admin';
@@ -216,7 +216,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <main id="app">{children}</main>
       {S.modal as Any}
       <Toasts />
-      <BusyPill />
+      <TaskTray />
       <RunPill />
     </>
   );

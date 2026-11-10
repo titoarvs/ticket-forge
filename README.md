@@ -563,3 +563,56 @@ On Postgres (Supabase), every table has row-level security switched on:
 - **No user, no rows.** A query without a signed-in user returns nothing.
 
 Migrations and `npm run db:push` run as the table owner. The policies are recreated on every start, and **Admin → Email & database** shows whether they're active. Set `TICKETFORGE_RLS=off` to run without the restricted role (the tables stay locked to Supabase's public roles).
+
+## Document templates and questions before the AI writes
+
+- **Per-epic documents:** each epic can have a Problem Statement (PSD), a Feature Brief (FBD) and an Architecture Record Design (ARD), written by the AI from the epic, its issues, the earlier documents and the source documents. View, edit, or download each as .md or .docx from the epic panel or the Epics page.
+- **Templates:**
+  - Administration → Generation sets the team's templates.
+  - Project settings → Templates gives one project its own templates. Its PSD, FBD and ARD then use those instead.
+  - Without either, the built-in defaults are used.
+- **Questions first:** before the AI writes anything, it reads what it was given and asks up to 5 questions, each with suggested answers. You answer what you can or skip; your answers go to the AI as instructions. This applies to:
+  - generating a project or adding a feature;
+  - writing, enhancing or splitting an issue;
+  - acceptance criteria and test cases;
+  - the PSD, FBD and ARD.
+
+## Test automation: repository sync and run settings
+
+- **Sync with the repository** (Test automation → App setup). TicketForge must be running on your computer for this. It reads the project's local repository (Project settings → Code & GitHub):
+  - It finds the app's pages from its routes. TanStack Router is supported, alongside Next.js, Remix, React Router and the others.
+  - It works out which pages changed since the last sync: commits, uncommitted edits and new files. The first sync looks at the last 30 commits.
+  - The AI updates the test cases those changes affect and adds test cases for new behaviour. Updated cases lose their old script, so the next run writes a fresh one.
+  - It reads the git history: issues it shows were delivered are marked Done, and delivered features with no issue are added to the backlog as Done, labelled `delivered`.
+
+  Everything comes back as a review, and only what you tick is applied.
+- **Run settings** (Test automation → Settings):
+  - retries, with tests that pass only on a retry marked *flaky*;
+  - time limits per test, per action, per page load and per check;
+  - screen size (desktop, laptop, tablet, phone);
+  - locale and time zone, and whether self-signed HTTPS certificates are accepted;
+  - reduced motion.
+
+  Failed network requests and 5xx responses appear in each test's log.
+
+### Signing in: login form, SSO, MFA and saved sessions
+
+Each role in Test automation → App setup → Roles & logins has a **Sign-in** method. Scripts always call `await app.loginAs('Role')`.
+
+- **Login form:** fills the app's own form.
+- **Single sign-on (SSO):** clicks the app's SSO button ("Continue with Google", "Sign in with Microsoft"…). It then fills the identity provider's pages with the role's username and password: Microsoft Entra, Google, Okta, Auth0, Keycloak or a generic page. It handles account pickers, "Stay signed in?" and pop-up windows.
+- **Saved session:** "Sign in in a browser" opens a real Chrome or Edge window on your computer. You sign in by hand, any way the app allows, and the cookies and local storage are saved encrypted for the role. Use this when a provider blocks automated browsers (Google often does), or for passkeys and push approvals. When the session expires, the run tells you to save a new one.
+- **MFA:** save the role's authenticator secret (the text under the QR code, or the `otpauth://` link). Form and SSO sign-ins then fill the 6-digit code automatically. `app.mfaCode('Role')` returns it for tests of the MFA step itself.
+
+Passwords, MFA secrets and sessions are only used with the project's saved application URL.
+
+## Separate backend repository (local only for now)
+
+Project settings → Code & GitHub → **Backend repository**: tick "This project has a separate backend repository" and pick its local folder.
+
+- **Issues** have an **Implementation** field: Frontend, Backend or Frontend + Backend. It shows as FE / BE / FE+BE in the backlog.
+  - The AI fills it when it writes issues.
+  - **Mark unmarked with AI** in the same settings card fills it for existing issues. ⌘Z undoes it.
+- **Write code with AI** shows **Frontend** and **Backend** tabs, one job per repository. Each agent is told which half of the app it is in, and the backend agent lists the APIs it added.
+- A Frontend + Backend issue starts on Backend. The frontend job then receives the backend job's summary, so it builds on the real API.
+- **Local only:** backend changes are committed to a new branch in your local backend repository (**Commit to local branch**). Nothing is pushed and no pull request is opened. The frontend repository keeps opening GitHub pull requests as before.

@@ -59,7 +59,7 @@ export const S: Any = {
   busy: null, autoRun: null, autoScope: 'all', autoRegen: false,
   undo: [] as string[], redo: [] as string[], lastSnap: { tag: '', at: 0 },
   saveTimer: null, saveText: '',
-  menu: null, modal: null as ReactNode, toasts: [] as Any[],
+  menu: null, modal: null as ReactNode, toasts: [] as Any[], tasks: [] as Any[],
   notifs: { items: [] as Any[], unread: 0 },
   nav: (href: string) => { location.href = href; },
 };
@@ -163,20 +163,61 @@ export function saveBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(href), 60_000);
 }
 
-export function toast(msg: string, kind: 'ok' | 'err' = 'ok') {
-  const t = { id: uid(), msg, kind };
-  S.toasts = [...S.toasts, t];
+// ---------------------------------------------------------------- toasts
+export type ToastKind = 'ok' | 'err' | 'info' | 'warn';
+export type ToastOpts = { title?: string; action?: { label: string; onClick: () => void }; duration?: number };
+/**
+ * Shows a toast. Errors written as "What failed: why" get the first part as their title. Repeating the same message
+ * bumps a counter on the toast already shown instead of stacking copies; at most 4 are shown.
+ */
+export function toast(msg: string, kind: ToastKind = 'ok', o: ToastOpts = {}) {
+  let title = o.title, body = String(msg ?? '');
+  if (!title && kind === 'err') { const m = body.match(/^([^:\n]{3,70}):\s+([\s\S]+)$/); if (m && !/^https?$/i.test(m[1])) { title = m[1]; body = m[2]; } }
+  const duration = o.duration ?? (kind === 'err' ? 9000 : o.action ? 8000 : kind === 'warn' ? 6500 : 4200);
+  const same = S.toasts.find((x: Any) => x.msg === body && x.kind === kind && x.title === title);
+  if (same) { S.toasts = S.toasts.map((x: Any) => (x === same ? { ...x, count: (x.count || 1) + 1, shownAt: Date.now() } : x)); emit(); return same.id as string; }
+  const t = { id: uid(), msg: body, kind, title, action: o.action, duration, count: 1, shownAt: Date.now() };
+  S.toasts = [...S.toasts, t].slice(-4);
   emit();
-  setTimeout(() => { S.toasts = S.toasts.filter((x: Any) => x.id !== t.id); emit(); }, kind === 'err' ? 8000 : 3500);
+  return t.id;
 }
+export function dismissToast(id: string) { S.toasts = S.toasts.filter((x: Any) => x.id !== id); emit(); }
+
+// ---------------------------------------------------------------- background tasks ("Working on…" tray)
+export type TaskHandle = { id: string; update: (p: { label?: string; detail?: string; done?: number; total?: number }) => void; finish: (message?: string) => void; fail: (message: string) => void };
+/**
+ * Long AI work shown in the tray at the bottom right: label, detail, elapsed time, "3 of 5" progress and Cancel.
+ * finish() shows a tick and the message for a moment; fail() removes the row and shows an error toast.
+ */
+export function startTask(label: string, o: { detail?: string; total?: number; cancel?: () => void; kind?: 'ai' | 'doc' | 'test' } = {}): TaskHandle {
+  const id = uid();
+  S.tasks = [...(S.tasks || []), { id, label, detail: o.detail || '', done: 0, total: o.total || 0, cancel: o.cancel, kind: o.kind || 'ai', status: 'running', startedAt: Date.now() }];
+  emit();
+  const set = (p: Any) => { S.tasks = S.tasks.map((x: Any) => (x.id === id ? { ...x, ...p } : x)); emit(); };
+  const drop = () => { S.tasks = S.tasks.filter((x: Any) => x.id !== id); emit(); };
+  return {
+    id,
+    update: (p) => set(p),
+    finish: (message) => { set({ status: 'ok', message: message || '', endedAt: Date.now(), cancel: undefined }); setTimeout(drop, 3500); },
+    fail: (message) => { drop(); if (message) toast(message, 'err'); },
+  };
+}
+
+let busyTask: TaskHandle | null = null;
+/** One Claude request at a time on an issue (enhance, split, test cases…), shown in the tray. */
 export async function withBusy<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
-  if (S.busy) { toast('Claude is still working on the previous request.', 'err'); return null; }
-  S.busy = label; emit();
-  try { return await fn(); }
-  catch (e: Any) { toast(`Claude: ${e.message}`, 'err'); return null; }
-  finally { S.busy = null; emit(); }
+  if (S.busy) { toast('Wait for it to finish, or cancel it in the tray.', 'warn', { title: 'Claude is still working on the previous request' }); return null; }
+  S.busy = label; busyTask = startTask(label.replace(/…$/, ''));
+  try { const out = await fn(); busyTask?.finish('Done'); return out; }
+  catch (e: Any) { busyTask?.fail(`${label.replace(/^Claude is |…$/g, '').replace(/^./, (c) => c.toUpperCase())} failed: ${e.message}`); return null; }
+  finally { S.busy = null; busyTask = null; emit(); }
 }
-export function setBusy(label: string | null) { S.busy = label; emit(); }
+/** Updates the running request's detail ("Writing test cases 2 of 5: PAY-12"). */
+export function setBusy(label: string | null) {
+  if (!busyTask) { S.busy = label; emit(); return; }
+  const m = label?.match(/(\d+) of (\d+)/);
+  busyTask.update({ detail: label || '', ...(m ? { done: Number(m[1]) - 1, total: Number(m[2]) } : {}) });
+}
 export function openModal(node: ReactNode) { S.modal = node; emit(); }
 export function closeModal() { S.modal = null; emit(); }
 export async function copyText(text: string) {
@@ -268,7 +309,7 @@ export function newTicket(fields: Any = {}) {
 }
 export const newTest = () => ({ id: uid(), title: 'New test case', type: 'Functional', priority: 'Medium', preconditions: '', steps: [], expected: '', acRef: [], status: 'Not run', script: '', lastRun: null });
 export const withIds = (list: Any[]) => (list || []).map((tc) => ({ script: '', lastRun: null, ...tc, id: tc.id || uid() }));
-const AI_FIELDS = ['title', 'type', 'priority', 'storyPoints', 'labels', 'userStory', 'description', 'acceptanceCriteria', 'dependencies'];
+const AI_FIELDS = ['title', 'type', 'priority', 'storyPoints', 'labels', 'userStory', 'description', 'acceptanceCriteria', 'dependencies', 'layer'];
 export function applyAi(base: Any, ai: Any) {
   const out = { ...base };
   for (const f of AI_FIELDS) if (ai[f] !== undefined) out[f] = ai[f];

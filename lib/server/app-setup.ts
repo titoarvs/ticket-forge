@@ -16,9 +16,10 @@ export async function runAppSetup(projectId: string | undefined, baseUrl: string
   if (!projectId) return { app: { pages: [], roles: [], login: {}, notes: '' }, warning: null };
   const saved = await savedSetup(projectId);
   const app = await appWithSecrets(projectId, saved.app);
-  const hasPasswords = app.roles.some((r: any) => r.password);
+  const hasPasswords = app.roles.some((r: any) => r.password || r.totp || r.session);
   if (hasPasswords && originOf(baseUrl) !== originOf(saved.baseUrl)) {
-    for (const r of app.roles as any[]) { if (r.password) r.blocked = true; r.password = ''; }
+    // Passwords, MFA secrets and saved sessions never go to another site.
+    for (const r of app.roles as any[]) { if (r.password || r.totp || r.session) r.blocked = true; r.password = ''; r.totp = ''; r.session = null; }
     return { app, warning: `Saved role passwords are only used with the project’s saved application URL (${saved.baseUrl || 'not set'}), so tests that sign in will fail on ${baseUrl}.` };
   }
   return { app, warning: null };

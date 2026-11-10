@@ -5,19 +5,20 @@ import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
   activeSprint, openSprints, tcKey, spSum, statusNames, allowedStatuses, sCls, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
-  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, toast, uid, logEvent, api, type Any,
+  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, Confirm, Spinner, AutoTextarea, EmptyState, Modal } from './ui';
+import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, LayerChip, Confirm, Spinner, AutoTextarea, EmptyState, Modal, Menu } from './ui';
 import {
   openDrawer, moveTicket, inlineCreate, createSprint, deleteSprint, SprintModal, CompleteSprintModal, NewWithClaudeModal, RegroupModal,
   addEpic, bulkTests, runTests, installBrowser, ScriptModal, openCreateIssue,
 } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { AppSetup } from './AppSetup';
+import { RunSettingsCard } from './RepoSync';
 import { FeatureModal } from './FeatureModal';
 import { RemoteBrowser } from './RemoteBrowser';
 import { epicRange } from './Timeline';
-import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy } from './Fbd';
+import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy, openDoc, openWriteDoc, downloadDocDocx, docBusy, writeMissingDocs } from './Fbd';
 import { openPsd, openWritePsd, downloadPsd, writeMissingPsds, psdBusy } from './Psd';
 import { ItemText } from './ListEditor';
 
@@ -198,6 +199,7 @@ export function IssueRow({ t, showEpic = true, zone, compact = false }: { t: Any
         {showEpic && e && <ELoz e={e} />}
         {!compact && can('issue.edit') ? <RowStatus t={t} /> : <StatusLoz s={t.status} />}
         {!compact && can('issue.edit') ? <RowAssignee t={t} /> : <Avatar name={t.assignee} />}
+        {!compact && <LayerChip layer={t.layer} short />}
         <span className="sp" title="Story points">{t.storyPoints ?? '–'}</span>
         <PriorityIcon p={t.priority} />
       </span>
@@ -338,19 +340,41 @@ export function Backlog() {
 }
 
 // ---------------------------------------------------------------- epics
+/** Every AI action on the Epics page in one menu: planning, then the per-epic documents in workflow order. */
+function EpicsAiMenu() {
+  const p = P();
+  if (!can('ai.use')) return null;
+  const plan = can('issue.create'), manage = can('epic.manage');
+  if (!plan && !manage) return null;
+  const missing = (k: string) => p.epics.filter((x: Any) => !x[k]).length;
+  const doc = (k: string, label: string, run: () => void) => {
+    const n = missing(k);
+    return <button disabled={!n} onClick={run}><Ico svg={I.doc} />{label}<small>{n ? `${n} missing` : 'all written'}</small></button>;
+  };
+  return (
+    <Menu id="epics-ai" button={<button className="btn ai" aria-haspopup="menu" aria-expanded={S.menu === 'epics-ai'} onClick={() => setMenu('epics-ai')}><Ico svg={I.sparkle} />AI actions<Ico svg={I.chevron} /></button>}>
+      {plan && <><div className="mh">Plan</div>
+        <button onClick={() => openModal(<FeatureModal />)}><Ico svg={I.plus} />Add feature<small>New epics and issues</small></button></>}
+      {manage && <>
+        <button onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize epics<small>Regroup issues</small></button>
+        {p.epics.length > 0 && <><hr /><div className="mh">Write for epics without one</div>
+          {doc('psd', 'Problem Statements', writeMissingPsds)}
+          {doc('fbd', 'Feature Briefs', writeMissingFbds)}
+          {doc('ard', 'Architecture Records', () => writeMissingDocs('ard'))}</>}
+      </>}
+    </Menu>
+  );
+}
+
 export function Epics() {
   const p = P();
   return <>
     <Header title="Epics" right={<>
-      {can('ai.use') && can('issue.create') && <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>}
-      {can('epic.manage') && <>
-      {can('ai.use') && <button className="btn ai" onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize with AI</button>}
-      {can('ai.use') && p.epics.some((x: Any) => !x.fbd) && <button className="btn ai" onClick={writeMissingFbds} title="Write a Feature Brief for every epic that doesn’t have one"><Ico svg={I.doc} />Write missing FBDs</button>}
-      {can('ai.use') && p.epics.some((x: Any) => !x.psd) && <button className="btn ai" onClick={writeMissingPsds} title="Write a Problem Statement for every epic that doesn’t have one"><Ico svg={I.doc} />Write missing PSDs</button>}
-      <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button></>}
+      <EpicsAiMenu />
+      {can('epic.manage') && <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}
       <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link></>} />
     {p.epics.length ? <>
-      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
@@ -366,6 +390,10 @@ export function Epics() {
                 : e.fbd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openFbd(e)}>{e.fbd.version || 'v1.0'} · {e.fbd.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Feature Brief for ${e.title}`} onClick={() => downloadFbdDocx(e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteFbd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{docBusy('ard', e.id) ? <span className="muted"><Spinner /> Writing…</span>
+                : e.ard ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openDoc('ard', e)}>{e.ard.version || 'v1.0'} · {e.ard.status || 'Draft'}</button>
+                  {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Architecture Record Design for ${e.title}`} onClick={() => downloadDocDocx('ard', e)}><Ico svg={I.download} /></button>}</span>
+                : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteDoc('ard', e)}>Write with AI</button> : <span className="muted">–</span>}</td>
               <td style={{ width: 200 }}><ProgBar {...pr} /></td>
               <td className="num">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
               <td className="num">{pr.total}</td><td className="num">{spSum(pr.ts)}</td><td className="num">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>
@@ -394,7 +422,7 @@ export function testRows() {
   }
   return rows;
 }
-const RunLoz = ({ tc }: { tc: Any }) => (tc.lastRun ? <span className={`loz ${tCls(tc.lastRun.status)}`} title={`Automated run ${ago(tc.lastRun.at)} · ${(tc.lastRun.durationMs / 1000).toFixed(1)}s`}><Ico svg={I.bot} /> {tc.lastRun.status}</span> : null);
+const RunLoz = ({ tc }: { tc: Any }) => (tc.lastRun ? <span className={`loz ${tCls(tc.lastRun.status)}`} title={`Automated run ${ago(tc.lastRun.at)} · ${(tc.lastRun.durationMs / 1000).toFixed(1)}s${tc.lastRun.attempts > 1 ? ` · passed on attempt ${tc.lastRun.attempts}` : ''}`}><Ico svg={I.bot} /> {tc.lastRun.status}{tc.lastRun.flaky ? ' · flaky' : ''}</span> : null);
 export function setTcStatus(t: Any, tc: Any, v: string) {
   mutate(() => { tc.status = v; logEvent(t, `marked ${tcKey(t, t.testCases.indexOf(tc))} as ${v}`); });
 }
@@ -406,6 +434,83 @@ function openTest(t: Any, tc: Any) {
   openDrawer('issue', t.id);
   S.openTc.add(tc.id); emit();
   setTimeout(() => document.getElementById(`tc-${tc.id}`)?.scrollIntoView({ block: 'center' }), 50);
+}
+
+const tcGroup = () => { try { return localStorage.getItem('tf.tcGroup') || 'feature'; } catch { return 'feature'; } };
+type TcRow = { t: Any; tc: Any; i: number };
+/** Pass / fail / not run counts for a set of test cases, as small lozenges. */
+function TcCounts({ list }: { list: TcRow[] }) {
+  const n = (s: string) => list.filter((x) => x.tc.status === s).length;
+  const pass = n('Pass'), fail = n('Fail'), blocked = n('Blocked'), notRun = list.length - pass - fail - blocked;
+  const auto = list.filter((x) => x.tc.script).length;
+  return <span className="res-counts small">
+    {pass > 0 && <span className="loz t-pass">{pass} passed</span>}{fail > 0 && <span className="loz t-fail">{fail} failed</span>}
+    {blocked > 0 && <span className={`loz ${tCls('Blocked')}`}>{blocked} blocked</span>}{notRun > 0 && <span className="loz">{notRun} not run</span>}
+    <span className="muted">{auto}/{list.length} automated</span></span>;
+}
+/** Test cases organized by feature (epic) and issue. Issues start collapsed unless a search or filter is on. */
+function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature: boolean; filtered: boolean }) {
+  const p = P();
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const issues = new Map<string, { t: Any; list: TcRow[] }>();
+  for (const r of rows) { const g = issues.get(r.t.id); if (g) g.list.push(r); else issues.set(r.t.id, { t: r.t, list: [r] }); }
+  const features: { key: string; epic: Any; issues: { t: Any; list: TcRow[] }[] }[] = [];
+  if (byFeature) {
+    for (const e of [...p.epics, null]) {
+      const its = [...issues.values()].filter((g) => (e ? g.t.epicId === e.id : !p.epics.some((x: Any) => x.id === g.t.epicId)));
+      if (its.length) features.push({ key: e ? e.id : 'none', epic: e, issues: its });
+    }
+  } else features.push({ key: 'all', epic: undefined, issues: [...issues.values()] });
+  const isOpen = (k: string, dflt: boolean) => open[k] ?? dflt;
+  const toggle = (k: string, dflt: boolean) => setOpen({ ...open, [k]: !isOpen(k, dflt) });
+  const issueBlock = ({ t, list }: { t: Any; list: TcRow[] }) => {
+    const dflt = filtered || list.some((x) => x.tc.status === 'Fail');
+    const o = isOpen(`i:${t.id}`, dflt);
+    return (
+      <div key={t.id} className={`tg-issue ${list.some((x) => x.tc.status === 'Fail') ? 'has-fail' : ''}`}>
+        <div className="res-head">
+          <button type="button" className={`as-h ${o ? '' : 'closed'}`} aria-expanded={o} onClick={() => toggle(`i:${t.id}`, dflt)}>
+            <Ico svg={I.chevron} /><TypeIcon type={t.type} /><span className="key">{t.key}</span><span className="res-title">{t.title}</span>
+            <span className={`loz ${sCls(t.status)} tg-status`}>{t.status}</span></button>
+          <TcCounts list={list} />
+          <button className="icon-btn" title="Open the issue" aria-label={`Open ${t.key}`} onClick={() => openDrawer('issue', t.id)}><Ico svg={I.external} /></button>
+          {can('test.run') && <button className="icon-btn" title={`Run ${list.length} test${list.length > 1 ? 's' : ''}`} aria-label={`Run ${t.key} tests`} onClick={() => runTests(list)}><Ico svg={I.play} /></button>}
+        </div>
+        {o && <table className="tbl res-tbl"><thead><tr><th>Key</th><th>Test case</th><th>Type</th><th>Covers</th><th>Automation</th><th>Result</th></tr></thead><tbody>
+          {list.map(({ t, tc, i }) => (
+            <tr key={tc.id} className="click" onClick={() => openTest(t, tc)}>
+              <td className="key">{tcKey(t, i)}</td><td>{tc.title}</td>
+              <td className="muted">{tc.type}</td>
+              <td className="muted">{(tc.acRef || []).map((n: number) => `AC${n}`).join(', ') || '–'}</td>
+              <td>{tc.lastRun ? <RunLoz tc={tc} /> : tc.script ? <span className="muted small"><Ico svg={I.bot} /> Script ready</span> : <span className="muted small">Manual</span>}</td>
+              <td><TcStatusSelect t={t} tc={tc} /></td>
+            </tr>))}
+        </tbody></table>}
+      </div>);
+  };
+  const allKeys = features.flatMap((f) => [`f:${f.key}`, ...f.issues.map((g) => `i:${g.t.id}`)]);
+  const expandAll = (v: boolean) => setOpen(Object.fromEntries(allKeys.map((k) => [k, v])));
+  return <>
+    <div className="row tg-tools"><span className="muted small">{byFeature ? `${features.length} feature${features.length === 1 ? '' : 's'} · ` : ''}{issues.size} issue{issues.size === 1 ? '' : 's'} · {rows.length} test case{rows.length === 1 ? '' : 's'}</span>
+      <span className="spacer" /><button className="btn sm subtle" onClick={() => expandAll(true)}>Expand all</button><button className="btn sm subtle" onClick={() => expandAll(false)}>Collapse all</button></div>
+    {features.map((f) => {
+      if (!byFeature) return <div key="all">{f.issues.map(issueBlock)}</div>;
+      const list = f.issues.flatMap((g) => g.list);
+      const o = isOpen(`f:${f.key}`, true);
+      return (
+        <section key={f.key} className="tg-feature">
+          <div className="tg-feature-h">
+            <button type="button" className={`as-h ${o ? '' : 'closed'}`} aria-expanded={o} onClick={() => toggle(`f:${f.key}`, true)}>
+              <Ico svg={I.chevron} />{f.epic ? <><Swatch color={f.epic.color} /><span className="key">{f.epic.key}</span><b>{f.epic.title}</b></> : <b>No feature</b>}
+              <span className="muted small">{f.issues.length} issue{f.issues.length === 1 ? '' : 's'}</span></button>
+            <TcCounts list={list} />
+            {f.epic && <button className="btn sm subtle" onClick={() => openDrawer('epic', f.epic.id)}>Open feature</button>}
+            {can('test.run') && <button className="btn sm" onClick={() => runTests(list)}><Ico svg={I.play} />Run {list.length}</button>}
+          </div>
+          {o && <div className="tg-issues">{f.issues.map(issueBlock)}</div>}
+        </section>);
+    })}
+  </>;
 }
 
 export function Tests() {
@@ -429,8 +534,11 @@ export function Tests() {
       <SF filter aria-label="Result" value={f.status} onChange={(e) => setF('status', e.target.value)}><MenuItem value="">Result</MenuItem>{opts(TC_STATUS)}</SF>
       <SF filter aria-label="Test type" value={f.type} onChange={(e) => setF('type', e.target.value)}><MenuItem value="">Test type</MenuItem>{opts(TC_TYPES)}</SF>
       <div className="spacer" /><span className="muted small">{rows.length} shown</span>
+      <SF filter aria-label="Group by" value={tcGroup()} onChange={(e) => { try { localStorage.setItem('tf.tcGroup', e.target.value); } catch { /* private mode */ } emit(); }}>
+        <MenuItem value="feature">Group by feature</MenuItem><MenuItem value="issue">Group by issue</MenuItem><MenuItem value="none">No grouping</MenuItem></SF>
     </div>
-    {rows.length ? <table className="tbl"><thead><tr><th>Key</th><th>Test case</th><th>Issue</th><th>Type</th><th>Covers</th><th>Automation</th><th>Result</th></tr></thead><tbody>
+    {rows.length && tcGroup() !== 'none' ? <TestsGrouped rows={rows} byFeature={tcGroup() === 'feature'} filtered={Boolean(f.q.trim() || f.status || f.type)} />
+    : rows.length ? <table className="tbl"><thead><tr><th>Key</th><th>Test case</th><th>Issue</th><th>Type</th><th>Covers</th><th>Automation</th><th>Result</th></tr></thead><tbody>
       {rows.map(({ t, tc, i }) => (
         <tr key={tc.id} className="click" onClick={() => openTest(t, tc)}>
           <td className="key">{tcKey(t, i)}</td><td>{tc.title}</td>
@@ -543,6 +651,72 @@ export function automationItems(scope: string) {
   }
   return out;
 }
+
+/** Results tab: test cases grouped under their issue, with counts, search and a Run button per issue. */
+function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; run: Any }) {
+  const [q, setQ] = useState('');
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? items.filter(({ t, tc, i }) => `${tcKey(t, i)} ${tc.title} ${t.key} ${t.title}`.toLowerCase().includes(needle)) : items;
+  const groups: { t: Any; list: { t: Any; tc: Any; i: number }[] }[] = [];
+  for (const it of shown) { const g = groups.find((x) => x.t.id === it.t.id); if (g) g.list.push(it); else groups.push({ t: it.t, list: [it] }); }
+  // Many issues: start collapsed, except issues with failing tests (and when searching, everything that matches).
+  const many = groups.length > 8 && !needle;
+  const failing = (list: Any[]) => list.some((x) => x.tc.lastRun && x.tc.lastRun.status !== 'Pass');
+  const isClosedG = (g: Any) => closed[g.t.id] ?? (many && !failing(g.list) && !g.list.some((x: Any) => run?.running && run.current === x.tc.id));
+  const allClosed = groups.length > 0 && groups.every(isClosedG);
+  if (!items.length) return <EmptyState compact icon={I.bot} tone="neutral" title="No test cases in this selection"
+    actions={S.autoScope !== 'all' && <button className="btn" onClick={() => { S.autoScope = 'all'; emit(); }}>Show all test cases</button>}>
+    <p>{S.autoScope === 'all' ? 'Add test cases to your issues first: select issues in the backlog and choose Write test cases.' : 'Pick a different set above.'}</p></EmptyState>;
+  return <>
+    <div className="toolbar results-tools">
+      <TF value={q} placeholder={`Search ${items.length} test cases or issues`} onChange={(e) => setQ(e.target.value)} sx={{ flex: 1, maxWidth: 420 }} aria-label="Search test cases" />
+      <span className="muted small">{groups.length} issue{groups.length === 1 ? '' : 's'} · {shown.length} test case{shown.length === 1 ? '' : 's'}</span>
+      <button className="btn sm subtle" style={{ marginLeft: 'auto' }} onClick={() => setClosed(allClosed ? {} : Object.fromEntries(groups.map((g) => [g.t.id, true])))}>{allClosed ? 'Expand all' : 'Collapse all'}</button>
+    </div>
+    {!shown.length && <p className="muted small">No test case matches “{q}”.</p>}
+    {groups.map(({ t, list }) => {
+      const pass = list.filter((x) => x.tc.lastRun?.status === 'Pass').length;
+      const fail = list.filter((x) => x.tc.lastRun && x.tc.lastRun.status !== 'Pass').length;
+      const never = list.length - pass - fail;
+      const scripted = list.filter((x) => x.tc.script).length;
+      const isClosed = isClosedG({ t, list });
+      return (
+        <section key={t.id} className={`res-group ${fail ? 'has-fail' : ''}`}>
+          <div className="res-head">
+            <button type="button" className={`as-h ${isClosed ? 'closed' : ''}`} aria-expanded={!isClosed} onClick={() => setClosed({ ...closed, [t.id]: !isClosed })}>
+              <Ico svg={I.chevron} /><TypeIcon type={t.type} /><span className="key">{t.key}</span><b className="res-title">{t.title}</b></button>
+            <span className="res-counts small">
+              {pass > 0 && <span className="loz t-pass">{pass} passed</span>}
+              {fail > 0 && <span className="loz t-fail">{fail} failed</span>}
+              {never > 0 && <span className="loz">{never} not run</span>}
+              <span className="muted">{scripted}/{list.length} scripted</span>
+            </span>
+            <button className="btn sm subtle" onClick={() => openDrawer('issue', t.id)}>Open issue</button>
+            {can('test.run') && <button className="btn sm" disabled={run?.running} onClick={() => runTests(list.map(({ t: tt, tc }) => ({ t: tt, tc })))}><Ico svg={I.play} />Run {list.length}</button>}
+          </div>
+          {!isClosed && <table className="tbl res-tbl"><thead><tr><th>Key</th><th>Test case</th><th>Script</th><th>Last run</th><th className="num">Duration</th><th /></tr></thead><tbody>
+            {list.map(({ t, tc, i }) => {
+              const running = run?.running && run.current === tc.id;
+        return [
+          <tr key={tc.id} className="click" onClick={() => openTest(t, tc)}>
+            <td className="key">{tcKey(t, i)}</td><td>{tc.title}</td>
+            <td>{tc.script ? <button className="btn sm subtle" onClick={(e) => { e.stopPropagation(); openModal(<ScriptModal tid={t.id} tcid={tc.id} />); }}><Ico svg={I.bot} />View</button> : <span className="muted small">Not written</span>}</td>
+            <td>{running ? <span className="row small" style={{ gap: 6 }}><Spinner />Running</span> : tc.lastRun ? <><RunLoz tc={tc} /> <span className="muted small">{ago(tc.lastRun.at)}</span></> : <span className="muted small">Never</span>}</td>
+            <td className="num muted">{tc.lastRun ? `${(tc.lastRun.durationMs / 1000).toFixed(1)}s` : '–'}</td>
+            <td style={{ textAlign: 'right' }}>{can('test.run') && <button className="icon-btn" title="Run this test" disabled={run?.running} onClick={(e) => { e.stopPropagation(); runTests([{ t, tc }]); }}><Ico svg={I.play} /></button>}</td>
+          </tr>,
+          tc.lastRun?.status === 'Fail' && <tr key={`${tc.id}-err`} className="err-row"><td /><td colSpan={5}><div className="err-box">{tc.lastRun.error.split('\n').slice(0, 4).join('\n')}</div>
+            {tc.lastRun.screenshot && <button type="button" className="shot-thumb sm" onClick={() => openModal(<ShotModal url={tc.lastRun.screenshot} title={`${tcKey(t, i)} ${tc.title}`} error={tc.lastRun.error} at={tc.lastRun.at} />)}>
+              <img src={tc.lastRun.screenshot} alt={`Screenshot of the failed test ${tc.title}`} loading="lazy" /></button>}</td></tr>,
+        ];
+            })}
+          </tbody></table>}
+        </section>);
+    })}
+  </>;
+}
+
 const AUTO_TABS: [string, string, string][] = [['results', 'Results', I.play], ['failures', 'Failures', I.warn], ['setup', 'App setup', I.doc], ['settings', 'Settings', I.settings]];
 
 export function Automation() {
@@ -585,30 +759,12 @@ export function Automation() {
       <ul className="log">{run.log.slice(-8).map((l: Any, i: number) => (
         <li key={i} className={l.level || ''}>{l.level === 'err' || l.level === 'warn' ? <Ico svg={I.warn} /> : l.level === 'pass' ? <Ico svg={I.check} className="ok" /> : l.level === 'fail' ? <Ico svg={I.close} style={{ color: 'var(--danger)' }} /> : l.level === 'info' || !run.running ? <Ico svg={I.check} className="muted" /> : <Spinner />}<span>{l.message}</span></li>))}</ul>
     </div>}
-    {items.length ? <table className="tbl"><thead><tr><th>Key</th><th>Test case</th><th>Issue</th><th>Script</th><th>Last run</th><th className="num">Duration</th><th /></tr></thead><tbody>
-      {items.map(({ t, tc, i }) => {
-        const running = run?.running && run.current === tc.id;
-        return [
-          <tr key={tc.id} className="click" onClick={() => openTest(t, tc)}>
-            <td className="key">{tcKey(t, i)}</td><td>{tc.title}</td>
-            <td><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type={t.type} /><span className="key">{t.key}</span></span></td>
-            <td>{tc.script ? <button className="btn sm subtle" onClick={(e) => { e.stopPropagation(); openModal(<ScriptModal tid={t.id} tcid={tc.id} />); }}><Ico svg={I.bot} />View</button> : <span className="muted small">Not written</span>}</td>
-            <td>{running ? <span className="row small" style={{ gap: 6 }}><Spinner />Running</span> : tc.lastRun ? <><RunLoz tc={tc} /> <span className="muted small">{ago(tc.lastRun.at)}</span></> : <span className="muted small">Never</span>}</td>
-            <td className="num muted">{tc.lastRun ? `${(tc.lastRun.durationMs / 1000).toFixed(1)}s` : '–'}</td>
-            <td style={{ textAlign: 'right' }}>{can('test.run') && <button className="icon-btn" title="Run this test" disabled={run?.running} onClick={(e) => { e.stopPropagation(); runTests([{ t, tc }]); }}><Ico svg={I.play} /></button>}</td>
-          </tr>,
-          tc.lastRun?.status === 'Fail' && <tr key={`${tc.id}-err`} className="err-row"><td /><td colSpan={6}><div className="err-box">{tc.lastRun.error.split('\n').slice(0, 4).join('\n')}</div>
-            {tc.lastRun.screenshot && <button type="button" className="shot-thumb sm" onClick={() => openModal(<ShotModal url={tc.lastRun.screenshot} title={`${tcKey(t, i)} ${tc.title}`} error={tc.lastRun.error} at={tc.lastRun.at} />)}>
-              <img src={tc.lastRun.screenshot} alt={`Screenshot of the failed test ${tc.title}`} loading="lazy" /></button>}</td></tr>,
-        ];
-      })}
-    </tbody></table> : <EmptyState compact icon={I.bot} tone="neutral" title="No test cases in this selection"
-      actions={S.autoScope !== 'all' && <button className="btn" onClick={() => { S.autoScope = 'all'; emit(); }}>Show all test cases</button>}>
-      <p>{S.autoScope === 'all' ? 'Add test cases to your issues first: select issues in the backlog and choose Write test cases.' : 'Pick a different set above.'}</p></EmptyState>}
+    <ResultsList items={items} run={run} />
     </>}
     {tab === 'failures' && <Failures />}
     {tab === 'setup' && <AppSetup />}
     {tab === 'settings' && <>
+    <RunSettingsCard />
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="grid2" style={{ alignItems: 'end' }}>
         <label className="field" style={{ margin: 0 }}><span>Application URL — where the tests run</span>

@@ -33,7 +33,7 @@ export const POST = api(async (req) => {
       send(ev);
     };
     try {
-      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user });
+      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user, notes: String(b.notes || '').slice(0, 4000) });
     } finally {
       if (results.size && project?.id) {
         try {

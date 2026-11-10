@@ -20,7 +20,7 @@ export const POST = api(async (req, p) => {
     date: new Date(epic.psd.generatedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     preparedBy: epic.psd.generatedBy || user.name, description: `Written from the epic “${epic.title}” and its issues in TicketForge.`,
   };
-  const tpl = await getPsdTemplate();
+  const tpl = await getPsdTemplate(p.id);
   let buf;
   try { buf = tpl ? await buildPsdDocx(tpl.data, psd, meta) : await buildPlainPsdDocx(psd, meta); }
   catch (e: any) { throw new HttpError(500, `Couldn’t build the document from the template: ${e.message}`); }

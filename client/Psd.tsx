@@ -2,27 +2,40 @@
 // Problem Statement documents (PSD), one per epic: written by the AI in the structure of the team's template,
 // saved on the epic, readable in the app and downloadable as a .docx built from the template.
 import { useEffect, useRef, useState } from 'react';
-import { S, P, api, downloadFrom, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, type Any } from './core';
+import { S, P, api, downloadFrom, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, startTask, type Any, type TaskHandle } from './core';
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA, TF, SF, MenuItem } from './fields';
+import { askFirst } from './Clarify';
+import { Running } from './Fbd';
 
 const STATUSES = ['Draft', 'For Review', 'Approved'];
-const busy = new Set<string>();
+const busy = new Map<string, number>(); // epic id → started at
 
-/** Writes the PSD for an epic and saves it on the epic. Returns true when it worked. */
-export async function writePsd(epic: Any, instructions = ''): Promise<boolean> {
-  if (busy.has(epic.id)) return false;
-  busy.add(epic.id); emit();
+/** Writes the PSD for an epic and saves it on the epic (shown in the tray, with Cancel). Returns true when it worked. */
+export async function writePsd(epic: Any, instructions = '', { task, notify = true }: { task?: TaskHandle; notify?: boolean } = {}): Promise<boolean> {
+  if (busy.has(epic.id)) { toast(`The Problem Statement for “${epic.title}” is already being written.`, 'info'); return false; }
+  const ctrl = new AbortController();
+  const own = task ? null : startTask('Writing the Problem Statement', { detail: epic.title, kind: 'doc', cancel: () => ctrl.abort() });
+  busy.set(epic.id, Date.now()); emit();
   try {
-    const res = await api(`/api/projects/${P().id}/psd`, { method: 'POST', raw: true, body: aiBody({ epicId: epic.id, instructions }) });
+    const res = await api(`/api/projects/${P().id}/psd`, { method: 'POST', raw: true, signal: ctrl.signal, body: aiBody({ epicId: epic.id, instructions }) });
     let psd: Any = null;
-    await readNdjson(res, (ev) => { if (ev.type === 'done') psd = ev.psd; else if (ev.type === 'error') throw new Error(ev.error); });
+    await readNdjson(res, (ev) => {
+      if (ev.type === 'done') psd = ev.psd; else if (ev.type === 'error') throw new Error(ev.error);
+      else if (ev.type === 'progress' && ev.message && own) own.update({ detail: `${epic.title} · ${ev.message.replace(/…$/, '')}` });
+    });
     if (!psd) throw new Error('The AI didn’t return a Problem Statement.');
     const prev = epic.psd;
     mutate(() => { epic.psd = { ...psd, generatedAt: new Date().toISOString(), generatedBy: me(), version: prev?.version || 'v1.0', status: prev?.status || 'Draft' }; });
+    own?.finish(`Saved on “${epic.title}”`);
+    if (notify) toast(`“${epic.title}”`, 'ok', { title: 'Problem Statement ready', action: { label: 'View', onClick: () => openPsd(epic) } });
     return true;
-  } catch (e: Any) { toast(`${epic.title}: ${e.message}`, 'err'); return false; }
-  finally { busy.delete(epic.id); emit(); }
+  } catch (e: Any) {
+    if (e.name === 'AbortError') { own?.fail(''); toast(`Nothing was saved for “${epic.title}”.`, 'info', { title: 'Stopped writing the Problem Statement' }); return false; }
+    const msg = `Couldn’t write the Problem Statement for “${epic.title}”: ${e.message}`;
+    if (own) own.fail(msg); else toast(msg, 'err');
+    return false;
+  } finally { busy.delete(epic.id); emit(); }
 }
 
 /** Downloads the epic's PSD as .docx (the team's template when uploaded). */
@@ -36,7 +49,7 @@ export async function downloadPsd(epic: Any) {
 function WriteModal({ epic }: { epic: Any }) {
   const [text, setText] = useState('');
   return (
-    <Modal title={`${epic.psd ? 'Rewrite' : 'Write'} the Problem Statement`} actions={[{ label: 'Cancel' }, { label: epic.psd ? 'Rewrite' : 'Write it', kind: 'ai', onClick: () => { closeModal(); writePsd(epic, text).then((ok) => ok && toast(`Problem Statement ready: ${epic.title}`)); } }]}>
+    <Modal title={`${epic.psd ? 'Rewrite' : 'Write'} the Problem Statement`} actions={[{ label: 'Cancel' }, { label: epic.psd ? 'Rewrite' : 'Write it', kind: 'ai', onClick: async () => { closeModal(); const answers = await askFirst({ kind: 'psd', epicId: epic.id, subject: `the Problem Statement for “${epic.title}”`, instructions: text }); if (answers === null) return; await writePsd(epic, [text, answers].filter(Boolean).join('\n\n')); } }]}>
       <p className="muted small" style={{ marginTop: 0 }}>The AI writes it from <b>{epic.title}</b>, its {P().tickets.filter((t: Any) => t.epicId === epic.id).length} issues, the project description and the source documents, in the sections of your template: At a Glance, Background, Problem Statement, Who Is Affected, business and user impact, Cost of Inaction and Evidence Needed.{epic.psd ? ' The current one is replaced (you can undo).' : ''}</p>
       <label className="field"><span>Extra instructions (optional)</span>
         <TA value={text} rows={3} placeholder="e.g. Focus on the payroll officers. Mention the BIR deadline. Keep it to one page per section." onChange={(e) => setText(e.target.value)} /></label>
@@ -99,7 +112,7 @@ export function PsdSection({ epic }: { epic: Any }) {
   return (
     <div className="sec psd-sec"><div className="sec-title"><h3>Problem Statement</h3>
       {psd && <span className="muted small" style={{ marginLeft: 'auto' }}>Written {ago(psd.generatedAt)}{psd.generatedBy ? ` by ${psd.generatedBy}` : ''}</span>}</div>
-      {running ? <div className="psd-running"><Spinner /> Writing the Problem Statement from the epic, its issues and the source documents… This takes a minute or two.</div>
+      {running ? <Running text="Writing the Problem Statement from the epic, its issues and the source documents…" since={busy.get(epic.id) || Date.now()} />
         : !psd ? <div className="psd-empty">
           <p className="muted small" style={{ margin: '0 0 8px' }}>A PSD for this feature in your template’s structure: what’s wrong today, who it hurts, what it costs and what evidence is needed.</p>
           {canWrite ? <button className="btn ai" onClick={() => openWritePsd(epic)}><Ico svg={I.sparkle} />Write Problem Statement with AI</button>
@@ -125,26 +138,33 @@ export function PsdSection({ epic }: { epic: Any }) {
   );
 }
 
-/** Epics page: write the PSDs that are missing, one after another. */
+/** Epics page: write the PSDs that are missing, one after another, as one task in the tray. */
 export async function writeMissingPsds() {
-  const epics = P().epics.filter((e: Any) => !e.psd);
-  if (!epics.length) { toast('Every epic already has a Problem Statement.'); return; }
-  let ok = 0;
-  for (const [i, e] of epics.entries()) {
-    toast(`Writing Problem Statement ${i + 1} of ${epics.length}: ${e.title}…`);
-    if (await writePsd(e)) ok++;
+  const epics = P().epics.filter((e: Any) => !e.psd && !busy.has(e.id));
+  if (!epics.length) { toast('Every epic already has a Problem Statement.', 'info'); return; }
+  let stop = false;
+  const task = startTask('Writing missing Problem Statements', { total: epics.length, kind: 'doc', cancel: () => { stop = true; task.update({ detail: 'Stopping after the current one…' }); } });
+  let ok = 0, i = 0;
+  for (const e of epics) {
+    if (stop) break;
+    task.update({ detail: e.title, done: i });
+    if (await writePsd(e, '', { task, notify: false })) ok++;
+    i++;
   }
-  toast(`${ok} of ${epics.length} Problem Statements written`, ok === epics.length ? undefined : 'err');
+  const skipped = epics.length - i;
+  if (ok === epics.length) { task.finish(`${ok} written`); toast(`${ok} Problem Statement${ok > 1 ? 's' : ''} written and saved on their epics.`, 'ok', { title: 'All done' }); }
+  else { task.finish(`${ok} of ${epics.length} written`); toast(`${ok} of ${epics.length} written${skipped ? `, ${skipped} not started (stopped)` : ''}.`, ok ? 'warn' : 'err', { title: 'Missing Problem Statements' }); }
 }
 export const psdBusy = (id: string) => busy.has(id);
 
-/** Administration → Generation: the .docx template every PSD is built from. */
-export function PsdTemplateCard() {
+/** The .docx template PSDs are built from: the team's (Administration → Generation) or a project's own (Project settings). */
+export function PsdTemplateCard({ project = false, ed = true }: { project?: boolean; ed?: boolean } = {}) {
+  const endpoint = project ? `/api/projects/${P().id}/templates/psd` : '/api/admin/psd-template';
   const [t, setT] = useState<Any>(undefined);
   const [busyUp, setBusyUp] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  const load = () => api('/api/admin/psd-template').then((d) => setT(d.template)).catch(() => setT(null));
-  useEffect(() => { load(); }, []);
+  const load = () => api(endpoint).then((d) => setT(d.template)).catch(() => setT(null));
+  useEffect(() => { load(); }, [endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
   const upload = async (file?: File) => {
     if (!file) return;
     if (!/\.docx$/i.test(file.name)) { toast('Upload a Word document (.docx).', 'err'); return; }
@@ -156,24 +176,29 @@ export function PsdTemplateCard() {
       await trimEmbeddedFonts(zip);
       const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
       const fd = new FormData(); fd.append('file', new File([blob], file.name));
-      const d = await api('/api/admin/psd-template', { method: 'PUT', body: fd });
-      setT(d.template); toast('Template saved. New Problem Statements use it.');
+      const d = await api(endpoint, { method: 'PUT', body: fd });
+      setT(d.template); toast(`Template saved. New Problem Statements${project ? ' in this project' : ''} use it.`);
     } catch (e: Any) { toast(e.message, 'err'); } finally { setBusyUp(''); }
   };
   const info = t?.info || {};
+  const own = t && (!project || t.scope === 'project'); // set at this level
+  const remove = () => openModal(<Confirm title={project ? 'Use the team’s template?' : 'Remove the template?'} label={project ? 'Use team template' : 'Remove'}
+    text={project ? 'New Problem Statements in this project use the team’s template (or the plain layout if there is none).' : 'New PSDs use the plain layout until you upload another.'}
+    onYes={async () => { const d = await api(endpoint, { method: 'DELETE' }); setT(d.template); }} />);
+  const uploadBtn = (label: string, primary = false) => ed && <button className={`btn ${primary ? 'primary' : 'sm'}`} disabled={!!busyUp} onClick={() => fileRef.current?.click()}>{busyUp ? <><Spinner />Uploading…</> : <><Ico svg={I.upload} />{label}</>}</button>;
   return (
     <div className="card wide"><h3>Problem Statement template</h3>
-      <p className="sub">The Word document each epic’s Problem Statement (PSD) is built from: its cover, logo, styles, fonts, header and footer are kept, and the AI’s content fills its sections and tables. Without one, PSDs use a plain layout with the same sections.</p>
+      <p className="sub">The Word document each epic’s Problem Statement (PSD) is built from: its cover, logo, styles, fonts, header and footer are kept, and the AI’s content fills its sections and tables. {project ? 'This project uses the team’s template unless you upload its own.' : 'Without one, PSDs use a plain layout with the same sections.'}</p>
       {t === undefined ? <span className="muted small"><Spinner /> Loading…</span> : t ? <div className="psd-tpl">
-        <Ico svg={I.doc} /><div style={{ minWidth: 0 }}><b>{t.name}</b>
+        <Ico svg={I.doc} /><div style={{ minWidth: 0 }}><b>{t.name}</b>{project && <span className="label-chip" style={{ marginLeft: 6 }}>{t.scope === 'project' ? 'This project' : 'Team template'}</span>}
           <div className="muted small">{(t.bytes / 1048576).toFixed(1)} MB · uploaded {ago(t.updatedAt)}{t.updatedBy ? ` by ${t.updatedBy}` : ''}</div>
           <div className="muted small">Found: cover “{info.coverTitle || '—'}”, {info.sections?.length || 0} sections, {info.tables || 0} tables{info.backMatter ? ', Document Control and Sign-off' : ''}. The product name, feature name, version and status are replaced in each PSD; sign-off names and signatures are left empty.</div>
         </div>
         <span className="spacer" />
-        <a className="btn sm" href="/api/admin/psd-template?download=1"><Ico svg={I.download} />Download</a>
-        <button className="btn sm" disabled={!!busyUp} onClick={() => fileRef.current?.click()}>{busyUp ? <><Spinner />Uploading…</> : 'Replace'}</button>
-        <button className="icon-btn" title="Remove" aria-label="Remove template" onClick={() => openModal(<Confirm title="Remove the template?" label="Remove" text="New PSDs use the plain layout until you upload another." onYes={async () => { await api('/api/admin/psd-template', { method: 'DELETE' }); setT(null); }} />)}><Ico svg={I.trash} /></button>
-      </div> : <button className="btn primary" disabled={!!busyUp} onClick={() => fileRef.current?.click()}>{busyUp ? <><Spinner />Uploading…</> : <><Ico svg={I.upload} />Upload template (.docx)</>}</button>}
+        {(own || !project) && <a className="btn sm" href={`${endpoint}?download=1`}><Ico svg={I.download} />Download</a>}
+        {uploadBtn(own ? 'Replace' : 'Upload for this project')}
+        {ed && own && <button className="icon-btn" title={project ? 'Use the team’s template' : 'Remove'} aria-label="Remove template" onClick={remove}><Ico svg={I.trash} /></button>}
+      </div> : <>{project && <p className="muted small" style={{ marginTop: 0 }}>No template yet: Problem Statements use the plain layout.</p>}{uploadBtn('Upload template (.docx)', true)}</>}
       <input ref={fileRef} type="file" hidden accept=".docx" onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
     </div>
   );

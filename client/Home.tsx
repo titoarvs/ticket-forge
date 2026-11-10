@@ -7,6 +7,7 @@ import { Ico, I, TypeIcon, Confirm, Spinner, EmptyState, ErrorState } from './ui
 import { ProjectsSkeleton } from './skeletons';
 import { BlankProjectModal, AiSettingsModal } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
+import { askFirst } from './Clarify';
 
 async function loadProjects() {
   try { S.projects = await api('/api/projects'); S.projectsLoaded = true; S.projectsError = null; }
@@ -100,11 +101,13 @@ export function CreateProjectPage() {
     const sourceName = S.doc ? S.doc.filename : 'Pasted requirements';
     if (text.trim().length < 20) return toast('Add a document or paste some requirements first.', 'err');
     if (!S.doc) S.doc = { filename: sourceName, text };
+    const answers = await askFirst({ kind: 'project', projectless: true, subject: 'the epics, issues and test cases', text, instructions: S.genOpts?.instructions });
+    if (answers === null) return;
     const ctrl = new AbortController();
     S.gen = { running: true, ctrl, chars: 0, log: [{ message: `Sending “${sourceName}” to Claude…` }] }; emit();
     const push = (message: string, level?: string) => { S.gen.log.forEach((l: Any) => { l.done = true; }); S.gen.log.push({ message, level }); emit(); };
     try {
-      const res = await api('/api/generate', { method: 'POST', raw: true, signal: ctrl.signal, body: { text, sourceName, options: { ...S.genOpts, provider: S.settings.provider || undefined, model: S.settings.model || undefined } } });
+      const res = await api('/api/generate', { method: 'POST', raw: true, signal: ctrl.signal, body: { text, sourceName, options: { ...S.genOpts, instructions: [S.genOpts?.instructions, answers].filter(Boolean).join('\n\n'), provider: S.settings.provider || undefined, model: S.settings.model || undefined } } });
       let project: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'progress') {

@@ -6,5 +6,5 @@ export const POST = api(async (req) => {
   const u = await perm('ai.use');
   const b = await body(req);
   if (b.project?.id) store.requireAccess(u, b.project.id);
-  return ticketAction({ action: b.action, ticket: b.ticket, project: b.project, instruction: b.instruction, ai: aiOpts(b) });
+  return ticketAction({ action: b.action, ticket: b.ticket, project: b.project, instruction: b.instruction, answers: b.answers, ai: aiOpts(b) });
 });
