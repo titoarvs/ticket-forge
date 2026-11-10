@@ -82,11 +82,11 @@ export function DevSettings({ ed }: { ed: boolean }) {
         <label className="field"><span>Base branch</span><TF disabled={!ed} value={d.baseBranch || ''} placeholder="main" spellCheck={false} onChange={(e) => setDev('baseBranch', e.target.value.trim())} /></label>
         <label className="field"><span>Branch prefix</span><TF disabled={!ed} value={d.branchPrefix ?? 'tf/'} spellCheck={false} onChange={(e) => setDev('branchPrefix', e.target.value.trim())} />
           <small className="muted">Branches look like <code>{(d.branchPrefix ?? 'tf/')}pay-12-short-title</code></small></label>
-        <label className="field"><span>Claude model</span><SF disabled={!ed} value={d.model || 'opus'} onChange={(e) => setDev('model', e.target.value)}>{['opus', 'sonnet', 'haiku'].map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}</SF></label>
+        <label className="field"><span>Claude model</span><SF disabled={!ed} value={d.model || ''} onChange={(e) => setDev('model', e.target.value)}><MenuItem value="">Each agent’s own (Administration → Agents)</MenuItem>{['opus', 'sonnet', 'haiku'].map((m) => <MenuItem key={m} value={m}>{m} for every agent</MenuItem>)}</SF></label>
       </div>
       <CB label="Open pull requests as drafts" disabled={!ed} checked={d.draft !== false} onChange={(e: Any) => setDev('draft', e.target.checked)} />
     </SetCard>
-    <SetCard id="agent" title="Coding agent" desc="What Claude Code may run and how your team writes code. It can read and edit files in the issue’s worktree; it can’t commit, push or browse the web.">
+    <SetCard id="agent" title="Coding agent" desc="What the code agents (Build a Ticket, Feature Tests, Review…) may run and how your team writes code. They read and edit files only in the issue’s worktree; they can’t commit, push, switch branches or browse the web. What each agent does is set in Administration → Agents.">
       <label className="field"><span>Check command (optional)</span><TF disabled={!ed} value={d.checkCommand || ''} placeholder="e.g. npm test, or npm run lint" spellCheck={false} onChange={(e) => setDev('checkCommand', e.target.value)} />
         <small className="muted">The only command it may run, to check its work. Leave empty and it only reads and edits code.</small></label>
       <label className="field"><span>Team conventions</span><TA disabled={!ed} rows={4} value={d.notes || ''} placeholder="e.g. Next.js App Router, server actions for writes, Tailwind, tests with Vitest next to the file. Don’t touch the payments module." onChange={(e) => setDev('notes', e.target.value)} /></label>
@@ -105,7 +105,7 @@ export function DevSettings({ ed }: { ed: boolean }) {
 /** Whether "Write code with AI" can be offered for issues in this project. */
 export const codeReady = () => Boolean(dev().localPath);
 
-const STATUS: Record<string, string> = { starting: 'Starting…', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
+const STATUS: Record<string, string> = { report: 'Report ready', starting: 'Starting…', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
 
 function DiffView({ jobId, file }: { jobId: string; file: string }) {
   const [text, setText] = useState<string | null>(null);
@@ -116,8 +116,11 @@ function DiffView({ jobId, file }: { jobId: string; file: string }) {
 }
 
 /** Issue panel → Write code with AI: start, watch, review, ask for changes, open the pull request. */
-export function CodeModal({ t }: { t: Any }) {
+export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agentId?: string }) {
   const [job, setJob] = useState<Any>(null);
+  const [agents, setAgents] = useState<Any[]>([]);
+  const [agentId, setAgentId] = useState(initialAgent);
+  const [reviewTab, setReviewTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [follow, setFollow] = useState('');
@@ -127,7 +130,7 @@ export function CodeModal({ t }: { t: Any }) {
   const [draft, setDraft] = useState(dev().draft !== false);
   const logRef = useRef<HTMLDivElement>(null);
   const base = `/api/projects/${P().id}/code`;
-  useEffect(() => { api(`${base}?ticketId=${t.id}`).then((r) => setJob(r.job)).catch((e) => toast(e.message, 'err')).finally(() => setLoading(false)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { api(`${base}?ticketId=${t.id}`).then((r) => { setJob(r.job); setAgents(r.agents || []); }).catch((e) => toast(e.message, 'err')).finally(() => setLoading(false)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Follow the job while it runs.
   useEffect(() => {
     if (!job || !['starting', 'running'].includes(job.status)) return;
@@ -154,20 +157,31 @@ export function CodeModal({ t }: { t: Any }) {
   return (
     <Modal title={`Write code · ${t.key}`} wide persistent={running} actions={[{ label: running ? 'Close (keeps running)' : 'Close' }]}>
       {loading ? <div className="muted"><Spinner /> Loading…</div> : !job || ['discarded'].includes(job.status) ? <>
-        <p className="muted small" style={{ marginTop: 0 }}>Claude Code implements <b>{t.title}</b> from its story, {t.acceptanceCriteria?.length || 0} acceptance criteria and {t.testCases?.length || 0} test cases, in a new branch <code>{(d.branchPrefix ?? 'tf/')}{String(t.key).toLowerCase()}-…</code> from <code>{d.baseBranch || 'the default branch'}</code> of <b>{d.repo || d.localPath}</b>, in its own worktree. Nothing is pushed until you review the changes and open the pull request.</p>
+        {agents.length > 0 && <>
+          <div className="pick-label small">Which agent?</div>
+          <div className="agent-pick" role="radiogroup" aria-label="Agent">{agents.filter((a: Any) => !['review', 'review-panel'].includes(a.id)).map((a: Any) => (
+            <button key={a.id} role="radio" aria-checked={agentId === a.id} className={`${agentId === a.id ? 'on' : ''} ph-${String(a.phase).toLowerCase()}`} disabled={!a.enabled} onClick={() => setAgentId(a.id)} title={a.does.join(' ')}>
+              <span className="agent-icon sm" aria-hidden>{a.icon}</span>
+              <span className="ap-text"><b>{a.name}</b><span className="muted small">{a.summary}{!a.enabled ? ' (turned off)' : ''}</span>
+                <span className="ap-meta">{a.workspaceLabel} · {a.model}{a.effort ? ` · ${a.effort}` : ''}</span></span></button>))}</div>
+          {(() => { const a = agents.find((x: Any) => x.id === agentId); return a ? <ul className="ap-does small">{a.does.map((x: string) => <li key={x}>{x}</li>)}</ul> : null; })()}
+        </>}
+        <p className="muted small" style={{ marginTop: 0 }}>It runs as a Claude Code agent on <b>{t.title}</b> from its story, {t.acceptanceCriteria?.length || 0} acceptance criteria and {t.testCases?.length || 0} test cases, in a new branch <code>{(d.branchPrefix ?? 'tf/')}{String(t.key).toLowerCase()}-…</code> from <code>{d.baseBranch || 'the default branch'}</code> of <b>{d.repo || d.localPath}</b>, in its own worktree. Nothing is pushed until you review the changes and open the pull request.</p>
         <label className="field"><span>Extra instructions (optional)</span><TA rows={4} value={text} placeholder="e.g. Put the API in app/api/payslips. Reuse the PayslipTable component. Add a Vitest test." onChange={(e) => setText(e.target.value)} /></label>
-        <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />Write the code</>}</button>
+        <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{agentId === 'architecture-record' ? 'Write the record' : agentId === 'feature-tests' ? 'Write the tests' : 'Start the agent'}</>}</button>
       </> : <>
         <div className="code-head">
           <span className={`code-status s-${job.status}`}>{running && <Spinner />}{STATUS[job.status] || job.status}</span>
-          <code>{job.branch}</code><span className="muted small">→ {job.base} · {job.repo || 'local'}{job.rounds > 1 ? ` · round ${job.rounds}` : ''} · started {ago(job.startedAt)}</span>
+          {job.agentName && <span className="label-chip">{job.agentName}</span>}<code>{job.branch}</code><span className="muted small">→ {job.base} · {job.repo || 'local'}{job.rounds > 1 ? ` · round ${job.rounds}` : ''} · started {ago(job.startedAt)}{job.costUsd ? ` · $${job.costUsd.toFixed(2)}` : ''}</span>
           <span className="spacer" />
           {running && <button className="btn sm" onClick={() => act('cancel', { action: 'cancel' })}>Stop</button>}
           {!running && job.status !== 'pr' && <button className="btn sm subtle" onClick={() => openModal(<Confirm title="Discard these changes?" label="Discard" text={`The worktree and the local branch ${job.branch} are removed. Nothing was pushed.`} onYes={async () => { await act('discard', { action: 'discard' }); setJob(null); openModal(<CodeModal t={t} />); }} />)}>Discard</button>}
         </div>
         <div className="code-log" ref={logRef}>{job.log.map((l: Any, i: number) => <div key={i} className={`cl k-${l.kind}`}>{l.text}</div>)}</div>
+        {job.todos?.length > 0 && <details className="code-summary" open={running}><summary className="small"><b>Plan</b> · {job.todos.filter((x: Any) => x.status === 'completed').length}/{job.todos.length} done</summary>
+          <ul className="code-todos small">{job.todos.map((x: Any, i: number) => <li key={i} className={x.status}>{x.status === 'in_progress' ? '▶ ' : ''}{x.content}</li>)}</ul></details>}
         {job.error && <div className="warn-banner danger"><Ico svg={I.warn} /><span>{job.error}</span></div>}
-        {job.summary && !running && <details className="code-summary" open><summary className="small"><b>Claude Code’s summary</b></summary><div className="small code-md"><Markdown text={job.summary} /></div></details>}
+        {job.summary && !running && <details className="code-summary" open><summary className="small"><b>{job.status === 'report' ? `${job.agentName}’s report` : 'Agent’s summary'}</b></summary><div className="small code-md"><Markdown text={job.summary} /></div></details>}
         {job.files?.length > 0 && <div className="code-files">
           <div className="small muted">{job.files.length} file{job.files.length === 1 ? '' : 's'} changed · <span className="da">+{job.files.reduce((n: number, f: Any) => n + f.added, 0)}</span> <span className="dr">−{job.files.reduce((n: number, f: Any) => n + f.removed, 0)}</span></div>
           {job.files.map((f: Any) => <div key={f.path}>
@@ -175,7 +189,16 @@ export function CodeModal({ t }: { t: Any }) {
             {open === f.path && job.status !== 'pr' && <DiffView jobId={job.id} file={f.path} />}
           </div>)}
         </div>}
-        {['review', 'empty', 'failed', 'cancelled'].includes(job.status) && <div className="code-follow">
+        {job.reviews?.length > 0 && (() => { const rv = job.reviews[job.reviews.length - 1]; const lens = rv.lenses?.[Math.min(reviewTab, rv.lenses.length - 1)]; return <details className="code-summary" open={!running}><summary className="small"><b>{rv.panel ? 'Review Panel' : rv.agent || 'Review agent'}’s findings</b> · round {rv.round}</summary>
+          {rv.panel && <div className="review-tabs" role="tablist">{rv.lenses.map((l: Any, i: number) => <button key={l.id} role="tab" aria-selected={reviewTab === i} className={reviewTab === i ? 'on' : ''} onClick={() => setReviewTab(i)}>{l.name}</button>)}</div>}
+          <div className="small code-md"><Markdown text={rv.panel ? lens?.text || '' : rv.text} /></div>
+          {job.status === 'review' && <button className="btn sm ai" disabled={!!busy} onClick={() => act('follow', { action: 'follow', text: `Fix these review findings (skip any you disagree with and say why):\n\n${job.reviews[job.reviews.length - 1].text}` })}><Ico svg={I.sparkle} />Fix the findings</button>}</details>; })()}
+        {job.status === 'review' && !job.pr && <div className="review-actions">
+          <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'review')?.enabled === false} onClick={() => act('review', { action: 'review' })}>🔍 {job.reviews?.length ? 'Review again' : 'Review changes'}</button>
+          <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'review-panel')?.enabled === false} onClick={() => { setReviewTab(0); act('review', { action: 'review', panel: true }); }} title="Three Review agents in parallel: correctness, security, tests & acceptance">🤝 Review panel</button>
+          <button className="agent-btn hire sm" disabled={!!busy || agents.find((a: Any) => a.id === 'ui-review')?.enabled === false} onClick={() => act('review', { action: 'review', agent: 'ui-review' })} title="Usability, accessibility, states, copy and responsive layout">🧐 UI/UX review</button>
+          <span className="muted small">Read-only Claude Code reviewers. They never edit files.</span></div>}
+        {['review', 'report', 'empty', 'failed', 'cancelled'].includes(job.status) && <div className="code-follow">
           <TA rows={2} value={follow} placeholder="Ask for changes: e.g. also handle the empty state, and rename the hook to usePayslips" onChange={(e) => setFollow(e.target.value)} />
           <button className="btn ai" disabled={!follow.trim() || !!busy} onClick={async () => { if (await act('follow', { action: 'follow', text: follow })) setFollow(''); }}><Ico svg={I.sparkle} />Make changes</button>
         </div>}

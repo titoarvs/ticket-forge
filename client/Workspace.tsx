@@ -1,9 +1,10 @@
 'use client';
 // Project workspace: sidebar, current view and the issue/epic panel.
 import { useEffect } from 'react';
+import { loadAgents, hireAgent } from './Agents';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss } from './core';
+import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
@@ -75,7 +76,19 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   const params = useSearchParams();
   const router = useRouter();
   const issueParam = params.get('issue');
+  const epicParam = params.get('epic');
+  const hireParam = params.get('hire');
   const loaded = P()?.id === id;
+  // From Administration → Agents → Hire: /p/<id>/backlog?epic=<epicId>&hire=<agentId> opens the epic and hires the agent.
+  useEffect(() => {
+    if (!loaded || !epicParam) return;
+    const ep = P().epics.find((x: Any) => x.id === epicParam);
+    if (ep) {
+      Object.assign(S, { drawer: { kind: 'epic', id: epicParam }, menu: null }); emit();
+      if (hireParam) loadAgents().then((d) => { const a = d.agents.find((x: Any) => x.id === hireParam); if (a) hireAgent(a, ep); }).catch(() => {});
+    }
+    router.replace(`/p/${id}/${view || 'backlog'}`, { scroll: false });
+  }, [loaded, epicParam, hireParam]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!loaded || !issueParam) return;
     if (ticket(issueParam)) { Object.assign(S, { drawer: { kind: 'issue', id: issueParam }, menu: null }); emit(); }

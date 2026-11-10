@@ -16,6 +16,7 @@ import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
 import { FbdSection } from './Fbd';
+import { EpicAgents } from './Agents';
 import { codeReady, openCode } from './DevCode';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
@@ -421,6 +422,7 @@ function EpicPanel({ e }: { e: Any }) {
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
       <PsdSection epic={e} />
       <FbdSection epic={e} />
+      <EpicAgents epic={e} />
       <div className="sec"><div className="sec-title"><h3>Dates</h3>
         {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>
         <div className="grid2 epic-dates">
