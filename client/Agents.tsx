@@ -4,7 +4,7 @@
 // Brief, test cases, new issues, test runs); document agents write their document and save it on the epic; code
 // agents open "Write code with AI" on one of the epic's issues with that agent picked.
 import { useEffect, useState } from 'react';
-import { S, P, api, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, ticket, type Any } from './core';
+import { S, P, api, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, ticket, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA } from './fields';
 import { Markdown } from './GuideCard';
@@ -83,17 +83,19 @@ function DocHireModal({ epic, a }: { epic: Any; a: Any }) {
   );
 }
 
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
-  const el = document.createElement('a'); el.href = url; el.download = name; el.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function download(name: string, text: string) { saveBlob(new Blob([text], { type: 'text/markdown' }), name); }
+async function downloadDocx(epic: Any, a: Any) {
+  try {
+    const name = await downloadFrom(`/api/projects/${P().id}/agent/docx`, { body: { epicId: epic.id, agentId: a.id }, fallbackName: `${a.name} - ${epic.title}.docx` });
+    toast(`Downloaded ${name}`);
+  } catch (e: Any) { toast(`Couldn’t download the ${a.name} document: ${e.message}`, 'err'); }
 }
 function DocViewModal({ epic, a }: { epic: Any; a: Any }) {
   const d = epic.agentDocs?.[a.id];
   if (!d) return null;
   const file = `${a.name} - ${epic.title}.md`.replace(/[\\/:*?"<>|]+/g, ' ');
   return (
-    <Modal title={`${a.name} · ${epic.title}`} wide actions={[{ label: 'Close' }, { label: 'Download .md', kind: 'primary', onClick: () => download(file, d.markdown) }]}>
+    <Modal title={`${a.name} · ${epic.title}`} wide actions={[{ label: 'Close' }, { label: 'Download .md', onClick: () => download(file, d.markdown) }, { label: 'Download .docx', kind: 'primary', onClick: () => downloadDocx(epic, a), hidden: !can('export') }]}>
       <p className="muted small" style={{ marginTop: 0 }}>Written by the {a.name} agent {ago(d.generatedAt)}{d.generatedBy ? ` for ${d.generatedBy}` : ''}.</p>
       <div className="agent-doc"><Markdown text={d.markdown} /></div>
     </Modal>

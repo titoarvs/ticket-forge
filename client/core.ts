@@ -132,6 +132,37 @@ export async function readNdjson(res: Response, onEvent: (ev: Any) => void | Pro
   }
 }
 
+/**
+ * Saves a file from the server. Checks the response really is the file (a JSON error becomes a readable message),
+ * clicks a link attached to the page (some browsers ignore detached links) and keeps the blob URL alive long enough
+ * for Safari and Firefox to finish saving (revoking it after a moment cancels big downloads there).
+ */
+export async function downloadFrom(url: string, { method = 'POST', body, fallbackName = 'download' }: { method?: string; body?: Any; fallbackName?: string } = {}) {
+  const res = await api(url, { method, body, raw: true });
+  const type = res.headers.get('content-type') || '';
+  if (type.includes('application/json')) {
+    let msg = 'The server didn’t send a file.';
+    try { msg = (await res.json()).error || msg; } catch { /* keep the message */ }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  if (!blob.size) throw new Error('The server sent an empty file. Try again.');
+  const cd = res.headers.get('content-disposition') || '';
+  const name = decodeURIComponent(cd.match(/filename\*=UTF-8''([^;]+)/i)?.[1] || cd.match(/filename="?([^";]+)"?/i)?.[1] || fallbackName);
+  saveBlob(blob, name);
+  return name;
+}
+/** Saves a blob made in the browser (e.g. Markdown) under a file name. */
+export function saveBlob(blob: Blob, name: string) {
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = href; a.download = name; a.rel = 'noopener'; a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+}
+
 export function toast(msg: string, kind: 'ok' | 'err' = 'ok') {
   const t = { id: uid(), msg, kind };
   S.toasts = [...S.toasts, t];

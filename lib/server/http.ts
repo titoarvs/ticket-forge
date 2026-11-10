@@ -1,14 +1,15 @@
 // Helpers shared by the Next.js route handlers.
 import { cookies, headers } from 'next/headers';
 import * as auth from '@/lib/auth.js';
-import { migrate, asSystem, asUser, currentContext } from '@/lib/db.js';
+import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION } from '@/lib/db.js';
 import * as store from '@/lib/store.js';
 import { isLocalHost } from '@/lib/claude.js';
 
 const G = globalThis as any;
 
-/** Creates tables, seeds roles and imports legacy JSON projects — once per server process. */
+/** Creates tables, seeds roles and imports legacy JSON projects — once per server process, and again when the schema changes. */
 export function ready(): Promise<void> {
+  if (G.__tfReadyFor !== SCHEMA_VERSION) { G.__tfReady = null; G.__tfReadyFor = SCHEMA_VERSION; }
   G.__tfReady ??= (async () => {
     await migrate();
     await auth.seedRoles();

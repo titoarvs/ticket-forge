@@ -2,7 +2,7 @@
 // Problem Statement documents (PSD), one per epic: written by the AI in the structure of the team's template,
 // saved on the epic, readable in the app and downloadable as a .docx built from the template.
 import { useEffect, useRef, useState } from 'react';
-import { S, P, api, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, type Any } from './core';
+import { S, P, api, downloadFrom, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA, TF, SF, MenuItem } from './fields';
 
@@ -28,13 +28,9 @@ export async function writePsd(epic: Any, instructions = ''): Promise<boolean> {
 /** Downloads the epic's PSD as .docx (the team's template when uploaded). */
 export async function downloadPsd(epic: Any) {
   try {
-    const res = await api(`/api/projects/${P().id}/psd/docx`, { method: 'POST', raw: true, body: { epicId: epic.id } });
-    const blob = await res.blob();
-    const name = decodeURIComponent((res.headers.get('content-disposition') || '').match(/filename\*=UTF-8''([^;]+)/)?.[1] || `Problem Statement - ${epic.title}.docx`);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  } catch (e: Any) { toast(e.message, 'err'); }
+    const name = await downloadFrom(`/api/projects/${P().id}/psd/docx`, { body: { epicId: epic.id }, fallbackName: `Problem Statement - ${epic.title}.docx` });
+    toast(`Downloaded ${name}`);
+  } catch (e: Any) { toast(`Couldn’t download the Problem Statement: ${e.message}`, 'err'); }
 }
 
 function WriteModal({ epic }: { epic: Any }) {
