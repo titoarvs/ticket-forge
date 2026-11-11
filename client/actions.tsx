@@ -8,6 +8,7 @@ import {
   addMember, logEvent, setField, addLink, deleteIssues, canMove, moveError, type Any,
 } from './core';
 import { askFirst } from './Clarify';
+import { recordAutomationResult } from './TestRepo';
 import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea, Spinner } from './ui';
 import { refreshStatus, aiInactive } from './AppShell';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -513,7 +514,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
         if (ev.result.status === 'Pass') run.pass += 1; else run.fail += 1;
         const msg = { message: `${label} — ${ev.result.status}${ev.result.durationMs ? ` (${(ev.result.durationMs / 1000).toFixed(1)}s)` : ''}`, level: ev.result.status === 'Pass' ? 'pass' : 'fail' };
         if (run.log[run.log.length - 1]?.message.startsWith('Running ')) run.log[run.log.length - 1] = msg; else run.log.push(msg);
-        mutate(() => { tc.lastRun = ev.result; tc.status = ev.result.status; logEvent(t, `automated test ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.status}`, 'Automation'); });
+        mutate((pp: Any) => { tc.lastRun = ev.result; tc.status = ev.result.status; logEvent(t, `automated test ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.status}`, 'Automation'); recordAutomationResult(pp, t, tc, ev.result, baseUrl); });
       }
     });
   } catch (e: Any) {

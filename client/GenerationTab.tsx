@@ -18,6 +18,21 @@ const REASONING: [string, string, string][] = [
   ['thorough', 'Thorough', 'Thinks deeply before answering. Slower and uses more of your AI usage or credits.'],
 ];
 
+/** Corporate test standards: picking one fills the Test management fields (each can then be changed). */
+const TM_STANDARDS: [string, string, string][] = [
+  ['istqb', 'ISTQB', 'Formal test cases: preconditions, numbered steps, expected result per step, test data.'],
+  ['xray', 'Xray for Jira', 'Step tables (action · data · expected) on every test, linked to requirements.'],
+  ['bdd', 'BDD (Cucumber)', 'Gherkin scenarios in business language: Given · When · Then.'],
+  ['browserstack', 'BrowserStack TM', 'Concise step tests with tags; expected result on the last step.'],
+  ['custom', 'Company standard', 'Your own rules: change any field below.'],
+];
+const TM_PRESETS: Record<string, Any> = {
+  istqb: { format: 'steps', titleFormat: 'TC: Verify <behaviour> when <condition>', stepsMin: 3, stepsMax: 12, expectedEveryStep: true, testData: true, preconditions: true, labels: 'functional, negative, boundary, security, usability, performance' },
+  xray: { format: 'steps', titleFormat: 'Verify <behaviour> when <condition>', stepsMin: 2, stepsMax: 8, expectedEveryStep: true, testData: true, preconditions: true, labels: 'smoke, regression, security, ui, api, integration, negative, edge' },
+  bdd: { format: 'gherkin', titleFormat: '<Actor> can <goal>', gherkinStyle: 'declarative', preconditions: true, labels: 'smoke, regression, wip, negative, edge' },
+  browserstack: { format: 'steps', titleFormat: '<Feature>: <behaviour>', stepsMin: 2, stepsMax: 6, expectedEveryStep: false, testData: false, preconditions: true, labels: 'smoke, sanity, regression, p1, p2, p3' },
+};
+
 export function GenerationTab() {
   const [data, setData] = useState<Any>(null);
   const [r, setR] = useState<Any>(null);
@@ -59,6 +74,11 @@ export function GenerationTab() {
     <label className="field"><span>{label}{def(path)}</span>
       <TF type="number" value={get(path)} slotProps={{ htmlInput: { min, max } }} onChange={(e) => set(path, Number(e.target.value))} /></label>
   );
+  // Test management: editing any field after picking a corporate standard makes it the company's own ("custom").
+  const setTm = (k: string, v: Any) => setR((x: Any) => ({ ...x, testmgmt: { ...x.testmgmt, [k]: v, standard: TM_PRESETS[x.testmgmt.standard] && TM_PRESETS[x.testmgmt.standard][k] !== undefined && TM_PRESETS[x.testmgmt.standard][k] !== v ? 'custom' : x.testmgmt.standard } }));
+  const numTm = (k: string, label: string, min: number, max: number) => (
+    <label className="field"><span>{label}{def(`testmgmt.${k}`)}</span>
+      <TF type="number" value={r.testmgmt[k]} slotProps={{ htmlInput: { min, max } }} onChange={(e) => setTm(k, Number(e.target.value))} /></label>);
   const check = (path: string, label: string) => <CB label={<>{label}{def(path)}</>} checked={Boolean(get(path))} onChange={(e: Any) => set(path, e.target.checked)} />;
   const save = async () => {
     setBusy('save');
@@ -135,6 +155,33 @@ export function GenerationTab() {
           </div>
           <label className="field" style={{ marginTop: 8 }}><span>Prefix for test data the scripts create{def('automation.testDataPrefix')}</span>
             <TF value={r.automation.testDataPrefix} placeholder="e.g. QA (leave empty for none)" onChange={(e) => set('automation.testDataPrefix', e.target.value)} /></label>
+        </div>
+
+        <div className="card wide"><h3>Test management</h3>
+          <p className="sub">How the AI writes repository tests and builds test plans (Test management). Start from a corporate standard, then change any field to match your company’s.</p>
+          <div className="tm-std" role="radiogroup" aria-label="Corporate standard">{TM_STANDARDS.map(([k, l, dsc]) => (
+            <button key={k} role="radio" aria-checked={r.testmgmt.standard === k} className={r.testmgmt.standard === k ? 'on' : ''}
+              onClick={() => setR((x: Any) => ({ ...x, testmgmt: { ...x.testmgmt, ...(TM_PRESETS[k] || {}), standard: k } }))}><b>{l}</b><span className="muted small">{dsc}</span></button>))}</div>
+          <div className="gen-grid two" style={{ marginTop: 12 }}>
+            <label className="field"><span>Test format{def('testmgmt.format')}</span><SF value={r.testmgmt.format} onChange={(e) => setTm('format', e.target.value)}>
+              <MenuItem value="steps">Step tables (action · data · expected)</MenuItem><MenuItem value="gherkin">Gherkin scenarios (BDD)</MenuItem><MenuItem value="both">Both: Gherkin for user behaviour, steps for the rest</MenuItem></SF></label>
+            <label className="field"><span>Title pattern{def('testmgmt.titleFormat')}</span><TF value={r.testmgmt.titleFormat} placeholder="e.g. Verify <behaviour> when <condition>" onChange={(e) => setTm('titleFormat', e.target.value)} /></label>
+            {numTm('perIssue', 'Tests per issue', 1, 20)}
+            {r.testmgmt.format !== 'gherkin' && <div className="row" style={{ gap: 8 }}>{numTm('stepsMin', 'Steps: at least', 1, 30)}{numTm('stepsMax', 'at most', 1, 40)}</div>}
+            {r.testmgmt.format !== 'steps' && <label className="field"><span>Gherkin style{def('testmgmt.gherkinStyle')}</span><SF value={r.testmgmt.gherkinStyle} onChange={(e) => setTm('gherkinStyle', e.target.value)}>
+              <MenuItem value="declarative">Declarative: business language</MenuItem><MenuItem value="imperative">Imperative: UI actions</MenuItem></SF></label>}
+            <label className="field"><span>Labels allowed{def('testmgmt.labels')}</span><TF value={r.testmgmt.labels} placeholder="e.g. smoke, regression, security" onChange={(e) => setTm('labels', e.target.value)} /></label>
+          </div>
+          <div className="gen-checks">
+            {r.testmgmt.format !== 'gherkin' && check('testmgmt.expectedEveryStep', 'An expected result on every step')}
+            {r.testmgmt.format !== 'gherkin' && check('testmgmt.testData', 'Test data in its own column, never inside the action')}
+            {check('testmgmt.preconditions', 'Preconditions on every test')}
+          </div>
+          <div className="gen-grid two">
+            <label className="field"><span>Priority rule{def('testmgmt.priorityRule')}</span><TA rows={2} value={r.testmgmt.priorityRule} onChange={(e) => setTm('priorityRule', e.target.value)} /></label>
+            <label className="field"><span>Test plan rules{def('testmgmt.planRules')}</span><TA rows={2} value={r.testmgmt.planRules} placeholder="e.g. Smoke ≤ 15 tests; regression includes every High-priority test" onChange={(e) => setTm('planRules', e.target.value)} /></label>
+          </div>
+          <label className="field"><span>Company test standard (anything else)</span><TA rows={3} value={r.testmgmt.custom} placeholder={'e.g. Every test names the role it runs as. Amounts use PHP with two decimals. Payroll tests use the QA-Payroll company. Never test against production data.'} onChange={(e) => setTm('custom', e.target.value)} /></label>
         </div>
 
         <div className="card wide"><h3>Team rules</h3>

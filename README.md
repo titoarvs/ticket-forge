@@ -656,3 +656,24 @@ Copilot runs without tools in an empty temporary folder: it only answers prompts
 - **Coverage:** each issue is OK (all its tests pass), NOK (one fails or is blocked), Not run, or Uncovered.
 
 Every issue's panel has a **Tests** section: link a test, create one, see each test's latest result, and the issue's coverage.
+
+Test management follows Xray for Jira and BrowserStack Test Management. It also has:
+- test environments, with coverage per environment;
+- an assignee per test run, and bulk updates;
+- BDD (Gherkin) tests;
+- JUnit XML results import;
+- TicketForge's own Playwright results feeding an "Automated runs" execution;
+- CSV import and export;
+- a traceability report.
+
+See [docs/test-management-parity.md](docs/test-management-parity.md) for the full comparison, including what isn't built yet.
+
+**AI in Test management** follows the company's test standard, set in Administration → Generation → **Test management**:
+- Pick a corporate standard to start from (ISTQB, Xray for Jira, BDD (Cucumber) or BrowserStack TM), then change any rule:
+  - format (steps, Gherkin or both) and title pattern;
+  - number of steps, an expected result per step, the test-data column and preconditions;
+  - Gherkin style, tests per issue, priority rule, allowed labels and test plan rules;
+  - your own company standard, as free text.
+- **Write tests with AI** writes repository tests for chosen issues, for review before they're added.
+- **Improve with AI** in the test editor rewrites a test to the standard (or as asked, e.g. "convert to Gherkin").
+- **Build plan with AI** follows the plan rules.
