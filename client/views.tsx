@@ -376,29 +376,29 @@ export function Epics() {
       {can('epic.manage') && <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}
       <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link></>} />
     {p.epics.length ? <>
-      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className="tbl ep-tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th><th>Progress</th><th className="num ep-done">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
             <tr key={e.id} className="click" onClick={() => openDrawer('epic', e.id)}>
-              <td><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b></span>
-                {e.description && <div className="muted small" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }}>{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{psdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
+              <td className="ep-main"><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b></span>
+                {e.description && <div className="muted small ep-desc" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Dates">{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Problem Statement" onClick={(ev) => ev.stopPropagation()}>{psdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
                 : e.psd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openPsd(e)}>{e.psd.version || 'v1.0'} · {e.psd.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Problem Statement for ${e.title}`} onClick={() => downloadPsd(e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWritePsd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{fbdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Feature Brief" onClick={(ev) => ev.stopPropagation()}>{fbdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
                 : e.fbd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openFbd(e)}>{e.fbd.version || 'v1.0'} · {e.fbd.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Feature Brief for ${e.title}`} onClick={() => downloadFbdDocx(e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteFbd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{docBusy('ard', e.id) ? <span className="muted"><Spinner /> Writing…</span>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Architecture Record" onClick={(ev) => ev.stopPropagation()}>{docBusy('ard', e.id) ? <span className="muted"><Spinner /> Writing…</span>
                 : e.ard ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openDoc('ard', e)}>{e.ard.version || 'v1.0'} · {e.ard.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Architecture Record Design for ${e.title}`} onClick={() => downloadDocDocx('ard', e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteDoc('ard', e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td style={{ width: 200 }}><ProgBar {...pr} /></td>
-              <td className="num">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
-              <td className="num">{pr.total}</td><td className="num">{spSum(pr.ts)}</td><td className="num">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>
+              <td style={{ width: 200 }} data-label="Progress"><ProgBar {...pr} /></td>
+              <td className="num ep-done" data-label="Done">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
+              <td className="num" data-label="Issues">{pr.total}</td><td className="num" data-label="Story points">{spSum(pr.ts)}</td><td className="num" data-label="Test cases">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>
             </tr>
           );
         })}

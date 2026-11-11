@@ -29,6 +29,8 @@ function Sidebar({ view }: { view: string }) {
       aria-label={mini ? label : undefined} aria-current={view === v ? 'page' : undefined}>
       <Ico svg={icon} /><span className="side-text">{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
   );
+  // On small screens the navigation is a scrolling top bar: keep the current page's tab in view.
+  useEffect(() => { document.querySelector('.sidebar .side-item.active')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [view]);
   return (
     <div className={`side-wrap ${mini ? 'is-collapsed' : ''}`}>
     <nav className="sidebar" aria-label="Project">

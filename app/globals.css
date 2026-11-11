@@ -1978,3 +1978,74 @@ tr.xr-step-passed td { background: color-mix(in srgb, var(--success-bg) 40%, tra
 .fm-unverified summary { cursor: pointer; }
 .fm-unverified ul { margin: 8px 0; padding-left: 18px; }
 .fm-unverified li { margin-bottom: 4px; }
+
+/* ================================================================ Responsive fixes (phones and tablets) */
+@media (max-width: 960px) {
+  /* Project navigation as a top bar: it scrolls sideways, and Project settings is in it too. */
+  .side-wrap .sidebar { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .side-wrap .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar .side-foot { display: contents; }
+  .page { padding: 16px 16px 64px; }
+  /* Wide tables scroll inside themselves instead of pushing the whole page sideways. */
+  .view table.tbl, .page table.tbl, table.rt-tbl, table.res-tbl, table.xr-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .page-h { flex-wrap: wrap; row-gap: 8px; }
+  .page-h h1 { flex: 1 0 auto; }
+  .tabbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tabbar::-webkit-scrollbar { display: none; }
+  .tabbar .tab { flex: none; white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  /* Backlog rows: the summary gets its own line(s); status, assignee and points sit under it. */
+  .irow { flex-wrap: wrap; padding: 8px; row-gap: 4px; min-height: 0; }
+  .irow .sum { flex: 1 1 55%; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
+  .irow .right { flex: 1 1 100%; justify-content: flex-end; flex-wrap: wrap; row-gap: 4px; }
+  .irow .lbls { display: none; }
+  .sec-h { flex-wrap: wrap; row-gap: 6px; }
+  .sec-h .sec-actions { flex-wrap: wrap; }
+  .page-h .btn, .view-h .btn { flex: none; }
+  .modal, .MuiDialog-paper { max-width: calc(100vw - 24px) !important; margin: 12px !important; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+}
+/* Epics table → stacked cards on phones and tablets */
+@media (max-width: 900px) {
+  table.tbl.ep-tbl { display: block; overflow: visible; }
+  .ep-tbl thead { display: none; }
+  .ep-tbl tbody { display: block; }
+  .ep-tbl tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; padding: 12px 4px; border-bottom: 1px solid var(--border); }
+  .ep-tbl td { display: block; border: 0 !important; padding: 0 !important; white-space: normal !important; width: auto !important; text-align: left !important; min-width: 0; }
+  .ep-tbl td.ep-main { grid-column: 1 / -1; }
+  .ep-tbl td.ep-main > .row { flex-wrap: wrap !important; }
+  .ep-tbl .ep-desc { white-space: normal !important; max-width: none !important; margin-left: 0 !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .ep-tbl td[data-label]::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 600; color: var(--text-subtle); margin-bottom: 1px; }
+  .ep-tbl td[data-label="Progress"] { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  /* Test management: folders above the tests (a later desktop rule used to win here). */
+  .xr-repo, .xr-exec { grid-template-columns: minmax(0, 1fr); }
+  .xr-tree { position: static; max-height: 280px; overflow: auto; }
+}
+@media (max-width: 640px) {
+  /* Toolbars: search boxes get a full row instead of being squeezed. */
+  .row > .MuiTextField-root:has(input[placeholder^="Search"]), .row > .MuiFormControl-root:has(input[placeholder^="Search"]) { flex: 1 1 100%; min-width: 0; }
+}
+/* Top bar on tablets: the create button and the AI pill go compact before they collide. */
+@media (max-width: 900px) {
+  .topnav .tn-create .hide-sm, .topnav .ai-name, .topnav .tn-sep { display: none; }
+  .topnav .tn-create { padding: 0 8px; }
+  .topnav .ai-pill, .topnav .tn-create { flex: none; }
+  .topnav .navlink { padding-left: 8px; padding-right: 8px; }
+}
+/* Epics table on laptops: titles and descriptions wrap, headers wrap, so it fits without sideways scrolling. */
+.ep-tbl th { white-space: normal; vertical-align: bottom; }
+.ep-tbl td.ep-main { min-width: 240px; }
+.ep-tbl td.ep-main > .row { flex-wrap: wrap !important; row-gap: 2px; }
+.ep-tbl .ep-desc { max-width: 380px !important; }
+@media (min-width: 901px) and (max-width: 1400px) {
+  .ep-tbl td[data-label="Progress"] { width: 120px !important; }
+  .ep-tbl td[data-label="Problem Statement"], .ep-tbl td[data-label="Feature Brief"], .ep-tbl td[data-label="Architecture Record"] { white-space: normal !important; }
+  .ep-tbl .psd-link { white-space: nowrap; }
+}
+@media (min-width: 901px) and (max-width: 1400px) {
+  .ep-tbl .ep-done { display: none; }
+  .view table.tbl.ep-tbl { display: block; max-width: 100%; overflow-x: auto; }
+}
