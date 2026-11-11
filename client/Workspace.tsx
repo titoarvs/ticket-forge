@@ -13,9 +13,10 @@ import { Sources } from './Sources';
 import { Drawer } from './Drawer';
 import { Timeline } from './Timeline';
 import { Board } from './Board';
+import { TestManagement } from './TestRepo';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', automation: 'Test automation', source: 'Source documents', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, automation: Automation, source: Sources, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', source: 'Source documents', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, source: Sources, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
@@ -39,6 +40,7 @@ function Sidebar({ view }: { view: string }) {
       {item('reports', I.chart, 'Reports')}
       <div className="side-label">Quality</div>
       {item('tests', I.test, 'Test cases', tests)}
+      {item('testmgmt', I.folder, 'Test management', (p.testRepo?.tests || []).length)}
       {item('automation', I.bot, 'Test automation')}
       <div className="side-label">Requirements</div>
       {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}

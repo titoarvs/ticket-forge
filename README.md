@@ -646,3 +646,13 @@ When TicketForge is opened at localhost, it can use **GitHub Copilot** through t
 3. Pick a Copilot model, or leave Copilot's default.
 
 Copilot runs without tools in an empty temporary folder: it only answers prompts and can't read or change files. Limits and sign-in problems switch to the next AI automatically, and the top-bar AI pill shows which AI is answering.
+
+## Test management (Xray-style)
+
+**Test management** in the project sidebar:
+- **Test repository:** reusable tests (keys like `T2-T7`) in folders. Each has a type, priority, labels, preconditions and numbered steps (action, data, expected result), and covers any number of issues. **Import from issues** turns the test cases issues already have into repository tests, linked to their issue, with one folder per epic.
+- **Test plans:** sets of tests for an epic, sprint or release, with a progress bar of their latest results. **Save and run** starts an execution.
+- **Test executions:** run tests step by step (✓ passed, ✗ failed, ⦸ blocked). The test's result follows its steps. Each test also takes a comment or evidence, and **Create defect** opens a Bug with the steps and failure, linked to the run and to the covered issues.
+- **Coverage:** each issue is OK (all its tests pass), NOK (one fails or is blocked), Not run, or Uncovered.
+
+Every issue's panel has a **Tests** section: link a test, create one, see each test's latest result, and the issue's coverage.

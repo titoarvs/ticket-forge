@@ -19,6 +19,7 @@ import { FbdSection, ArdSection } from './Fbd';
 import { openSplitIssues } from './Split';
 import { EpicAgents } from './Agents';
 import { codeReady, openCode, openUpdatePr } from './DevCode';
+import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -200,6 +201,7 @@ function IssuePanel({ t }: { t: Any }) {
             {!t.testCases.length && <p className="muted small">No test cases yet. Use “Regenerate test cases” to let Claude write them.</p>}
           </div>
 
+          <TestsSection t={t} />
           <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span>
             {edit && <div className="tools">
               {can('ai.use') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>

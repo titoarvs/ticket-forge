@@ -59,7 +59,7 @@ export const S: Any = {
   busy: null, autoRun: null, autoScope: 'all', autoRegen: false,
   undo: [] as string[], redo: [] as string[], lastSnap: { tag: '', at: 0 },
   saveTimer: null, saveText: '',
-  menu: null, modal: null as ReactNode, toasts: [] as Any[], tasks: [] as Any[],
+  menu: null, modal: null as ReactNode, toasts: [] as Any[], tasks: [] as Any[], trTab: 'repository',
   notifs: { items: [] as Any[], unread: 0 },
   nav: (href: string) => { location.href = href; },
 };
