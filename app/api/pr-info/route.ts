@@ -1,4 +1,14 @@
-import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
+import { api, perm, HttpError } from '@/lib/server/http';
+import * as store from '@/lib/store.js';
 import { prInfo } from '@/lib/github.js';
+import { getProjectSecret } from '@/lib/secrets.js';
 
-export const GET = api(async (req) => { await perm('issue.edit'); return prInfo(new URL(req.url).searchParams.get('url')); });
+// Looks up a pull/merge request for the Development panel. With ?projectId, the project's GitLab token reads private merge requests.
+export const GET = api(async (req) => {
+  const user = await perm('issue.edit');
+  const sp = new URL(req.url).searchParams;
+  const projectId = sp.get('projectId');
+  let gitlabToken = '';
+  if (projectId) { store.requireAccess(user, projectId); gitlabToken = await getProjectSecret(projectId, 'gitlabToken'); }
+  try { return await prInfo(sp.get('url'), { gitlabToken }); } catch (e: any) { throw new HttpError(400, e.message); }
+});

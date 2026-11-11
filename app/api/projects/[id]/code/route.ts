@@ -1,7 +1,7 @@
-import { api, authed, body, HttpError, appUrl } from '@/lib/server/http';
+import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob } from '@/lib/devagent.js';
+import { startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel } from '@/lib/devagent.js';
 import { publicAgents, CODE_AGENT_IDS } from '@/lib/agents.js';
 import { getProjectSecret } from '@/lib/secrets.js';
 import { ardContext } from '@/lib/ard.js';
@@ -29,6 +29,19 @@ function sideNote(project: any, ticket: any, side: string) {
   if (side === 'backend') return `REPOSITORY: this is the BACKEND of the project (${name(be)}). Implement only the server side: endpoints, data and migrations, validation, permissions, background jobs, and their tests. The frontend is a separate repository (${name(fe)}) handled by a separate job: don't write UI code. At the end, list every API you added or changed (method, path, request, response, errors) so the frontend can use it.`;
   const done = ticket.layer === 'both' ? backendSummary(project.id, ticket.id) : null;
   return `REPOSITORY: this is the FRONTEND of the project (${name(fe)}). Build only the user interface and its calls to the API. The backend is a separate repository (${name(be)}) handled by a separate job: don't implement server logic here; call the API as described${done ? '' : ' in the issue, and say in your summary which endpoints the UI expects'}.${done ? `\n\nThe backend part of this issue is already done (branch ${done.branch}). Its summary, including the API:\n${String(done.summary).slice(0, 6000)}` : ''}`;
+}
+
+/** Which of the project's repositories a linked pull/merge request belongs to: { side, dev } or null. */
+async function repoForPr(project: any, pr: any) {
+  const norm = (x: string) => String(x || '').toLowerCase().replace(/\.git$/, '');
+  const candidates: [string, any][] = [['frontend', project.dev], ['backend', backendDev(project)]];
+  for (const [side, dev] of candidates) {
+    if (!dev?.localPath) continue;
+    const r = await remoteInfo(dev.localPath).catch(() => null);
+    if (r && norm(r.path) === norm(pr.repo)) return { side, dev };
+    if (dev.repo && norm(dev.repo) === norm(pr.repo)) return { side, dev };
+  }
+  return null;
 }
 
 export const GET = api(async (req, p) => {
@@ -70,6 +83,42 @@ export const POST = api(async (req, p) => {
   }
   if (b.action === 'follow') { await guard(p, ['ai.use', 'issue.edit']); own(b.jobId); return followUp(b.jobId, String(b.text || '').slice(0, 4000)); }
   if (b.action === 'review') { await guard(p, ['ai.use']); own(b.jobId); return reviewJob(b.jobId, { panel: Boolean(b.panel), agent: String(b.agent || 'review') }); }
+  // ---------------------------------------------------------------- pull requests: better text, and updating an open one
+  if (b.action === 'prDraft') { await guard(p, ['ai.use']); own(b.jobId); return prDraft(b.jobId, { appLink: `${appUrl(req)}/p/${p.id}/backlog`, ai: aiOpts(b) }); }
+  if (b.action === 'push') {
+    await guard(p, ['issue.edit']); own(b.jobId);
+    return pushToPullRequest(b.jobId, { message: String(b.message || ''), token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') });
+  }
+  if (['update', 'describe', 'comments'].includes(b.action)) {
+    const user = await guard(p, b.action === 'comments' ? [] : ['ai.use', 'issue.edit']);
+    const project = await store.getProject(p.id);
+    const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
+    const pr = ticket?.prs?.find((x: any) => x.id === b.prId);
+    if (!ticket || !pr) throw new HttpError(404, 'That pull request isn’t linked to this issue any more.');
+    const where = await repoForPr(project, pr);
+    if (!where) throw new HttpError(400, `${pr.repo} isn’t this project’s repository or its backend repository (Project settings → Code & GitHub), so it can’t be updated from here.`);
+    if (!pr.branch) throw new HttpError(400, 'TicketForge doesn’t know this request’s branch yet. Click refresh on it first.');
+    const target = { url: pr.url, number: pr.number, branch: pr.branch, base: pr.base || where.dev.baseBranch || 'main', title: pr.title, provider: pr.provider };
+    const tokens = { token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') };
+    if (b.action === 'comments') return { comments: await reviewComments({ repoPath: where.dev.localPath, target, ...tokens }) };
+    if (b.action === 'describe') return describePullRequest({ repoPath: where.dev.localPath, target, ticket, side: where.side, ...tokens, appLink: `${appUrl(req)}/p/${p.id}/backlog`, ai: aiOpts(b) });
+    // update: an agent works on the request's own branch; the person reviews, then pushes to the same request.
+    const mode = String(b.mode || 'prompt');
+    let ask = String(b.prompt || '').trim().slice(0, 6000);
+    let label = 'Apply requested changes';
+    if (mode === 'enhance') { label = 'Enhance tests, edge cases and error handling'; ask = `Enhance this ${pr.provider === 'GitLab' ? 'merge request' : 'pull request'} without changing what it does: add or improve automated tests for its behaviour and the issue's acceptance criteria, handle edge cases and errors it misses, and tidy names and structure where it helps a reviewer. Keep the change focused.${ask ? `\n\nAlso: ${ask}` : ''}`; }
+    if (mode === 'review') {
+      label = 'Address review comments';
+      const cs = await reviewComments({ repoPath: where.dev.localPath, target, ...tokens });
+      if (!cs.length) throw new HttpError(400, 'There are no open review comments on it.');
+      ask = `Address these review comments on the ${pr.provider === 'GitLab' ? 'merge request' : 'pull request'}. Change what each asks; if you disagree with one, leave the code and say why in your summary.\n\n${cs.map((c: any, i: number) => `${i + 1}. ${c.author ? `@${c.author}` : 'Reviewer'}${c.file ? ` on ${c.file}${c.line ? `:${c.line}` : ''}` : ''}: ${c.body}`).join('\n')}${ask ? `\n\nAlso: ${ask}` : ''}`;
+    }
+    if (!ask) throw new HttpError(400, 'Say what to change.');
+    const context = [sideNote(project, ticket, where.side), `UPDATING AN OPEN ${pr.provider === 'GitLab' ? 'MERGE' : 'PULL'} REQUEST: ${pr.url} (branch ${target.branch} → ${target.base}). The request's changes are already committed on this branch. Make only the changes asked for below; don't redo the original work.`].filter(Boolean).join('\n\n');
+    const job = await startJob({ projectId: p.id, ticket, dev: where.dev, instructions: ask, user, agentId: String(b.agentId || (where.side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build')), context, side: where.side, target });
+    setUpdateLabel(job.id, label);
+    return job;
+  }
   if (b.action === 'commit') { await guard(p, ['issue.edit']); own(b.jobId); return commitLocal(b.jobId, { title: String(b.title || ''), appLink: `${appUrl(req)}/p/${p.id}/backlog` }); }
   if (b.action === 'cancel') { await guard(p, ['issue.edit']); own(b.jobId); return cancelJob(b.jobId); }
   if (b.action === 'discard') { await guard(p, ['issue.edit']); own(b.jobId); return discardJob(b.jobId); }
