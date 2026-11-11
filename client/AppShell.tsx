@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, hashColor, COLORS, type Any,
+  loadFlags,
 } from './core';
 import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
@@ -27,7 +28,7 @@ export async function bootSession() {
   try { S.auth = await api('/api/auth/me'); }
   catch (e: Any) { S.bootError = e; S.ready = true; emit(); return; } // server unreachable: show it, don't pretend to be signed out
   S.user = S.auth.user;
-  if (S.user) { await refreshStatus(); loadEngine(); startSync(); loadNotifs(); }
+  if (S.user) { await loadFlags(); await refreshStatus(); loadEngine(); startSync(); loadNotifs(); }
   S.ready = true;
   emit();
 }
@@ -122,7 +123,7 @@ export function TopNav() {
         <Link className="brand" href="/" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} /><span className="hide-sm">TicketForge</span></Link>
         <nav className="tn-nav" aria-label="Main">
           <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/"><Ico svg={I.folder} />Projects</Link>
-          {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href="/admin/users"><Ico svg={I.settings} />Administration</Link>}
+          {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href={S.user?.isOwner ? '/admin/users' : '/admin/ai'}><Ico svg={I.settings} />Administration</Link>}
         </nav>
         {inProject && <><span className="tn-sep" aria-hidden>/</span><ProjectSwitcher p={p} /></>}
         {(inProject ? can('issue.create') : can('project.create')) && (
@@ -151,7 +152,7 @@ export function TopNav() {
         <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name} — account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /><span className="me-name hide-md">{S.user.name.split(' ')[0]}</span><Ico svg={I.chevron} className="me-chev hide-md" /></button>}>
           <div className="acct"><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div><hr />
           {can('users.manage') && <>
-            <button onClick={() => S.nav('/admin/users')}><Ico svg={I.people} />Administration</button>
+            <button onClick={() => S.nav(S.user?.isOwner ? '/admin/users' : '/admin/ai')}><Ico svg={I.people} />Administration</button>
             <button onClick={() => S.nav('/admin/invites')}><Ico svg={I.plus} />Invite people</button>
           </>}
           <button onClick={() => openModal(<AiSettingsModal />)}><Ico svg={I.bot} />AI connection</button>
@@ -250,7 +251,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     const onUnload = () => { if (P() && S.saveTimer) saveNow(); };
     const poll = setInterval(() => { if (document.visibilityState === 'visible') loadNotifs(); }, 30000);
     // Keep the AI pill current (e.g. when TicketForge switches to a backup provider).
-    const statusPoll = setInterval(() => { if (document.visibilityState === 'visible' && S.user) refreshStatus(); }, 60000);
+    const statusPoll = setInterval(() => { if (document.visibilityState === 'visible' && S.user) { refreshStatus(); loadFlags(); } }, 60000);
     // Coming back to the tab: refresh what may be stale (status at most every 20 s).
     const onFocus = () => { loadNotifs(); if (S.user && Date.now() - (S.statusAt || 0) > 20000) refreshStatus(); };
     window.addEventListener('focus', onFocus);

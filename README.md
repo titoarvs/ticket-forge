@@ -364,9 +364,8 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), sh
 | Review | **UI/UX Review** (UI/UX) | Audits usability, accessibility, states, copy and layout; never edits | Repo, read-only |
 | General | **Free Worker** | Any task you describe, same safety rules as Build | Own git worktree |
 
-**Hiring agents.** Every agent can be hired. Open an epic: its **Agents** section lists the feature's lifecycle by
-phase, shows how far each step is, and has **Hire** on each row. Or use **Hire** on a card in Administration → Agents
-and pick the project and epic. Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
+**Hiring agents.** Every agent can be hired: use **Hire** on a card in Administration → Agents and pick the project
+and epic. (Epic and issue panels don't list agents.) Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
 run TicketForge's existing writers with the agent's instructions. Epic, Kick Off, Demo, Sign-Off and Manual, Deploy,
 Release Certification and Review a Submission write a Markdown document from the epic, its documents, issues, test
 results and pull requests, saved on the epic (`lib/agentdocs.js`). Code agents ask which issue to work on. In the code
@@ -740,3 +739,22 @@ Test automation → **Find built features** works from the **code**. Without AI,
 The AI groups that into epics and features, and writes each feature's tickets from its pages' code: real labels, fields, rules and endpoints.
 
 Git history and `.md` documents (release notes, feature notes) are hints for naming only. Every feature must cite code that exists in the repository. Anything only the documents mention is listed separately as **not found in the code** and is never added, and existing issues are only marked Done when the code proves it. The code is in `lib/codeinventory.js`.
+
+### Feature flags (Administration → Features, owner only)
+
+The owner can **lock** any feature for everyone. Each feature has a switch and an optional reason. Changes apply right away, and other open tabs pick them up within a minute.
+
+Features you can lock:
+- **Planning:** Issues page, Board, Timeline, Reports, Source documents.
+- **AI:** AI features (every AI action), Epic documents, Agents, Split issues.
+- **Quality:** Test cases page, Test management, Test automation, AI failure analysis, Repository sync.
+- **Development:** Coding agents, Pull requests.
+- **Data:** Export, Attachments.
+
+A locked feature:
+- disappears from the navigation, buttons and menus; opening its page directly shows a "locked" notice;
+- has its API routes refuse requests with `423 Locked`, for everyone including the owner. This is checked in the shared API wrapper (`lib/server/http.ts`).
+
+Locking **AI features** hides every AI control, because the `ai.use` permission counts only while AI is on. Test automation does the same for `test.run`, and Export for `export`.
+
+Data is never deleted: unlocking brings everything back as it was. Flags are stored in `app_meta` (`feature_flags`), and the catalog is in `lib/features.js`.

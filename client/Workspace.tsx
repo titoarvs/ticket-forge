@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { loadAgents, hireAgent } from './Agents';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, isDone, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
+import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
@@ -24,7 +24,7 @@ function Sidebar({ view }: { view: string }) {
   const p = P();
   const tests = p.tickets.reduce((s: number, t: any) => s + t.testCases.length, 0);
   const mini = S.sideCollapsed;
-  const item = (v: string, icon: string, label: string, n?: number) => (
+  const item = (v: string, icon: string, label: string, n?: number) => (!feat(VIEW_FEATURE[v] || '') ? null :
     <Link key={v} className={`side-item ${view === v ? 'active' : ''}`} href={`/p/${p.id}/${v}`} title={mini ? `${label}${n !== undefined ? ` (${n})` : ''}` : undefined}
       aria-label={mini ? label : undefined} aria-current={view === v ? 'page' : undefined}>
       <Ico svg={icon} /><span className="side-text">{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
@@ -47,7 +47,7 @@ function Sidebar({ view }: { view: string }) {
       {item('tests', I.test, 'Test cases', tests)}
       {item('testmgmt', I.folder, 'Test management', (p.testRepo?.tests || []).length)}
       {item('automation', I.bot, 'Test automation')}
-      <div className="side-label">Development</div>
+      {feat('prs') && <div className="side-label">Development</div>}
       {item('prs', I.pr, 'Pull requests', p.tickets.reduce((n: number, t: any) => n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length, 0))}
       <div className="side-label">Requirements</div>
       {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}
@@ -57,6 +57,14 @@ function Sidebar({ view }: { view: string }) {
       title={mini ? 'Expand sidebar  [' : 'Collapse sidebar  ['}><Ico svg={I.chevron} /></button>
     </div>
   );
+}
+
+/** Pages that belong to a feature the owner can lock (Administration → Features). */
+const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs' };
+function LockedView({ label }: { label: string }) {
+  return <EmptyState icon={I.settings} tone="neutral" title={`${label} is locked`}
+    actions={S.user?.isOwner ? <Link className="btn primary" href="/admin/features">Manage features</Link> : <Link className="btn" href={`/p/${P().id}/backlog`}>Go to the backlog</Link>}>
+    <p>{S.user?.isOwner ? 'You locked this feature. Unlock it in Administration → Features.' : 'The owner locked this feature. Ask them if you need it.'}</p></EmptyState>;
 }
 
 /** The project couldn't be opened: missing, no access, or a failed request. */
@@ -112,7 +120,7 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
       <style>{statusColorCss()}</style>
       <Sidebar view={v} />
       <div className="main">
-        <section className="view"><View /></section>
+        <section className="view">{feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}</section>
         <Drawer />
       </div>
     </div>

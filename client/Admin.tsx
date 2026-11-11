@@ -8,9 +8,12 @@ import { RoutingSection } from './AiRouting';
 import { AdminSkeleton } from './skeletons';
 import { GenerationTab } from './GenerationTab';
 import { AgentsTab } from './AgentsTab';
+import { FeaturesTab } from './FeatureFlags';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['email', 'Email & database', I.doc]];
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['email', 'Email & database', I.doc]];
+/** Tabs only the owner sees: people (users and invites) and feature flags. */
+const OWNER_TABS = ['users', 'invites', 'features'];
 const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
 
 const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
@@ -22,8 +25,10 @@ function inviteState(i: Any): [string, string] {
   return ['Pending', 's-inprogress'];
 }
 async function load() {
+  // Users and invites are the owner's alone (the server refuses them to other administrators).
+  const owner = Boolean(S.user?.isOwner);
   const [users, roles, invites, projects, email, ai] = await Promise.all([
-    api('/api/admin/users'), api('/api/admin/roles'), api('/api/admin/invites'), api('/api/admin/projects'), api('/api/admin/email'),
+    owner ? api('/api/admin/users') : [], api('/api/admin/roles'), owner ? api('/api/admin/invites') : [], api('/api/admin/projects'), api('/api/admin/email'),
     api('/api/admin/ai').catch(() => null),
   ]);
   Object.assign(A, { users, roles, invites, projects, email, loaded: true, error: null });
@@ -40,7 +45,8 @@ export default function AdminPage({ tab }: { tab: string }) {
   const [q, setQ] = useState('');
   useEffect(() => { closeProject(); reload(); }, []);
   const tt = tab === 'claude' ? 'ai' : tab;
-  const t = TABS.some(([k]) => k === tt) ? tt : 'users';
+  const tabs = TABS.filter(([k]) => S.user?.isOwner || !OWNER_TABS.includes(k));
+  const t = tabs.some(([k]) => k === tt) ? tt : tabs[0][0];
   if (!A.loaded) {
     if (!A.error) return <AdminSkeleton />;
     return <div className="page"><div className="page-inner">
@@ -52,16 +58,17 @@ export default function AdminPage({ tab }: { tab: string }) {
   return (
     <div className="page"><div className="page-inner">
       <div className="crumbs"><Link href="/">Projects</Link><span>/</span><span>Administration</span></div>
-      <div className="page-h"><h1>Administration</h1><div className="spacer" /><button className="btn primary" onClick={() => openModal(<InviteModal />)}><Ico svg={I.plus} />Invite people</button></div>
-      <div className="tabbar">{TABS.map(([k, l, ic]) => (
+      <div className="page-h"><h1>Administration</h1><div className="spacer" />{S.user?.isOwner && <button className="btn primary" onClick={() => openModal(<InviteModal />)}><Ico svg={I.plus} />Invite people</button>}</div>
+      <div className="tabbar">{tabs.map(([k, l, ic]) => (
         <Link key={k} className={`tab ${t === k ? 'active' : ''}`} href={`/admin/${k}`}><Ico svg={ic} />{l}
-          {k === 'invites' && <span className="count">{pending}</span>}{k === 'users' && <span className="count">{A.users.length}</span>}</Link>))}</div>
+          {k === 'invites' && <span className="count">{pending}</span>}{k === 'features' && (S.flags?.locked || []).length > 0 && <span className="count bad">{S.flags.locked.length}</span>}{k === 'users' && <span className="count">{A.users.length}</span>}</Link>))}</div>
       {t === 'users' && <UsersTab q={q} setQ={setQ} />}
       {t === 'invites' && <InvitesTab />}
       {t === 'roles' && <RolesTab />}
       {t === 'ai' && <AiTab />}
       {t === 'generation' && <GenerationTab />}
       {t === 'agents' && <AgentsTab />}
+      {t === 'features' && <FeaturesTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
   );

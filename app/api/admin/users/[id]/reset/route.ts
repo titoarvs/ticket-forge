@@ -1,8 +1,8 @@
-import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
+import { api, authed, ownerOnly, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
 import * as auth from '@/lib/auth.js';
 
 export const POST = api(async (req, p) => {
-  const actor = await perm('users.manage');
+  const actor = await ownerOnly();
   const u = await auth.getUser(p.id);
   if (!u) throw new HttpError(404, 'User not found');
   const t = await auth.createReset(u.id);

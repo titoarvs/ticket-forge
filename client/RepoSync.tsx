@@ -3,7 +3,7 @@
 // Sync reads the project's local repository: its pages, what changed since the last sync, the test cases those changes
 // affect, and features already delivered. Everything comes back as a review; nothing changes until you apply it.
 import { useState } from 'react';
-import { S, P, api, nextEpicKey, COLORS, isDone, mutate, toast, openModal, closeModal, can, uid, ago, readNdjson, aiBody, startTask, setField, logEvent, newTicket, newTest, me, type Any } from './core';
+import { S, P, feat, api, nextEpicKey, COLORS, isDone, mutate, toast, openModal, closeModal, can, uid, ago, readNdjson, aiBody, startTask, setField, logEvent, newTicket, newTest, me, type Any } from './core';
 import { Ico, I, Modal, Spinner } from './ui';
 import { TF, SF, CB, MenuItem } from './fields';
 import { appSetup } from './AppSetup';
@@ -13,7 +13,12 @@ const stepsOf = (s: Any) => (Array.isArray(s) ? s : s ? [String(s)] : []);
 let running = false;
 
 // ---------------------------------------------------------------- sync card (Test automation → App setup)
+/** Repository sync, unless the owner locked it (Administration → Features). */
 export function RepoSyncCard() {
+  if (!feat('reposync')) return <p className="muted small" style={{ margin: 0 }}><b>Repository sync is locked.</b> {S.user?.isOwner ? 'Unlock it in Administration → Features.' : 'The owner locked this feature.'}</p>;
+  return <RepoSyncCardInner />;
+}
+function RepoSyncCardInner() {
   const p = P();
   const dir = p.dev?.localPath || (appSetup(p).source?.kind === 'folder' ? appSetup(p).source.location : '');
   const last = p.automation?.repoSync;

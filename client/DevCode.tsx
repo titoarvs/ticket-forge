@@ -2,7 +2,7 @@
 // Code & GitHub: a project's local repository and GitHub settings, and the "Write code with AI" job for an issue:
 // Claude Code implements it in its own git worktree, you review the diff, TicketForge opens the pull request.
 import { useEffect, useRef, useState } from 'react';
-import { S, P, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, type Any } from './core';
+import { S, P, feat, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm, SetCard, LAYER_LABEL } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
@@ -183,7 +183,7 @@ function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boole
 }
 
 /** Whether "Write code with AI" can be offered for issues in this project. */
-export const codeReady = () => Boolean(dev().localPath);
+export const codeReady = () => feat('code') && Boolean(dev().localPath);
 
 const STATUS: Record<string, string> = { committed: 'Committed locally', report: 'Report ready', starting: 'Starting…', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
 

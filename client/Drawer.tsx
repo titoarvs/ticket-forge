@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   S, emit, P, ago, fmtDate, allowedStatuses, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
   statusNames, statusOf, statusColor, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
-  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, type Any,
+  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, feat, type Any,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState } from './ui';
 import {
@@ -17,7 +17,6 @@ import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
 import { FbdSection, ArdSection } from './Fbd';
 import { openSplitIssues } from './Split';
-import { EpicAgents } from './Agents';
 import { codeReady, openCode, openUpdatePr } from './DevCode';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -204,9 +203,9 @@ function IssuePanel({ t }: { t: Any }) {
           <TestsSection t={t} />
           <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span>
             {edit && <div className="tools">
-              {can('ai.use') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
+              {can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
                 : can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>)}
-              <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button></div>}</div>
+              {feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
             {t.prs.map((r: Any) => (
               <div key={r.id} className="pr-row"><Ico svg={I.pr} /><div className="pr-main"><a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
                 <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div></div>
@@ -289,7 +288,7 @@ function IssuePanel({ t }: { t: Any }) {
               </>}
               <span className="label">Development</span>
               <span className="dev-sum">{t.prs.length ? <><Ico svg={I.pr} /> {t.prs.length} pull request{t.prs.length > 1 ? 's' : ''} {[...new Set(t.prs.map((r: Any) => r.status))].map((s2: Any) => <span key={s2} className={`loz ${prCls(s2)}`}>{s2}</span>)}</>
-                : edit ? <a href="#" className="small" onClick={(ev) => { ev.preventDefault(); S.prForm = true; emit(); }}>Link pull request</a> : <span className="muted">None</span>}</span>
+                : edit && feat('prs') ? <a href="#" className="small" onClick={(ev) => { ev.preventDefault(); S.prForm = true; emit(); }}>Link pull request</a> : <span className="muted">None</span>}</span>
               <span className="label">Tests</span>
               <span className="dev-sum">{t.testCases.length ? `${t.testCases.filter((x: Any) => x.status === 'Pass').length}/${t.testCases.length} passing · ${t.testCases.filter((x: Any) => x.script).length} automated` : <span className="muted">None</span>}</span>
             </div>
@@ -464,14 +463,13 @@ function EpicPanel({ e }: { e: Any }) {
       <div className="dr-actions">
         {can('issue.create') && <button className="btn" onClick={() => openModal(<CreateIssueModal epicId={e.id} />)}><Ico svg={I.plus} />Create issue</button>}
         {can('issue.create') && can('ai.use') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
-        {can('issue.create') && can('ai.use') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
+        {can('issue.create') && can('ai.use') && feat('split') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
-      <PsdSection epic={e} />
+      {feat('docs') && <><PsdSection epic={e} />
       <FbdSection epic={e} />
-      <ArdSection epic={e} />
-      <EpicAgents epic={e} />
+      <ArdSection epic={e} /></>}
       <div className="sec"><div className="sec-title"><h3>Dates</h3>
         {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>
         <div className="grid2 epic-dates">

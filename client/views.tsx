@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
   activeSprint, openSprints, tcKey, spSum, statusNames, allowedStatuses, sCls, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
-  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, type Any,
+  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, feat, type Any,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, LayerChip, Confirm, Spinner, AutoTextarea, EmptyState, Modal, Menu } from './ui';
 import {
@@ -358,8 +358,8 @@ function EpicsAiMenu() {
         <button onClick={() => openModal(<FeatureModal />)}><Ico svg={I.plus} />Add feature<small>New epics and issues</small></button></>}
       {manage && <>
         <button onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize epics<small>Regroup issues</small></button>
-        {plan && <button onClick={() => openSplitIssues()}><Ico svg={I.subtask} />Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small></button>}
-        {p.epics.length > 0 && <><hr /><div className="mh">Write for epics without one</div>
+        {plan && feat('split') && <button onClick={() => openSplitIssues()}><Ico svg={I.subtask} />Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small></button>}
+        {p.epics.length > 0 && feat('docs') && <><hr /><div className="mh">Write for epics without one</div>
           {doc('psd', 'Problem Statements', writeMissingPsds)}
           {doc('fbd', 'Feature Briefs', writeMissingFbds)}
           {doc('ard', 'Architecture Records', () => writeMissingDocs('ard'))}</>}
@@ -374,9 +374,9 @@ export function Epics() {
     <Header title="Epics" right={<>
       <EpicsAiMenu />
       {can('epic.manage') && <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}
-      <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link></>} />
+      {feat('timeline') && <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link>}</>} />
     {p.epics.length ? <>
-      <table className="tbl ep-tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th><th>Progress</th><th className="num ep-done">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className={`tbl ep-tbl ${feat('docs') ? '' : 'no-docs'}`}><thead><tr><th>Epic</th><th>Dates</th>{feat('docs') && <><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th></>}<th>Progress</th><th className="num ep-done">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
@@ -785,8 +785,8 @@ export function Automation() {
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), comment: e.target.checked }; })} />
         <CB label="Notify the assignee (in-app and email)" disabled={!can('project.settings')} checked={p.automation.onFail?.notify !== false}
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
-        <CB label={<>Add an AI failure analysis <span className="muted">(cause, evidence, fix; uses the light model)</span></>} disabled={!can('project.settings')} checked={p.automation.onFail?.analyze !== false}
-          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), analyze: e.target.checked }; })} />
+        {feat('failure-analysis') && can('ai.use') && <CB label={<>Add an AI failure analysis <span className="muted">(cause, evidence, fix; uses the light model)</span></>} disabled={!can('project.settings')} checked={p.automation.onFail?.analyze !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), analyze: e.target.checked }; })} />}
       </div>
       <div className="row" style={{ marginTop: 4, gap: 16 }}>
         <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When all of an issue’s tests pass</span>

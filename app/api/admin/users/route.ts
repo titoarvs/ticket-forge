@@ -1,4 +1,4 @@
-import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
+import { api, authed, ownerOnly, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
 import * as auth from '@/lib/auth.js';
 
-export const GET = api(async () => { await perm('users.manage'); return auth.listUsers(); });
+export const GET = api(async () => { await ownerOnly(); return auth.listUsers(); });

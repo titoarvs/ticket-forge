@@ -278,7 +278,12 @@ export const tCls = (s: string) => `t-${String(s).toLowerCase().replace(/\s/g, '
 export const openIssue = () => (S.drawer?.kind === 'issue' ? ticket(S.drawer.id) : null);
 export const openEpic = () => (S.drawer?.kind === 'epic' ? epic(S.drawer.id) : null);
 export const me = () => S.user?.name || 'You';
-export const can = (perm: string) => Boolean(S.user && (S.user.isOwner || S.user.permissions.includes(perm)));
+/** Feature flags (Administration → Features): features the owner locked are hidden for everyone. */
+export const feat = (id: string) => !(S.flags?.locked || []).includes(id);
+/** Permissions that mean nothing while their feature is locked. */
+const PERM_FEATURE: Record<string, string> = { 'ai.use': 'ai', 'test.run': 'automation', export: 'export' };
+export const can = (perm: string) => Boolean(S.user && (S.user.isOwner || S.user.permissions.includes(perm)) && (!PERM_FEATURE[perm] || feat(PERM_FEATURE[perm])));
+export async function loadFlags() { try { S.flags = await api('/api/features'); emit(); } catch { /* keep what we have */ } }
 export const peopleNames = (): string[] => [...new Set([...S.people.map((u: Any) => u.name), ...(P()?.members || []).map((m: Any) => m.name)])].filter(Boolean) as string[];
 export const keyOf = (id: string) => ticket(id)?.key || '';
 export const isBlocked = (t: Any) => t.links.some((l: Any) => l.type === 'is blocked by' && ticket(l.targetId) && !isDone(ticket(l.targetId)));
