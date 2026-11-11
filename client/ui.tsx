@@ -213,3 +213,21 @@ export function SetCard({ title, desc, right, children, tone, id }: { title: Rea
     </section>
   );
 }
+
+/** Which section of a long settings page is open; remembered per browser. */
+export function useSection(key: string, keys: string[], dflt: string): [string, (k: string) => void] {
+  const [v, setV] = useState(() => { try { const x = localStorage.getItem(key); return x && keys.includes(x) ? x : dflt; } catch { return dflt; } });
+  const set = (k: string) => { setV(k); try { localStorage.setItem(key, k); } catch { /* private mode */ } };
+  return [keys.includes(v) ? v : dflt, set];
+}
+/** Section navigation for a long settings page: a list on the left (a scrolling row on small screens). */
+export function SectionNav({ items, value, onChange, label }: { items: { key: string; label: string; hint?: string; icon?: string; badge?: ReactNode }[]; value: string; onChange: (k: string) => void; label: string }) {
+  return (
+    <nav className="sec-nav" role="tablist" aria-label={label}>
+      {items.map((x) => (
+        <button key={x.key} type="button" role="tab" aria-selected={value === x.key} className={value === x.key ? 'on' : ''} onClick={() => onChange(x.key)}>
+          {x.icon && <Ico svg={x.icon} />}<span className="sec-nav-t"><b>{x.label}{x.badge}</b>{x.hint && <span>{x.hint}</span>}</span>
+        </button>))}
+    </nav>
+  );
+}

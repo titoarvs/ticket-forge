@@ -606,7 +606,9 @@ export function AiSettingsModal() {
           <br /><span className="muted">{account ? 'Used because you opened TicketForge on this computer (localhost).' : 'Used because TicketForge was opened on a web address. On your own computer it uses your Claude account instead.'}</span></span>
       </div>
       {account
-        ? <><label className="field"><span>Claude model — leave blank for the default</span><PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={st.model || 'opus'} /></label>
+        ? st.routingOn
+          ? <p className="small muted" style={{ marginBottom: 0 }}><b>Model routing is on:</b> each kind of work uses the model your administrator set for it (for example a lighter model for epics and failure notes){admin ? <>; see {goAdmin} → Model routing</> : ''}.</p>
+          : <><label className="field"><span>Claude model — leave blank for the default</span><PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={st.model || 'opus'} /></label>
             <p className="small muted" style={{ marginBottom: 0 }}>Aliases like <code>opus</code> or <code>sonnet</code> use the newest model your Claude Code knows (<code>claude update</code> gets the latest).</p></>
         : <p className="small muted" style={{ marginBottom: 0 }}>The provider and model are set with environment variables on the server{admin ? <>; see {goAdmin}</> : ''}.</p>}
     </Modal>

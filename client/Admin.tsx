@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
-import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState } from './ui';
+import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection } from './ui';
+import { RoutingSection } from './AiRouting';
 import { AdminSkeleton } from './skeletons';
 import { GenerationTab } from './GenerationTab';
 import { AgentsTab } from './AgentsTab';
@@ -426,7 +427,25 @@ function ProvidersCard({ c }: { c: Any }) {
       })}</div> : <EmptyState compact icon={I.sparkle} title="No AI providers yet" actions={<button className="btn primary" onClick={() => openModal(<ProviderModal c={c} />)}><Ico svg={I.plus} />Add provider</button>}>
         <p>Add one or more AI APIs. With two or more, TicketForge switches automatically when one is limited.</p></EmptyState>}
 
-      {c.copilot && <div className="local-ai">
+      <div className="row" style={{ marginTop: 14, justifyContent: 'space-between' }}>
+        <label className="check small" style={{ maxWidth: 620 }}><CB checked={c.accountFallback !== false} disabled={!!busy}
+          onChange={(e: Any) => run('fallback', () => patch({ accountFallback: e.target.checked }))} />
+          On your own computer, use these providers when the local AI can’t: not installed, not signed in, sign-in expired, or usage limit reached</label>
+        {anyCooling && <button className="btn sm subtle" disabled={!!busy} onClick={() => reset()}>Clear all cooldowns</button>}
+      </div>
+    </div>
+  );
+}
+
+/** Which AI runs on this computer (localhost): Claude Code or the GitHub Copilot CLI, and Copilot as Claude's backup. */
+function LocalAiCard({ c }: { c: Any }) {
+  const [busy, setBusy] = useState('');
+  const run = async (key: string, fn: () => Promise<void>) => { setBusy(key); try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
+  const patch = (b: Any) => api('/api/admin/ai', { method: 'PATCH', body: b }).then(applyAi);
+  return (
+    <div className="card wide"><h3>Local AI</h3>
+      <p className="sub">Used when TicketForge is opened on this computer (localhost), with your own subscription. Model routing picks the model per task.</p>
+      <div className="local-ai" style={{ marginTop: 0 }}>
         <div className="local-ai-h"><b>Local AI on this computer</b><span className="muted small">Used when TicketForge is opened at localhost. Runs with your own subscription.</span></div>
         <div className="local-ai-opts" role="radiogroup" aria-label="Local AI">
           {([['claude', 'Claude Code', 'Your Claude account (Claude Code).'], ['copilot', 'GitHub Copilot CLI', 'Your GitHub Copilot subscription (copilot).']] as [string, string, string][]).map(([k, l, d]) => (
@@ -445,13 +464,6 @@ function ProvidersCard({ c }: { c: Any }) {
         {(c.localEngine || 'claude') === 'claude' && c.copilot.available && <label className="check small"><CB checked={Boolean(c.copilotBackup)} disabled={!!busy}
           onChange={(e: Any) => run('cpbackup', () => patch({ copilotBackup: e.target.checked }))} />
           When your Claude account is limited or signed out, use GitHub Copilot before the providers below</label>}
-      </div>}
-
-      <div className="row" style={{ marginTop: 14, justifyContent: 'space-between' }}>
-        <label className="check small" style={{ maxWidth: 620 }}><CB checked={c.accountFallback !== false} disabled={!!busy}
-          onChange={(e: Any) => run('fallback', () => patch({ accountFallback: e.target.checked }))} />
-          On your own computer, use these providers when the local AI can’t: not installed, not signed in, sign-in expired, or usage limit reached</label>
-        {anyCooling && <button className="btn sm subtle" disabled={!!busy} onClick={() => reset()}>Clear all cooldowns</button>}
       </div>
     </div>
   );
@@ -463,6 +475,7 @@ function AiTab() {
   const [busy, setBusy] = useState('');
   const [showEnv, setShowEnv] = useState(false);
   const [envProv, setEnvProv] = useState('openai');
+  const [sec, setSec] = useSection('tf.adminAiSec', ['connection', 'routing', 'providers', 'local'], 'connection');
   const refresh = async () => { setBusy('refresh'); try { applyAi(await api('/api/admin/ai?fresh=1')); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
   if (!c) {
     return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await api('/api/admin/ai?fresh=1'))}>
@@ -479,8 +492,29 @@ function AiTab() {
     : c.serverless ? 'This copy runs on serverless hosting, so it uses the AI providers below.'
     : 'TicketForge was opened on a web address (not localhost), so it uses the AI providers below.';
   const now = c.mode === 'account' && !c.switched ? 'Your Claude account' : c.label;
+  const items = [
+    { key: 'connection', label: 'Connection', hint: 'Status, sign-in and test', icon: I.sparkle },
+    { key: 'routing', label: 'Model routing', hint: 'Which model each task uses', icon: I.chart, badge: c.routingOn ? null : <span className="loz">Off</span> },
+    { key: 'providers', label: 'Providers', hint: 'AI APIs, in priority order', icon: I.grid, badge: (c.apis || []).some((x: Any) => x.cooldown) ? <span className="loz t-blocked">Limited</span> : null },
+    ...(c.copilot ? [{ key: 'local', label: 'Local AI', hint: 'Claude Code or GitHub Copilot', icon: I.user }] : []),
+  ];
   return (
-    <div className="cards">
+    <div className="sec-layout">
+      <SectionNav label="AI settings" items={items} value={sec} onChange={setSec} />
+      <div className="sec-body">
+      {sec === 'routing' && <RoutingSection key={JSON.stringify(c.settings?.routing)} c={c} onSaved={applyAi} />}
+      {sec === 'local' && c.copilot && <div className="cards"><LocalAiCard c={c} /></div>}
+      {sec === 'providers' && <div className="cards"><ProvidersCard c={c} />
+      <div className="card wide">
+        <p className="muted small" style={{ margin: 0 }}>
+          <a href="#" onClick={(e) => { e.preventDefault(); setShowEnv(!showEnv); }}>{showEnv ? 'Hide' : 'Prefer environment variables?'}</a>
+          {showEnv && <> A provider set with environment variables (on Vercel: <b>Settings → Environment Variables</b>, then redeploy) is used after the ones above.</>}</p>
+        {showEnv && <>
+          <label className="field" style={{ maxWidth: 280, marginTop: 12 }}><span>Provider</span>
+            <SF value={envProv} onChange={(e) => setEnvProv(e.target.value)}>{c.providers.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.label}</MenuItem>)}</SF></label>
+          <pre className="code">{envExample(c, envProv)}</pre></>}
+      </div></div>}
+      {sec === 'connection' && <div className="cards">
       <div className="card wide"><h3>AI connection</h3>
         <p className="sub">TicketForge uses AI to write and improve tickets and test scripts. On your own computer it uses your Claude account; anywhere else, the providers below.</p>
         <table className="tbl"><tbody>
@@ -510,17 +544,14 @@ function AiTab() {
         </div>
         {test && <div style={{ marginTop: 12 }}><TestResult t={test} /></div>}
       </div>
-
-      <ProvidersCard c={c} />
-
-      <div className="card wide">
-        <p className="muted small" style={{ margin: 0 }}>
-          <a href="#" onClick={(e) => { e.preventDefault(); setShowEnv(!showEnv); }}>{showEnv ? 'Hide' : 'Prefer environment variables?'}</a>
-          {showEnv && <> A provider set with environment variables (on Vercel: <b>Settings → Environment Variables</b>, then redeploy) is used after the ones above.</>}</p>
-        {showEnv && <>
-          <label className="field" style={{ maxWidth: 280, marginTop: 12 }}><span>Provider</span>
-            <SF value={envProv} onChange={(e) => setEnvProv(e.target.value)}>{c.providers.map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.label}</MenuItem>)}</SF></label>
-          <pre className="code">{envExample(c, envProv)}</pre></>}
+      <div className="card wide"><h3>At a glance</h3>
+        <table className="tbl"><tbody>
+          {row('Model routing', c.routingOn ? <>On · <a href="#" onClick={(e) => { e.preventDefault(); setSec('routing'); }}>{(c.tasks || []).length} tasks across High, Standard and Light</a></> : <>Off · every task uses the main model</>)}
+          {row('AI APIs', <><a href="#" onClick={(e) => { e.preventDefault(); setSec('providers'); }}>{(c.apis || []).filter((x: Any) => x.enabled && x.configured).length} ready</a>{(c.apis || []).some((x: Any) => x.cooldown) && <span className="loz t-blocked" style={{ marginLeft: 6 }}>Some limited</span>}</>)}
+          {c.copilot && row('Local AI', <a href="#" onClick={(e) => { e.preventDefault(); setSec('local'); }}>{c.localEngine === 'copilot' ? 'GitHub Copilot' : 'Claude Code'}{c.localEngine !== 'copilot' && c.copilotBackup ? ', Copilot as backup' : ''}</a>)}
+        </tbody></table>
+      </div>
+      </div>}
       </div>
     </div>
   );

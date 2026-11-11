@@ -209,7 +209,7 @@ export function IssueRow({ t, showEpic = true, zone, compact = false }: { t: Any
 }
 
 /** Status lozenge that opens a menu of the statuses this issue may move to (respects custom workflow transitions). */
-const RowStatus = ({ t }: { t: Any }) => (
+export const RowStatus = ({ t }: { t: Any }) => (
   <SF loz className={`loz ${sCls(t.status)}`} aria-label={`Status of ${t.key}`} value={t.status}
     onClick={(e: Any) => e.stopPropagation()} onMouseDown={(e: Any) => e.stopPropagation()} draggable={false}
     onChange={(e: Any) => { if (e.target.value !== t.status) mutate(() => setField(t, 'status', e.target.value), { tag: `t.status${t.id}` }); }}>
@@ -224,7 +224,7 @@ const avatarSelect = { '&&': {
   '& .MuiSelect-select': { padding: '0 !important', minHeight: '0 !important', display: 'flex' },
   '& .MuiSelect-icon': { display: 'none' },
 } };
-function RowAssignee({ t }: { t: Any }) {
+export function RowAssignee({ t }: { t: Any }) {
   const people = peopleNames();
   const list = t.assignee && !people.includes(t.assignee) ? [t.assignee, ...people] : people;
   const set = (v: string) => { if (v !== (t.assignee || '')) mutate(() => setField(t, 'assignee', v), { tag: `t.assignee${t.id}` }); };
@@ -253,7 +253,7 @@ function InlineCreate({ group }: { group: string }) {
   );
 }
 
-function BulkBar() {
+export function BulkBar() {
   const p = P();
   const ids = [...S.checked].filter((id: string) => ticket(id)) as string[];
   if (!ids.length) return null;
@@ -785,6 +785,8 @@ export function Automation() {
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), comment: e.target.checked }; })} />
         <CB label="Notify the assignee (in-app and email)" disabled={!can('project.settings')} checked={p.automation.onFail?.notify !== false}
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
+        <CB label={<>Add an AI failure analysis <span className="muted">(cause, evidence, fix; uses the light model)</span></>} disabled={!can('project.settings')} checked={p.automation.onFail?.analyze !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), analyze: e.target.checked }; })} />
       </div>
       <div className="row" style={{ marginTop: 4, gap: 16 }}>
         <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When all of an issue’s tests pass</span>

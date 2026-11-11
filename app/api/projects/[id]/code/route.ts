@@ -1,7 +1,7 @@
 import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel } from '@/lib/devagent.js';
+import { startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent.js';
 import { publicAgents, CODE_AGENT_IDS } from '@/lib/agents.js';
 import { getProjectSecret } from '@/lib/secrets.js';
 import { ardContext } from '@/lib/ard.js';
@@ -89,8 +89,12 @@ export const POST = api(async (req, p) => {
     await guard(p, ['issue.edit']); own(b.jobId);
     return pushToPullRequest(b.jobId, { message: String(b.message || ''), token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') });
   }
-  if (['update', 'describe', 'comments'].includes(b.action)) {
-    const user = await guard(p, b.action === 'comments' ? [] : ['ai.use', 'issue.edit']);
+  if (b.action === 'postReview') {
+    await guard(p, ['ai.use']); own(b.jobId);
+    return postReview(b.jobId, { token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') });
+  }
+  if (['update', 'describe', 'comments', 'prReview'].includes(b.action)) {
+    const user = await guard(p, b.action === 'comments' ? [] : b.action === 'prReview' ? ['ai.use'] : ['ai.use', 'issue.edit']);
     const project = await store.getProject(p.id);
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     const pr = ticket?.prs?.find((x: any) => x.id === b.prId);
@@ -101,6 +105,7 @@ export const POST = api(async (req, p) => {
     const target = { url: pr.url, number: pr.number, branch: pr.branch, base: pr.base || where.dev.baseBranch || 'main', title: pr.title, provider: pr.provider };
     const tokens = { token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') };
     if (b.action === 'comments') return { comments: await reviewComments({ repoPath: where.dev.localPath, target, ...tokens }) };
+    if (b.action === 'prReview') return startPrReview({ projectId: p.id, ticket, dev: where.dev, target, user, side: where.side, agentId: b.agent === 'ui-review' ? 'ui-review' : 'review', focus: String(b.focus || '').slice(0, 1000) });
     if (b.action === 'describe') return describePullRequest({ repoPath: where.dev.localPath, target, ticket, side: where.side, ...tokens, appLink: `${appUrl(req)}/p/${p.id}/backlog`, ai: aiOpts(b) });
     // update: an agent works on the request's own branch; the person reviews, then pushes to the same request.
     const mode = String(b.mode || 'prompt');

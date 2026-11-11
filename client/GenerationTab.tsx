@@ -3,7 +3,7 @@
 // Every generation follows these rules; the defaults give consistent, direct results.
 import { useEffect, useRef, useState } from 'react';
 import { S, api, toast, openModal, ago, type Any } from './core';
-import { Ico, I, Confirm, Spinner, ErrorState } from './ui';
+import { Ico, I, Confirm, Spinner, ErrorState, SectionNav, useSection } from './ui';
 import { TF, TA, SF, CB, RB, MenuItem } from './fields';
 import { Loading, Sk } from './ui';
 import { GuideCard } from './GuideCard';
@@ -40,6 +40,7 @@ export function GenerationTab() {
   const [busy, setBusy] = useState('');
   const [preview, setPreview] = useState<Any>(null);
   const [prompts, setPrompts] = useState<Any>(null);
+  const [sec, setSec] = useSection('tf.adminGenSec', ['general', 'tickets', 'tests', 'testmgmt', 'documents', 'prompts'], 'general');
   const timer = useRef<Any>(null);
   const load = async () => { setErr(null); try { const d = await api('/api/admin/generation'); setData(d); setR(d.rules); setPreview(d.preview); setPrompts(d.prompts); } catch (e: Any) { setErr(e); } };
   const refreshPrompts = () => { if (r) api('/api/admin/generation', { method: 'PUT', body: { rules: r, preview: true } }).then((x) => { setPreview(x.preview); setPrompts(x.prompts); }).catch(() => {}); };
@@ -90,9 +91,21 @@ export function GenerationTab() {
     onYes={async () => { const d = await api('/api/admin/generation', { method: 'DELETE' }); setData(d); setR(d.rules); setPreview(d.preview); setPrompts(d.prompts); toast('Generation rules reset to the defaults'); }} />);
   const scaleText = (r.tickets.pointScale || []).join(', ');
 
+  const changed = (keys: string[]) => keys.some((k) => JSON.stringify(r[k]) !== JSON.stringify(data.rules[k]));
+  const dot = (keys: string[]) => (changed(keys) ? <span className="gen-dot" title="Unsaved changes" /> : null);
+  const items = [
+    { key: 'general', label: 'General', hint: 'Thinking level and team rules', icon: I.sparkle, badge: dot(['reasoning', 'stickToDocument', 'custom']) },
+    { key: 'tickets', label: 'Tickets', hint: 'Titles, criteria, points, types', icon: I.backlog, badge: dot(['tickets']) },
+    { key: 'tests', label: 'Test cases & scripts', hint: 'Test cases on issues, Playwright', icon: I.test, badge: dot(['tests', 'automation']) },
+    { key: 'testmgmt', label: 'Test management', hint: 'Corporate test standard', icon: I.check, badge: dot(['testmgmt']) },
+    { key: 'documents', label: 'Documents', hint: 'Guide and document templates', icon: I.doc },
+    { key: 'prompts', label: 'What the AI is told', hint: 'Preview of every prompt', icon: I.summary },
+  ];
   return (
-    <div className="gen">
-      <div className="cards">
+    <div className="gen sec-layout">
+      <SectionNav label="Generation settings" items={items} value={sec} onChange={setSec} />
+      <div className="sec-body">
+      {sec === 'general' && <div className="cards">
         <div className="card wide"><h3>How the AI works</h3>
           <p className="sub">These rules apply to everyone’s generation: new projects from documents, Enhance, acceptance criteria, test cases, splitting issues and automation scripts.</p>
           <div className="gen-reason">{REASONING.map(([k, label, desc]) => (
@@ -101,7 +114,16 @@ export function GenerationTab() {
               <div><b>{label}</b>{k === D.reasoning && <span className="label-chip" style={{ marginLeft: 6 }}>Default</span>}<div className="muted small">{desc}</div></div>
             </label>))}</div>
           {check('stickToDocument', 'Stick to the document: no extra features or speculative tickets; unclear points become open questions')}
+          <p className="muted small" style={{ margin: '8px 0 0' }}>Which <b>model</b> each task uses is set in <a href="/admin/ai" onClick={(e) => { e.preventDefault(); try { localStorage.setItem('tf.adminAiSec', 'routing'); } catch { /* */ } S.nav('/admin/ai'); }}>AI → Model routing</a>.</p>
         </div>
+
+        <div className="card wide"><h3>Team rules</h3>
+          <p className="sub">Anything else every generation should follow, in plain words.</p>
+          <TA value={r.custom} placeholder={'e.g. Write for a non-technical reader. Use “customer”, not “user”. Mention the API endpoint in technical tasks.'} onChange={(e) => set('custom', e.target.value)} />
+        </div>
+      </div>}
+
+      {sec === 'tickets' && <div className="cards">
 
         <div className="card wide"><h3>Tickets</h3>
           <div className="gen-grid">
@@ -131,6 +153,9 @@ export function GenerationTab() {
           </div>
         </div>
 
+      </div>}
+
+      {sec === 'tests' && <div className="cards">
         <div className="card"><h3>Test cases</h3>
           <div className="gen-grid two">
             {num('tests.perTicket', 'Test cases per ticket', 1, 15)}
@@ -157,6 +182,9 @@ export function GenerationTab() {
             <TF value={r.automation.testDataPrefix} placeholder="e.g. QA (leave empty for none)" onChange={(e) => set('automation.testDataPrefix', e.target.value)} /></label>
         </div>
 
+      </div>}
+
+      {sec === 'testmgmt' && <div className="cards">
         <div className="card wide"><h3>Test management</h3>
           <p className="sub">How the AI writes repository tests and builds test plans (Test management). Start from a corporate standard, then change any field to match your company’s.</p>
           <div className="tm-std" role="radiogroup" aria-label="Corporate standard">{TM_STANDARDS.map(([k, l, dsc]) => (
@@ -184,21 +212,16 @@ export function GenerationTab() {
           <label className="field"><span>Company test standard (anything else)</span><TA rows={3} value={r.testmgmt.custom} placeholder={'e.g. Every test names the role it runs as. Amounts use PHP with two decimals. Payroll tests use the QA-Payroll company. Never test against production data.'} onChange={(e) => setTm('custom', e.target.value)} /></label>
         </div>
 
-        <div className="card wide"><h3>Team rules</h3>
-          <p className="sub">Anything else every generation should follow, in plain words.</p>
-          <TA value={r.custom} placeholder={'e.g. Write for a non-technical reader. Use “customer”, not “user”. Mention the API endpoint in technical tasks.'} onChange={(e) => set('custom', e.target.value)} />
-        </div>
+      </div>}
 
+      {sec === 'documents' && <div className="cards">
         <GuideCard onChange={refreshPrompts} />
-
         <PsdTemplateCard />
-
         <FbdTemplateCard />
-
         <ArdTemplateCard />
+      </div>}
 
-        <AiTold prompts={prompts} />
-      </div>
+      {sec === 'prompts' && <div className="cards"><AiTold prompts={prompts} /></div>}
 
       <div className={`gen-bar ${dirty ? 'dirty' : ''}`}>
         <span className="muted small">{dirty ? 'Unsaved changes' : data.meta ? <>Saved{data.meta.updatedBy ? ` by ${data.meta.updatedBy}` : ''} {ago(data.meta.updatedAt)}</> : 'Using the default rules'}</span>
@@ -206,6 +229,7 @@ export function GenerationTab() {
         <button className="btn subtle" disabled={!!busy} onClick={reset}><Ico svg={I.undo} />Reset to defaults</button>
         {dirty && <button className="btn" disabled={!!busy} onClick={() => setR(data.rules)}>Discard</button>}
         <button className="btn primary" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? <><Spinner />Saving…</> : 'Save rules'}</button>
+      </div>
       </div>
     </div>
   );

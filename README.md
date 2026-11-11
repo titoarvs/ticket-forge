@@ -677,3 +677,66 @@ See [docs/test-management-parity.md](docs/test-management-parity.md) for the ful
 - **Write tests with AI** writes repository tests for chosen issues, for review before they're added.
 - **Improve with AI** in the test editor rewrites a test to the standard (or as asked, e.g. "convert to Gherkin").
 - **Build plan with AI** follows the plan rules.
+
+### Model routing (Administration → AI → Model routing)
+
+Every AI call names its task, and each task uses a **tier**:
+- **High** (best model): tickets, documents and automation scripts.
+- **Standard**: epics from documents, splitting issues, the repository scan, test cases and test plans.
+- **Light** (fast and cheap): failure analysis, PR text, clarifying questions and small helper jobs. Light tasks skip extended thinking.
+
+Each tier maps to a model on every AI:
+- your Claude account: `opus` / `sonnet` / `haiku` by default;
+- GitHub Copilot;
+- each AI API. A blank field uses the provider's own model, e.g. set OpenAI's Light tier to `gpt-4.1-mini`.
+
+Claude Code agents are routed too:
+- **Coding agents** (Build, Frontend and Backend Developer, Fix a Bug, Architecture Record) use High.
+- **Test and helper agents** (Feature Tests, Test Automation, Free Worker) use Standard.
+- **Code review** (Review a Pull Request, Review Panel, UI/UX Review) uses High.
+- **Document agents** use Standard.
+
+A model picked on an agent in Administration → Agents still wins over routing. Usage for agent runs shows the cost Claude Code reports.
+
+Presets: **Best quality**, **Balanced** (the default) and **Economy**. The page also shows the calls, the volume of text and the model that answered for each task since the server started. When routing is on, it overrides each person's own model choice in the AI connection dialog. The code is in `lib/aitasks.js`.
+
+### AI failure analysis on automated tests
+
+When automated tests fail, the test-run comment on the issue includes an AI analysis of each failure, using the **Light** tier. It covers:
+- a category (product bug, test script, test data, environment or flaky), a confidence and an owner;
+- expected and actual results, the likely cause, the evidence, a fix and next steps;
+- for script problems, corrected script lines.
+
+The analysis works from the error, the script, the test case, the issue's acceptance criteria, the page the test ended on and the browser logs.
+
+The same analysis goes into the assignee's notification and email. From the comment you can copy it as a bug report, or rewrite the script and re-run. Turn it off in Test automation → Settings → "When a test fails". The code is in `lib/failures.js`.
+
+### Pull requests page
+
+**Pull requests** (sidebar → Development) lists every pull and merge request linked to the project's issues. You can filter by status (Active, Open, Draft, Merged, Declined) or repository, and search. Each request shows its branch, author, linked issue (click it to open the issue) and the latest AI review verdict.
+
+Actions on each request:
+- **Review with AI**: a read-only Code review or UI/UX review agent reads the request's diff on a detached checkout of its branch and checks it against the issue's acceptance criteria. It writes a verdict and findings (blocking, should fix, nits). You can then post the review on the request as a comment.
+- **Update with AI**: change, enhance, address review comments, or rewrite the description.
+- **Refresh** the status from GitHub or GitLab, one request or all open ones.
+- **Link** a request to an issue.
+
+### Issues page
+
+**Issues** (sidebar → Planning) is a flat, sortable table of every issue, like an issue navigator:
+- **Quick views:** All, Open, Assigned to me, Unassigned, Open bugs, Blocked, Failing tests, Updated this week, Done. Each shows its count.
+- **Filters:** search (key, summary, description), type, status, priority, assignee, epic, sprint, layer and label. Sub-tasks can be shown too.
+- **Sorting and columns:** click a column header to sort. A column chooser covers type, status, priority, assignee, epic, sprint, layer, points, labels, tests passing, PRs, reporter, due, updated and created.
+- **Saved views:** save the current filters, sort and columns as a view (kept in this browser).
+- **Editing:** change status and assignee inline, select rows for the usual bulk actions, and **Export CSV** of what's shown.
+
+### Find built features: from the code
+
+Test automation → **Find built features** works from the **code**. Without AI, it first takes an inventory of:
+- every page's headings, actions, fields, links and API calls;
+- the API endpoints (Next.js, Express, Fastify, Hono, NestJS, Laravel, Django);
+- the data models (Prisma, Drizzle, TypeORM, Sequelize, Mongoose, SQL migrations, Django), also from the **backend repository** when one is set.
+
+The AI groups that into epics and features, and writes each feature's tickets from its pages' code: real labels, fields, rules and endpoints.
+
+Git history and `.md` documents (release notes, feature notes) are hints for naming only. Every feature must cite code that exists in the repository. Anything only the documents mention is listed separately as **not found in the code** and is never added, and existing issues are only marked Done when the code proves it. The code is in `lib/codeinventory.js`.

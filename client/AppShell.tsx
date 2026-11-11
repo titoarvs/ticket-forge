@@ -58,7 +58,7 @@ function connInfo() {
   if (!st) return { ok: false, label: S.statusError ? 'AI status unavailable' : 'Checking AI…', model: '', switched: false, unknown: true };
   const ok = Boolean(st.ready);
   const label = st.label || 'AI';
-  const model = !ok ? '' : st.mode === 'account' && st.label === 'Claude account' ? (S.settings.model || st.model || '') : (st.model || '');
+  const model = !ok ? '' : st.mode === 'account' && st.label === 'Claude account' && !st.routingOn ? (S.settings.model || st.model || '') : (st.model || '');
   return { ok, label, model, switched: Boolean(st.switched) };
 }
 

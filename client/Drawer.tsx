@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   S, emit, P, ago, fmtDate, allowedStatuses, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
   statusNames, statusOf, statusColor, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
-  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, type Any,
+  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, type Any,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState } from './ui';
 import {
@@ -304,6 +304,44 @@ function IssuePanel({ t }: { t: Any }) {
 const fmtMs = (ms: number) => (!ms ? '' : ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`);
 const hostOf = (u: string) => { try { return new URL(u).host; } catch { return u || ''; } };
 
+const CAT_CLS: Record<string, string> = { 'app-bug': 'bug', 'test-script': 'script', 'test-data': 'script', environment: 'env', flaky: 'env', 'needs-info': 'info' };
+const OWNER_TXT: Record<string, string> = { developer: 'Developer', qa: 'QA', devops: 'DevOps' };
+/** The AI's failure analysis on one failed test: what broke, why, the evidence and what to do next. */
+function FailAnalysis({ a, t, tcId, title }: { a: Any; t: Any; tcId: string; title: string }) {
+  const [more, setMore] = useState(false);
+  const tc = t.testCases.find((x: Any) => x.id === tcId);
+  const report = () => copyText([`${title}`, `Category: ${a.label} (${a.confidence} confidence) · Owner: ${OWNER_TXT[a.owner] || a.owner}`, a.summary,
+    a.failedStep && `Failed at: ${a.failedStep}`, a.expected && `Expected: ${a.expected}`, a.actual && `Actual: ${a.actual}`, a.cause && `Likely cause: ${a.cause}`,
+    a.evidence?.length && `Evidence:\n${a.evidence.map((e: string) => `- ${e}`).join('\n')}`, a.fix && `Fix: ${a.fix}`,
+    a.nextSteps?.length && `Next steps:\n${a.nextSteps.map((x: string, i: number) => `${i + 1}. ${x}`).join('\n')}`].filter(Boolean).join('\n\n'));
+  return (
+    <div className={`fa fa-${CAT_CLS[a.category] || 'info'}`}>
+      <div className="fa-h">
+        <Ico svg={I.sparkle} /><b>{a.label}</b>
+        <span className="fa-tag">{a.confidence} confidence</span>
+        <span className="fa-tag">Owner: {OWNER_TXT[a.owner] || a.owner}</span>
+      </div>
+      <p className="fa-sum">{a.summary}</p>
+      {(a.expected || a.actual) && <div className="fa-ea">
+        {a.expected && <div><span>Expected</span>{a.expected}</div>}
+        {a.actual && <div><span>Actual</span>{a.actual}</div>}</div>}
+      {a.cause && <div className="fa-row"><span>Likely cause</span><p>{a.cause}</p></div>}
+      {a.fix && <div className="fa-row"><span>Fix</span><p>{a.fix}</p></div>}
+      {more && <>
+        {a.failedStep && <div className="fa-row"><span>Failed at</span><p>{a.failedStep}</p></div>}
+        {a.evidence?.length > 0 && <div className="fa-row"><span>Evidence</span><ul>{a.evidence.map((e: string, i: number) => <li key={i}><code>{e}</code></li>)}</ul></div>}
+        {a.nextSteps?.length > 0 && <div className="fa-row"><span>Next steps</span><ol>{a.nextSteps.map((x: string, i: number) => <li key={i}>{x}</li>)}</ol></div>}
+        {a.scriptFix && <div className="fa-row"><span>Script fix</span><pre className="run-err-full">{a.scriptFix}</pre></div>}
+      </>}
+      <div className="fa-actions">
+        {(a.failedStep || a.evidence?.length || a.nextSteps?.length || a.scriptFix) && <button className="link-btn small" onClick={() => setMore(!more)}>{more ? 'Less' : 'Evidence and next steps'}</button>}
+        <button className="link-btn small" onClick={report}>Copy as bug report</button>
+        {tc && ['test-script', 'test-data', 'flaky'].includes(a.category) && can('test.run') && can('ai.use') && <button className="link-btn small" onClick={() => runTests([{ t, tc }], { regenerate: true })}>Rewrite the script and re-run</button>}
+      </div>
+    </div>
+  );
+}
+
 /** An automated test-run comment, made readable: a pass/fail summary, then each test with its error and screenshot. */
 function AutoBody({ c, t }: { c: Any; t: Any }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -346,6 +384,7 @@ function AutoBody({ c, t }: { c: Any; t: Any }) {
                   {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}</span>
               </div>
             </div>
+            {bad && r.analysis && <FailAnalysis a={r.analysis} t={t} tcId={r.tcId} title={`${r.key} ${r.title}`} />}
             {bad && <div className="run-err">
               <code className="run-err-1">{first || 'Failed'}</code>
               {more && <button className="link-btn small" onClick={() => setOpen({ ...open, [r.tcId]: !open[r.tcId] })}>{open[r.tcId] ? 'Hide details' : 'Details'}</button>}

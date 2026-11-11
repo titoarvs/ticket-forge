@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { loadAgents, hireAgent } from './Agents';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
+import { S, emit, useStore, P, openProject, isSub, isDone, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
@@ -14,9 +14,11 @@ import { Drawer } from './Drawer';
 import { Timeline } from './Timeline';
 import { Board } from './Board';
 import { TestManagement } from './TestRepo';
+import { PullRequests } from './PullRequests';
+import { Issues } from './Issues';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', source: 'Source documents', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, source: Sources, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
@@ -33,6 +35,7 @@ function Sidebar({ view }: { view: string }) {
       <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}
+      {item('issues', I.grid, 'Issues', p.tickets.filter((t: any) => !isSub(t) && !isDone(t)).length)}
       {item('backlog', I.backlog, 'Backlog', p.tickets.filter((t: any) => !isSub(t)).length)}
       {item('board', I.board, activeSprint() ? 'Active sprint' : 'Board')}
       {item('epics', I.epic, 'Epics', p.epics.length)}
@@ -42,6 +45,8 @@ function Sidebar({ view }: { view: string }) {
       {item('tests', I.test, 'Test cases', tests)}
       {item('testmgmt', I.folder, 'Test management', (p.testRepo?.tests || []).length)}
       {item('automation', I.bot, 'Test automation')}
+      <div className="side-label">Development</div>
+      {item('prs', I.pr, 'Pull requests', p.tickets.reduce((n: number, t: any) => n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length, 0))}
       <div className="side-label">Requirements</div>
       {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}
       <div className="side-foot">{item('settings', I.settings, 'Project settings')}</div>

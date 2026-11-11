@@ -1,6 +1,7 @@
 import { api, perm, body, HttpError, aiOpts, ndjson, appUrl } from '@/lib/server/http';
 import { engineStatus, runAutomation, noBrowser } from '@/lib/automation.js';
 import { reportRun } from '@/lib/notify.js';
+import { analyzeFailures } from '@/lib/failures.js';
 import * as store from '@/lib/store.js';
 import { runAppSetup } from '@/lib/server/app-setup';
 
@@ -37,7 +38,13 @@ export const POST = api(async (req) => {
     } finally {
       if (results.size && project?.id) {
         try {
-          const report = await reportRun({ projectId: project.id, results, runner: user, baseUrl, appUrl: origin });
+          // Failure analysis needs the scripts as they ran (written during this run too) and AI use.
+          const byTc = new Map<string, any>(items.map((it: any) => [it.tc?.id, it]));
+          const analyze = store.has(user, 'ai.use') ? (_issueId: string, fails: any[]) => analyzeFailures({
+            project, ai: { ...aiOpts(b), onSwitch: (message: string) => send({ type: 'phase', level: 'warn', message }) },
+            failures: fails.map((f: any) => ({ ...byTc.get(f.tcId), result: f.result })).filter((f: any) => f.tc && f.ticket),
+          }) : null;
+          const report = await reportRun({ projectId: project.id, results, runner: user, baseUrl, appUrl: origin, analyze, say: (message: string) => send({ type: 'phase', message }) });
           send({ type: 'reported', ...report });
         } catch (e: any) {
           console.error('Failure report failed:', e);
