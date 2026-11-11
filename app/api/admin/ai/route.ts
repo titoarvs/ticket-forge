@@ -53,7 +53,7 @@ export const PATCH = api(async (req) => {
   const user = await perm('users.manage');
   const b = await body(req);
   if (Array.isArray(b.order)) await reorderAiProviders(user, b.order.map(String));
-  if (b.id || typeof b.accountFallback === 'boolean') await setAiOptions(user, { id: b.id ? String(b.id) : undefined, enabled: b.enabled, accountFallback: b.accountFallback });
+  if (b.id || typeof b.accountFallback === 'boolean' || b.localEngine || typeof b.copilotModel === 'string' || typeof b.copilotBackup === 'boolean') await setAiOptions(user, { id: b.id ? String(b.id) : undefined, enabled: b.enabled, accountFallback: b.accountFallback, localEngine: b.localEngine, copilotModel: b.copilotModel, copilotBackup: b.copilotBackup });
   return status();
 });
 

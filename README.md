@@ -634,3 +634,15 @@ On the Epics page (**AI actions → Split issues**) or in an epic's panel (**Spl
 - **Pick the issues.** Big ones are ticked for you: over 3 points, or unestimated with many acceptance criteria, many test cases or a long description.
 - **The AI proposes** small tickets for each issue: one testable behaviour each, 1–3 points, following your team's acceptance-criteria rules, and covering exactly the original scope. It shares the issue's test cases out to the part each one tests. Issues that are already small are kept, with the reason.
 - **On apply**, the first part keeps the original issue (key, history, comments, pull requests, links). The other parts become new issues next to it, in the same epic, sprint and status, linked with "relates to". Parts that no test case covers are flagged so you can write tests for them. ⌘Z undoes it.
+
+## GitHub Copilot as the local AI
+
+When TicketForge is opened at localhost, it can use **GitHub Copilot** through the Copilot CLI with your own Copilot subscription, the same way it uses your Claude account through Claude Code.
+
+1. Install it with `npm install -g @github/copilot`, run `copilot` once, and sign in with `/login`.
+2. In **Administration → AI → Local AI on this computer**, choose:
+   - **GitHub Copilot CLI** to use Copilot first, with your Claude account and then the AI APIs as backups; or
+   - **Claude Code**, optionally ticking "use GitHub Copilot when your Claude account is limited".
+3. Pick a Copilot model, or leave Copilot's default.
+
+Copilot runs without tools in an empty temporary folder: it only answers prompts and can't read or change files. Limits and sign-in problems switch to the next AI automatically, and the top-bar AI pill shows which AI is answering.

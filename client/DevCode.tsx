@@ -196,11 +196,11 @@ function DiffView({ jobId, file }: { jobId: string; file: string }) {
 }
 
 /** Issue panel → Write code with AI: start, watch, review, ask for changes, open the pull request. */
-export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agentId?: string }) {
+export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: { t: Any; agentId?: string; initialSide?: string }) {
   // Projects with a separate backend: one job per repository (Frontend / Backend). "Both" issues start with the backend.
   const [jobs, setJobs] = useState<Record<string, Any>>({});
   const [backend, setBackend] = useState(hasBackend());
-  const [side, setSide] = useState<string>(hasBackend() && (t.layer === 'backend' || t.layer === 'both') ? 'backend' : 'frontend');
+  const [side, setSide] = useState<string>(initialSide || (hasBackend() && (t.layer === 'backend' || t.layer === 'both') ? 'backend' : 'frontend'));
   const job = jobs[side] || null;
   const setJob = (v: Any) => setJobs((js) => ({ ...js, [side]: typeof v === 'function' ? v(js[side]) : v }));
   const [agents, setAgents] = useState<Any[]>([]);
@@ -212,6 +212,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agen
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
   const [title, setTitle] = useState(`${t.key}: ${t.title}`);
+  const [prBody, setPrBody] = useState('');
   const [draft, setDraft] = useState(dev().draft !== false);
   const logRef = useRef<HTMLDivElement>(null);
   const base = `/api/projects/${P().id}/code`;
@@ -243,8 +244,21 @@ export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agen
     mutate(() => { logEvent(t, `committed the ${side} changes written by AI on the local branch ${r.commit.branch} (${r.commit.sha}) in ${r.commit.repoPath}`, 'Development'); });
     toast(`On branch ${r.commit.branch} in ${r.commit.repoPath}. Nothing was pushed.`, 'ok', { title: `Committed ${r.commit.sha} locally` });
   };
+  /** The AI drafts the title and description from the diff, the agent's summary and the issue. */
+  const draftPr = async () => {
+    setBusy('draft');
+    try { const r = await api(base, { method: 'POST', body: aiBody({ action: 'prDraft', jobId: job?.id }) }); setTitle(r.title); setPrBody(r.body); }
+    catch (e: Any) { toast(`Couldn’t write the description: ${e.message}`, 'err'); } finally { setBusy(''); }
+  };
+  const pushUpdate = async () => {
+    const r = await act('push', { action: 'push', message: title });
+    if (!r?.job) return;
+    setJob(r.job);
+    mutate(() => { logEvent(t, `pushed ${r.commit} to ${job.target.provider === 'GitLab' ? 'merge request !' : 'pull request #'}${job.target.number} with changes written by AI`, 'Development'); });
+    toast(`Pushed ${r.commit} to ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number}: the ${job.target.provider === 'GitLab' ? 'merge request' : 'pull request'} is updated.`, 'ok', { title: 'Changes pushed', action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') } });
+  };
   const openPr = async () => {
-    const r = await act('pr', { action: 'pr', title, draft });
+    const r = await act('pr', { action: 'pr', title, draft, body: prBody.trim() || undefined });
     if (!r?.pr) return;
     setJob(r.job);
     mutate(() => { t.prs.push({ id: uid(), ...r.pr, checkedAt: nowIso() }); logEvent(t, `opened pull request ${r.pr.repo} #${r.pr.number} with code written by AI`, 'Development'); });
@@ -318,16 +332,80 @@ export function CodeModal({ t, agentId: initialAgent = 'build' }: { t: Any; agen
         </div>}
         {job.status === 'committed' && <div className="ok-banner"><Ico svg={I.check} /><span>Committed on the local branch <code>{job.branch}</code> in <code>{job.repoPath}</code>. Nothing was pushed.{side === 'backend' && t.layer === 'both' ? ' Next: the Frontend tab, which builds on this API.' : ''}</span>
           {side === 'backend' && t.layer === 'both' && <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('frontend')}>Go to Frontend</button>}</div>}
-        {job.status === 'review' && can('issue.edit') && <div className="code-pr">
-          <label className="field" style={{ flex: 1, margin: 0 }}><span>Pull request title</span><TF value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-          <CB label="Draft" checked={draft} onChange={(e: Any) => setDraft(e.target.checked)} />
-          <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</button>
-          <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>
+        {job.status === 'review' && can('issue.edit') && job.target && <div className="code-pr pr-compose">
+          <div className="pr-compose-h"><Ico svg={I.pr} /><b>Update {job.target.provider === 'GitLab' ? `merge request !${job.target.number}` : `pull request #${job.target.number}`}</b>
+            <a className="muted small" href={job.target.url} target="_blank" rel="noopener noreferrer">{job.target.title}</a></div>
+          <label className="field" style={{ margin: 0 }}><span>Commit message</span><TF value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn primary" disabled={!!busy || !title.trim()} onClick={pushUpdate}>{busy === 'push' ? <><Spinner />Pushing…</> : <><Ico svg={I.pr} />Commit and push to {job.target.provider === 'GitLab' ? '!' : '#'}{job.target.number}</>}</button>
+            <span className="muted small">Pushes to <code>{job.branch}</code>; the {job.target.provider === 'GitLab' ? 'merge request' : 'pull request'} updates itself, and a comment says what changed.</span></div>
         </div>}
-        {job.pr && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> is open{job.pr.draft ? ' as a draft' : ''} and linked to this issue.</span></div>}
+        {job.status === 'review' && can('issue.edit') && !job.target && <div className="code-pr pr-compose">
+          <div className="pr-compose-h"><Ico svg={I.pr} /><b>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'}</b><span className="muted small"><code>{job.branch}</code> → <code>{job.base}</code></span>
+            {can('ai.use') && <button className="btn sm ai" style={{ marginLeft: 'auto' }} disabled={!!busy} onClick={draftPr}>{busy === 'draft' ? <><Spinner />Writing…</> : <><Ico svg={I.sparkle} />{prBody ? 'Rewrite with AI' : 'Write title & description with AI'}</>}</button>}</div>
+          <label className="field" style={{ margin: 0 }}><span>Title</span><TF value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+          <label className="field" style={{ margin: 0 }}><span>Description (Markdown)</span>
+            <TA rows={prBody ? 10 : 3} value={prBody} placeholder="Leave empty for the standard description (story, acceptance criteria, the agent’s summary), or write it with AI: Summary, Changes, How to test, Acceptance criteria." onChange={(e) => setPrBody(e.target.value)} /></label>
+          <div className="row" style={{ gap: 8 }}>
+            <CB label="Draft" checked={draft} onChange={(e: Any) => setDraft(e.target.checked)} />
+            <span className="spacer" />
+            <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>
+            <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</button>
+          </div>
+        </div>}
+        {job.pr && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}</span></div>}
       </>}
     </Modal>
   );
 }
-export const openCode = (t: Any) => openModal(<CodeModal t={t} />);
+export const openCode = (t: Any, side?: string) => openModal(<CodeModal t={t} initialSide={side} />);
+
+// ---------------------------------------------------------------- update an open pull / merge request with AI
+const UPDATE_MODES: [string, string, string][] = [
+  ['prompt', 'Apply changes', 'Tell the agent what to change; it works on the request’s branch.'],
+  ['enhance', 'Enhance', 'Better tests, edge cases and error handling, without changing what it does.'],
+  ['review', 'Address review comments', 'Reads the open review comments and fixes what they ask.'],
+  ['describe', 'Improve description', 'Rewrites the title and description from the real diff. No code changes.'],
+];
+function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
+  const [mode, setMode] = useState('prompt');
+  const [text, setText] = useState('');
+  const [comments, setComments] = useState<Any[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const base = `/api/projects/${P().id}/code`;
+  const noun = pr.provider === 'GitLab' ? 'merge request' : 'pull request';
+  const ref = `${pr.provider === 'GitLab' ? '!' : '#'}${pr.number}`;
+  const loadComments = async () => {
+    setComments(null);
+    try { setComments((await api(base, { method: 'POST', body: { action: 'comments', ticketId: t.id, prId: pr.id } })).comments); } catch (e: Any) { setComments([]); toast(e.message, 'err'); }
+  };
+  const pick = (m: string) => { setMode(m); if (m === 'review' && comments === null) loadComments(); };
+  const go = async () => {
+    setBusy(true);
+    try {
+      if (mode === 'describe') {
+        const r = await api(base, { method: 'POST', body: aiBody({ action: 'describe', ticketId: t.id, prId: pr.id }) });
+        mutate(() => { pr.title = r.title; logEvent(t, `rewrote the description of ${noun} ${ref} with AI`, 'Development'); });
+        closeModal(); toast(`${ref} now reads “${r.title}”.`, 'ok', { title: 'Description updated', action: { label: 'Open', onClick: () => window.open(pr.url, '_blank', 'noopener') } });
+        return;
+      }
+      const job = await api(base, { method: 'POST', body: aiBody({ action: 'update', ticketId: t.id, prId: pr.id, mode, prompt: text }) });
+      closeModal(); openCode(t, job.side);
+    } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  const ready = mode === 'prompt' ? Boolean(text.trim()) : mode === 'review' ? Boolean(comments?.length) : true;
+  return (
+    <Modal title={`Update ${ref} with AI`} wide actions={[{ label: 'Cancel' }, { label: busy ? 'Starting…' : mode === 'describe' ? 'Rewrite description' : 'Start', kind: 'ai', disabled: busy || !ready, onClick: go }]}>
+      <p className="muted small" style={{ marginTop: 0 }}><b>{pr.title}</b> · {pr.repo} · <code>{pr.branch}</code> → <code>{pr.base}</code>. Code changes run on the {noun}’s own branch; you review the diff, then push to the same {noun}.</p>
+      <div className="upd-modes" role="radiogroup" aria-label="What to do">{UPDATE_MODES.map(([k, l, d]) => (
+        <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} onClick={() => pick(k)}><b>{l}</b><span className="muted small">{d}</span></button>))}</div>
+      {mode === 'review' && <div className="upd-comments">{comments === null ? <span className="muted small"><Spinner /> Reading the review comments…</span>
+        : comments.length ? <ul className="small">{comments.slice(0, 12).map((c, i) => <li key={i}><b>{c.author ? `@${c.author}` : 'Reviewer'}</b>{c.file ? <code> {c.file}{c.line ? `:${c.line}` : ''}</code> : null} — {c.body.slice(0, 220)}{c.body.length > 220 ? '…' : ''}</li>)}{comments.length > 12 && <li className="muted">…and {comments.length - 12} more</li>}</ul>
+        : <span className="muted small">No open review comments on it.</span>}</div>}
+      {mode !== 'describe' && <label className="field" style={{ marginTop: 10 }}><span>{mode === 'prompt' ? 'What to change' : 'Anything else (optional)'}</span>
+        <TA rows={4} value={text} autoFocus={mode === 'prompt'} placeholder={mode === 'prompt' ? 'e.g. Rename the endpoint to /salary-proposals/:id/notify, and return 404 when the proposal is missing.' : 'e.g. Focus the tests on the approval rules.'} onChange={(e) => setText(e.target.value)} /></label>}
+    </Modal>
+  );
+}
+export const openUpdatePr = (t: Any, pr: Any) => openModal(<UpdatePrModal t={t} pr={pr} />);
 void S; void closeModal; void emit;

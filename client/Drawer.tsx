@@ -18,7 +18,7 @@ import { PsdSection } from './Psd';
 import { FbdSection, ArdSection } from './Fbd';
 import { openSplitIssues } from './Split';
 import { EpicAgents } from './Agents';
-import { codeReady, openCode } from './DevCode';
+import { codeReady, openCode, openUpdatePr } from './DevCode';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -209,6 +209,8 @@ function IssuePanel({ t }: { t: Any }) {
               <div key={r.id} className="pr-row"><Ico svg={I.pr} /><div className="pr-main"><a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
                 <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div></div>
                 <span className={`loz ${prCls(r.status)}`}>{r.status}</span>
+                {edit && can('ai.use') && codeReady() && ['Open', 'Draft'].includes(r.status) && ['GitHub', 'GitLab'].includes(r.provider) &&
+                  <button className="btn sm ai" title={`Change, enhance or re-describe this ${r.provider === 'GitLab' ? 'merge request' : 'pull request'} with AI`} onClick={() => openUpdatePr(t, r)}><Ico svg={I.sparkle} />Update</button>}
                 {edit && <><button className="icon-btn" title="Refresh status" onClick={() => refreshPr(t, r.id)}><Ico svg={I.refresh} /></button>
                   <button className="icon-btn" title="Unlink" onClick={() => mutate(() => { t.prs = t.prs.filter((x: Any) => x.id !== r.id); logEvent(t, `unlinked pull request ${r.title}`); })}><Ico svg={I.close} /></button></>}
               </div>

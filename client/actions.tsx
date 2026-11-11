@@ -359,7 +359,7 @@ export async function linkPr(t: Any, url: string) {
   if (!url) return false;
   if (t.prs.some((r: Any) => r.url === url)) { toast('That pull request is already linked.', 'err'); return false; }
   try {
-    const info = await api(`/api/pr-info?url=${encodeURIComponent(url)}`);
+    const info = await api(`/api/pr-info?url=${encodeURIComponent(url)}&projectId=${encodeURIComponent(P().id)}`);
     S.prForm = false;
     mutate(() => { t.prs.push({ id: uid(), ...info, checkedAt: nowIso() }); logEvent(t, `linked pull request ${info.title}`); });
     toast(`Linked ${info.repo}${info.number ? ` #${info.number}` : ''} (${info.status})`);
@@ -369,9 +369,15 @@ export async function linkPr(t: Any, url: string) {
 export async function refreshPr(t: Any, prId: string) {
   const r = t.prs.find((x: Any) => x.id === prId);
   try {
-    const info = await api(`/api/pr-info?url=${encodeURIComponent(r.url)}`);
+    const info = await api(`/api/pr-info?url=${encodeURIComponent(r.url)}&projectId=${encodeURIComponent(P().id)}`);
+    // Only what was really read from GitHub/GitLab replaces what's saved: a placeholder never overwrites the real title or branch.
+    if (!info.fetched) {
+      mutate(() => { r.checkedAt = nowIso(); });
+      toast(`Couldn’t read ${r.provider === 'GitLab' ? 'the merge request from GitLab' : 'the pull request'}${r.provider === 'GitLab' ? ' (save a GitLab token in Project settings → Code & GitHub)' : ''}. Kept what was saved.`, 'warn');
+      return;
+    }
     mutate(() => {
-      if (info.status !== r.status) logEvent(t, `pull request ${info.repo}${info.number ? ` #${info.number}` : ''} is now ${info.status}`, 'Development');
+      if (info.status !== r.status) logEvent(t, `${r.provider === 'GitLab' ? 'merge request' : 'pull request'} ${info.repo}${info.number ? ` ${r.provider === 'GitLab' ? '!' : '#'}${info.number}` : ''} is now ${info.status}`, 'Development');
       Object.assign(r, info, { checkedAt: nowIso() });
     });
     toast(`${info.title}: ${info.status}`);
