@@ -2431,3 +2431,36 @@ td.danger-text { color: var(--danger); }
   .ag-grid { grid-template-columns: 1fr; }
   .ag-row-sum { white-space: normal; }
 }
+
+/* ---------------------------------------------------------------- AI usage report */
+.au-sugg ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.au-sugg li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
+.au-sugg li.imp-high { border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
+.au-sugg li > div { flex: 1; min-width: 0; }
+.au-sugg li p { margin: 2px 0 0; }
+.au-sugg li .loz { flex: none; margin-top: 2px; }
+.au-sugg h3 .ico { color: var(--ai, var(--brand)); }
+.au-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.au-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+.au-kpis > div { display: flex; flex-direction: column; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.au-kpis b { font-size: 18px; } .au-kpis span { font-size: 12px; color: var(--text-subtle); }
+.au-kpis .bad b { color: var(--danger); }
+.au-days { display: flex; align-items: flex-end; gap: 3px; height: 90px; padding: 6px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 14px; overflow-x: auto; }
+.au-days > div { position: relative; flex: 1 0 10px; max-width: 28px; height: 100%; display: flex; align-items: flex-end; }
+.au-days i { display: block; width: 100%; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--brand) 70%, transparent); }
+.au-days > div:hover i { background: var(--brand); }
+.au-days span { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font-size: 9.5px; color: var(--text-subtlest); }
+.au-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.au-break h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-subtle); }
+.au-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.au-bar { height: 4px; background: var(--bg-neutral); border-radius: 2px; margin-top: 4px; }
+.au-bar i { display: block; height: 100%; border-radius: 2px; background: var(--brand); }
+.au-top { margin-top: 14px; } .au-top summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.au-budget { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.au-budget .prog { flex: 1; max-width: 360px; }
+.au-budget.near .p-done { background: var(--warning); } .au-budget.over .p-done { background: var(--danger); }
+.au-prices summary { cursor: pointer; list-style: none; } .au-prices summary::-webkit-details-marker { display: none; }
+.au-in { height: 30px; padding: 0 8px; border: 1px solid var(--border-input); border-radius: var(--radius); background: var(--bg); color: var(--text); font: inherit; width: 100%; }
+.au-in.num { width: 90px; }
+@media (max-width: 640px) { .au-sugg li { flex-wrap: wrap; } .au-grid { grid-template-columns: 1fr; } }
+.ai-budget { margin: 0; padding: 0 16px 8px; } .ai-backup.over { color: var(--danger); background: var(--danger-bg); }

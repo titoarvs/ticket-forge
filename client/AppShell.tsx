@@ -93,6 +93,7 @@ function AiMenu() {
         <span className="ai-name">{name}</span>
         {run !== 'auto' && <span className="ai-runtag">{runName}</span>}
         {c.switched && <span className="ai-backup">Backup</span>}
+        {st?.budget?.near && <span className={`ai-backup ${st.budget.over ? 'over' : ''}`} title="Monthly AI budget">{Math.round(st.budget.pct * 100)}%</span>}
         <Ico svg={I.chevron} className="ai-chev" />
       </button>}>
       <div className="ai-menu-h" onClick={(e) => e.stopPropagation()}>
@@ -101,6 +102,8 @@ function AiMenu() {
           {c.switched && <p className="warn-text small">Backup: {why}. It switches back by itself.</p>}
           {!unknown && !c.ok && <p className="muted small">AI actions are off until an AI is connected.</p>}</div>
       </div>
+      {st?.budget?.near && <p className={st.budget.over ? 'warn-text small ai-budget' : 'muted small ai-budget'} onClick={(e) => e.stopPropagation()}>
+        AI budget: ${st.budget.spent.toFixed(2)} of ${st.budget.limit} this month ({Math.round(st.budget.pct * 100)}%).{st.budget.over ? (st.budget.action === 'pause' ? ' AI is paused for everyone but owners.' : st.budget.action === 'downgrade' ? ' High work now runs on Standard.' : '') : ''}</p>}
       {can('ai.use') && <><hr /><div className="mh">Runs on <small className="muted">your next AI actions</small></div>
         {runs.map(([k, label, model]) => <button key={k} role="menuitemradio" aria-checked={run === k} onClick={() => setAiRun(k)}>
           <span className="radio-dot">{run === k && <Ico svg={I.check} />}</span>{label}{model && <small>{model}</small>}</button>)}</>}

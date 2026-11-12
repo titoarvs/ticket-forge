@@ -5,6 +5,10 @@ import * as store from '@/lib/store.js';
 export const POST = api(async (req) => {
   const u = await perm('ai.use');
   const b = await body(req);
-  if (b.project?.id) store.requireAccess(u, b.project.id);
-  return newTicket({ epicId: b.epicId, project: b.project, idea: b.idea, answers: b.answers, ai: aiOpts(b) });
+  // The project comes from the database (saved and cached per version), not from the browser: a big project no
+  // longer travels with every AI request. Older browsers still send it.
+  let project = b.project;
+  if (b.projectId) { store.requireAccess(u, String(b.projectId)); project = await store.getProject(String(b.projectId)); }
+  else if (b.project?.id) store.requireAccess(u, b.project.id);
+  return newTicket({ epicId: b.epicId, project, idea: b.idea, answers: b.answers, ai: aiOpts(b) });
 });

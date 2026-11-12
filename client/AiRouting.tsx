@@ -6,15 +6,18 @@ import { useState } from 'react';
 import { api, toast, openModal, ago, type Any } from './core';
 import { Ico, I, Spinner, Confirm } from './ui';
 import { CB, SF, MenuItem, PeopleF } from './fields';
+import { UsageReport } from './AiUsage';
 
 const TIER_LABEL: Record<string, string> = { high: 'High', standard: 'Standard', light: 'Light' };
 const TIER_HINT: Record<string, string> = { high: 'Best quality, most usage', standard: 'Good quality, moderate usage', light: 'Fast and cheap' };
 const CLAUDE_OPTIONS = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-2'];
 
 /** One-click starting points. */
-const PRESETS: { key: string; label: string; desc: string; tiers: (t: Any) => string }[] = [
+const PRESETS: { key: string; label: string; desc: string; tiers: (t: Any) => string; escalate?: boolean }[] = [
   { key: 'quality', label: 'Best quality', desc: 'Every task on the High tier. Uses the most.', tiers: () => 'high' },
   { key: 'balanced', label: 'Balanced', desc: 'The defaults: High for tickets, documents and scripts; lighter models for routine work.', tiers: (t) => t.tier },
+  { key: 'smart', label: 'Smart savings', desc: 'Documents and scripts on Standard; tickets and tests try Standard first and step up to High only when needed; coding and review stay High.',
+    tiers: (t) => (['docs', 'automation'].includes(t.id) ? 'standard' : t.tier), escalate: true },
   { key: 'economy', label: 'Economy', desc: 'Light for most work; Standard for tickets, documents, scripts and coding agents.', tiers: (t) => (['tickets', 'docs', 'automation', 'code', 'agent-tests', 'review'].includes(t.id) ? 'standard' : 'light') },
 ];
 
@@ -26,7 +29,7 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
   const tasks: Any[] = c.tasks || [];
   const tiers: string[] = c.tiers || ['high', 'standard', 'light'];
   const dirty = JSON.stringify(r) !== JSON.stringify(saved);
-  const preset = PRESETS.find((p) => tasks.every((t) => r.tiers[t.id] === p.tiers(t)))?.key;
+  const preset = PRESETS.find((p) => tasks.every((t) => r.tiers[t.id] === p.tiers(t)) && (!p.escalate || r.escalate))?.key;
   const setTier = (id: string, v: string) => setR((x: Any) => ({ ...x, tiers: { ...x.tiers, [id]: v } }));
   const setModel = (ai: string, tier: string, v: string, entry?: string) => setR((x: Any) => {
     const n = structuredClone(x);
@@ -38,12 +41,11 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
   const save = () => run('save', async () => { const st = await patch(r); onSaved(st); setR(structuredClone(st.settings.routing)); toast('Model routing saved. New AI work uses it right away.'); });
   const reset = () => openModal(<Confirm title="Reset model routing?" label="Reset" text="Every task goes back to its default tier, and every tier to its default model."
     onYes={() => run('reset', async () => { const st = await patch(null); onSaved(st); setR(structuredClone(st.settings.routing)); toast('Model routing reset to the defaults'); })} />);
-  const clearUsage = () => run('usage', async () => onSaved(await api('/api/admin/ai', { method: 'POST', body: { action: 'usage-reset' } })));
+  // One-click changes from the usage report (suggestions, budget, prices): saved at once, on top of what's saved.
+  const apply = async (change: Any, msg: string) => { const st = await patch({ ...saved, ...change }); onSaved(st); setR((x: Any) => ({ ...x, ...change })); toast(msg); };
 
   // The AIs a tier maps to: your Claude account and Copilot on this computer, then each AI API.
   const apis: Any[] = (c.apis || []).filter((x: Any) => x.entryId);
-  const usage = c.usage?.tasks || {};
-  const totalCalls = Object.values(usage).reduce((n: number, u: Any) => n + u.calls, 0) as number;
   const modelFor = (tier: string, agent = false) => {
     if (agent) return r.claude[tier] || c.claudeTiers?.[tier];
     if (c.mode === 'account') {
@@ -69,13 +71,13 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
         <div className={off ? 'rt-off' : ''}>
           <div className="rt-presets" role="radiogroup" aria-label="Preset">{PRESETS.map((p) => (
             <button key={p.key} type="button" role="radio" aria-checked={preset === p.key} className={preset === p.key ? 'on' : ''} disabled={off}
-              onClick={() => setR({ ...r, tiers: Object.fromEntries(tasks.map((t) => [t.id, p.tiers(t)])) })}><b>{p.label}</b><span className="muted small">{p.desc}</span></button>))}</div>
+              onClick={() => setR({ ...r, tiers: Object.fromEntries(tasks.map((t) => [t.id, p.tiers(t)])), escalate: Boolean(p.escalate) })}><b>{p.label}</b><span className="muted small">{p.desc}</span></button>))}</div>
           <div className="rt-scroll"><table className="rt-tbl">
             <thead><tr><th>Task</th><th className="rt-desc">What it covers</th><th>Tier</th><th>Model now</th><th>Used</th></tr></thead>
             <tbody>{tasks.map((t) => {
               const g = t.group !== lastGroup ? t.group : '';
               lastGroup = t.group;
-              const u = usage[t.id];
+              const u = c.usage?.tasks?.[t.id];
               return [
                 g && <tr key={`g-${g}`} className="rt-group"><td colSpan={5}>{g}</td></tr>,
                 <tr key={t.id}>
@@ -130,18 +132,7 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
         </div>
       </div>
 
-      <div className="card wide">
-        <div className="row"><h3 style={{ margin: 0 }}>Usage by task</h3><span className="muted small">since {ago(c.usage?.since)} on this server</span><span className="spacer" />
-          {totalCalls > 0 && <button className="btn sm subtle" disabled={!!busy} onClick={clearUsage}>{busy === 'usage' ? <Spinner /> : null}Clear</button>}</div>
-        {totalCalls ? <table className="rt-tbl" style={{ marginTop: 8 }}>
-          <thead><tr><th>Task</th><th>Calls</th><th>Text sent and received</th><th>Answered by</th></tr></thead>
-          <tbody>{Object.entries(usage).sort((a: Any, b: Any) => b[1].chars - a[1].chars).map(([k, u]: Any) => (
-            <tr key={k}><td><b>{tasks.find((t) => t.id === k)?.label || 'Other'}</b></td><td>{u.calls}</td>
-              <td>{u.chars ? <>{u.chars > 1e6 ? `${(u.chars / 1e6).toFixed(1)}M` : `${Math.round(u.chars / 1e3)}k`} characters <span className="muted small">(~{Math.round(u.chars / 4 / 1e3)}k tokens)</span></> : null}
-                {u.cost ? <div>${u.cost.toFixed(2)} <span className="muted small">reported by Claude Code</span></div> : null}{!u.chars && !u.cost ? '—' : null}</td>
-              <td className="small">{Object.entries(u.models).map(([m, n]: Any) => <div key={m}>{m} <span className="muted">×{n}</span></div>)}</td></tr>))}</tbody></table>
-          : <p className="muted small" style={{ marginBottom: 0 }}>No AI work yet since the server started. Generate something and the calls show here, with the model that answered.</p>}
-      </div>
+      <UsageReport routing={saved} apply={apply} />
 
       <div className={`gen-bar ${dirty ? 'dirty' : ''}`}>
         <span className="muted small">{dirty ? 'Unsaved changes' : saved.enabled ? 'Model routing is on' : 'Model routing is off'}</span>
