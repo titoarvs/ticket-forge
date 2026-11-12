@@ -5,10 +5,10 @@
 // agent to work there.
 import { useEffect, useState } from 'react';
 import { S, api, toast, openModal, closeModal, ago, aiBody, can, type Any } from './core';
-import { Ico, I, Modal, Spinner, ErrorState, Loading, Sk } from './ui';
-import { TA, SF, CB, MenuItem } from './fields';
+import { Ico, I, Modal, Spinner, ErrorState, Loading, Sk, EmptyState } from './ui';
+import { TA, TF, SF, CB, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
-import { AgentCard, setAgentsCache, phaseClass } from './Agents';
+import { setAgentsCache, phaseClass } from './Agents';
 
 const RUNNER: Record<string, string> = {
   code: 'Runs as a Claude Code agent in a git worktree',
@@ -141,51 +141,129 @@ function HireModal({ a }: { a: Any }) {
   );
 }
 
+/** On/off switch for an agent, right on its card or row. */
+function Toggle({ a, onChange, busy }: { a: Any; onChange: (on: boolean) => void; busy: boolean }) {
+  return <button type="button" role="switch" aria-checked={a.enabled} aria-label={`${a.name}: ${a.enabled ? 'on' : 'off'}`} title={a.enabled ? 'On: people can hire it. Click to turn off.' : 'Off. Click to turn on.'}
+    className={`ag-switch ${a.enabled ? 'on' : ''}`} disabled={busy} onClick={(e) => { e.stopPropagation(); onChange(!a.enabled); }}><i /></button>;
+}
+const modelOf = (a: Any) => (a.runner === 'code' || a.runner === 'panel' ? a.model || a.defaults?.model || '' : '');
+
+/** One agent card: what it does, where it runs, its model, an on/off switch, Details and Hire. */
+function Card({ a, onDetails, onHire, onToggle, busy }: { a: Any; onDetails: () => void; onHire?: () => void; onToggle: (on: boolean) => void; busy: boolean }) {
+  return (
+    <article className={`ag-card ${phaseClass(a.phase)} ${a.enabled ? '' : 'off'} ${a.broken ? 'broken' : ''}`} onClick={onDetails} role="button" tabIndex={0}
+      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onDetails(); } }} aria-label={`${a.name} details`}>
+      <header>
+        <span className="agent-icon" aria-hidden>{a.icon}</span>
+        <div className="ag-title"><h4>{a.name}</h4><span>{a.team || a.phase}{a.custom ? ' · Custom' : ''}</span></div>
+        <Toggle a={a} onChange={onToggle} busy={busy} />
+      </header>
+      <p className="ag-sum">{a.summary}</p>
+      <div className="ag-meta">
+        <span className="ag-chip"><Ico svg={a.runner === 'code' || a.runner === 'panel' ? I.pr : a.runner === 'document' ? I.doc : a.runner === 'testing' ? I.test : I.sparkle} />{a.workspaceLabel}</span>
+        {modelOf(a) && <span className="ag-chip mono">{modelOf(a)}</span>}
+        {a.runner === 'code' && <span className="ag-chip">{a.writes ? 'Edits code' : 'Read-only'}</span>}
+        {a.broken && <span className="ag-chip bad">Rules need fixing</span>}
+      </div>
+      <footer onClick={(e) => e.stopPropagation()}>
+        <button className="btn sm subtle" onClick={onDetails}>Details</button>
+        {a.runner === 'testing' ? <span className="muted small">{a.enabled ? 'Runs in test runs' : 'Off in test runs'}</span>
+          : onHire && <button className="btn sm" disabled={!a.enabled} onClick={onHire} title={a.enabled ? `Put ${a.name} to work on an epic` : 'Turn it on first'}><Ico svg={I.bot} />Hire</button>}
+      </footer>
+    </article>
+  );
+}
+
 export function AgentsTab() {
   const [data, setData] = useState<Any>(null);
   const [err, setErr] = useState<Any>(null);
   const [phase, setPhase] = useState('All');
-  const [team, setTeam] = useState('All');
+  const [team, setTeam] = useState('');
+  const [state, setState] = useState('');
   const [q, setQ] = useState('');
+  const [view, setView] = useState<string>(() => { try { return localStorage.getItem('tf.agents.view') || 'cards'; } catch { return 'cards'; } });
+  const [busy, setBusy] = useState('');
   const load = async () => { setErr(null); try { const d = await api('/api/admin/agents'); setData(d); setAgentsCache(d); } catch (e: Any) { setErr(e); } };
   useEffect(() => { load(); }, []);
   if (err) return <div className="card"><ErrorState compact title="Couldn’t load the agents" error={err} onRetry={load} /></div>;
   if (!data) return <Loading><div className="agent-grid">{[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <div key={i} className="agent-card"><div className="agent-head"><Sk w={44} h={44} r={12} /><div><Sk w={140} h={14} /><Sk w={60} h={10} style={{ marginTop: 6 }} /></div></div><Sk w="90%" h={10} /><Sk w="60%" h={10} /></div>)}</div></Loading>;
 
-  const save = async (id: string, v: Any) => {
+  const save = async (id: string, v: Any, quiet = false) => {
     const agents: Any = {};
     for (const a of data.agents) agents[a.id] = { enabled: a.enabled, model: a.model, effort: a.effort, instructions: a.instructions };
     agents[id] = v;
-    try { const d = await api('/api/admin/agents', { method: 'PUT', body: { agents } }); setData(d); setAgentsCache(d); toast('Agent saved'); } catch (e: Any) { toast(e.message, 'err'); }
+    try { const d = await api('/api/admin/agents', { method: 'PUT', body: { agents } }); setData(d); setAgentsCache(d); if (!quiet) toast('Agent saved'); } catch (e: Any) { toast(e.message, 'err'); }
+  };
+  const toggle = async (a: Any, on: boolean) => {
+    setBusy(a.id);
+    await save(a.id, { enabled: on, model: a.model, effort: a.effort, instructions: a.instructions }, true);
+    setBusy('');
+    toast(`${a.name} turned ${on ? 'on' : 'off'}`);
   };
   const hire = (a: Any) => openModal(<HireModal a={a} />);
   const onData = (d: Any) => { setData(d); setAgentsCache(d); };
   const details = (a: Any) => openModal(<AgentDetails a={a} data={data} onSave={save} onHire={() => hire(a)} onData={onData} />);
   const create = () => openModal(<CustomAgentModal onSaved={onData} />);
+  const setV = (v: string) => { setView(v); try { localStorage.setItem('tf.agents.view', v); } catch { /* storage off */ } };
   const qq = q.trim().toLowerCase();
-  const list = data.agents.filter((a: Any) => (phase === 'All' || a.phase === phase) && (team === 'All' || a.team === team) && (!qq || `${a.name} ${a.summary} ${a.step || ''} ${a.team || ''}`.toLowerCase().includes(qq)));
-  const on = data.agents.filter((a: Any) => a.enabled).length;
-  return <>
-    <div className="agents-top">
+  const all: Any[] = data.agents;
+  const list = all.filter((a: Any) => (phase === 'All' || a.phase === phase) && (!team || a.team === team)
+    && (!state || (state === 'on' ? a.enabled : state === 'off' ? !a.enabled : state === 'custom' ? a.custom : a.runner === state))
+    && (!qq || `${a.name} ${a.summary} ${a.step || ''} ${a.team || ''} ${a.workspaceLabel || ''}`.toLowerCase().includes(qq)));
+  const teams = (data.teams || []).filter((tm: string) => all.some((a: Any) => a.team === tm));
+  const groups: [string, Any[]][] = phase === 'All' ? data.phases.map((p: string) => [p, list.filter((a: Any) => a.phase === p)]).filter(([, l]: Any) => l.length) : [[phase, list]];
+  const stats: [string, number, string][] = [['Agents', all.length, ''], ['On', all.filter((a: Any) => a.enabled).length, 'ok'], ['Off', all.filter((a: Any) => !a.enabled).length, ''],
+    ['Code agents', all.filter((a: Any) => a.runner === 'code' || a.runner === 'panel').length, ''], ['Custom', all.filter((a: Any) => a.custom).length, '']];
+  const filtering = Boolean(phase !== 'All' || team || state || qq);
+  const hireFor = (a: Any) => (a.runner === 'testing' || a.broken ? undefined : () => hire(a));
+
+  return <div className="ag-page">
+    <div className="ag-head">
       <div>
         <h2>Agents</h2>
-        <p className="muted small">{on} of {data.agents.length} on · Code agents run as Claude Code agents in the issue’s own git worktree. {data.updatedAt && <>Changed by {data.updatedBy || 'an administrator'} {ago(data.updatedAt)}.</>}</p>
+        <p className="muted small">AI teammates for each step of a feature: plan, build, review, test and release. Turn them on or off, tune their model and instructions, or create your own.
+          {data.updatedAt && <> Last changed by {data.updatedBy || 'an administrator'} {ago(data.updatedAt)}.</>}</p>
       </div>
-      <div className="row" style={{ gap: 8 }}>
-        <input className="agents-search" type="search" placeholder="Search agents" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search agents" />
-        {can('ai.use') && <button className="btn primary" onClick={create}><Ico svg={I.plus} />Create agent</button>}</div>
+      {can('ai.use') && <button className="btn primary" onClick={create}><Ico svg={I.plus} />Create agent</button>}
     </div>
-    <div className="agent-filter" role="tablist" aria-label="Phase">{['All', ...data.phases].map((p: string) => {
-      const n = p === 'All' ? data.agents.length : data.agents.filter((a: Any) => a.phase === p).length;
-      return <button key={p} role="tab" aria-selected={phase === p} className={`${phase === p ? 'on' : ''} ${p === 'All' ? 'ph-all' : phaseClass(p)}`} onClick={() => setPhase(p)}>{p}<span>{n}</span></button>;
-    })}</div>
-    <div className="agent-filter teams" role="tablist" aria-label="Team">{['All', ...(data.teams || []).filter((tm: string) => data.agents.some((a: Any) => a.team === tm))].map((tm: string) => {
-      const n = tm === 'All' ? data.agents.length : data.agents.filter((a: Any) => a.team === tm).length;
-      return <button key={tm} role="tab" aria-selected={team === tm} className={`${team === tm ? 'on' : ''} ph-all`} onClick={() => setTeam(tm)}>{tm === 'All' ? 'All teams' : tm}<span>{n}</span></button>;
-    })}</div>
-    <div className="agent-grid">
-      {list.map((a: Any) => <AgentCard key={a.id} a={a} onDetails={() => details(a)} onHire={a.runner === 'testing' || a.broken ? undefined : () => hire(a)} hireLabel={a.runner === 'testing' ? undefined : 'Hire'} />)}
-      {!list.length && <p className="muted">No agents match.</p>}
+    <div className="ag-stats">{stats.map(([l, n, tone]) => <div key={l} className={`ag-stat ${tone}`}><b>{n}</b><span>{l}</span></div>)}</div>
+
+    <div className="ag-toolbar">
+      <div className="ag-phases" role="tablist" aria-label="Phase">{['All', ...data.phases].map((p: string) => {
+        const n = p === 'All' ? all.length : all.filter((a: Any) => a.phase === p).length;
+        return <button key={p} role="tab" aria-selected={phase === p} className={`${phase === p ? 'on' : ''} ${p === 'All' ? 'ph-all' : phaseClass(p)}`} onClick={() => setPhase(p)}>
+          {p !== 'All' && <i className="ph-dot" />}{p}<span>{n}</span></button>;
+      })}</div>
+      <div className="ag-tools">
+        <TF search sx={{ width: 220 }} value={q} placeholder="Search agents" onChange={(e) => setQ(e.target.value)} aria-label="Search agents" />
+        {teams.length > 1 && <SF filter value={team} onChange={(e) => setTeam(e.target.value)} aria-label="Team"><MenuItem value="">All teams</MenuItem>{teams.map((tm: string) => <MenuItem key={tm} value={tm}>{tm}</MenuItem>)}</SF>}
+        <SF filter value={state} onChange={(e) => setState(e.target.value)} aria-label="Show">
+          <MenuItem value="">Any status</MenuItem><MenuItem value="on">Turned on</MenuItem><MenuItem value="off">Turned off</MenuItem><MenuItem value="custom">Custom agents</MenuItem>
+          <MenuItem value="code">Code agents</MenuItem><MenuItem value="document">Document agents</MenuItem><MenuItem value="testing">Testing agents</MenuItem></SF>
+        {filtering && <button className="btn subtle sm" onClick={() => { setPhase('All'); setTeam(''); setState(''); setQ(''); }}>Clear</button>}
+        <div className="seg ag-view" role="tablist" aria-label="View">
+          <button role="tab" aria-selected={view === 'cards'} className={view === 'cards' ? 'on' : ''} onClick={() => setV('cards')} title="Cards"><Ico svg={I.grid} /></button>
+          <button role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => setV('list')} title="List"><Ico svg={I.backlog} /></button>
+        </div>
+      </div>
     </div>
-  </>;
+
+    {!list.length ? <EmptyState compact icon={I.bot} tone="neutral" title="No agents match" actions={<button className="btn" onClick={() => { setPhase('All'); setTeam(''); setState(''); setQ(''); }}>Show all</button>} />
+      : view === 'list' ? <div className="table-wrap"><table className="tbl ag-tbl">
+        <thead><tr><th>Agent</th><th>Phase</th><th>Runs</th><th>Model</th><th>On</th><th /></tr></thead>
+        <tbody>{list.map((a: Any) => (
+          <tr key={a.id} className={`click ${a.enabled ? '' : 'off'} ${phaseClass(a.phase)}`} onClick={() => details(a)}>
+            <td data-label="Agent"><div className="ag-row"><span className="agent-icon sm" aria-hidden>{a.icon}</span><div><b>{a.name}</b>{a.custom && <span className="ag-chip tiny">Custom</span>}<div className="muted small ag-row-sum">{a.summary}</div></div></div></td>
+            <td data-label="Phase"><span className="ag-phase"><i className="ph-dot" />{a.phase}</span></td>
+            <td data-label="Runs" className="muted small">{a.workspaceLabel}</td>
+            <td data-label="Model">{modelOf(a) ? <code>{modelOf(a)}</code> : <span className="muted">—</span>}</td>
+            <td data-label="On" onClick={(e) => e.stopPropagation()}><Toggle a={a} busy={busy === a.id} onChange={(on) => toggle(a, on)} /></td>
+            <td className="ag-acts" onClick={(e) => e.stopPropagation()}>{hireFor(a) && <button className="btn sm" disabled={!a.enabled} onClick={hireFor(a)}>Hire</button>}</td>
+          </tr>))}</tbody></table></div>
+      : groups.map(([p, l]) => (
+        <section key={p} className={`ag-group ${phaseClass(p)}`}>
+          {phase === 'All' && <h3 className="ag-group-h"><i className="ph-dot" />{p}<span className="count">{l.length}</span></h3>}
+          <div className="ag-grid">{l.map((a: Any) => <Card key={a.id} a={a} busy={busy === a.id} onDetails={() => details(a)} onHire={hireFor(a)} onToggle={(on) => toggle(a, on)} />)}</div>
+        </section>))}
+  </div>;
 }
