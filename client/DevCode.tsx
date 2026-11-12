@@ -2,7 +2,7 @@
 // Code & GitHub: a project's local repository and GitHub settings, and the "Write code with AI" job for an issue:
 // Claude Code implements it in its own git worktree, you review the diff, TicketForge opens the pull request.
 import { useEffect, useRef, useState } from 'react';
-import { S, P, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, type Any } from './core';
+import { S, P, feat, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm, SetCard, LAYER_LABEL } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
@@ -183,7 +183,7 @@ function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boole
 }
 
 /** Whether "Write code with AI" can be offered for issues in this project. */
-export const codeReady = () => Boolean(dev().localPath);
+export const codeReady = () => feat('code') && Boolean(dev().localPath);
 
 const STATUS: Record<string, string> = { committed: 'Committed locally', report: 'Report ready', starting: 'Starting…', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
 
@@ -266,8 +266,22 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   };
   const running = job && ['starting', 'running'].includes(job.status);
   const d = dev();
+  // An AI review of an open pull request: remember the verdict on the linked request (Pull requests page).
+  const isPrReview = job?.kind === 'pr-review';
+  const reviewedPr = isPrReview ? t.prs.find((r: Any) => r.url === job.target?.url) : null;
+  useEffect(() => {
+    if (!isPrReview || job.status !== 'report' || !reviewedPr || reviewedPr.aiReview?.jobId === job.id) return;
+    const verdict = /request(ed)? changes/i.test(job.summary || '') ? 'Changes requested' : /approve with comments/i.test(job.summary || '') ? 'Approve with comments' : /approve/i.test(job.summary || '') ? 'Approve' : 'Reviewed';
+    mutate(() => { reviewedPr.aiReview = { jobId: job.id, at: job.finishedAt || nowIso(), agent: job.agentName, verdict, posted: null }; logEvent(t, `${job.agentName} agent reviewed ${reviewedPr.provider === 'GitLab' ? '!' : '#'}${reviewedPr.number}: ${verdict}`, 'Development'); });
+  }, [isPrReview, job?.status, job?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const postReview = async () => {
+    const r = await act('postReview', { action: 'postReview' });
+    if (!r?.id) return;
+    if (reviewedPr) mutate(() => { reviewedPr.aiReview = { ...(reviewedPr.aiReview || {}), posted: r.posted }; });
+    toast(`The review is a comment on ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number} now.`, 'ok', { title: 'Review posted', action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') } });
+  };
   return (
-    <Modal title={`Write code · ${t.key}`} wide persistent={running} actions={[{ label: running ? 'Close (keeps running)' : 'Close' }]}>
+    <Modal title={`${isPrReview ? `Code review · ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number}` : 'Write code'} · ${t.key}`} wide persistent={running} actions={[{ label: running ? 'Close (keeps running)' : 'Close' }]}>
       {backend && !loading && <div className="side-tabs" role="tablist" aria-label="Repository">
         {(['backend', 'frontend'] as const).map((k) => { const jj = jobs[k]; const busyK = jj && ['starting', 'running'].includes(jj.status); return (
           <button key={k} role="tab" aria-selected={side === k} className={side === k ? 'on' : ''} onClick={() => setSide(k)}>
@@ -306,6 +320,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           <ul className="code-todos small">{job.todos.map((x: Any, i: number) => <li key={i} className={x.status}>{x.status === 'in_progress' ? '▶ ' : ''}{x.content}</li>)}</ul></details>}
         {job.error && <div className="warn-banner danger"><Ico svg={I.warn} /><span>{job.error}</span></div>}
         {job.summary && !running && <details className="code-summary" open><summary className="small"><b>{job.status === 'report' ? `${job.agentName}’s report` : 'Agent’s summary'}</b></summary><div className="small code-md"><Markdown text={job.summary} /></div>
+          {isPrReview && job.status === 'report' && <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            {job.posted ? <span className="muted small"><Ico svg={I.check} /> Posted on {job.target.provider === 'GitLab' ? '!' : '#'}{job.target.number} {ago(job.posted)}</span>
+              : <button className="btn sm primary" disabled={!!busy} onClick={postReview}>{busy === 'postReview' ? <><Spinner />Posting…</> : <>Post on {job.target.provider === 'GitLab' ? '!' : '#'}{job.target.number} as a comment</>}</button>}
+            <a className="btn sm subtle" href={job.target.url} target="_blank" rel="noopener noreferrer"><Ico svg={I.external} />Open {job.target.provider === 'GitLab' ? 'merge request' : 'pull request'}</a>
+          </div>}
           {job.status === 'report' && can('export') && <div className="row" style={{ gap: 8, marginTop: 8 }}>
             <button className="btn sm" onClick={async () => { try { toast(`Downloaded ${await downloadFrom(`/api/projects/${P().id}/code`, { body: { action: 'docx', jobId: job.id }, fallbackName: `${job.agentName} - ${job.ticketKey}.docx` })}`); } catch (e: Any) { toast(`Couldn’t download the report: ${e.message}`, 'err'); } }}><Ico svg={I.download} />Download .docx</button>
             <button className="btn sm ghost" onClick={() => saveBlob(new Blob([job.summary], { type: 'text/markdown' }), `${job.agentName} - ${job.ticketKey}.md`)}>Download .md</button>

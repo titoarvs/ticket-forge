@@ -12,6 +12,7 @@ import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, EmptyState } from './ui';
 import { openDrawer, CompleteSprintModal } from './actions';
 import { SF, MenuItem } from './fields';
 import { Header, FilterBar, daysLeft, rowDnd, zoneDnd } from './views';
+import { rowContextMenu } from './RowActions';
 
 const COLLAPSED_W = 44;
 
@@ -32,9 +33,10 @@ const Card = memo(function Card({ t, showEpic, zoneKey, active, v, kidsDone, kid
   const passing = tests ? t.testCases.filter((x: Any) => x.status === 'Pass').length : 0;
   const color = statusColor(statusOf(t.status)) || CAT_COLOR[cat];
   return (
-    <div className={`bcard ${active ? 'active' : ''} ${done ? 'is-done' : ''}`} style={{ ['--pc' as string]: color }} role="button" tabIndex={0} aria-label={`${t.key} ${t.title}`}
-      onClick={() => openDrawer('issue', t.id)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openDrawer('issue', t.id); } }} {...rowDnd(t, zone)}>
+    <div className={`bcard ${active ? 'active' : ''} ${done ? 'is-done' : ''} ${t.flagged ? 'flagged' : ''}`} style={{ ['--pc' as string]: color }} role="button" tabIndex={0} aria-label={`${t.key} ${t.title}`}
+      onClick={() => openDrawer('issue', t.id)} onContextMenu={(ev) => rowContextMenu(ev, t)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openDrawer('issue', t.id); } }} {...rowDnd(t, zone)}>
       <div className="bcard-tags">
+        {t.flagged && <span className="ptag pt-blocked" title="Flagged"><Ico svg={I.flag} />Flagged</span>}
         {pt && <span className={`ptag ${pt[1]}`}>{pt[0]}</span>}
         {e && <ELoz e={e} />}
         {t.labels?.slice(0, 2).map((l: string) => <span key={l} className="label-chip">{l}</span>)}
@@ -170,7 +172,7 @@ export function Board() {
                 return <div key={`${l.id}-${w.id}`} className={`bcol ${c ? 'collapsed' : ''} ${wi === 0 ? 'first' : ''} ${li === lanes.length - 1 ? 'last' : ''}`} data-drop-status={w.name} {...zoneDnd(zone)}>
                   {c && <button className="bcol-strip body" onClick={() => toggleCol(w.id)} title={`Expand ${w.name}`} aria-label={`Expand column ${w.name}`}>
                     <span className="bcol-vname">{w.name}</span>{items.length > 0 && <span className="bcol-n">{items.length}</span>}</button>}
-                  {!c && items.map((t: Any) => <Card key={t.id} t={t} kidsDone={kidCount.get(t.id)?.[0] || 0} kids={kidCount.get(t.id)?.[1] || 0} showEpic={group !== 'epic'} zoneKey={zk} active={S.drawer?.id === t.id} v={`${t.updatedAt}|${t.status}|${t.title}|${t.assignee}|${t.storyPoints}|${t.priority}|${t.epicId}|${t.prs.length}|${(t.links || []).length}|${(t.labels || []).join()}|${(t.comments || []).length}|${(t.testCases || []).map((x: Any) => x.status).join()}`} />)}
+                  {!c && items.map((t: Any) => <Card key={t.id} t={t} kidsDone={kidCount.get(t.id)?.[0] || 0} kids={kidCount.get(t.id)?.[1] || 0} showEpic={group !== 'epic'} zoneKey={zk} active={S.drawer?.id === t.id} v={`${t.updatedAt}|${t.flagged ? 1 : 0}|${t.status}|${t.title}|${t.assignee}|${t.storyPoints}|${t.priority}|${t.epicId}|${t.prs.length}|${(t.links || []).length}|${(t.labels || []).join()}|${(t.comments || []).length}|${(t.testCases || []).map((x: Any) => x.status).join()}`} />)}
                   {!c && createOk && <QuickCreate id={`${l.id}|${w.id}`} status={w.name} fields={{ ...sprintFields, ...l.fields }} />}
                 </div>;
               })),

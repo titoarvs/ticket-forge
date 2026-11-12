@@ -1,12 +1,13 @@
 'use client';
 // Project views: Summary, Backlog, Board, Epics, Reports, Test cases, Test automation, Source, Settings.
-import { useState, type DragEvent, type ReactNode } from 'react';
+import { memo, useState, type DragEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
   activeSprint, openSprints, tcKey, spSum, statusNames, allowedStatuses, sCls, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
-  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, type Any,
+  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, feat, idx, undo, type Any,
 } from './core';
+import { StatusCell, AssigneeCell, PointsCell, PriorityCell, MoreCell, rowContextMenu, openPop, setFlag } from './RowActions';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, LayerChip, Confirm, Spinner, AutoTextarea, EmptyState, Modal, Menu } from './ui';
 import {
   openDrawer, moveTicket, inlineCreate, createSprint, deleteSprint, SprintModal, CompleteSprintModal, NewWithClaudeModal, RegroupModal,
@@ -17,6 +18,7 @@ import { AppSetup } from './AppSetup';
 import { openSplitIssues, isBig } from './Split';
 import { RunSettingsCard } from './RepoSync';
 import { FeatureModal } from './FeatureModal';
+import { SmartSelectModal } from './TestSelect';
 import { RemoteBrowser } from './RemoteBrowser';
 import { epicRange } from './Timeline';
 import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy, openDoc, openWriteDoc, downloadDocDocx, docBusy, writeMissingDocs } from './Fbd';
@@ -61,7 +63,13 @@ export function Header({ title, right, sub }: { title: string; right?: ReactNode
   </>;
 }
 
-export function FilterBar({ status = true, group }: { status?: boolean; group?: { value: string; options: [string, string][]; onChange: (v: string) => void } }) {
+type FilterProps = { status?: boolean; group?: { value: string; options: [string, string][]; onChange: (v: string) => void } };
+/** The filter bar redraws only when what it shows changes (its menus are heavy to redraw on every change). */
+export function FilterBar(props: FilterProps) {
+  const sig = [JSON.stringify(S.filter), props.status !== false, props.group?.value, peopleNames().join(), P().epics.map((e: Any) => `${e.id}${e.title}`).join(), statusNames().join(), filtersActive()].join('|');
+  return <FilterBarView {...props} sig={sig} />;
+}
+const FilterBarView = memo(function FilterBarView({ status = true, group }: FilterProps & { sig: string }) {
   const f = S.filter;
   const setF = (k: string, v: string) => { S.filter = { ...S.filter, [k]: v }; emit(); };
   const people = peopleNames();
@@ -79,7 +87,7 @@ export function FilterBar({ status = true, group }: { status?: boolean; group?: 
       {group && <><span className="muted small">Group by</span><SF filter value={group.value} onChange={(e) => group.onChange(e.target.value)}>{group.options.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}</SF></>}
     </div>
   );
-}
+}, (a, b) => a.sig === b.sig);
 export function epicProgress(e: Any) {
   const ts = epicTickets(e.id);
   const c = (cat: string) => ts.filter((t: Any) => catOf(t.status) === cat).length;
@@ -182,60 +190,80 @@ function backlogGroups() {
 }
 const showChecks = () => can('issue.edit') || can('issue.delete') || can('sprint.manage') || can('test.run');
 
-export function IssueRow({ t, showEpic = true, zone, compact = false }: { t: Any; showEpic?: boolean; zone?: Any; compact?: boolean }) {
+// ---- selection, Jira-style: tick boxes, ⌘/Ctrl-click a row to add or remove it, Shift-click to select a range.
+let lastPick: string | null = null;
+let visibleIds: string[] = [];
+function pickRange(id: string) {
+  const a = lastPick ? visibleIds.indexOf(lastPick) : -1, b = visibleIds.indexOf(id);
+  if (a < 0 || b < 0) { S.checked.add(id); lastPick = id; return; }
+  for (const x of visibleIds.slice(Math.min(a, b), Math.max(a, b) + 1)) S.checked.add(x);
+}
+function toggleCheck(id: string, on: boolean) { if (on) S.checked.add(id); else S.checked.delete(id); lastPick = id; emit(); }
+
+/** What a row shows, as one string: the row redraws only when this changes (thousands of rows stay fast). */
+function rowSig(t: Any, x: { e: Any; kids: [number, number]; blocked: boolean; active: boolean; checked: boolean; showEpic: boolean; compact: boolean; popped: boolean }) {
+  return [t.updatedAt, t.key, t.type, t.title, t.status, t.assignee, t.storyPoints, t.priority, t.flagged ? 1 : 0, t.layer, (t.labels || []).slice(0, 2).join(','),
+    x.e ? `${x.e.id}${x.e.title}${x.e.color}` : '', t.prs.length, x.kids[0], x.kids[1], +x.blocked, +x.active, +x.checked, +x.showEpic, +x.compact, +x.popped].join('|');
+}
+/** Things every row depends on (workflow colours and transitions, permissions, the current user). */
+const pageSig = () => `${JSON.stringify(P().workflow)}|${P().flowMode}|${S.user?.id}|${(S.user?.permissions || []).length}|${S.user?.name}`;
+
+/** Everything a row shows, worked out from the project (cheap; drawing is what costs). */
+function rowData(t: Any, showEpic: boolean, compact: boolean, page: string) {
+  const { byId, kids: kidMap } = idx();
   const e = epic(t.epicId);
-  const kids = isSub(t) ? [] : childrenOf(t);
+  const kids: Any[] = isSub(t) ? [] : kidMap.get(t.id) || [];
+  const kc: [number, number] = [kids.filter(isDone).length, kids.length];
+  const blocked = (t.links || []).some((l: Any) => l.type === 'is blocked by' && byId.get(l.targetId) && !isDone(byId.get(l.targetId)));
   const active = S.drawer?.kind === 'issue' && S.drawer.id === t.id;
+  const checked = S.checked.has(t.id);
+  const popped = Boolean(S.pop?.ids?.includes(t.id));
+  return { t, e: showEpic ? e : null, kc, blocked, active, checked, compact, page, sig: rowSig(t, { e, kids: kc, blocked, active, checked, showEpic, compact, popped }) };
+}
+export function IssueRow({ t, showEpic = true, zone, compact = false }: { t: Any; showEpic?: boolean; zone?: Any; compact?: boolean }) {
+  return <RowView {...rowData(t, showEpic, compact, pageSig())} zoneKey={zone ? JSON.stringify(zone) : ''} />;
+}
+/**
+ * A group's rows. Skipped entirely when none of its rows changed (sig), so opening a menu, a toast or "Saved"
+ * doesn't redraw hundreds of rows; when one row changes, only that row redraws (RowView).
+ */
+const GroupRows = memo(function GroupRows({ rows, zoneKey }: { rows: Any[]; zoneKey: string; sig: string }) {
+  return <>{rows.map((r) => <RowView key={r.t.id} {...r} zoneKey={zoneKey} />)}</>;
+}, (a, b) => a.sig === b.sig && a.zoneKey === b.zoneKey);
+const RowView = memo(function RowView({ t, e, kc, blocked, active, checked, compact, zoneKey }: { t: Any; e: Any; kc: [number, number]; blocked: boolean; active: boolean; checked: boolean; compact: boolean; zoneKey: string; sig: string; page: string }) {
+  const zone = zoneKey ? JSON.parse(zoneKey) : null;
+  const full = !compact;
+  const onClick = (ev: React.MouseEvent) => {
+    if (full && showChecks() && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); toggleCheck(t.id, !S.checked.has(t.id)); return; }
+    if (full && showChecks() && ev.shiftKey) { ev.preventDefault(); window.getSelection()?.removeAllRanges(); pickRange(t.id); emit(); return; }
+    openDrawer('issue', t.id);
+  };
   return (
-    <div className={`irow ${active ? 'active' : ''}`} onClick={() => openDrawer('issue', t.id)} {...(zone && !compact ? rowDnd(t, zone) : {})}>
-      {!compact && showChecks() && <CB aria-label={`Select ${t.key}`} checked={S.checked.has(t.id)} onClick={(ev) => ev.stopPropagation()}
-        onChange={(ev) => { if (ev.target.checked) S.checked.add(t.id); else S.checked.delete(t.id); emit(); }} />}
+    <div className={`irow ${active ? 'active' : ''} ${checked ? 'checked' : ''} ${t.flagged ? 'flagged' : ''}`} onClick={onClick} onContextMenu={full ? (ev) => rowContextMenu(ev, t) : undefined} {...(zone && full ? rowDnd(t, zone) : {})}>
+      {full && showChecks() && <input type="checkbox" className="row-check" aria-label={`Select ${t.key}`} checked={checked} onClick={(ev) => { ev.stopPropagation(); if (ev.shiftKey) { pickRange(t.id); emit(); ev.preventDefault(); } }}
+        onChange={(ev) => toggleCheck(t.id, ev.target.checked)} />}
       <TypeIcon type={t.type} /><span className="key">{t.key}</span>
       <span className="sum" title={t.title}>{t.title}</span>
       <span className="right">
-        {isBlocked(t) && <span className="flag" title="Blocked by an open issue"><Ico svg={I.flag} />Blocked</span>}
-        {!compact && <span className="lbls">{t.labels.slice(0, 2).map((l: string) => <span key={l} className="label-chip">{l}</span>)}</span>}
-        {kids.length > 0 && <span className="mini" title={`${kids.filter(isDone).length} of ${kids.length} sub-tasks done`}><Ico svg={I.subtask} />{kids.filter(isDone).length}/{kids.length}</span>}
+        {t.flagged && <span className="flag is-flag" title="Flagged"><Ico svg={I.flag} />Flagged</span>}
+        {blocked && <span className="flag" title="Blocked by an open issue"><Ico svg={I.flag} />Blocked</span>}
+        {full && <span className="lbls">{(t.labels || []).slice(0, 2).map((l: string) => <span key={l} className="label-chip">{l}</span>)}</span>}
+        {kc[1] > 0 && <span className="mini" title={`${kc[0]} of ${kc[1]} sub-tasks done`}><Ico svg={I.subtask} />{kc[0]}/{kc[1]}</span>}
         {t.prs.length > 0 && <span className="mini" title={`${t.prs.length} pull request(s)`}><Ico svg={I.pr} />{t.prs.length}</span>}
-        {showEpic && e && <ELoz e={e} />}
-        {!compact && can('issue.edit') ? <RowStatus t={t} /> : <StatusLoz s={t.status} />}
-        {!compact && can('issue.edit') ? <RowAssignee t={t} /> : <Avatar name={t.assignee} />}
-        {!compact && <LayerChip layer={t.layer} short />}
-        <span className="sp" title="Story points">{t.storyPoints ?? '–'}</span>
-        <PriorityIcon p={t.priority} />
+        {e && <ELoz e={e} />}
+        {full ? <StatusCell t={t} /> : <StatusLoz s={t.status} />}
+        {full ? <AssigneeCell t={t} /> : <Avatar name={t.assignee} />}
+        {full && <LayerChip layer={t.layer} short />}
+        {full ? <PointsCell t={t} /> : <span className="sp" title="Story points">{t.storyPoints ?? '–'}</span>}
+        {full ? <PriorityCell t={t} /> : <PriorityIcon p={t.priority} />}
+        {full && <MoreCell t={t} />}
       </span>
     </div>
   );
-}
+}, (a, b) => a.sig === b.sig && a.page === b.page && a.zoneKey === b.zoneKey && a.t === b.t);
 
-/** Status lozenge that opens a menu of the statuses this issue may move to (respects custom workflow transitions). */
-const RowStatus = ({ t }: { t: Any }) => (
-  <SF loz className={`loz ${sCls(t.status)}`} aria-label={`Status of ${t.key}`} value={t.status}
-    onClick={(e: Any) => e.stopPropagation()} onMouseDown={(e: Any) => e.stopPropagation()} draggable={false}
-    onChange={(e: Any) => { if (e.target.value !== t.status) mutate(() => setField(t, 'status', e.target.value), { tag: `t.status${t.id}` }); }}>
-    {opts(allowedStatuses(t))}
-  </SF>
-);
-
-/** Assignee avatar that opens a menu of project people (plus Unassigned). */
-const avatarSelect = { '&&': {
-  width: 'auto', minWidth: 0,
-  '& .MuiOutlinedInput-root': { height: 'auto', borderRadius: '50%' },
-  '& .MuiSelect-select': { padding: '0 !important', minHeight: '0 !important', display: 'flex' },
-  '& .MuiSelect-icon': { display: 'none' },
-} };
-function RowAssignee({ t }: { t: Any }) {
-  const people = peopleNames();
-  const list = t.assignee && !people.includes(t.assignee) ? [t.assignee, ...people] : people;
-  const set = (v: string) => { if (v !== (t.assignee || '')) mutate(() => setField(t, 'assignee', v), { tag: `t.assignee${t.id}` }); };
-  return (
-    <SF bare sx={avatarSelect} aria-label={`Assignee of ${t.key}`} value={t.assignee || ''} renderValue={() => <Avatar name={t.assignee} />}
-      onClick={(e: Any) => e.stopPropagation()} onMouseDown={(e: Any) => e.stopPropagation()} draggable={false} onChange={(e: Any) => set(e.target.value)}>
-      <MenuItem value=""><Avatar size={20} /><span style={{ marginLeft: 8 }}>Unassigned</span></MenuItem>
-      {list.map((n) => <MenuItem key={n} value={n}><Avatar name={n} size={20} /><span style={{ marginLeft: 8 }}>{n}</span></MenuItem>)}
-    </SF>
-  );
-}
+/** The status lozenge and assignee avatar as buttons that open the row popup (also used on the Issues page). */
+export { StatusCell as RowStatus, AssigneeCell as RowAssignee } from './RowActions';
 
 function InlineCreate({ group }: { group: string }) {
   const [title, setTitle] = useState('');
@@ -253,13 +281,19 @@ function InlineCreate({ group }: { group: string }) {
   );
 }
 
-function BulkBar() {
-  const p = P();
-  const ids = [...S.checked].filter((id: string) => ticket(id)) as string[];
+/** The selection bar: redrawn only when the selection (or what its menus list) changes. */
+export function BulkBar() {
+  const { byId } = idx();
+  const ids = [...S.checked].filter((id: string) => byId.has(id)) as string[];
   if (!ids.length) return null;
+  const sig = [ids.join(), ids.map((id) => (byId.get(id)?.flagged ? 1 : 0)).join(''), openSprints().map((x: Any) => x.id + x.name).join(), P().epics.map((x: Any) => x.id + x.title).join(), statusNames().join(), peopleNames().join(), S.user?.id, S.autoRun?.running].join('|');
+  return <BulkBarView ids={ids} sig={sig} />;
+}
+const BulkBarView = memo(function BulkBarView({ ids }: { ids: string[]; sig: string }) {
+  const p = P();
   const bulkSet = (field: string, value: Any, label: string) => {
     mutate(() => ids.forEach((id) => { const t = ticket(id); if (t) setField(t, field, value); }));
-    S.checked.clear(); emit(); toast(`${ids.length} issues ${label}`);
+    S.checked.clear(); emit(); toast(`${ids.length} issues ${label}`, 'ok', { action: { label: 'Undo', onClick: undo } });
   };
   // With custom transitions, only issues allowed to move to that status change; the rest are reported.
   const bulkStatus = (to: string) => {
@@ -278,7 +312,10 @@ function BulkBar() {
       {can('issue.edit') && <>
         <SF filter value="" onChange={(e) => e.target.value && bulkStatus(e.target.value)}><MenuItem value="">Set status…</MenuItem>{opts(statusNames())}</SF>
         <SF filter value="" onChange={(e) => e.target.value && bulkSet('assignee', e.target.value === '__none' ? '' : e.target.value, e.target.value === '__none' ? 'unassigned' : `assigned to ${e.target.value}`)}>
-          <MenuItem value="">Assign to…</MenuItem>{opts(peopleNames())}<MenuItem value="__none">Unassigned</MenuItem></SF>
+          <MenuItem value="">Assign to…</MenuItem>{S.user?.name && <MenuItem value={S.user.name}>Assign to me</MenuItem>}{opts(peopleNames())}<MenuItem value="__none">Unassigned</MenuItem></SF>
+        <SF filter value="" onChange={(e) => e.target.value && bulkSet('priority', e.target.value, `set to ${e.target.value} priority`)}><MenuItem value="">Priority…</MenuItem>{opts(PRIORITIES)}</SF>
+        <button className="btn sm" onClick={(e) => openPop('points', ids, e.currentTarget)}>Story points…</button>
+        <button className="btn sm" onClick={() => setFlag(ids, !ids.every((id) => ticket(id)?.flagged))}><Ico svg={I.flag} />{ids.every((id) => ticket(id)?.flagged) ? 'Remove flag' : 'Add flag'}</button>
       </>}
       {can('ai.use') && can('issue.edit') && <button className="btn sm ai" onClick={bulkTests}><Ico svg={I.sparkle} />Write test cases</button>}
       {can('test.run') && <button className="btn sm" onClick={() => runTests(p.tickets.filter((x: Any) => S.checked.has(x.id)).flatMap((x: Any) => x.testCases.map((tc: Any) => ({ t: x, tc }))))}><Ico svg={I.play} />Run tests</button>}
@@ -287,12 +324,18 @@ function BulkBar() {
       <div className="spacer" /><button className="btn sm subtle" onClick={() => { S.checked.clear(); emit(); }}>Clear selection</button>
     </div>
   );
-}
+}, (a, b) => a.sig === b.sig);
 
+/** Rows drawn per group at first; "Show more" draws the next ones (a backlog of thousands opens at once). */
+const ROW_CAP = 200;
 export function Backlog() {
   const groups = backlogGroups();
   const act = activeSprint();
   const toggle = (id: string) => { if (S.collapsed.has(id)) S.collapsed.delete(id); else S.collapsed.add(id); saveUi(); emit(); };
+  S.rowCap ??= {};
+  const capOf = (g: Any) => S.rowCap[g.id] || ROW_CAP;
+  const page = pageSig();
+  visibleIds = groups.flatMap((g: Any) => (S.collapsed.has(g.id) ? [] : g.items.slice(0, capOf(g)).map((t: Any) => t.id)));
   return <>
     <Header title="Backlog" right={can('ai.use') && can('issue.create') && <>
       <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>
@@ -326,7 +369,12 @@ export function Backlog() {
           </div>
           {s?.goal && !closed && <div className="sprint-goal">{s.goal}</div>}
           {!closed && <>
-            {g.items.length ? <div className="rows">{g.items.map((t: Any) => <IssueRow key={t.id} t={t} showEpic={g.kind !== 'epic'} zone={{ group: g.id }} />)}</div>
+            {g.items.length ? <div className="rows">{(() => {
+              const rows = g.items.slice(0, capOf(g)).map((t: Any) => rowData(t, g.kind !== 'epic', false, page));
+              return <GroupRows rows={rows} zoneKey={JSON.stringify({ group: g.id })} sig={`${page}\n${rows.map((r: Any) => r.sig).join('\n')}`} />;
+            })()}
+              {g.items.length > capOf(g) && <button className="show-more" onClick={() => { S.rowCap[g.id] = capOf(g) + 500; emit(); }}>
+                Show {Math.min(500, g.items.length - capOf(g))} more <span className="muted">· {g.items.length - capOf(g)} not shown</span></button>}</div>
               : <div className="drop-hint">{s ? 'Plan this sprint by dragging issues here from the backlog.' : 'No issues. Drag issues here or create one.'}</div>}
             {can('issue.create') && <InlineCreate group={g.id} />}
           </>}
@@ -358,8 +406,8 @@ function EpicsAiMenu() {
         <button onClick={() => openModal(<FeatureModal />)}><Ico svg={I.plus} />Add feature<small>New epics and issues</small></button></>}
       {manage && <>
         <button onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize epics<small>Regroup issues</small></button>
-        {plan && <button onClick={() => openSplitIssues()}><Ico svg={I.subtask} />Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small></button>}
-        {p.epics.length > 0 && <><hr /><div className="mh">Write for epics without one</div>
+        {plan && feat('split') && <button onClick={() => openSplitIssues()}><Ico svg={I.subtask} />Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small></button>}
+        {p.epics.length > 0 && feat('docs') && <><hr /><div className="mh">Write for epics without one</div>
           {doc('psd', 'Problem Statements', writeMissingPsds)}
           {doc('fbd', 'Feature Briefs', writeMissingFbds)}
           {doc('ard', 'Architecture Records', () => writeMissingDocs('ard'))}</>}
@@ -374,31 +422,31 @@ export function Epics() {
     <Header title="Epics" right={<>
       <EpicsAiMenu />
       {can('epic.manage') && <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}
-      <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link></>} />
+      {feat('timeline') && <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link>}</>} />
     {p.epics.length ? <>
-      <table className="tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th><th>Progress</th><th className="num">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className={`tbl ep-tbl ${feat('docs') ? '' : 'no-docs'}`}><thead><tr><th>Epic</th><th>Dates</th>{feat('docs') && <><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th></>}<th>Progress</th><th className="num ep-done">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
             <tr key={e.id} className="click" onClick={() => openDrawer('epic', e.id)}>
-              <td><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b></span>
-                {e.description && <div className="muted small" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }}>{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{psdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
+              <td className="ep-main"><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b></span>
+                {e.description && <div className="muted small ep-desc" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Dates">{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Problem Statement" onClick={(ev) => ev.stopPropagation()}>{psdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
                 : e.psd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openPsd(e)}>{e.psd.version || 'v1.0'} · {e.psd.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Problem Statement for ${e.title}`} onClick={() => downloadPsd(e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWritePsd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{fbdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Feature Brief" onClick={(ev) => ev.stopPropagation()}>{fbdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
                 : e.fbd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openFbd(e)}>{e.fbd.version || 'v1.0'} · {e.fbd.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Feature Brief for ${e.title}`} onClick={() => downloadFbdDocx(e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteFbd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} onClick={(ev) => ev.stopPropagation()}>{docBusy('ard', e.id) ? <span className="muted"><Spinner /> Writing…</span>
+              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Architecture Record" onClick={(ev) => ev.stopPropagation()}>{docBusy('ard', e.id) ? <span className="muted"><Spinner /> Writing…</span>
                 : e.ard ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openDoc('ard', e)}>{e.ard.version || 'v1.0'} · {e.ard.status || 'Draft'}</button>
                   {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Architecture Record Design for ${e.title}`} onClick={() => downloadDocDocx('ard', e)}><Ico svg={I.download} /></button>}</span>
                 : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteDoc('ard', e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td style={{ width: 200 }}><ProgBar {...pr} /></td>
-              <td className="num">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
-              <td className="num">{pr.total}</td><td className="num">{spSum(pr.ts)}</td><td className="num">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>
+              <td style={{ width: 200 }} data-label="Progress"><ProgBar {...pr} /></td>
+              <td className="num ep-done" data-label="Done">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
+              <td className="num" data-label="Issues">{pr.total}</td><td className="num" data-label="Story points">{spSum(pr.ts)}</td><td className="num" data-label="Test cases">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>
             </tr>
           );
         })}
@@ -732,7 +780,8 @@ export function Automation() {
   const ran = all.filter((x: Any) => x.lastRun);
   return <>
     <Header title="Test automation" right={can('test.run') && (run?.running ? <button className="btn danger" onClick={() => run.ctrl?.abort()}><Ico svg={I.stop} />Stop</button>
-      : <button className="btn primary" disabled={!items.length || !eng?.browser} onClick={() => runTests(items, { regenerate: S.autoRegen })}><Ico svg={I.play} />Run {items.length} test{items.length === 1 ? '' : 's'}</button>)} />
+      : <>{can('ai.use') && <button className="btn ai" disabled={!eng?.browser} onClick={() => openModal(<SmartSelectModal />)} title="The Test Selection Agent picks the tests worth running for the latest changes">🎯 Smart selection</button>}
+        <button className="btn primary" disabled={!items.length || !eng?.browser} onClick={() => runTests(items, { regenerate: S.autoRegen })}><Ico svg={I.play} />Run {items.length} test{items.length === 1 ? '' : 's'}</button></>)} />
     <div className="tabbar auto-tabs" role="tablist" aria-label="Test automation">{AUTO_TABS.map(([k, label, icon]) => (
       <button key={k} type="button" role="tab" aria-selected={tab === k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
         <Ico svg={icon} />{label}{k === 'failures' && failing > 0 ? <span className="count bad">{failing}</span> : k === 'setup' ? <span className="count">{(p.automation.app?.pages || []).length}</span> : null}
@@ -785,6 +834,10 @@ export function Automation() {
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), comment: e.target.checked }; })} />
         <CB label="Notify the assignee (in-app and email)" disabled={!can('project.settings')} checked={p.automation.onFail?.notify !== false}
           onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked }; })} />
+        {can('ai.use') && <CB label={<>Self-healing <span className="muted">(repair scripts broken by page changes, then re-run)</span></>} disabled={!can('project.settings')} checked={p.automation.selfHeal !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.selfHeal = e.target.checked; })} />}
+        {feat('failure-analysis') && can('ai.use') && <CB label={<>Add an AI failure analysis <span className="muted">(cause, evidence, fix; uses the light model)</span></>} disabled={!can('project.settings')} checked={p.automation.onFail?.analyze !== false}
+          onChange={(e: Any) => mutate((pp) => { pp.automation.onFail = { ...(pp.automation.onFail || {}), analyze: e.target.checked }; })} />}
       </div>
       <div className="row" style={{ marginTop: 4, gap: 16 }}>
         <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>When all of an issue’s tests pass</span>

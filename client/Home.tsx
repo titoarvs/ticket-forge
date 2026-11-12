@@ -107,7 +107,7 @@ export function CreateProjectPage() {
     S.gen = { running: true, ctrl, chars: 0, log: [{ message: `Sending “${sourceName}” to Claude…` }] }; emit();
     const push = (message: string, level?: string) => { S.gen.log.forEach((l: Any) => { l.done = true; }); S.gen.log.push({ message, level }); emit(); };
     try {
-      const res = await api('/api/generate', { method: 'POST', raw: true, signal: ctrl.signal, body: { text, sourceName, options: { ...S.genOpts, instructions: [S.genOpts?.instructions, answers].filter(Boolean).join('\n\n'), provider: S.settings.provider || undefined, model: S.settings.model || undefined } } });
+      const res = await api('/api/generate', { method: 'POST', raw: true, signal: ctrl.signal, body: { text, sourceName, options: { ...S.genOpts, instructions: [S.genOpts?.instructions, answers].filter(Boolean).join('\n\n'), provider: S.settings.provider || undefined, model: S.settings.model || undefined, run: S.aiRun && S.aiRun !== 'auto' ? S.aiRun : undefined } } });
       let project: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'progress') {

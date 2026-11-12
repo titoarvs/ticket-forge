@@ -23,7 +23,9 @@ export const POST = api(async (req, p) => {
     if (!store.has(user, 'ai.use') || !store.has(user, 'issue.create')) throw new HttpError(403, 'Mapping built features uses the AI and creates issues, which your role does not allow.');
     return ndjson(req, async (send, signal) => {
       const say = (message: string) => send({ type: 'progress', message });
-      send({ type: 'done', result: await builtFeatureMap({ project, dir, ai: { ...aiOpts(b), signal }, emit: say }) });
+      // The backend repository too (Project settings → Code & GitHub → Backend), for its endpoints and data models.
+      const backendDir = project.devBackend?.enabled ? String(project.devBackend.localPath || '').trim() : '';
+      send({ type: 'done', result: await builtFeatureMap({ project, dir, backendDir, ai: { ...aiOpts(b), signal }, emit: say }) });
     });
   }
   if (b.mode === 'pageTests') {

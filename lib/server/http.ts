@@ -1,4 +1,5 @@
 // Helpers shared by the Next.js route handlers.
+import { lockedFeatureFor, lockedMessage } from '../features.js';
 import { cookies, headers } from 'next/headers';
 import * as auth from '@/lib/auth.js';
 import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION } from '@/lib/db.js';
@@ -33,6 +34,12 @@ export async function authed() {
   if (!u) throw new HttpError(401, 'Sign in to continue.');
   return u;
 }
+/** Only the owner (the first account, created at setup): managing users and invites. */
+export async function ownerOnly() {
+  const u: any = await authed();
+  if (!u.is_owner) throw new HttpError(403, 'Only the owner can manage users and invites.');
+  return u;
+}
 export async function perm(...perms: string[]) {
   const u = await authed();
   for (const p of perms) store.requirePerm(u, p);
@@ -56,7 +63,7 @@ export async function clientIp() {
   return h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip') || 'local';
 }
 export const appUrl = (req: Request) => (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '');
-export const aiOpts = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined });
+export const aiOpts = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined, run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined, fresh: b?.fresh === true || b?.regenerate === true || undefined });
 
 type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
@@ -71,6 +78,9 @@ export function api(fn: Handler) {
         const origin = req.headers.get('origin');
         if (origin && new URL(origin).host !== req.headers.get('host')) throw new HttpError(403, 'Cross-site request blocked');
       }
+      // Feature flags: a feature the owner locked refuses its API routes for everyone.
+      const locked = await lockedFeatureFor(new URL(req.url).pathname);
+      if (locked) throw new HttpError(423, lockedMessage(locked));
       // Every query in this request runs as the signed-in user, so database row-level security applies.
       const user = await currentUser();
       // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
@@ -79,7 +89,7 @@ export function api(fn: Handler) {
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);
-      return Response.json({ error: e.message || String(e) }, { status: e.status || 500 });
+      return Response.json({ error: e.message || String(e), ...(e.extra || {}) }, { status: e.status || 500 });
     }
   };
 }
