@@ -6,11 +6,12 @@ import {
   statusNames, statusOf, statusColor, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
   clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, feat, type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState } from './ui';
+import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState, AiRunPicker } from './ui';
 import {
   openDrawer, runTicketAi, AskModal, duplicateIssue, confirmDeleteIssue, convertToSubtask, createSubtask, linkPr, refreshPr,
   saveComment, runTests, DeleteEpicModal, CreateIssueModal, NewWithClaudeModal,
 } from './actions';
+import { setFlag } from './RowActions';
 import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
@@ -115,6 +116,7 @@ function IssuePanel({ t }: { t: Any }) {
     </>} menu={<>
       {can('issue.create') && <button onClick={() => duplicateIssue(t)}><Ico svg={I.copy} />Duplicate</button>}
       <button onClick={() => { navigator.clipboard?.writeText(t.key); toast(`Copied ${t.key}`); }}><Ico svg={I.copy} />Copy key</button>
+      {edit && <button onClick={() => setFlag([t.id], !t.flagged)}><Ico svg={I.flag} />{t.flagged ? 'Remove flag' : 'Add flag'}</button>}
       {edit && !isSub(t) && <button onClick={() => convertToSubtask(t)}><Ico svg={I.subtask} />Convert to sub-task…</button>}
       {can('issue.delete') && <><hr /><button style={{ color: 'var(--danger)' }} onClick={() => confirmDeleteIssue(t)}><Ico svg={I.trash} />Delete</button></>}
     </>} />
@@ -122,15 +124,16 @@ function IssuePanel({ t }: { t: Any }) {
       <TA title rows={1} aria-label="Summary" disabled={!edit} value={t.title} onChange={(ev) => field('title', ev.target.value.replace(/\n/g, ' '))} />
       <div className="dr-actions">
         <SF tone={catOf(t.status)} toneColor={statusColor(statusOf(t.status))} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(allowedStatuses(t))}</SF>
+        {t.flagged && <span className="flag is-flag" title="Flagged: needs attention"><Ico svg={I.flag} />Flagged</span>}
         {can('ai.use') && edit && <>
           <button className="btn ai" title="Improve the whole issue" onClick={() => runTicketAi(t, 'enhance')}><Ico svg={I.sparkle} />Enhance</button>
-          <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More Claude actions<Ico svg={I.chevron} /></button>}>
-            <div className="mh">Claude</div>
+          <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More AI actions<Ico svg={I.chevron} /></button>}>
+            <div className="mh">AI</div>
             <button onClick={() => runTicketAi(t, 'ac')}>Improve acceptance criteria</button>
             <button onClick={() => runTicketAi(t, 'tests')}>Regenerate test cases</button>
             {!isSub(t) && <button onClick={() => runTicketAi(t, 'split')}>Split into smaller issues</button>}<hr />
-            <button onClick={() => openModal(<AskModal t={t} />)}>Ask Claude to change this issue…</button>
-          </Menu></>}
+            <button onClick={() => openModal(<AskModal t={t} />)}>Ask AI to change this issue…</button>
+          </Menu><AiRunPicker compact /></>}
         {t.testCases.length > 0 && can('test.run') && <button className="btn" disabled={S.autoRun?.running} title="Run this issue's test cases in a browser" onClick={() => runTests(t.testCases.map((tc: Any) => ({ t, tc })))}><Ico svg={I.play} />Run tests</button>}
       </div>
       <div className="dr-cols">
@@ -380,7 +383,8 @@ function AutoBody({ c, t }: { c: Any; t: Any }) {
               <div className="run-main">
                 <span className="run-title" title={r.title}>{r.title}</span>
                 <span className="run-sub"><a href={`#tc-${r.tcId}`} className="key" onClick={(e) => { e.preventDefault(); S.openTc.add(r.tcId); emit(); setTimeout(() => document.getElementById(`tc-${r.tcId}`)?.scrollIntoView({ block: 'center' }), 50); }}>{r.key}</a>
-                  {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}</span>
+                  {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}
+                  {r.healed && <span className="heal-chip" title={`Was failing: ${r.healed.error || ''}`}>🩹 Self-healed: {r.healed.reason}</span>}</span>
               </div>
             </div>
             {bad && r.analysis && <FailAnalysis a={r.analysis} t={t} tcId={r.tcId} title={`${r.key} ${r.title}`} />}

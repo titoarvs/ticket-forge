@@ -63,7 +63,7 @@ export async function clientIp() {
   return h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip') || 'local';
 }
 export const appUrl = (req: Request) => (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '');
-export const aiOpts = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined });
+export const aiOpts = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined, run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined, fresh: b?.fresh === true || b?.regenerate === true || undefined });
 
 type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
@@ -89,7 +89,7 @@ export function api(fn: Handler) {
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);
-      return Response.json({ error: e.message || String(e) }, { status: e.status || 500 });
+      return Response.json({ error: e.message || String(e), ...(e.extra || {}) }, { status: e.status || 500 });
     }
   };
 }

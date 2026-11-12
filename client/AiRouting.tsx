@@ -83,8 +83,10 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
                   <td className="rt-desc muted small">{t.desc}{t.agent && <div>Runs in Claude Code. A model picked on the agent in Agents wins.</div>}</td>
                   <td><div className="rt-tier" role="radiogroup" aria-label={`${t.label} tier`}>{tiers.map((k) => (
                     <button key={k} type="button" role="radio" aria-checked={r.tiers[t.id] === k} title={TIER_HINT[k]} disabled={off}
-                      className={`${r.tiers[t.id] === k ? 'on' : ''} t-${k}`} onClick={() => setTier(t.id, k)}>{TIER_LABEL[k]}</button>))}</div></td>
-                  <td><code className="rt-model">{off ? '—' : modelFor(r.tiers[t.id], t.agent) || '—'}</code></td>
+                      className={`${r.tiers[t.id] === k ? 'on' : ''} t-${k}`} onClick={() => setTier(t.id, k)}>{TIER_LABEL[k]}</button>))}</div>
+                    {(c.settings?.configs || []).length > 0 && <select className="rt-cfg" aria-label={`${t.label}: custom configuration`} disabled={off} value={String(r.tiers[t.id]).startsWith('cfg:') ? r.tiers[t.id] : ''}
+                      onChange={(e) => setTier(t.id, e.target.value || t.tier)}><option value="">or a configuration…</option>{c.settings.configs.map((x: Any) => <option key={x.id} value={`cfg:${x.id}`}>{x.name}</option>)}</select>}</td>
+                  <td><code className="rt-model">{off ? '—' : String(r.tiers[t.id]).startsWith('cfg:') ? (c.settings?.configs || []).find((x: Any) => `cfg:${x.id}` === r.tiers[t.id])?.name || '—' : modelFor(r.tiers[t.id], t.agent) || '—'}</code></td>
                   <td className="rt-use" title={u ? Object.entries(u.models).map(([m, n]) => `${m}: ${n}`).join('\n') : ''}>{u ? `${u.calls} call${u.calls === 1 ? '' : 's'}` : '—'}</td>
                 </tr>];
             })}</tbody></table></div>
@@ -111,6 +113,21 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
             {c.mode !== 'account' && !apis.length && <tr><td colSpan={4} className="muted small">No AI APIs yet: add one under Providers.</td></tr>}
           </tbody></table></div>
         {c.mode !== 'account' && <p className="muted small" style={{ marginBottom: 0 }}>Your Claude account and GitHub Copilot rows show when TicketForge is opened on your own computer (localhost).</p>}
+      </div>
+
+      <div className="card wide"><h3>Save usage</h3>
+        <p className="sub">Three things keep AI costs down: model routing above, <b>prompt caching</b> (the stable part of every prompt, such as rules and the project’s App context, is cached by the AI API and re-read at about a tenth of the price; always on), and <b>reusing answers</b> to identical requests.</p>
+        <CB label={<><b>Reuse answers to identical requests</b> <span className="muted">— the same task, choice of model and input within the days below gets the stored answer, at no AI cost. “Again” and “Rewrite” always ask fresh.</span></>} checked={r.cache} onChange={(e: Any) => setR({ ...r, cache: e.target.checked })} />
+        <div className={`row ${r.cache ? '' : 'rt-off'}`} style={{ gap: 12, alignItems: 'center', margin: '6px 0 4px 32px', flexWrap: 'wrap' }}>
+          <label className="small">Keep answers for <input className="rt-days" type="number" min={1} max={90} value={r.cacheDays} disabled={!r.cache} onChange={(e) => setR({ ...r, cacheDays: Number(e.target.value) || 14 })} /> days</label>
+          <span className="small muted">for:</span>
+          {tasks.map((t) => <CB key={t.id} label={t.label} disabled={!r.cache} checked={r.cacheTasks.includes(t.id)} onChange={(e: Any) => setR({ ...r, cacheTasks: e.target.checked ? [...r.cacheTasks, t.id] : r.cacheTasks.filter((x: string) => x !== t.id) })} />)}
+        </div>
+        <div className="rt-saved small">
+          <span><b>{c.cacheStore?.hits || 0}</b> reused answers{c.cacheStore?.savedChars ? <> · ~{Math.round(c.cacheStore.savedChars / 4 / 1000)}k tokens not sent</> : ''} · {c.cacheStore?.entries || 0} stored</span>
+          {c.usage?.tokens && <span>Prompt caching: <b>{Math.round((c.usage.tokens.cacheRead || 0) / 1000)}k</b> tokens read from cache vs {Math.round((c.usage.tokens.input || 0) / 1000)}k sent fresh</span>}
+          {(c.cacheStore?.entries || 0) > 0 && <button className="btn sm subtle" disabled={!!busy} onClick={() => run('cclear', async () => onSaved(await api('/api/admin/ai', { method: 'POST', body: { action: 'cache-clear' } })))}>Clear stored answers</button>}
+        </div>
       </div>
 
       <div className="card wide">

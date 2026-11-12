@@ -41,12 +41,18 @@ It also borrows BrowserStack Test Management's import/export and its automation-
 | AI-written tests from code / requirements | — | ✓ | ✓ **Write tests with AI** for issues, **Improve with AI** on any test, and test cases from page code (Repository sync) |
 | Company test standard enforced on AI output | — | — | ✓ Administration → Generation → **Test management**: start from ISTQB, Xray, BDD or BrowserStack, then edit format, title pattern, steps, data, priority rule, labels and plan rules |
 
+| Test review workflow (Draft → Ready for review → Approved, Needs update, Deprecated) | ✓ (with Xray workflows) | ✓ test case states and review | ✓ **Reviews** tab with an approval queue, reviewer comments, optional **four-eyes** rule |
+| Test versioning, runs tied to a version | ✓ | ✓ | ✓ editing an Approved test makes a new version (old ones kept, viewable, restorable); executions record the version run |
+| Only approved tests in plans and executions | ✓ (configurable) | ✓ | ✓ Test management → **Workflow** → “Only Approved tests” |
+| Self-healing automated tests | — | ✓ Self-healing agent | ✓ **Self-healing Agent**: repairs scripts broken by page changes, re-runs, keeps the fix only if it passes; never heals app bugs |
+| AI failure analysis | — | ✓ Test Failure Analysis | ✓ **Test Failure Analysis** agent on every failed run |
+| Smart test selection | — | ✓ Test Selection agent | ✓ **Smart selection**: tests worth running for the code changes, within a budget |
+
 ## Not built yet
 
 | Capability | In | Notes |
 |---|---|---|
 | Test Sets (reusable groups separate from plans) | Xray | Plans and folders cover most uses today. |
-| Test versioning (versions of a test, run against a version) | Xray | Edits update the test in place, and run history is kept per execution. |
 | Parameterised tests / datasets | Xray | Steps take a Data column; there's no iteration matrix yet. |
 | Shared / called tests (one test calling another) | Xray, BrowserStack | |
 | Custom fields and templates on tests | BrowserStack | |

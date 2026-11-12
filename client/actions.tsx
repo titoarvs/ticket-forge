@@ -493,7 +493,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
     const res = await api('/api/automation/run', {
       method: 'POST', raw: true, signal: ctrl.signal,
       body: {
-        baseUrl, regenerate, provider: S.settings.provider || undefined, model: S.settings.model || undefined,
+        baseUrl, regenerate, provider: S.settings.provider || undefined, model: S.settings.model || undefined, run: S.aiRun || undefined, heal: P().automation.selfHeal !== false,
         project: { id: P().id, name: P().name, summary: P().summary },
         items: list.map(({ t, tc }) => ({
           ticket: { id: t.id, key: t.key, title: t.title, userStory: t.userStory, acceptanceCriteria: t.acceptanceCriteria },
@@ -507,6 +507,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
       if (ev.type === 'phase') push(ev.message, ev.level);
       else if (ev.type === 'error') push(ev.message || ev.error, 'err');
       else if (ev.type === 'script' && tc) mutate(() => { tc.script = ev.code; });
+      else if (ev.type === 'phase' && ev.level === 'pass') push(ev.message, 'pass');
       else if (ev.type === 'start') { run.current = ev.tcId; push(`Running ${label}`); }
       else if (ev.type === 'reported') run.report = ev;
       else if (ev.type === 'result' && tc) {
@@ -514,7 +515,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
         if (ev.result.status === 'Pass') run.pass += 1; else run.fail += 1;
         const msg = { message: `${label} — ${ev.result.status}${ev.result.durationMs ? ` (${(ev.result.durationMs / 1000).toFixed(1)}s)` : ''}`, level: ev.result.status === 'Pass' ? 'pass' : 'fail' };
         if (run.log[run.log.length - 1]?.message.startsWith('Running ')) run.log[run.log.length - 1] = msg; else run.log.push(msg);
-        mutate((pp: Any) => { tc.lastRun = ev.result; tc.status = ev.result.status; logEvent(t, `automated test ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.status}`, 'Automation'); recordAutomationResult(pp, t, tc, ev.result, baseUrl); });
+        mutate((pp: Any) => { if (ev.result.healed) { tc.healed = ev.result.healed; logEvent(t, `Self-healing agent repaired the script of ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.healed.reason}`, 'Automation'); } tc.lastRun = ev.result; tc.status = ev.result.status; logEvent(t, `automated test ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.status}`, 'Automation'); recordAutomationResult(pp, t, tc, ev.result, baseUrl); });
       }
     });
   } catch (e: Any) {
@@ -558,6 +559,8 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
       { label: 'Save', kind: 'primary', hidden: !editable, onClick: () => { save(); closeModal(); toast('Script saved'); } }]}>
       <p className="muted small" style={{ marginTop: 0 }}>Body of <code>{'async ({ page, expect, baseURL }) => { … }'}</code> — runs with Playwright against {P().automation.baseUrl || 'your app'}.</p>
       <TA mono spellCheck={false} style={{ minHeight: 280 }} max={480} value={code} disabled={!editable} onChange={(e) => setCode(e.target.value)} />
+      {tc.healed?.previous && <div className="heal-note small"><b>🩹 Self-healed {ago(tc.healed.at)}</b>: {tc.healed.reason}
+        {editable && <button className="link-btn small" onClick={() => { mutate(() => { tc.script = tc.healed.previous; tc.healed = null; logEvent(t, `reverted the self-healed script of ${tcKey(t, t.testCases.indexOf(tc))}`, 'Automation'); }); setCode(tc.script); toast('Reverted to the script before healing'); }}>Revert to the previous script</button>}</div>}
       {tc.lastRun?.error && <><h5 style={{ margin: '12px 0 4px' }}>Last error</h5><pre className="err-box">{tc.lastRun.error}</pre></>}
     </Modal>
   );

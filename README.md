@@ -247,8 +247,11 @@ Without `DATABASE_URL`, TicketForge uses an embedded Postgres stored in `data/db
 **Speed.** A hosted database is a network round trip away, so TicketForge keeps round trips down:
 - each statement goes to Postgres in one message, together with the row-level security settings and the commit;
 - the signed-in user is remembered for 15 seconds (cleared at once when users, roles or sessions change);
-- a save writes all changed issues in one statement and only reads the issues it changes;
+- a save writes all changed issues in one statement, reads only the issues it changes and writes only the project
+  sections that changed (not the whole project);
 - the schema check on start is one message.
+
+See **Speed with thousands of people** below for syncing, caching and how to run it for a big team.
 
 Pick the Supabase region closest to you and your server. To see what a request costs, start the server with
 `TICKETFORGE_SQL_LOG=1`: each statement is logged with its time.
@@ -758,3 +761,101 @@ A locked feature:
 Locking **AI features** hides every AI control, because the `ai.use` permission counts only while AI is on. Test automation does the same for `test.run`, and Export for `export`.
 
 Data is never deleted: unlocking brings everything back as it was. Flags are stored in `app_meta` (`feature_flags`), and the catalog is in `lib/features.js`.
+
+### AI testing agents (Administration → Agents → Test)
+
+- **Self-healing Agent:** when an automated test fails because the page changed (renamed button, moved field, an extra step), it reads the page as it was at the failure and rewrites the script. It then re-runs it once and keeps the repaired script only if it passes. The result is marked **Self-healed**, and the old script can be reverted from the script dialog. Real app bugs are left failing: it never loosens an assertion. Turn it off per project in Test automation → Settings.
+- **Test Failure Analysis:** the AI note on every failed test (cause, evidence, fix).
+- **Test Selection Agent:** Test automation → **🎯 Smart selection**. It picks the tests worth running from code changes since the last run, recently changed issues and recent failures, within your budget, and gives a reason for each.
+
+Each one can be turned off in Administration → Agents.
+
+### Custom agents
+
+Administration → Agents → **Create agent**. Describe what the agent should do and the AI writes its Markdown rules, or paste or import a `.md` file in the Claude Code agent format:
+- a frontmatter block: `name`, `description`, `runner` (`code`, `review` or `document`), and optionally `model` and `icon`;
+- then the instructions.
+
+Where custom agents run:
+- **Code** agents appear in Write code with AI.
+- **Review** agents appear in Pull requests → Review with AI.
+- **Document** agents are hired for an epic.
+
+The lifecycle document agents nothing used any more were removed (Epic, Kick Off, UX Design, Demo, Sign-Off, Deploy, Release Certification, Review a Submission, Automation Scripts).
+
+### Which AI runs it ("Runs on") and custom AI configurations
+
+Every AI dialog, the issue panel's AI bar and the top bar show a **Runs on** picker:
+- **Auto:** model routing decides per task.
+- **A tier:** High, Standard or Light, showing the model it runs on here.
+- **A custom configuration.**
+
+The choice is per person, saved in the browser.
+
+Administration → AI → **Configurations** defines named setups: Claude account, GitHub Copilot or an AI API provider, plus a model, a reasoning level and standing instructions. Model routing can also send a whole task to one.
+
+### Saving AI usage
+
+- **App context** (Project settings → App context): a compact brief of the app, built once from the code (pages, endpoints, data models), the issues and the documents. Every AI prompt for the project includes it, so the AI stops re-discovering the app and uses the real names. You can edit it, and it warns when the code has new commits.
+- **Prompt caching:** with the Anthropic API, the stable part of every prompt (rules, app context) is cached and re-read at about a tenth of the price.
+- **Answer cache:** identical requests for safe tasks reuse the stored answer for 14 days. The tasks and the number of days are set in Model routing → Save usage. "Again" and "Rewrite" always ask fresh.
+
+The Model routing page shows reused answers and the tokens read from cache.
+
+### Test management: review workflow
+
+- Tests go **Draft → Ready for review → Approved**, with **Needs update** and **Deprecated**. The **Reviews** tab is the approval queue.
+- Editing an Approved test creates a new **version**. Earlier versions are kept and can be restored, and executions record which version ran.
+- Test management → **Workflow** has two rules: "Only Approved tests in plans and executions", and four-eyes approval (the last editor can't approve).
+
+### Backlog: Jira-style actions
+
+Every backlog row works like Jira's: click the field you want to change and pick from a small popup.
+- **Status**, **assignee** (search, *Assign to me*, *Unassigned*), **story points** (type a number or pick 1, 2, 3, 5,
+  8, 13, 21; *Clear estimate*) and **priority**, right on the row. Only the statuses the workflow allows are offered.
+- **"…" or right-click** a row: move it to the top or bottom of the backlog or to a sprint, assign to me, unassign,
+  change status, points, priority or epic, add or remove a **flag** (flagged issues are highlighted, as in Jira),
+  open, copy the issue link or key, duplicate, delete.
+- **Selecting several:** tick the boxes, **⌘/Ctrl-click** rows to add or remove them, **Shift-click** to select a range.
+  The row menu and the selection bar then act on all of them (status, assignee, priority, story points, flag, sprint,
+  epic, delete). Changes to many issues show a toast with **Undo** (⌘Z also works).
+- The same popups work on the Issues page, and right-click works on Board cards. Flags show on the board and in the
+  issue panel (*Add flag* / *Remove flag* in its menu), and are recorded in the issue history.
+- Rows are drawn 200 per group at first, with *Show more*, so a backlog of thousands opens at once.
+
+### Speed with thousands of people
+
+- **Teammates' changes arrive as "changes since my version".** Each browser asks every 10 s (a little random, and at
+  once when the tab comes back into view) whether the project changed, and then downloads only the issues and
+  sections saved since its version (`GET /api/projects/:id/changes?since=`), usually a few kB. Before, every change
+  made every open browser download the whole project again (20 MB for 2,000 issues).
+- **Nobody overwrites anybody.** Each save says which version of each issue and section it started from. If a teammate
+  saved the same issue meanwhile, the server answers 409 with their copy; the browser merges both people's changes
+  (both edited fields, both comments, both history entries, different epics or sprints) and saves again. When both
+  changed the same field, the person saving now wins. Saves of one project queue on the project row, so none is lost.
+- **Server caches** (per server, short-lived): the project version for 2 s, and each version of the whole project and
+  of "changes since" once, shared by everyone asking. A thousand people opening the same project cost one database
+  read. The project is downloaded gzipped (about 30–40 times smaller) and unpacked in the browser.
+- **Database:** issue and section versions (`rev` columns, `issue_tombstones` for deleted issues) and the project list's
+  counts come from small columns. Row-level security works out the user's access once per query instead of once per
+  row. All of this is added automatically on start; nothing to run.
+- **Browser:** rows redraw only when they change (menus, toasts and "Saved" don't redraw the list), and undo shares the
+  saved text of unchanged issues instead of copying the whole project for every change.
+- **An older TicketForge sharing the database** (a server not updated yet) doesn't record what it changed. Database
+  triggers record it for it (issue versions, deleted issues, changed sections), and a browser that sees the version
+  move with nothing listed reloads the project. Update every server anyway: an older server also puts back its own,
+  slower row-level security rules each time it starts.
+
+Measured on a local PostgreSQL with 2,000 issues (scripts not included): 100 people saving at the same moment
+finished in 0.2 s (p95 186 ms, was 819 ms); 30 people changing different settings at once lost none of them (before:
+28 lost); 2,000 version checks took 4 ms (was 138 ms); catching up after a teammate's change downloaded 9.7 kB
+(was 20 MB). In a production build with 1,500 issues and 742 rows on screen, changing a status took 4 ms and a
+search keystroke 17–37 ms.
+
+**Running it for a big team**
+- Run the production build (`npm run build` then `npm start`), not `npm run dev`.
+- Host the server in the same region as the database (every database round trip counts on a save).
+- Use Supabase's **Transaction pooler** (port 6543) and raise `PG_POOL_MAX` (for example 20 per server); run several
+  copies behind a load balancer if needed. The caches above are per copy and short-lived, so copies stay in step
+  within about 2 seconds.
+

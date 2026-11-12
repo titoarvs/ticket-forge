@@ -3,6 +3,7 @@ import { engineStatus, runAutomation, noBrowser } from '@/lib/automation.js';
 import { reportRun } from '@/lib/notify.js';
 import { analyzeFailures } from '@/lib/failures.js';
 import { isLocked } from '@/lib/features.js';
+import { resolveAgent } from '@/lib/agents.js';
 import * as store from '@/lib/store.js';
 import { runAppSetup } from '@/lib/server/app-setup';
 
@@ -23,6 +24,13 @@ export const POST = api(async (req) => {
   const origin = appUrl(req);
   // Pages, roles and login settings come from the saved project; passwords only for its saved application URL.
   const { app, warning } = await runAppSetup(project?.id, baseUrl);
+  // Testing agents (Administration → Agents): on unless turned off there, AI is locked, or the person can't use AI.
+  const aiOk = store.has(user, 'ai.use') && !(await isLocked('ai'));
+  const agentOn = async (id: string) => aiOk && (await resolveAgent(id).then((a: any) => a.enabled).catch(() => false));
+  const heal = b.heal !== false && await agentOn('self-healing');
+  // The saved project's app context goes into the AI prompts (the browser sends only a slim project).
+  if (project?.id) { const saved: any = await store.getProject(project.id).catch(() => null); if (saved?.appContext) project.appContext = saved.appContext; }
+  const analyzeOn = !(await isLocked('failure-analysis')) && await agentOn('failure-analysis');
   return ndjson(req, async (send, signal) => {
     if (warning) send({ type: 'phase', level: 'warn', message: warning });
     // Collect results per issue; report them once the run ends (also when it is stopped part-way).
@@ -35,13 +43,13 @@ export const POST = api(async (req) => {
       send(ev);
     };
     try {
-      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user, notes: String(b.notes || '').slice(0, 4000) });
+      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user, notes: String(b.notes || '').slice(0, 4000), heal });
     } finally {
       if (results.size && project?.id) {
         try {
           // Failure analysis needs the scripts as they ran (written during this run too) and AI use.
           const byTc = new Map<string, any>(items.map((it: any) => [it.tc?.id, it]));
-          const analyze = store.has(user, 'ai.use') && !(await isLocked('failure-analysis')) && !(await isLocked('ai')) ? (_issueId: string, fails: any[]) => analyzeFailures({
+          const analyze = analyzeOn ? (_issueId: string, fails: any[]) => analyzeFailures({
             project, ai: { ...aiOpts(b), onSwitch: (message: string) => send({ type: 'phase', level: 'warn', message }) },
             failures: fails.map((f: any) => ({ ...byTc.get(f.tcId), result: f.result })).filter((f: any) => f.tc && f.ticket),
           }) : null;

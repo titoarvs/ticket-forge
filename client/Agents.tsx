@@ -42,6 +42,8 @@ export function AgentCard({ a, onDetails, onHire, hireLabel = 'Hire' }: { a: Any
       <div className="agent-chips">
         <span className="agent-chip">{a.workspaceLabel}</span>
         {a.step && <span className="agent-chip step">{a.step}</span>}
+        {a.custom && <span className="agent-chip step">Custom</span>}
+        {a.runner === 'testing' && <span className={`agent-chip ${a.enabled ? 'step' : ''}`}>{a.enabled ? 'On in test runs' : 'Off'}</span>}
       </div>
       <footer className="agent-foot">
         {onDetails && <button className="agent-btn ghost" onClick={onDetails}>Details</button>}
@@ -66,7 +68,7 @@ async function runDoc(epic: Any, a: Any, instructions: string) {
     await readNdjson(res, (ev) => { if (ev.type === 'done') md = ev.markdown; else if (ev.type === 'error') throw new Error(ev.error); });
     if (!md) throw new Error(`${a.name} didn’t return a document.`);
     mutate(() => { epic.agentDocs = { ...(epic.agentDocs || {}), [a.id]: { name: a.name, markdown: md, generatedAt: new Date().toISOString(), generatedBy: me() } }; });
-    toast(`${a.name} is ready: ${epic.title}`);
+    toast(`${a.name} is ready: ${epic.title}`, 'ok', { action: { label: 'View', onClick: () => openModal(<DocViewModal epic={epic} a={a} />) } });
   } catch (e: Any) { toast(`${a.name}: ${e.message}`, 'err'); }
   finally { busy.delete(k); emit(); }
 }

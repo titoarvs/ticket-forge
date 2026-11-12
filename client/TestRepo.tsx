@@ -6,7 +6,7 @@
 //   Coverage    per issue: OK (all its tests pass), NOK (one fails), Not run, Uncovered
 // Issues show their tests in the issue panel (TestsSection). Existing test cases on issues can be imported.
 import { useState, type ReactNode } from 'react';
-import { S, P, api, aiBody, startTask, readNdjson, emit, useStore, peopleNames, mutate, toast, openModal, closeModal, can, uid, nowIso, me, newTicket, addLink, logEvent, isSub, type Any } from './core';
+import { S, P, api, aiBody, startTask, readNdjson, emit, useStore, peopleNames, mutate, toast, openModal, closeModal, can, uid, nowIso, me, newTicket, addLink, logEvent, isSub, ago, type Any } from './core';
 import { Ico, I, Modal, Confirm, TypeIcon, StatusLoz, EmptyState } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { Header } from './views';
@@ -25,6 +25,42 @@ const edit = (fn: (r: Any, p: Any) => void, tag?: string) => mutate((pp: Any) =>
 }, tag ? { tag } : undefined);
 const nextKey = (r: Any, p: Any, kind: 't' | 'tp' | 'te') => { r.seq[kind] = (r.seq[kind] || 0) + 1; return `${p.key}-${kind.toUpperCase()}${r.seq[kind]}`; };
 const canEdit = () => can('test.run') || can('issue.edit');
+
+// ---------------------------------------------------------------- review workflow (Xray / BrowserStack style)
+// Draft → Ready for review → Approved (or Needs update) · Deprecated. Editing an Approved test makes a new version
+// (the old one is kept) and sends it back to Draft. Settings (Test management → Workflow): only Approved tests in plans
+// and executions; the approver must not be the person who last changed the test.
+export const WF = ['Draft', 'Ready for review', 'Approved', 'Needs update', 'Deprecated'];
+const WF_CLS: Record<string, string> = { Draft: 'wf-draft', 'Ready for review': 'wf-review', Approved: 'wf-approved', 'Needs update': 'wf-changes', Deprecated: 'wf-deprecated' };
+/** Tests from before the workflow existed count as Approved. */
+export const wfOf = (t: Any) => (WF.includes(t?.status) ? t.status : 'Approved');
+export const WfLoz = ({ t }: { t: Any }) => <span className={`wf-loz ${WF_CLS[wfOf(t)]}`}>{wfOf(t)}</span>;
+export const wfSettings = (p: Any = P()) => ({ requireApproval: false, fourEyes: true, ...(repo(p).settings || {}) });
+const canReview = () => can('issue.edit');
+/** Tests that may go into plans and executions under the current settings. */
+const plannable = (t: Any, p: Any = P()) => wfOf(t) !== 'Deprecated' && (!wfSettings(p).requireApproval || wfOf(t) === 'Approved');
+const CONTENT = ['title', 'type', 'preconditions', 'steps', 'gherkin'];
+const snapshot = (t: Any) => ({ version: t.version || 1, at: t.updatedAt || t.createdAt || nowIso(), by: t.updatedBy || t.createdBy || null, title: t.title, type: t.type, preconditions: t.preconditions || '', steps: (t.steps || []).map((s: Any) => ({ ...s })), gherkin: t.gherkin || '', status: wfOf(t) });
+/** Workflow actions: submit · approve · changes · deprecate · restore. Returns an error message when not allowed. */
+export function wfAction(testId: string, action: string, comment = ''): string | null {
+  const p = P();
+  const t0 = repo(p).tests.find((x: Any) => x.id === testId);
+  if (!t0) return 'That test is gone.';
+  const st = wfOf(t0);
+  if ((action === 'approve' || action === 'changes') && !canReview()) return 'Approving tests needs the Edit issues permission.';
+  if (action === 'approve' && wfSettings(p).fourEyes && (t0.updatedBy || t0.createdBy) === me() && !S.user?.isOwner) return 'Someone other than the last editor must approve it (four-eyes rule in Test management → Workflow).';
+  if (action === 'changes' && !comment.trim()) return 'Say what needs to change.';
+  const next: Record<string, string> = { submit: 'Ready for review', approve: 'Approved', changes: 'Needs update', deprecate: 'Deprecated', restore: 'Draft' };
+  const allowed: Record<string, string[]> = { submit: ['Draft', 'Needs update'], approve: ['Ready for review', 'Draft', 'Needs update'], changes: ['Ready for review'], deprecate: ['Draft', 'Ready for review', 'Approved', 'Needs update'], restore: ['Deprecated'] };
+  if (!allowed[action]?.includes(st)) return `A test that is ${st} can’t be ${action === 'changes' ? 'sent back' : action === 'submit' ? 'submitted' : `${action}d`}.`;
+  edit((rr) => {
+    const t = rr.tests.find((x: Any) => x.id === testId);
+    t.status = next[action];
+    t.reviews = [...(t.reviews || []), { at: nowIso(), by: me(), action, from: st, to: next[action], comment: comment.trim().slice(0, 1000), version: t.version || 1 }];
+    if (action === 'approve') { t.approvedBy = me(); t.approvedAt = nowIso(); }
+  });
+  return null;
+}
 
 /** A test's latest result across executions: the newest run that isn't To do. */
 export function latestRun(testId: string, p: Any = P(), env = ''): Any | null {
@@ -66,7 +102,7 @@ const runStatusFromSteps = (steps: Record<string, string>, total: number) => {
 };
 
 // ---------------------------------------------------------------- page
-const TABS: [string, string, string][] = [['repository', 'Test repository', I.folder], ['plans', 'Test plans', I.epic], ['executions', 'Test executions', I.play], ['coverage', 'Coverage', I.check]];
+const TABS: [string, string, string][] = [['repository', 'Test repository', I.folder], ['reviews', 'Reviews', I.check], ['plans', 'Test plans', I.epic], ['executions', 'Test executions', I.play], ['coverage', 'Coverage', I.check]];
 export function TestManagement() {
   const p = P();
   const r = repo(p);
@@ -83,6 +119,7 @@ export function TestManagement() {
         {tab === 'plans' && can('ai.use') && <button className="btn ai" disabled={!repo(p).tests.length} title={repo(p).tests.length ? 'The AI picks the tests for a goal from the repository' : 'Add or import tests first'} onClick={() => openModal(<AiPlanModal />)}><Ico svg={I.sparkle} />Build plan with AI</button>}
         {tab === 'plans' && <button className="btn primary" onClick={() => openModal(<PlanModal plan={null} />)}><Ico svg={I.plus} />New test plan</button>}
         {tab === 'executions' && <button className="btn primary" onClick={() => openModal(<NewExecutionModal />)}><Ico svg={I.plus} />New execution</button>}
+        {can('project.settings') && <button className="btn subtle" onClick={() => openModal(<WorkflowModal />)} title="Review workflow rules"><Ico svg={I.settings} />Workflow</button>}
       </>} />
     <div className="tiles">
       <div className="tile"><span className="ic"><Ico svg={I.test} /></span><div><b>{r.tests.length}</b><span>tests in {r.folders.length} folder{r.folders.length === 1 ? '' : 's'}</span></div></div>
@@ -91,8 +128,10 @@ export function TestManagement() {
       <div className="tile"><span className="ic"><Ico svg={I.backlog} /></span><div><b>{issues.length ? Math.round((covered / issues.length) * 100) : 0}%</b><span>issues covered ({covered} of {issues.length})</span></div></div>
     </div>
     <div className="tabbar auto-tabs" role="tablist" aria-label="Test management">{TABS.map(([k, l, icon]) => (
-      <button key={k} type="button" role="tab" aria-selected={tab === k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}><Ico svg={icon} />{l}</button>))}</div>
+      <button key={k} type="button" role="tab" aria-selected={tab === k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}><Ico svg={icon} />{l}
+        {k === 'reviews' && r.tests.filter((t: Any) => wfOf(t) === 'Ready for review').length > 0 && <span className="count bad">{r.tests.filter((t: Any) => wfOf(t) === 'Ready for review').length}</span>}</button>))}</div>
     {tab === 'repository' && <Repository />}
+    {tab === 'reviews' && <Reviews />}
     {tab === 'plans' && <Plans />}
     {tab === 'executions' && <Executions />}
     {tab === 'coverage' && <Coverage />}
@@ -122,7 +161,8 @@ function Repository() {
     }
     return folder === 'none' ? !t.folderId : t.folderId === folder;
   };
-  const list = r.tests.filter(inFolder).filter((t: Any) => !q.trim() || `${t.key} ${t.title} ${t.labels?.join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()));
+  const [wf, setWf] = useState('');
+  const list = r.tests.filter(inFolder).filter((t: Any) => (!wf ? wfOf(t) !== 'Deprecated' : wf === 'all' || wfOf(t) === wf)).filter((t: Any) => !q.trim() || `${t.key} ${t.title} ${t.labels?.join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()));
   const tree = (parentId: string | null, depth: number): ReactNode => r.folders.filter((f: Any) => (f.parentId || null) === parentId).map((f: Any) => (
     <div key={f.id}>
       <button className={`xr-folder ${folder === f.id ? 'on' : ''}`} style={{ paddingLeft: 10 + depth * 14 }} title={f.name} onClick={() => setFolder(f.id)}>
@@ -199,7 +239,8 @@ function Repository() {
       </aside>
       <section className="xr-list">
         <div className="toolbar">
-          <TF search sx={{ width: 260 }} placeholder="Search tests" value={q} onChange={(e) => setQ(e.target.value)} />
+          <TF search sx={{ width: 260, maxWidth: '100%' }} placeholder="Search tests" value={q} onChange={(e) => setQ(e.target.value)} />
+          <SF filter value={wf} onChange={(e) => setWf(e.target.value)} aria-label="Workflow status"><MenuItem value="">Active (not deprecated)</MenuItem>{WF.map((x) => <MenuItem key={x} value={x}>{x} ({r.tests.filter((t: Any) => wfOf(t) === x).length})</MenuItem>)}<MenuItem value="all">All</MenuItem></SF>
           <span className="spacer" />
           {canEdit() && can('ai.use') && <button className="btn sm ai" onClick={() => openModal(<AiWriteModal scope={folder} folderId={cur?.id || null} />)} title="The AI writes repository tests for issues, following your test standard (Administration → Generation)"><Ico svg={I.sparkle} />Write tests with AI</button>}
           {selIssue && canEdit() && <button className="btn sm" onClick={() => openTest(null, null, selIssue.id)}><Ico svg={I.plus} />New test for {selIssue.key}</button>}
@@ -207,11 +248,11 @@ function Repository() {
           {canEdit() && <button className="btn sm subtle" onClick={() => openModal(<CsvImportModal folderId={cur?.id || null} />)}><Ico svg={I.upload} />Import CSV</button>}
           {canEdit() && <button className="btn sm" onClick={() => openModal(<ImportModal folderId={cur?.id || null} />)}><Ico svg={I.upload} />Import from issues</button>}
         </div>
-        {list.length ? <table className="tbl"><thead><tr><th>Key</th><th>Test</th><th>Type</th><th>Steps</th><th>Issues</th><th>Latest result</th></tr></thead><tbody>
+        {list.length ? <table className="tbl xr-tests"><thead><tr><th>Key</th><th>Test</th><th>Status</th><th>Type</th><th>Steps</th><th>Issues</th><th>Latest result</th></tr></thead><tbody>
           {list.map((t: Any) => { const lr = latestRun(t.id); return (
             <tr key={t.id} className="click" onClick={() => openTest(t)}>
               <td className="key">{t.key}</td><td>{t.title}{t.labels?.length ? <span className="lbls">{t.labels.slice(0, 2).map((l: string) => <span key={l} className="label-chip">{l}</span>)}</span> : null}</td>
-              <td className="muted">{t.type}</td><td className="num muted">{t.steps?.length || 0}</td>
+              <td><WfLoz t={t} />{(t.version || 1) > 1 && <span className="muted small"> v{t.version}</span>}</td><td className="muted">{t.type}</td><td className="num muted">{t.steps?.length || 0}</td>
               <td onClick={(e) => e.stopPropagation()}>{(t.issueIds || []).map((id: string) => p.tickets.find((x: Any) => x.id === id)).filter(Boolean).slice(0, 3).map((x: Any) =>
                 <button key={x.id} className="link-btn key small" onClick={() => openDrawer('issue', x.id)}>{x.key}</button>)}{(t.issueIds || []).length > 3 ? <span className="muted small"> +{t.issueIds.length - 3}</span> : null}</td>
               <td>{lr ? <><RunLoz s={lr.status} /> <span className="muted small">{lr.execution.key}</span></> : <span className="muted small">Not run</span>}</td>
@@ -272,6 +313,52 @@ function ImportModal({ folderId }: { folderId: string | null }) {
   );
 }
 
+// ---------------------------------------------------------------- reviews (the approval queue)
+function Reviews() {
+  useStore();
+  const p = P();
+  const r = repo(p);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const waiting = r.tests.filter((t: Any) => wfOf(t) === 'Ready for review');
+  const back = r.tests.filter((t: Any) => wfOf(t) === 'Needs update');
+  const drafts = r.tests.filter((t: Any) => wfOf(t) === 'Draft');
+  const act = (t: Any, a: string) => { const err = wfAction(t.id, a, notes[t.id] || ''); if (err) toast(err, 'err'); else { setNotes({ ...notes, [t.id]: '' }); toast(`${t.key}: ${a === 'approve' ? 'approved' : a === 'changes' ? 'sent back for changes' : 'submitted for review'}`); } };
+  const submitted = (t: Any) => [...(t.reviews || [])].reverse().find((x: Any) => x.action === 'submit');
+  const row = (t: Any, kind: string) => (
+    <div key={t.id} className="wf-row">
+      <div className="wf-main">
+        <div><button className="link-btn key" onClick={() => openTest(t)}>{t.key}</button> <b>{t.title}</b> <WfLoz t={t} /> <span className="muted small">v{t.version || 1} · {t.type} · {t.steps?.length || 0} steps</span></div>
+        <div className="muted small">{kind === 'waiting' ? `Submitted by ${submitted(t)?.by || t.updatedBy || t.createdBy || '—'} ${submitted(t) ? ago(submitted(t).at) : ''}` : kind === 'back' ? `${(t.reviews || []).slice(-1)[0]?.by || 'A reviewer'}: “${(t.reviews || []).slice(-1)[0]?.comment || ''}”` : `Created by ${t.createdBy || '—'} ${ago(t.createdAt)}`}
+          {(t.issueIds || []).length > 0 && <> · covers {(t.issueIds || []).map((id: string) => p.tickets.find((x: Any) => x.id === id)?.key).filter(Boolean).join(', ')}</>}</div>
+      </div>
+      <div className="wf-acts">
+        {kind === 'waiting' && canReview() && <><TF bare className="wf-note" value={notes[t.id] || ''} placeholder="Comment" onChange={(e) => setNotes({ ...notes, [t.id]: e.target.value })} />
+          <button className="btn sm primary" onClick={() => act(t, 'approve')}>Approve</button><button className="btn sm" onClick={() => act(t, 'changes')}>Request changes</button></>}
+        {kind !== 'waiting' && canEdit() && <button className="btn sm" onClick={() => act(t, 'submit')}>Submit for review</button>}
+        <button className="btn sm subtle" onClick={() => openTest(t)}>Open</button>
+      </div>
+    </div>);
+  const st = wfSettings(p);
+  return <div className="wf-queue">
+    <p className="muted small" style={{ marginTop: 0 }}>Tests move Draft → Ready for review → Approved. {st.requireApproval ? <b>Only Approved tests can go into plans and executions.</b> : 'Any active test can go into plans and executions (turn on “Only Approved tests” in Workflow).'} {st.fourEyes ? 'The approver must not be the person who last changed the test.' : ''}</p>
+    <h4 className="sync-h">Waiting for review ({waiting.length})</h4>
+    {waiting.length ? waiting.map((t: Any) => row(t, 'waiting')) : <p className="muted small">Nothing waiting. Tests appear here when someone submits them for review.</p>}
+    {back.length > 0 && <><h4 className="sync-h">Sent back for changes ({back.length})</h4>{back.map((t: Any) => row(t, 'back'))}</>}
+    {drafts.length > 0 && <><h4 className="sync-h">Drafts ({drafts.length})</h4>{drafts.slice(0, 50).map((t: Any) => row(t, 'draft'))}
+      {canEdit() && drafts.length > 1 && <button className="btn sm subtle" onClick={() => { drafts.forEach((t: Any) => wfAction(t.id, 'submit')); toast(`${drafts.length} drafts submitted for review`); }}>Submit all {drafts.length} drafts for review</button>}</>}
+  </div>;
+}
+function WorkflowModal() {
+  const [v, setV] = useState(() => wfSettings());
+  return (
+    <Modal title="Test review workflow" actions={[{ label: 'Cancel' }, { label: 'Save', kind: 'primary', onClick: () => { edit((rr) => { rr.settings = { ...(rr.settings || {}), ...v }; }); closeModal(); toast('Workflow saved'); } }]}>
+      <p className="muted small" style={{ marginTop: 0 }}>Like Xray and BrowserStack Test Management: tests are written as Drafts, reviewed, and approved before they count. Editing an approved test makes a new version and sends it back to review; earlier versions are kept.</p>
+      <CB label={<><b>Only Approved tests in plans and executions</b><div className="muted small">Drafts and tests waiting for review can’t be planned or run until approved.</div></>} checked={v.requireApproval} onChange={(e: Any) => setV({ ...v, requireApproval: e.target.checked })} />
+      <CB label={<><b>Four-eyes approval</b><div className="muted small">Whoever last changed a test can’t approve it (the owner can).</div></>} checked={v.fourEyes} onChange={(e: Any) => setV({ ...v, fourEyes: e.target.checked })} />
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------- one test
 export function openTest(test: Any | null, folderId?: string | null, issueId?: string) { openModal(<TestModal test={test} folderId={folderId || null} issueId={issueId} />); }
 function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: string | null; issueId?: string }) {
@@ -299,11 +386,26 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
     if (!d.title.trim()) { toast('Give the test a title.', 'err'); return; }
     const clean = { ...d, title: d.title.trim(), steps: d.steps.filter((s: Any) => s.action.trim() || s.expected.trim()) };
     edit((rr, pp) => {
-      if (test) { const i = rr.tests.findIndex((x: Any) => x.id === test.id); if (i >= 0) rr.tests[i] = { ...rr.tests[i], ...clean, updatedAt: nowIso() }; }
-      else rr.tests.push({ ...clean, id: uid(), key: nextKey(rr, pp, 't'), createdAt: nowIso(), createdBy: me() });
+      if (test) {
+        const i = rr.tests.findIndex((x: Any) => x.id === test.id);
+        if (i >= 0) {
+          const old = rr.tests[i];
+          const changed = CONTENT.some((k) => JSON.stringify(old[k] ?? '') !== JSON.stringify(clean[k] ?? ''));
+          // Changing an approved test makes a new version: the approved one is kept in its history.
+          const bump = changed && wfOf(old) === 'Approved' ? { version: (old.version || 1) + 1, versions: [...(old.versions || []), snapshot(old)].slice(-15), status: 'Draft' } : {};
+          rr.tests[i] = { ...old, ...clean, ...bump, updatedAt: nowIso(), updatedBy: me() };
+        }
+      }
+      else rr.tests.push({ ...clean, id: uid(), key: nextKey(rr, pp, 't'), createdAt: nowIso(), createdBy: me(), status: 'Draft', version: 1 });
     });
-    closeModal(); toast(test ? `${test.key} saved` : 'Test created');
+    closeModal();
+    const after = test && repo().tests.find((x: Any) => x.id === test.id);
+    toast(test ? (after && after.version !== test.version ? `${test.key} saved as version ${after.version} (Draft): submit it for review to approve it again.` : `${test.key} saved`) : 'Test created as a Draft: submit it for review when it’s ready.');
   };
+  const [note, setNote] = useState('');
+  const act = (a: string) => { const err = wfAction(test.id, a, note); if (err) { toast(err, 'err'); return; } setNote(''); toast(`${test.key}: ${{ submit: 'submitted for review', approve: 'approved', changes: 'sent back for changes', deprecate: 'deprecated', restore: 'restored as a Draft' }[a]}`); closeModal(); };
+  const live = test ? repo().tests.find((x: Any) => x.id === test.id) || test : null;
+  const [showV, setShowV] = useState<number | null>(null);
   const runs = test ? r.executions.filter((e: Any) => e.runs?.[test.id]).sort((a: Any, b: Any) => String(b.createdAt).localeCompare(String(a.createdAt))) : [];
   const issues = (d.issueIds || []).map((id: string) => p.tickets.find((x: Any) => x.id === id)).filter(Boolean);
   return (
@@ -311,6 +413,17 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
       ...(test && ed ? [{ label: 'Delete', kind: 'danger' as const, onClick: () => openModal(<Confirm title={`Delete ${test.key}?`} label="Delete test" text="It’s removed from the repository, its plans and executions (their other results stay)."
         onYes={() => { edit((rr) => { rr.tests = rr.tests.filter((x: Any) => x.id !== test.id); rr.plans.forEach((pl: Any) => { pl.testIds = pl.testIds.filter((x: string) => x !== test.id); }); rr.executions.forEach((e: Any) => { e.testIds = e.testIds.filter((x: string) => x !== test.id); delete e.runs?.[test.id]; }); }); toast(`${test.key} deleted`); }} />) }] : []),
       { label: 'Cancel' }, ...(ed ? [{ label: test ? 'Save' : 'Create test', kind: 'primary' as const, onClick: save }] : [])]}>
+      {live && <div className={`wf-bar ${WF_CLS[wfOf(live)]}`}>
+        <WfLoz t={live} /><span className="muted small">Version {live.version || 1}{live.approvedBy && wfOf(live) === 'Approved' ? ` · approved by ${live.approvedBy} ${ago(live.approvedAt)}` : ''}</span>
+        <span className="spacer" />
+        {ed && ['Draft', 'Needs update'].includes(wfOf(live)) && <button className="btn sm primary" onClick={() => act('submit')}>Submit for review</button>}
+        {canReview() && wfOf(live) === 'Ready for review' && <><button className="btn sm primary" onClick={() => act('approve')}>Approve</button><button className="btn sm" onClick={() => act('changes')}>Request changes</button></>}
+        {canReview() && ['Draft', 'Needs update'].includes(wfOf(live)) && <button className="btn sm subtle" onClick={() => act('approve')} title="Approve without a separate review">Approve</button>}
+        {ed && wfOf(live) !== 'Deprecated' && <button className="btn sm subtle" onClick={() => act('deprecate')}>Deprecate</button>}
+        {ed && wfOf(live) === 'Deprecated' && <button className="btn sm" onClick={() => act('restore')}>Restore</button>}
+        {(canReview() || ed) && wfOf(live) !== 'Deprecated' && <TF bare className="wf-note" value={note} placeholder={wfOf(live) === 'Ready for review' ? 'Review comment (needed to request changes)' : 'Comment (optional)'} onChange={(e) => setNote(e.target.value)} />}
+      </div>}
+      {live && wfOf(live) === 'Needs update' && (live.reviews || []).slice(-1)[0]?.comment && <div className="warn-banner small" style={{ marginBottom: 10 }}><Ico svg={I.warn} /><span><b>{live.reviews.slice(-1)[0].by} asked for changes:</b> {live.reviews.slice(-1)[0].comment}</span></div>}
       <div className="grid2">
         <label className="field" style={{ gridColumn: '1 / -1' }}><span>Title</span><TF autoFocus={!test} disabled={!ed} value={d.title} placeholder="e.g. Approve a salary proposal as the assigned approver" onChange={(e) => set('title', e.target.value)} /></label>
         <label className="field"><span>Type</span><SF disabled={!ed} value={d.type} onChange={(e) => set('type', e.target.value)}>{TEST_TYPES.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}</SF></label>
@@ -353,6 +466,14 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
       {test && <><h4 className="sync-h">Execution history</h4>
         {runs.length ? <ul className="xr-history small">{runs.map((e: Any) => <li key={e.id}><RunLoz s={e.runs[test.id].status} /> <b>{e.key}</b> {e.title}<span className="muted"> · {e.runs[test.id].by || '—'}{e.runs[test.id].at ? ` · ${new Date(e.runs[test.id].at).toLocaleString()}` : ''}</span>
           {e.runs[test.id].comment && <div className="muted">“{e.runs[test.id].comment}”</div>}</li>)}</ul> : <p className="muted small">Not in any execution yet.</p>}</>}
+      {live && ((live.reviews || []).length > 0 || (live.versions || []).length > 0) && <><h4 className="sync-h">Review and version history</h4>
+        <ul className="xr-history small">
+          {[...(live.reviews || []).map((x: Any) => ({ ...x, kind: 'review' })), ...(live.versions || []).map((x: Any) => ({ ...x, kind: 'version' }))].sort((a: Any, b: Any) => String(b.at).localeCompare(String(a.at))).map((x: Any, i: number) => x.kind === 'review'
+            ? <li key={`r${i}`}><span className={`wf-loz ${WF_CLS[x.to]}`}>{x.to}</span> <b>{x.by}</b> {({ submit: 'submitted it for review', approve: 'approved', changes: 'requested changes', deprecate: 'deprecated it', restore: 'restored it' } as Any)[x.action]} (v{x.version}) <span className="muted">· {ago(x.at)}</span>{x.comment && <div className="muted">“{x.comment}”</div>}</li>
+            : <li key={`v${i}`}><b>Version {x.version}</b> <span className="muted">· {x.status} · {x.by || '—'} · {ago(x.at)}</span> <button className="link-btn small" onClick={() => setShowV(showV === x.version ? null : x.version)}>{showV === x.version ? 'Hide' : 'View'}</button>
+              {showV === x.version && <div className="wf-version"><b>{x.title}</b>{x.preconditions && <div className="muted">Preconditions: {x.preconditions}</div>}{x.gherkin ? <pre>{x.gherkin}</pre> : <ol>{(x.steps || []).map((s: Any, k: number) => <li key={k}>{s.action}{s.data ? ` [${s.data}]` : ''}{s.expected ? <span className="muted"> → {s.expected}</span> : ''}</li>)}</ol>}
+                {ed && <button className="btn sm subtle" onClick={() => { setD({ ...d, title: x.title, type: x.type, preconditions: x.preconditions, steps: (x.steps || []).map((s: Any) => ({ ...s, id: uid() })), gherkin: x.gherkin }); toast(`Version ${x.version} loaded into the editor: save to make it the current version.`); }}>Restore this version</button>}</div>}</li>)}
+        </ul></>}
     </Modal>
   );
 }
@@ -392,7 +513,7 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
   const ed = canEdit();
   // With an AI draft, its picks come first, in its order (most important first).
   const order = new Map<string, number>((draft?.tests || []).map((x: Any, i: number) => [x.id, i] as [string, number]));
-  const pool0 = r.tests.filter((t: Any) => folder === 'all' || (folder === 'epic' ? (t.issueIds || []).some((id: string) => p.tickets.find((x: Any) => x.id === id)?.epicId === d.epicId) : t.folderId === folder));
+  const pool0 = r.tests.filter((t: Any) => plannable(t, p) || d.testIds.includes(t.id)).filter((t: Any) => folder === 'all' || (folder === 'epic' ? (t.issueIds || []).some((id: string) => p.tickets.find((x: Any) => x.id === id)?.epicId === d.epicId) : t.folderId === folder));
   const pool = draft && folder === 'picked' ? r.tests.filter((t: Any) => d.testIds.includes(t.id) || why[t.id]).sort((a: Any, b: Any) => (order.get(a.id) ?? 1e6) - (order.get(b.id) ?? 1e6))
     : [...pool0].sort((a: Any, b: Any) => (order.get(a.id) ?? 1e6) - (order.get(b.id) ?? 1e6));
   const toggle = (id: string) => setD({ ...d, testIds: d.testIds.includes(id) ? d.testIds.filter((x: string) => x !== id) : [...d.testIds, id] });
@@ -485,7 +606,8 @@ function AiPlanModal() {
 function createExecution({ title, planId, testIds, environment = '' }: { title: string; planId: string | null; testIds: string[]; environment?: string }) {
   let created: Any = null;
   edit((rr, pp) => {
-    created = { id: uid(), key: nextKey(rr, pp, 'te'), title, planId, testIds: [...testIds], environment, assignee: me(), runs: Object.fromEntries(testIds.map((id) => [id, { status: 'TODO', steps: {}, comment: '', defectIds: [] }])), createdAt: nowIso(), createdBy: me() };
+    testIds = testIds.filter((id) => { const t = rr.tests.find((x: Any) => x.id === id); return t && plannable(t, pp); });
+    created = { id: uid(), key: nextKey(rr, pp, 'te'), title, planId, testIds: [...testIds], environment, assignee: me(), runs: Object.fromEntries(testIds.map((id) => [id, { status: 'TODO', version: rr.tests.find((x: Any) => x.id === id)?.version || 1, steps: {}, comment: '', defectIds: [] }])), createdAt: nowIso(), createdBy: me() };
     rr.executions.push(created);
   });
   S.trTab = 'executions'; emit();
@@ -891,7 +1013,7 @@ function AiTestsReview({ results, folderId }: { results: Any[]; folderId: string
         const epicFolder = ep ? rr.folders.find((f: Any) => f.name === `${ep.key} ${ep.title}`)?.id : null;
         x.tests.forEach((tc: Any, i: number) => {
           if (!pick[`${x.ticketId}:${i}`]) return;
-          rr.tests.push({ id: uid(), key: nextKey(rr, pp, 't'), ...tc, steps: (tc.steps || []).map((st: Any) => ({ id: uid(), ...st })), folderId: folderId || epicFolder || null, issueIds: [x.ticketId], createdAt: nowIso(), createdBy: me(), source: { ai: true } });
+          rr.tests.push({ id: uid(), key: nextKey(rr, pp, 't'), status: 'Draft', version: 1, ...tc, steps: (tc.steps || []).map((st: Any) => ({ id: uid(), ...st })), folderId: folderId || epicFolder || null, issueIds: [x.ticketId], createdAt: nowIso(), createdBy: me(), source: { ai: true } });
           made++;
         });
       }

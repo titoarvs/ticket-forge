@@ -1,6 +1,7 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
 import { providerStatus, accountStatus, testConnection, listModels, clearCooldown, clearAiUsage, PROVIDERS } from '@/lib/claude.js';
-import { saveAiProvider, removeAiProvider, reorderAiProviders, setAiOptions, setAiRouting } from '@/lib/settings.js';
+import { cacheClear } from '@/lib/aicache.js';
+import { saveAiProvider, removeAiProvider, reorderAiProviders, setAiOptions, setAiRouting, setAiConfigs } from '@/lib/settings.js';
 
 // AI for administrators: status, the list of AI APIs (in priority order), tests, model lists and cooldowns.
 
@@ -36,6 +37,7 @@ export const POST = api(async (req) => {
   if (b.action === 'models') return { models: await listModels(target) };
   if (b.action === 'reset') { clearCooldown(b.id ? String(b.id) : undefined); return status(); }
   if (b.action === 'usage-reset') { clearAiUsage(); return status(); }
+  if (b.action === 'cache-clear') { await cacheClear(); return status(); }
   return testConnection(target);
 });
 
@@ -55,6 +57,7 @@ export const PATCH = api(async (req) => {
   const b = await body(req);
   if (Array.isArray(b.order)) await reorderAiProviders(user, b.order.map(String));
   if ('routing' in b) await setAiRouting(user, b.routing && typeof b.routing === 'object' ? b.routing : null);
+  if (Array.isArray(b.configs)) await setAiConfigs(user, b.configs);
   if (b.id || typeof b.accountFallback === 'boolean' || b.localEngine || typeof b.copilotModel === 'string' || typeof b.copilotBackup === 'boolean') await setAiOptions(user, { id: b.id ? String(b.id) : undefined, enabled: b.enabled, accountFallback: b.accountFallback, localEngine: b.localEngine, copilotModel: b.copilotModel, copilotBackup: b.copilotBackup });
   return status();
 });

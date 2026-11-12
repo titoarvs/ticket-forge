@@ -8,6 +8,7 @@ import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, h
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
+import { RowPop } from './RowActions';
 import { Settings } from './ProjectSettings';
 import { Sources } from './Sources';
 import { Drawer } from './Drawer';
@@ -123,6 +124,7 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
         <section className="view">{feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}</section>
         <Drawer />
       </div>
+      <RowPop />
     </div>
   );
 }

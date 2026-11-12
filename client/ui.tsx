@@ -2,7 +2,7 @@
 // Small shared React components.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { I, typeIcon, priorityIcon } from './icons';
-import { S, emit, closeModal, hashColor, initials, sCls, toast, dismissToast, type Any } from './core';
+import { S, emit, closeModal, hashColor, initials, sCls, toast, dismissToast, setAiRun, type Any } from './core';
 
 export { I };
 const sized = (svg: string, size?: number) => (size ? svg.replace('width="16" height="16"', `width="${size}" height="${size}"`) : svg);
@@ -72,6 +72,7 @@ export function Modal({ title, children, actions = [], wide = false, left, persi
         <div className="mb">{children}</div>
         <footer>
           {left && <div className="left">{left}</div>}
+          {!left && actions.some((a) => a.kind === 'ai' && !a.hidden) && <div className="left"><AiRunPicker /></div>}
           {actions.filter((a) => !a.hidden).map((a) => (
             <button key={a.label} className={`btn ${a.kind || 'subtle'}`} disabled={a.disabled} onClick={a.onClick || closeModal}>{a.label}</button>
           ))}
@@ -229,5 +230,33 @@ export function SectionNav({ items, value, onChange, label }: { items: { key: st
           {x.icon && <Ico svg={x.icon} />}<span className="sec-nav-t"><b>{x.label}{x.badge}</b>{x.hint && <span>{x.hint}</span>}</span>
         </button>))}
     </nav>
+  );
+}
+
+/**
+ * Which AI runs this action: Auto (model routing picks per task), a tier (High / Standard / Light, with the model it
+ * runs on here) or a custom configuration from Administration → AI. The choice is the person's, remembered per browser.
+ */
+const TIER_NAME: Record<string, string> = { high: 'High', standard: 'Standard', light: 'Light' };
+export function AiRunPicker({ compact = false }: { compact?: boolean }) {
+  const ch = S.status?.aiChoices;
+  const v = S.aiRun || 'auto';
+  const known = v === 'auto' || TIER_NAME[v] || (ch?.configs || []).some((c: Any) => `cfg:${c.id}` === v);
+  const val = known ? v : 'auto';
+  const label = (k: string) => {
+    if (k === 'auto') return S.status?.routingOn ? 'Auto · per task' : `Auto${S.status?.model ? ` · ${S.status.model}` : ''}`;
+    if (TIER_NAME[k]) return `${TIER_NAME[k]}${ch?.tiers?.[k] ? ` · ${ch.tiers[k]}` : ''}`;
+    const c = (ch?.configs || []).find((x: Any) => `cfg:${x.id}` === k);
+    return c ? `${c.name}${c.model ? ` · ${c.model}` : ''}` : k;
+  };
+  return (
+    <label className={`ai-run ${compact ? 'compact' : ''} ${val !== 'auto' ? 'set' : ''}`} title="Which AI runs this. Auto follows Administration → AI → Model routing.">
+      <Ico svg={I.sparkle} /><span className="ai-run-l">Runs on</span>
+      <select value={val} onChange={(e) => setAiRun(e.target.value)} aria-label="Which AI runs this">
+        <option value="auto">{label('auto')}</option>
+        <optgroup label="Model tier">{Object.keys(TIER_NAME).map((k) => <option key={k} value={k}>{label(k)}</option>)}</optgroup>
+        {(ch?.configs || []).length > 0 && <optgroup label="Custom configurations">{ch.configs.map((c: Any) => <option key={c.id} value={`cfg:${c.id}`}>{label(`cfg:${c.id}`)}</option>)}</optgroup>}
+      </select>
+    </label>
   );
 }

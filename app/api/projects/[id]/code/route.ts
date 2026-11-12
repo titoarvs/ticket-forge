@@ -2,7 +2,7 @@ import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http'
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
 import { startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent.js';
-import { publicAgents, CODE_AGENT_IDS } from '@/lib/agents.js';
+import { publicAgents } from '@/lib/agents.js';
 import { getProjectSecret } from '@/lib/secrets.js';
 import { ardContext } from '@/lib/ard.js';
 import { markdownToDocx } from '@/lib/md-docx.js';
@@ -54,7 +54,7 @@ export const GET = api(async (req, p) => {
   const project = await store.getProject(p.id);
   const ticketId = String(sp.get('ticketId') || '');
   return { job: jobForTicket(p.id, ticketId), jobs: jobsForTicket(p.id, ticketId), backend: Boolean(backendDev(project)),
-    agents: agents.filter((a: any) => CODE_AGENT_IDS.includes(a.id) || a.id === 'review-panel') };
+    agents: agents.filter((a: any) => (a.runner === 'code' && !a.broken) || a.id === 'review-panel') };
 });
 
 export const POST = api(async (req, p) => {
@@ -105,7 +105,7 @@ export const POST = api(async (req, p) => {
     const target = { url: pr.url, number: pr.number, branch: pr.branch, base: pr.base || where.dev.baseBranch || 'main', title: pr.title, provider: pr.provider };
     const tokens = { token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') };
     if (b.action === 'comments') return { comments: await reviewComments({ repoPath: where.dev.localPath, target, ...tokens }) };
-    if (b.action === 'prReview') return startPrReview({ projectId: p.id, ticket, dev: where.dev, target, user, side: where.side, agentId: b.agent === 'ui-review' ? 'ui-review' : 'review', focus: String(b.focus || '').slice(0, 1000) });
+    if (b.action === 'prReview') return startPrReview({ projectId: p.id, ticket, dev: where.dev, target, user, side: where.side, agentId: b.agent === 'ui-review' || /^custom-[a-z0-9-]+$/.test(String(b.agent || '')) ? String(b.agent) : 'review', focus: String(b.focus || '').slice(0, 1000) });
     if (b.action === 'describe') return describePullRequest({ repoPath: where.dev.localPath, target, ticket, side: where.side, ...tokens, appLink: `${appUrl(req)}/p/${p.id}/backlog`, ai: aiOpts(b) });
     // update: an agent works on the request's own branch; the person reviews, then pushes to the same request.
     const mode = String(b.mode || 'prompt');

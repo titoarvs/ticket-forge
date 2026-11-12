@@ -8,6 +8,7 @@ import { Ico, I, Modal, Spinner, EmptyState, TypeIcon, LayerChip } from './ui';
 import { TF, TA, SF, MenuItem } from './fields';
 import { openDrawer, linkPr, refreshPr } from './actions';
 import { openCode, openUpdatePr, codeReady } from './DevCode';
+import { useAgents } from './Agents';
 
 const STATUSES = ['Open', 'Draft', 'Merged', 'Declined'];
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -20,6 +21,8 @@ function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
   const [focus, setFocus] = useState('');
   const [busy, setBusy] = useState(false);
   const noun = pr.provider === 'GitLab' ? 'merge request' : 'pull request';
+  const agents = useAgents();
+  const custom = (agents?.agents || []).filter((a: Any) => a.custom && a.runner === 'code' && !a.writes && a.enabled);
   const go = async () => {
     setBusy(true);
     try {
@@ -34,6 +37,7 @@ function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
       <div className="upd-modes" role="radiogroup" aria-label="Reviewer">
         {([['review', '🔍 Code review', 'Correctness, security, tests and the acceptance criteria.'], ['ui-review', '🧐 UI/UX review', 'Usability, accessibility, states, copy and responsive layout.']] as [string, string, string][]).map(([k, l, d]) => (
           <button key={k} role="radio" aria-checked={agent === k} className={agent === k ? 'on' : ''} onClick={() => setAgent(k)}><b>{l}</b><span className="muted small">{d}</span></button>))}
+        {custom.map((a: Any) => <button key={a.id} role="radio" aria-checked={agent === a.id} className={agent === a.id ? 'on' : ''} onClick={() => setAgent(a.id)}><b>{a.icon} {a.name}</b><span className="muted small">{a.summary} · custom</span></button>)}
       </div>
       <label className="field" style={{ marginTop: 10 }}><span>Focus on (optional)</span>
         <TA rows={2} value={focus} placeholder="e.g. the payroll rounding rules and the permission checks on the new endpoint" onChange={(e) => setFocus(e.target.value)} /></label>

@@ -7,7 +7,7 @@ import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, hashColor, COLORS, type Any,
   loadFlags,
 } from './core';
-import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState } from './ui';
+import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, AiRunPicker } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue } from './actions';
 import { AccountModal } from './Admin';
@@ -144,6 +144,7 @@ export function TopNav() {
             </Menu>
           )}
         </div>}
+        {can('ai.use') && <span className="tn-airun"><AiRunPicker compact /></span>}
         <AiStatus />
         <div className="tn-group">
           <ThemeToggle />
@@ -237,6 +238,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !inField && P()) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && P()) { e.preventDefault(); saveNow(); return; }
       if (e.key === 'Escape') {
+        if (S.pop) { S.pop = null; emit(); return; }
         if (S.menu) { S.menu = null; emit(); return; }
         if (S.full) { S.full = false; emit(); return; }
         if (S.drawer && !inField) { S.drawer = null; emit(); }
