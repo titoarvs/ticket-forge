@@ -367,22 +367,25 @@ export async function linkPr(t: Any, url: string) {
     return true;
   } catch (err: Any) { toast(err.message, 'err'); return false; }
 }
-export async function refreshPr(t: Any, prId: string) {
+/** Reads the request again from GitHub / GitLab. quiet: no toasts (background refresh); returns whether it was read. */
+export async function refreshPr(t: Any, prId: string, { quiet = false } = {}) {
   const r = t.prs.find((x: Any) => x.id === prId);
+  if (!r) return false;
   try {
     const info = await api(`/api/pr-info?url=${encodeURIComponent(r.url)}&projectId=${encodeURIComponent(P().id)}`);
     // Only what was really read from GitHub/GitLab replaces what's saved: a placeholder never overwrites the real title or branch.
     if (!info.fetched) {
       mutate(() => { r.checkedAt = nowIso(); });
-      toast(`Couldn’t read ${r.provider === 'GitLab' ? 'the merge request from GitLab' : 'the pull request'}${r.provider === 'GitLab' ? ' (save a GitLab token in Project settings → Code & GitHub)' : ''}. Kept what was saved.`, 'warn');
-      return;
+      if (!quiet) toast(`Couldn’t read ${r.provider === 'GitLab' ? 'the merge request from GitLab' : 'the pull request'}${r.provider === 'GitLab' ? ' (save a GitLab token in Project settings → Code & GitHub)' : ''}. Kept what was saved.`, 'warn');
+      return false;
     }
     mutate(() => {
       if (info.status !== r.status) logEvent(t, `${r.provider === 'GitLab' ? 'merge request' : 'pull request'} ${info.repo}${info.number ? ` ${r.provider === 'GitLab' ? '!' : '#'}${info.number}` : ''} is now ${info.status}`, 'Development');
       Object.assign(r, info, { checkedAt: nowIso() });
-    });
-    toast(`${info.title}: ${info.status}`);
-  } catch (err: Any) { toast(err.message, 'err'); }
+    }, { tag: `pr.${r.id}` });
+    if (!quiet) toast(`${info.title}: ${info.status}`);
+    return true;
+  } catch (err: Any) { if (!quiet) toast(err.message, 'err'); return false; }
 }
 /** Adds a comment: plain text, or rich text from the comment editor ({ doc, text, attachments }). */
 export function saveComment(t: Any, v: string | { doc: Any; text: string; attachments: Any[] }) {

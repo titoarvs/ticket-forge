@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   S, emit, P, ago, fmtDate, allowedStatuses, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
   statusNames, statusOf, statusColor, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
-  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, feat, type Any,
+  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, feat, type Any, releases, release,
 } from './core';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState, AiRunPicker } from './ui';
 import {
@@ -278,6 +278,13 @@ function IssuePanel({ t }: { t: Any }) {
               {isSub(t) ? <span className="muted" style={{ padding: '6px 8px' }}>{sprint(t.sprintId)?.name || 'None'} <span className="small">(from parent)</span></span>
                 : <SF disabled={!edit && !can('sprint.manage')} value={t.sprintId || ''} onChange={(ev) => field('sprintId', ev.target.value || null)}><MenuItem value="">None</MenuItem>
                   {sprints.map((s: Any) => <MenuItem key={s.id} value={s.id}>{s.name}{s.state === 'active' ? ' (active)' : s.state === 'closed' ? ' (closed)' : ''}</MenuItem>)}</SF>}
+              {!isSub(t) && (releases().length > 0 || (t.fixVersions || []).length > 0) && <>
+                <span className="label">Fix versions</span>
+                <SF multiple disabled={!edit && !can('sprint.manage')} aria-label="Fix versions" value={(t.fixVersions || []).filter((v: string) => release(v))}
+                  renderValue={(v: Any) => (v.length ? <span className="fixv">{v.map((id: string) => <span key={id} className={`label-chip ${release(id)?.status === 'released' ? 'rel-done' : ''}`}>{release(id)?.name}</span>)}</span> : <span className="muted">None</span>)}
+                  onChange={(ev: Any) => field('fixVersions', ev.target.value)}>
+                  {releases().filter((r: Any) => r.status !== 'archived' || (t.fixVersions || []).includes(r.id)).map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}{r.status !== 'unreleased' ? ` (${r.status})` : ''}</MenuItem>)}</SF>
+              </>}
               {isSub(t) ? <>
                 <span className="label">Parent</span>
                 <SF disabled={!edit} value={t.parentId} onChange={(ev) => mutate(() => { const par = ticket(ev.target.value); setField(t, 'parentId', ev.target.value); if (par) { t.epicId = par.epicId; t.sprintId = par.sprintId; } })}>

@@ -8,12 +8,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type KeyboardEvent as RKeyboardEvent } from 'react';
 import {
   S, emit, P, ticket, epic, isSub, openSprints, statusNames, allowedStatuses, canMove, sCls, setField, mutate, deleteIssues, peopleNames, me, can,
-  toast, openModal, undo, copyText, PRIORITIES, type Any,
+  toast, openModal, undo, copyText, PRIORITIES, releases, release, type Any,
 } from './core';
 import { Ico, I, PriorityIcon, Avatar, Swatch, Confirm } from './ui';
 import { openDrawer, duplicateIssue } from './actions';
 
-type PopKind = 'status' | 'assignee' | 'points' | 'priority' | 'epic' | 'more';
+type PopKind = 'status' | 'assignee' | 'points' | 'priority' | 'epic' | 'version' | 'more';
 type Pop = { kind: PopKind; ids: string[]; x: number; y: number; bottom: number; at: number };
 
 const POINTS = [1, 2, 3, 5, 8, 13, 21];
@@ -219,6 +219,29 @@ function EpicList({ ids }: { ids: string[] }) {
   </div>;
 }
 
+/** Fix versions: tick to add, untick to remove (for several issues: added to or removed from all of them). */
+function VersionList({ ids }: { ids: string[] }) {
+  const list = ids.map(ticket).filter((t: Any) => t && !isSub(t));
+  const rel = releases().filter((r: Any) => r.status !== 'archived');
+  const has = (rid: string) => list.length > 0 && list.every((t: Any) => (t.fixVersions || []).includes(rid));
+  const toggle = (rid: string) => {
+    const on = !has(rid);
+    const name = release(rid)?.name;
+    mutate(() => list.forEach((t: Any) => {
+      const cur = t.fixVersions || [];
+      const next = on ? [...new Set([...cur, rid])] : cur.filter((v: string) => v !== rid);
+      if (JSON.stringify(next) !== JSON.stringify(cur)) setField(t, 'fixVersions', next);
+    }));
+    if (list.length > 1) toast(`${plural(list.length, 'issue')} ${on ? `added to ${name}` : `removed from ${name}`}`, 'ok', { action: { label: 'Undo', onClick: undo } });
+  };
+  return <div className="pop-list" role="listbox" aria-label="Fix versions" aria-multiselectable>
+    <div className="pop-h">Fix versions</div>
+    {rel.length ? rel.map((r: Any) => <button key={r.id} role="option" aria-selected={has(r.id)} onClick={() => toggle(r.id)}>
+      <span className="radio-box">{has(r.id) && <Ico svg={I.check} />}</span><span>{r.name}</span>{r.status === 'released' && <small>Released</small>}</button>)
+      : <p className="pop-note">No versions yet. Create one on the Releases page.</p>}
+  </div>;
+}
+
 function MoreMenu({ ids }: { ids: string[] }) {
   const list = ids.map(ticket).filter(Boolean);
   if (!list.length) return null;
@@ -248,6 +271,7 @@ function MoreMenu({ ids }: { ids: string[] }) {
       <button role="menuitem" onClick={() => swapPop('points')}><span className="mi-sp">#</span>Story points…{one?.storyPoints != null && <small>{one.storyPoints}</small>}</button>
       <button role="menuitem" onClick={() => swapPop('priority')}><PriorityIcon p={one?.priority || 'Medium'} />Priority…{one && <small>{one.priority}</small>}</button>
       {(can('epic.manage') || edit) && !subs && P().epics.length > 0 && <button role="menuitem" onClick={() => swapPop('epic')}><Ico svg={I.epic} />Change epic…{one && epic(one.epicId) && <small>{epic(one.epicId).title}</small>}</button>}
+      {!subs && (can('sprint.manage') || edit) && releases().some((r: Any) => r.status !== 'archived') && <button role="menuitem" onClick={() => swapPop('version')}><Ico svg={I.calendar} />Fix version…{one && (one.fixVersions || []).length > 0 && <small>{(one.fixVersions || []).map((v: string) => release(v)?.name).filter(Boolean).join(', ')}</small>}</button>}
       <button role="menuitem" onClick={act(() => setFlag(ids, !allFlagged))}><Ico svg={I.flag} />{allFlagged ? 'Remove flag' : 'Add flag'}</button>
       <hr />
     </>}
@@ -290,7 +314,7 @@ export function RowPop() {
   if (!pop || !P()) return null;
   const ids = pop.ids.filter((id) => ticket(id));
   if (!ids.length) return null;
-  const Body = { status: StatusList, assignee: AssigneeList, points: PointsEditor, priority: PriorityList, epic: EpicList, more: MoreMenu }[pop.kind];
+  const Body = { status: StatusList, assignee: AssigneeList, points: PointsEditor, priority: PriorityList, epic: EpicList, version: VersionList, more: MoreMenu }[pop.kind];
   return <div ref={ref} className={`row-pop pop-${pop.kind}`} role="dialog" aria-label={pop.kind === 'more' ? 'Issue actions' : `Change ${pop.kind}`}
     style={{ left: pos?.left ?? pop.x, top: pos?.top ?? pop.y, opacity: pos ? 1 : 0 }} onClick={stop} onContextMenu={(e) => e.preventDefault()}>
     {ids.length > 1 && pop.kind !== 'more' && pop.kind !== 'points' && <div className="pop-h">{plural(ids.length, 'issue')} selected</div>}

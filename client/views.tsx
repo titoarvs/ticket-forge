@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
   activeSprint, openSprints, tcKey, spSum, statusNames, allowedStatuses, sCls, catOf, isDone, tCls, filtered, filtersActive, can, peopleNames, ticket, isBlocked,
-  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, feat, idx, undo, type Any,
+  saveUi, EMPTY_FILTER, mutate, setField, canMove, deleteIssues, historyText, openModal, setMenu, toast, uid, logEvent, api, feat, idx, undo, releases, release, type Any,
 } from './core';
 import { StatusCell, AssigneeCell, PointsCell, PriorityCell, MoreCell, rowContextMenu, openPop, setFlag } from './RowActions';
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, LayerChip, Confirm, Spinner, AutoTextarea, EmptyState, Modal, Menu } from './ui';
@@ -66,7 +66,7 @@ export function Header({ title, right, sub }: { title: string; right?: ReactNode
 type FilterProps = { status?: boolean; group?: { value: string; options: [string, string][]; onChange: (v: string) => void } };
 /** The filter bar redraws only when what it shows changes (its menus are heavy to redraw on every change). */
 export function FilterBar(props: FilterProps) {
-  const sig = [JSON.stringify(S.filter), props.status !== false, props.group?.value, peopleNames().join(), P().epics.map((e: Any) => `${e.id}${e.title}`).join(), statusNames().join(), filtersActive()].join('|');
+  const sig = [JSON.stringify(S.filter), props.status !== false, props.group?.value, peopleNames().join(), P().epics.map((e: Any) => `${e.id}${e.title}`).join(), statusNames().join(), filtersActive(), releases().map((r: Any) => r.id + r.name + r.status).join()].join('|');
   return <FilterBarView {...props} sig={sig} />;
 }
 const FilterBarView = memo(function FilterBarView({ status = true, group }: FilterProps & { sig: string }) {
@@ -82,6 +82,8 @@ const FilterBarView = memo(function FilterBarView({ status = true, group }: Filt
       <SF filter aria-label="Type" value={f.type} onChange={(e) => setF('type', e.target.value)}><MenuItem value="">Type</MenuItem>{opts([...TYPES, 'Sub-task'])}</SF>
       <SF filter aria-label="Priority" value={f.priority} onChange={(e) => setF('priority', e.target.value)}><MenuItem value="">Priority</MenuItem>{opts(PRIORITIES)}</SF>
       {status && <SF filter aria-label="Status" value={f.status} onChange={(e) => setF('status', e.target.value)}><MenuItem value="">Status</MenuItem>{opts(statusNames())}</SF>}
+      {releases().length > 0 && <SF filter aria-label="Fix version" value={f.version || ''} onChange={(e) => setF('version', e.target.value)}><MenuItem value="">Version</MenuItem>
+        {releases().filter((r: Any) => r.status !== 'archived' || f.version === r.id).map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}<MenuItem value="none">No version</MenuItem></SF>}
       {filtersActive() && <button className="btn subtle" onClick={() => { S.filter = EMPTY_FILTER(); emit(); }}>Clear filters</button>}
       <div className="spacer" />
       {group && <><span className="muted small">Group by</span><SF filter value={group.value} onChange={(e) => group.onChange(e.target.value)}>{group.options.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}</SF></>}
@@ -202,11 +204,11 @@ function toggleCheck(id: string, on: boolean) { if (on) S.checked.add(id); else 
 
 /** What a row shows, as one string: the row redraws only when this changes (thousands of rows stay fast). */
 function rowSig(t: Any, x: { e: Any; kids: [number, number]; blocked: boolean; active: boolean; checked: boolean; showEpic: boolean; compact: boolean; popped: boolean }) {
-  return [t.updatedAt, t.key, t.type, t.title, t.status, t.assignee, t.storyPoints, t.priority, t.flagged ? 1 : 0, t.layer, (t.labels || []).slice(0, 2).join(','),
+  return [t.updatedAt, t.key, t.type, t.title, t.status, t.assignee, t.storyPoints, t.priority, t.flagged ? 1 : 0, t.layer, (t.labels || []).slice(0, 2).join(','), (t.fixVersions || []).join(','),
     x.e ? `${x.e.id}${x.e.title}${x.e.color}` : '', t.prs.length, x.kids[0], x.kids[1], +x.blocked, +x.active, +x.checked, +x.showEpic, +x.compact, +x.popped].join('|');
 }
 /** Things every row depends on (workflow colours and transitions, permissions, the current user). */
-const pageSig = () => `${JSON.stringify(P().workflow)}|${P().flowMode}|${S.user?.id}|${(S.user?.permissions || []).length}|${S.user?.name}`;
+const pageSig = () => `${JSON.stringify(P().workflow)}|${P().flowMode}|${S.user?.id}|${(S.user?.permissions || []).length}|${S.user?.name}|${releases().map((r: Any) => r.id + r.name + r.status).join()}`;
 
 /** Everything a row shows, worked out from the project (cheap; drawing is what costs). */
 function rowData(t: Any, showEpic: boolean, compact: boolean, page: string) {
@@ -247,6 +249,7 @@ const RowView = memo(function RowView({ t, e, kc, blocked, active, checked, comp
       <span className="right">
         {t.flagged && <span className="flag is-flag" title="Flagged"><Ico svg={I.flag} />Flagged</span>}
         {blocked && <span className="flag" title="Blocked by an open issue"><Ico svg={I.flag} />Blocked</span>}
+        {full && (t.fixVersions || []).length > 0 && <span className="fixv-row">{(t.fixVersions || []).map((v: string) => release(v)).filter(Boolean).slice(0, 2).map((r: Any) => <span key={r.id} className={`ver-chip ${r.status === 'released' ? 'rel-done' : ''}`} title={`Fix version ${r.name}`}>{r.name}</span>)}</span>}
         {full && <span className="lbls">{(t.labels || []).slice(0, 2).map((l: string) => <span key={l} className="label-chip">{l}</span>)}</span>}
         {kc[1] > 0 && <span className="mini" title={`${kc[0]} of ${kc[1]} sub-tasks done`}><Ico svg={I.subtask} />{kc[0]}/{kc[1]}</span>}
         {t.prs.length > 0 && <span className="mini" title={`${t.prs.length} pull request(s)`}><Ico svg={I.pr} />{t.prs.length}</span>}
@@ -286,7 +289,7 @@ export function BulkBar() {
   const { byId } = idx();
   const ids = [...S.checked].filter((id: string) => byId.has(id)) as string[];
   if (!ids.length) return null;
-  const sig = [ids.join(), ids.map((id) => (byId.get(id)?.flagged ? 1 : 0)).join(''), openSprints().map((x: Any) => x.id + x.name).join(), P().epics.map((x: Any) => x.id + x.title).join(), statusNames().join(), peopleNames().join(), S.user?.id, S.autoRun?.running].join('|');
+  const sig = [ids.join(), releases().length, ids.map((id) => (byId.get(id)?.flagged ? 1 : 0)).join(''), openSprints().map((x: Any) => x.id + x.name).join(), P().epics.map((x: Any) => x.id + x.title).join(), statusNames().join(), peopleNames().join(), S.user?.id, S.autoRun?.running].join('|');
   return <BulkBarView ids={ids} sig={sig} />;
 }
 const BulkBarView = memo(function BulkBarView({ ids }: { ids: string[]; sig: string }) {
@@ -315,6 +318,7 @@ const BulkBarView = memo(function BulkBarView({ ids }: { ids: string[]; sig: str
           <MenuItem value="">Assign to…</MenuItem>{S.user?.name && <MenuItem value={S.user.name}>Assign to me</MenuItem>}{opts(peopleNames())}<MenuItem value="__none">Unassigned</MenuItem></SF>
         <SF filter value="" onChange={(e) => e.target.value && bulkSet('priority', e.target.value, `set to ${e.target.value} priority`)}><MenuItem value="">Priority…</MenuItem>{opts(PRIORITIES)}</SF>
         <button className="btn sm" onClick={(e) => openPop('points', ids, e.currentTarget)}>Story points…</button>
+        {releases().some((r: Any) => r.status !== 'archived') && <button className="btn sm" onClick={(e) => openPop('version', ids, e.currentTarget)}>Fix version…</button>}
         <button className="btn sm" onClick={() => setFlag(ids, !ids.every((id) => ticket(id)?.flagged))}><Ico svg={I.flag} />{ids.every((id) => ticket(id)?.flagged) ? 'Remove flag' : 'Add flag'}</button>
       </>}
       {can('ai.use') && can('issue.edit') && <button className="btn sm ai" onClick={bulkTests}><Ico svg={I.sparkle} />Write test cases</button>}
