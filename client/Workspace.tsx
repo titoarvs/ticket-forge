@@ -101,6 +101,11 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   const epicParam = params.get('epic');
   const hireParam = params.get('hire');
   const loaded = P()?.id === id;
+  // Changing page closes the issue/epic panel and any row popup, so the next page doesn't open with the last
+  // page's issue beside it. (Runs before the ?issue / ?epic effects below, which may open one for the new page.)
+  useEffect(() => {
+    if (S.drawer || S.full || S.pop) { Object.assign(S, { drawer: null, full: false, pop: null, menu: null }); emit(); }
+  }, [view, id]);
   // From Administration → Agents → Hire: /p/<id>/backlog?epic=<epicId>&hire=<agentId> opens the epic and hires the agent.
   useEffect(() => {
     if (!loaded || !epicParam) return;
