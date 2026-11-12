@@ -1,9 +1,10 @@
 'use client';
 // MUI-based form inputs used across the app. Props mirror native inputs (onChange/onBlur receive events)
 // so they drop in where <input>, <textarea> and <select> were used.
-import type { ReactNode } from 'react';
+import { Children, Fragment, cloneElement, isValidElement, useState, type ReactNode } from 'react';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import ListSubheader from '@mui/material/ListSubheader';
 import Checkbox from '@mui/material/Checkbox';
 import Radio from '@mui/material/Radio';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -96,24 +97,68 @@ export function TA(props: Any) {
   );
 }
 
-/** Dropdown (MUI Select). Children are <MenuItem>s; an item with value "" acts as the placeholder/None. */
-export function SF({ children, placeholder, className, ...props }: Any) {
+/** The text a menu item shows (for searching). */
+const textOf = (n: Any): string => (typeof n === 'string' || typeof n === 'number' ? String(n)
+  : Array.isArray(n) ? n.map(textOf).join(' ') : isValidElement(n) ? textOf((n.props as Any).children) : '');
+const flatItems = (children: ReactNode): Any[] => Children.toArray(children).flatMap((c: Any) => (isValidElement(c) && c.type === Fragment ? flatItems((c.props as Any).children) : [c]));
+/** Dropdowns with at least this many choices get a search box at the top of their menu. */
+const SEARCH_MIN = 8;
+
+/**
+ * Dropdown (MUI Select). Children are <MenuItem>s; an item with value "" acts as the placeholder/None.
+ * With 8 or more choices (or searchable), the open menu starts with a search box: type to narrow the list, ↓ to move
+ * into it, Enter to pick the first match. searchable={false} turns it off.
+ */
+export function SF({ children, placeholder, className, searchable, ...props }: Any) {
   // Select-only options go to the Select, never onto the TextField's root element (React warns about unknown
   // DOM props like displayEmpty). Empty values always show, so displayEmpty is on for every dropdown.
   const { displayEmpty: _de, renderValue, MenuProps, multiple, open, onOpen, onClose, autoWidth, ...own } = props;
   const { rest, html, sx } = split(own);
+  const [q, setQ] = useState('');
+  const items = flatItems(children);
+  const choices = items.filter((c) => isValidElement(c) && c.type === MenuItem && (c.props as Any).value !== '' && (c.props as Any).value !== undefined);
+  const canSearch = searchable ?? choices.length >= SEARCH_MIN;
+  const qq = q.trim().toLowerCase();
+  // Items that don't match stay in the list (hidden and skipped), so the chosen value still shows in the field.
+  const hide = (c: Any) => cloneElement(c, { disabled: true, style: { ...((c.props as Any).style || {}), display: 'none' } });
+  const shown = !canSearch || !qq ? items : items.map((c) => {
+    if (!isValidElement(c)) return c;
+    if (c.type !== MenuItem) return hide(c); // headings and dividers while searching
+    const v = (c.props as Any).value;
+    return `${textOf((c.props as Any).children)} ${typeof v === 'string' ? v : ''}`.toLowerCase().includes(qq) ? c : hide(c);
+  });
+  const matches = qq ? shown.filter((c) => isValidElement(c) && c.type === MenuItem && !(c.props as Any).disabled).length : choices.length;
+  const firstOption = (el: HTMLElement) => [...(el.closest('ul')?.querySelectorAll<HTMLElement>('li[role="option"][tabindex]') || [])].find((li) => li.style.display !== 'none' && li.getAttribute('aria-disabled') !== 'true');
+  const search = canSearch ? (
+    <ListSubheader key="__sf_search" className="sf-search">
+      <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onMouseUp={(e) => e.stopPropagation()}>
+        <span className="sf-search-ic">{ico(I.search)}</span>
+        <input autoFocus placeholder="Search" aria-label="Search the options" value={q} onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'Tab') return; // the menu closes as usual
+            e.stopPropagation(); // typing must not jump to items (the menu's type-ahead)
+            if (e.key === 'ArrowDown') { e.preventDefault(); firstOption(e.currentTarget)?.focus(); }
+            if (e.key === 'Enter') { e.preventDefault(); firstOption(e.currentTarget)?.click(); }
+          }} />
+        {qq && <span className="sf-count">{matches || 'No matches'}</span>}
+      </div>
+    </ListSubheader>
+  ) : null;
   return (
     <TextField select {...rest} className={className} sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
       slotProps={{
         htmlInput: html,
         select: {
           displayEmpty: true,
-          MenuProps: { ...(MenuProps || {}), slotProps: { paper: { sx: { maxHeight: 360 } }, ...(MenuProps?.slotProps || {}) } },
+          MenuProps: { ...(MenuProps || {}), ...(canSearch && { autoFocus: false }), slotProps: { paper: { sx: { maxHeight: 360 } }, ...(MenuProps?.slotProps || {}) } },
           renderValue: renderValue || (placeholder ? (v: Any) => (v === '' || v == null ? <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>{placeholder}</span> : undefined) : undefined),
-          ...(multiple !== undefined && { multiple }), ...(open !== undefined && { open }), ...(onOpen && { onOpen }), ...(onClose && { onClose }), ...(autoWidth !== undefined && { autoWidth }),
+          ...(multiple !== undefined && { multiple }), ...(open !== undefined && { open }), ...(autoWidth !== undefined && { autoWidth }),
+          onOpen: (e: Any) => { setQ(''); onOpen?.(e); },
+          onClose: (e: Any) => { onClose?.(e); setTimeout(() => setQ(''), 200); },
         },
       }}>
-      {children}
+      {search}
+      {shown}
     </TextField>
   );
 }

@@ -237,7 +237,7 @@ export function SectionNav({ items, value, onChange, label }: { items: { key: st
  * Which AI runs this action: Auto (model routing picks per task), a tier (High / Standard / Light, with the model it
  * runs on here) or a custom configuration from Administration → AI. The choice is the person's, remembered per browser.
  */
-const TIER_NAME: Record<string, string> = { high: 'High', standard: 'Standard', light: 'Light' };
+export const TIER_NAME: Record<string, string> = { high: 'High', standard: 'Standard', light: 'Light' };
 export function AiRunPicker({ compact = false }: { compact?: boolean }) {
   const ch = S.status?.aiChoices;
   const v = S.aiRun || 'auto';

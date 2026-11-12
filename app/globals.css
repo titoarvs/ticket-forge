@@ -2162,3 +2162,86 @@ tr.xr-step-passed td { background: color-mix(in srgb, var(--success-bg) 40%, tra
   .row-pop { font-size: 15px; }
   .row-pop .pop-list button, .row-pop .pop-menu button { min-height: 42px; }
 }
+
+/* ---------------------------------------------------------------- top bar (organized) */
+.topnav { display: flex; gap: 12px; }
+.topnav .tn-left { flex: 0 1 auto; min-width: 0; }
+.topnav .tn-left > * { flex: none; }
+.topnav .tn-left > .menu-wrap { flex: 0 1 auto; min-width: 0; }
+.topnav .tn-left .proj-switch { min-width: 0; }
+.topnav .tn-left .proj-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.topnav .tn-center { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+.topnav .tn-right { flex: none; gap: 6px; }
+.tn-create { margin-left: 0; }
+.tn-search { position: relative; display: flex; align-items: center; flex: 0 1 380px; min-width: 150px; }
+.tn-search input { width: 100%; height: 32px; padding: 0 44px 0 32px; border: 1px solid var(--border-input); border-radius: var(--radius); background: var(--bg-sunken); color: var(--text); font: inherit; font-size: 13.5px; }
+.tn-search input::placeholder { color: var(--text-subtlest); }
+.tn-search input:hover { background: var(--hover); }
+.tn-search input:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; background: var(--bg); }
+.tn-search input::-webkit-search-cancel-button { display: none; }
+.tn-search-ic { position: absolute; left: 9px; color: var(--text-subtlest); pointer-events: none; }
+.tn-kbd { position: absolute; right: 8px; font: 600 10.5px/1 var(--font, inherit); color: var(--text-subtlest); border: 1px solid var(--border); border-radius: 4px; padding: 3px 5px; pointer-events: none; }
+.tn-search input:focus ~ .tn-kbd { display: none; }
+.tn-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; min-width: 420px; background: var(--overlay); border-radius: var(--radius); box-shadow: var(--shadow-overlay); padding: 6px 0; z-index: 90; max-height: 60vh; overflow-y: auto; }
+.tn-results button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 7px 12px; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; border-left: 2px solid transparent; }
+.tn-results button.on { background: var(--hover); border-left-color: var(--selected-text); }
+.tn-results .key { color: var(--text-subtle); font-size: 12px; white-space: nowrap; }
+.tn-results .tn-r-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tn-results small { color: var(--text-subtlest); font-size: 11.5px; white-space: nowrap; }
+.tn-none { margin: 6px 12px; }
+
+.tn-edit { gap: 2px; padding-right: 8px; margin-right: 2px; border-right: 1px solid var(--border); }
+.topnav .save-state { display: inline-flex; align-items: center; gap: 5px; margin: 0 6px 0 0; font-size: 12px; color: var(--text-subtlest); }
+.save-state .ico { width: 14px; height: 14px; }
+.save-state.saved .ico { color: var(--success); }
+.save-state.failed { color: var(--danger); }
+.spinner.sm { width: 12px; height: 12px; border-width: 2px; }
+
+button.ai-pill { gap: 7px; padding: 0 10px 0 11px; color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; max-width: 280px; }
+button.ai-pill:hover, button.ai-pill.on { background: var(--hover); }
+.ai-pill .ai-ic { color: var(--ai, var(--brand)); }
+.ai-pill .ai-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ai-pill .ai-runtag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--ai-bg, var(--selected-bg)); color: var(--ai, var(--selected-text)); }
+.ai-pill .ai-chev { color: var(--text-subtle); }
+.ai-menu-h { display: flex; gap: 10px; align-items: flex-start; padding: 8px 16px; min-width: 280px; }
+.ai-menu-h .dot { margin-top: 6px; }
+.ai-menu-h b { display: block; }
+.ai-menu-h .ai-model { display: inline-block; margin-top: 2px; }
+.ai-menu-h p { margin: 4px 0 0; }
+.menu .radio-dot { display: inline-grid; place-items: center; width: 16px; height: 16px; border: 1.5px solid var(--border-input); border-radius: 50%; flex: none; }
+.menu [aria-checked="true"] .radio-dot { border-color: var(--selected-text); color: var(--selected-text); }
+.menu [aria-checked="true"] .radio-dot .ico { width: 11px; height: 11px; }
+.menu .mh small { text-transform: none; font-weight: 500; letter-spacing: 0; margin-left: 4px; }
+.acct { display: flex; gap: 10px; align-items: center; }
+.acct > div { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; min-width: 0; }
+
+@media (max-width: 1200px) { .tn-kbd { display: none; } }
+@media (max-width: 1024px) { .ai-pill .ai-name, .ai-pill .ai-runtag { display: none; } .topnav .save-state .hide-md { display: none; } }
+@media (max-width: 900px) { .proj-switch { max-width: 160px; } }
+@media (max-width: 720px) {
+  .topnav { gap: 6px; }
+  .topnav .tn-left { flex: none; }
+  .topnav .tn-left .tn-nav, .topnav .tn-left .tn-sep, .topnav .tn-left > .menu-wrap { display: none; } /* the sidebar shows the project */
+  .topnav .tn-center { flex: 1 1 auto; justify-content: flex-end; }
+  .topnav .save-state { display: none; }
+  .ai-pill .ai-chev, .ai-pill .ai-backup { display: none; }
+  .tn-search { flex: none; width: 36px; min-width: 0; }
+  .tn-search input { padding: 0; width: 36px; color: transparent; cursor: pointer; }
+  .tn-search input::placeholder { color: transparent; }
+  .tn-search-ic { left: 10px; }
+  .tn-search:focus-within { position: absolute; left: 8px; right: 8px; width: auto; z-index: 95; }
+  .tn-search:focus-within input { width: 100%; padding: 0 12px 0 32px; color: var(--text); cursor: text; }
+  .tn-results { min-width: 0; }
+  .tn-search:focus-within .tn-results { left: 0; right: 0; }
+  .tn-edit { padding-right: 4px; }
+  .tn-edit .icon-btn[aria-label="Redo"] { display: none; }
+  button.ai-pill { width: auto; padding: 0 8px; }
+}
+
+/* search box at the top of long dropdown menus */
+.sf-search.MuiListSubheader-root { padding: 6px 8px; line-height: normal; background: var(--overlay, var(--bg)); border-bottom: 1px solid var(--border); z-index: 2; }
+.sf-search > div { position: relative; display: flex; align-items: center; }
+.sf-search input { width: 100%; height: 32px; padding: 0 64px 0 30px; border: 1px solid var(--border-input); border-radius: var(--radius); background: var(--bg); color: var(--text); font: inherit; font-size: 13.5px; }
+.sf-search input:focus { outline: 2px solid var(--border-focus); outline-offset: -1px; }
+.sf-search-ic { position: absolute; left: 8px; display: inline-flex; color: var(--text-subtlest); pointer-events: none; }
+.sf-count { position: absolute; right: 8px; font-size: 11.5px; color: var(--text-subtlest); pointer-events: none; }

@@ -859,3 +859,13 @@ search keystroke 17–37 ms.
   copies behind a load balancer if needed. The caches above are per copy and short-lived, so copies stay in step
   within about 2 seconds.
 
+### Top bar and searchable dropdowns
+
+- **Top bar**, left to right: TicketForge, Projects and Administration, the project you're in (switch project);
+  **search** (⌘K / Ctrl+K: issues and epics by key or summary in a project, projects elsewhere; ↑↓ and Enter) and
+  **Create**; the project's save state, undo, redo and export; the **AI menu** (which AI is connected, a backup and why,
+  *Runs on* for your next AI actions, check the connection again, AI settings); notifications; your account (with the
+  light/dark theme). On a phone it keeps the icons only, and the search opens across the bar.
+- **Dropdowns with 8 or more choices** open with a search box: type to narrow the list, ↓ to move into it, Enter to pick
+  the first match. Shorter ones stay a plain list; `searchable` on `SF` forces it on or off.
+
