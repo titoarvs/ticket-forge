@@ -8,6 +8,7 @@ import {
   addMember, logEvent, setField, addLink, deleteIssues, canMove, moveError, type Any,
 } from './core';
 import { askFirst } from './Clarify';
+import { recordAutomationResult } from './TestRepo';
 import { Modal, Confirm, Ico, I, TypeIcon, PriorityIcon, AutoTextarea, Spinner } from './ui';
 import { refreshStatus, aiInactive } from './AppShell';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -366,22 +367,25 @@ export async function linkPr(t: Any, url: string) {
     return true;
   } catch (err: Any) { toast(err.message, 'err'); return false; }
 }
-export async function refreshPr(t: Any, prId: string) {
+/** Reads the request again from GitHub / GitLab. quiet: no toasts (background refresh); returns whether it was read. */
+export async function refreshPr(t: Any, prId: string, { quiet = false } = {}) {
   const r = t.prs.find((x: Any) => x.id === prId);
+  if (!r) return false;
   try {
     const info = await api(`/api/pr-info?url=${encodeURIComponent(r.url)}&projectId=${encodeURIComponent(P().id)}`);
     // Only what was really read from GitHub/GitLab replaces what's saved: a placeholder never overwrites the real title or branch.
     if (!info.fetched) {
       mutate(() => { r.checkedAt = nowIso(); });
-      toast(`Couldn’t read ${r.provider === 'GitLab' ? 'the merge request from GitLab' : 'the pull request'}${r.provider === 'GitLab' ? ' (save a GitLab token in Project settings → Code & GitHub)' : ''}. Kept what was saved.`, 'warn');
-      return;
+      if (!quiet) toast(`Couldn’t read ${r.provider === 'GitLab' ? 'the merge request from GitLab' : 'the pull request'}${r.provider === 'GitLab' ? ' (save a GitLab token in Project settings → Code & GitHub)' : ''}. Kept what was saved.`, 'warn');
+      return false;
     }
     mutate(() => {
       if (info.status !== r.status) logEvent(t, `${r.provider === 'GitLab' ? 'merge request' : 'pull request'} ${info.repo}${info.number ? ` ${r.provider === 'GitLab' ? '!' : '#'}${info.number}` : ''} is now ${info.status}`, 'Development');
       Object.assign(r, info, { checkedAt: nowIso() });
-    });
-    toast(`${info.title}: ${info.status}`);
-  } catch (err: Any) { toast(err.message, 'err'); }
+    }, { tag: `pr.${r.id}` });
+    if (!quiet) toast(`${info.title}: ${info.status}`);
+    return true;
+  } catch (err: Any) { if (!quiet) toast(err.message, 'err'); return false; }
 }
 /** Adds a comment: plain text, or rich text from the comment editor ({ doc, text, attachments }). */
 export function saveComment(t: Any, v: string | { doc: Any; text: string; attachments: Any[] }) {
@@ -492,7 +496,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
     const res = await api('/api/automation/run', {
       method: 'POST', raw: true, signal: ctrl.signal,
       body: {
-        baseUrl, regenerate, provider: S.settings.provider || undefined, model: S.settings.model || undefined,
+        baseUrl, regenerate, provider: S.settings.provider || undefined, model: S.settings.model || undefined, run: S.aiRun || undefined, heal: P().automation.selfHeal !== false,
         project: { id: P().id, name: P().name, summary: P().summary },
         items: list.map(({ t, tc }) => ({
           ticket: { id: t.id, key: t.key, title: t.title, userStory: t.userStory, acceptanceCriteria: t.acceptanceCriteria },
@@ -506,6 +510,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
       if (ev.type === 'phase') push(ev.message, ev.level);
       else if (ev.type === 'error') push(ev.message || ev.error, 'err');
       else if (ev.type === 'script' && tc) mutate(() => { tc.script = ev.code; });
+      else if (ev.type === 'phase' && ev.level === 'pass') push(ev.message, 'pass');
       else if (ev.type === 'start') { run.current = ev.tcId; push(`Running ${label}`); }
       else if (ev.type === 'reported') run.report = ev;
       else if (ev.type === 'result' && tc) {
@@ -513,7 +518,7 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
         if (ev.result.status === 'Pass') run.pass += 1; else run.fail += 1;
         const msg = { message: `${label} — ${ev.result.status}${ev.result.durationMs ? ` (${(ev.result.durationMs / 1000).toFixed(1)}s)` : ''}`, level: ev.result.status === 'Pass' ? 'pass' : 'fail' };
         if (run.log[run.log.length - 1]?.message.startsWith('Running ')) run.log[run.log.length - 1] = msg; else run.log.push(msg);
-        mutate(() => { tc.lastRun = ev.result; tc.status = ev.result.status; logEvent(t, `automated test ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.status}`, 'Automation'); });
+        mutate((pp: Any) => { if (ev.result.healed) { tc.healed = ev.result.healed; logEvent(t, `Self-healing agent repaired the script of ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.healed.reason}`, 'Automation'); } tc.lastRun = ev.result; tc.status = ev.result.status; logEvent(t, `automated test ${tcKey(t, t.testCases.indexOf(tc))}: ${ev.result.status}`, 'Automation'); recordAutomationResult(pp, t, tc, ev.result, baseUrl); });
       }
     });
   } catch (e: Any) {
@@ -557,6 +562,8 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
       { label: 'Save', kind: 'primary', hidden: !editable, onClick: () => { save(); closeModal(); toast('Script saved'); } }]}>
       <p className="muted small" style={{ marginTop: 0 }}>Body of <code>{'async ({ page, expect, baseURL }) => { … }'}</code> — runs with Playwright against {P().automation.baseUrl || 'your app'}.</p>
       <TA mono spellCheck={false} style={{ minHeight: 280 }} max={480} value={code} disabled={!editable} onChange={(e) => setCode(e.target.value)} />
+      {tc.healed?.previous && <div className="heal-note small"><b>🩹 Self-healed {ago(tc.healed.at)}</b>: {tc.healed.reason}
+        {editable && <button className="link-btn small" onClick={() => { mutate(() => { tc.script = tc.healed.previous; tc.healed = null; logEvent(t, `reverted the self-healed script of ${tcKey(t, t.testCases.indexOf(tc))}`, 'Automation'); }); setCode(tc.script); toast('Reverted to the script before healing'); }}>Revert to the previous script</button>}</div>}
       {tc.lastRun?.error && <><h5 style={{ margin: '12px 0 4px' }}>Last error</h5><pre className="err-box">{tc.lastRun.error}</pre></>}
     </Modal>
   );
@@ -605,7 +612,9 @@ export function AiSettingsModal() {
           <br /><span className="muted">{account ? 'Used because you opened TicketForge on this computer (localhost).' : 'Used because TicketForge was opened on a web address. On your own computer it uses your Claude account instead.'}</span></span>
       </div>
       {account
-        ? <><label className="field"><span>Claude model — leave blank for the default</span><PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={st.model || 'opus'} /></label>
+        ? st.routingOn
+          ? <p className="small muted" style={{ marginBottom: 0 }}><b>Model routing is on:</b> each kind of work uses the model your administrator set for it (for example a lighter model for epics and failure notes){admin ? <>; see {goAdmin} → Model routing</> : ''}.</p>
+          : <><label className="field"><span>Claude model — leave blank for the default</span><PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={st.model || 'opus'} /></label>
             <p className="small muted" style={{ marginBottom: 0 }}>Aliases like <code>opus</code> or <code>sonnet</code> use the newest model your Claude Code knows (<code>claude update</code> gets the latest).</p></>
         : <p className="small muted" style={{ marginBottom: 0 }}>The provider and model are set with environment variables on the server{admin ? <>; see {goAdmin}</> : ''}.</p>}
     </Modal>

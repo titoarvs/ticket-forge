@@ -3,7 +3,7 @@
 // Sync reads the project's local repository: its pages, what changed since the last sync, the test cases those changes
 // affect, and features already delivered. Everything comes back as a review; nothing changes until you apply it.
 import { useState } from 'react';
-import { S, P, api, nextEpicKey, COLORS, isDone, mutate, toast, openModal, closeModal, can, uid, ago, readNdjson, aiBody, startTask, setField, logEvent, newTicket, newTest, me, type Any } from './core';
+import { S, P, feat, api, nextEpicKey, COLORS, isDone, mutate, toast, openModal, closeModal, can, uid, ago, readNdjson, aiBody, startTask, setField, logEvent, newTicket, newTest, me, type Any } from './core';
 import { Ico, I, Modal, Spinner } from './ui';
 import { TF, SF, CB, MenuItem } from './fields';
 import { appSetup } from './AppSetup';
@@ -13,7 +13,12 @@ const stepsOf = (s: Any) => (Array.isArray(s) ? s : s ? [String(s)] : []);
 let running = false;
 
 // ---------------------------------------------------------------- sync card (Test automation → App setup)
+/** Repository sync, unless the owner locked it (Administration → Features). */
 export function RepoSyncCard() {
+  if (!feat('reposync')) return <p className="muted small" style={{ margin: 0 }}><b>Repository sync is locked.</b> {S.user?.isOwner ? 'Unlock it in Administration → Features.' : 'The owner locked this feature.'}</p>;
+  return <RepoSyncCardInner />;
+}
+function RepoSyncCardInner() {
   const p = P();
   const dir = p.dev?.localPath || (appSetup(p).source?.kind === 'folder' ? appSetup(p).source.location : '');
   const last = p.automation?.repoSync;
@@ -117,7 +122,7 @@ export function RepoSyncCard() {
         </div>
         <div className="repo-tile">
           <div className="rt-h"><Ico svg={I.epic} /><b>Find built features</b></div>
-          <p className="muted small">Reads every page, the <code>.md</code> documents (feature notes, release notes, READMEs) and the history, and organizes everything already built into <b>epics</b>, as {doneStatus()} issues.</p>
+          <p className="muted small">Reads the <b>code</b>: every page’s screens, actions and fields, the API endpoints and data models{P().devBackend?.enabled ? ' (frontend and backend)' : ''}. Organizes what’s built into <b>epics</b>, as {doneStatus()} issues. Documents and history only help name things; nothing is added from them alone.</p>
           <button className="btn ai sm" disabled={!dir || !aiOk || !can('issue.create') || busy} onClick={findFeatures}><Ico svg={I.sparkle} />Find built features</button>
         </div>
         <div className="repo-tile">
@@ -186,7 +191,7 @@ export function FeatureMapReview({ r }: { r: Any }) {
     <Modal title="Built features, by epic" wide persistent actions={[{ label: 'Cancel' }, { label: (() => { const sel = r.epics.flatMap((e: Any, ei: number) => e.features.filter((_: Any, fi: number) => pick[key(ei, fi)])); const nNew = sel.filter((f: Any) => !f.existingId).length;
       return nNew === sel.length ? `Add ${nNew} ticket${nNew === 1 ? '' : 's'}` : nNew ? `Add ${nNew}, update ${sel.length - nNew}` : `Apply ${sel.length} change${sel.length === 1 ? '' : 's'}`; })(), kind: 'primary', disabled: !chosen, onClick: apply }]}>
       <div className="sync-sum"><span><Ico svg={I.pr} /> <b>{r.repo.branch}</b> at <code>{String(r.repo.head).slice(0, 7)}</code></span>
-        <span>Read {r.pages} pages, {r.docs.length} .md document{r.docs.length === 1 ? '' : 's'} and {r.commits} commits</span>
+        <span>{r.code ? <>From the code: {r.code.pages} pages, {r.code.endpoints} endpoints, {r.code.models} data models{r.code.backend ? ' (with the backend)' : ''}</> : <>Read {r.pages} pages</>} · hints from {r.docs.length} .md file{r.docs.length === 1 ? '' : 's'} and {r.commits} commits</span>
         <span>{all.length} small tickets · {new Set(all.map((f: Any) => f.group || f.title)).size} features · {r.epics.length} epics ({r.epics.filter((e: Any) => e.isNew).length} new)</span></div>
       <div className="sync-pane">
         {r.epics.map((e: Any, ei: number) => {
@@ -215,13 +220,18 @@ export function FeatureMapReview({ r }: { r: Any }) {
                       : f.existingKey ? <span className="pg-badge dyn">{f.existingKey}: {f.existingStatus} → {done}</span> : <span className="pg-badge">New · {done}</span>}</div>
                     {!f.existingKey && <button className="link-btn small" onClick={() => setOpen(open === k ? null : k)}>{open === k ? 'Hide details' : `${f.acceptanceCriteria.length} acceptance criteria`}</button>}
                     {open === k && <div className="pt-steps small">{f.userStory && <p><i>{f.userStory}</i></p>}{f.description && <p>{f.description}</p>}<ol>{f.acceptanceCriteria.map((a: string, i: number) => <li key={i}>{a}</li>)}</ol>
-                      {(f.pages.length > 0 || f.sources.length > 0) && <p className="muted">{[f.pages.length && `Pages: ${f.pages.join(', ')}`, f.sources.length && `Sources: ${f.sources.join(', ')}`].filter(Boolean).join(' · ')}</p>}</div>}
+                      {(f.pages.length > 0 || f.sources.length > 0) && <p className="muted">{[f.pages.length && `Pages: ${f.pages.join(', ')}`, f.sources.length && `Code and hints: ${f.sources.join(', ')}`].filter(Boolean).join(' · ')}</p>}</div>}
                   </div>
                 </div>
                 </div>); })}
             </div>);
         })}
-        {!r.epics.length && <p className="muted small">Nothing built was found.</p>}
+        {!r.epics.length && <p className="muted small">Nothing built was found in the code.</p>}
+        {r.unverified?.length > 0 && <details className="fm-unverified">
+          <summary className="small"><b>{r.unverified.length} not found in the code</b> <span className="muted">· mentioned only in documents or history, so not added</span></summary>
+          <ul className="small">{r.unverified.map((u: Any, i: number) => <li key={i}><b>{u.title}</b>{u.source && <span className="muted"> · {u.source}</span>}<div className="muted">{u.why}</div></li>)}</ul>
+          <p className="muted small" style={{ margin: 0 }}>If one is really built, it may live in a repository TicketForge doesn’t read: set the backend repository in Project settings → Code & GitHub, then run this again.</p>
+        </details>}
       </div>
     </Modal>
   );

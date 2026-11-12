@@ -247,8 +247,11 @@ Without `DATABASE_URL`, TicketForge uses an embedded Postgres stored in `data/db
 **Speed.** A hosted database is a network round trip away, so TicketForge keeps round trips down:
 - each statement goes to Postgres in one message, together with the row-level security settings and the commit;
 - the signed-in user is remembered for 15 seconds (cleared at once when users, roles or sessions change);
-- a save writes all changed issues in one statement and only reads the issues it changes;
+- a save writes all changed issues in one statement, reads only the issues it changes and writes only the project
+  sections that changed (not the whole project);
 - the schema check on start is one message.
+
+See **Speed with thousands of people** below for syncing, caching and how to run it for a big team.
 
 Pick the Supabase region closest to you and your server. To see what a request costs, start the server with
 `TICKETFORGE_SQL_LOG=1`: each statement is logged with its time.
@@ -364,9 +367,8 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), sh
 | Review | **UI/UX Review** (UI/UX) | Audits usability, accessibility, states, copy and layout; never edits | Repo, read-only |
 | General | **Free Worker** | Any task you describe, same safety rules as Build | Own git worktree |
 
-**Hiring agents.** Every agent can be hired. Open an epic: its **Agents** section lists the feature's lifecycle by
-phase, shows how far each step is, and has **Hire** on each row. Or use **Hire** on a card in Administration → Agents
-and pick the project and epic. Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
+**Hiring agents.** Every agent can be hired: use **Hire** on a card in Administration → Agents and pick the project
+and epic. (Epic and issue panels don't list agents.) Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
 run TicketForge's existing writers with the agent's instructions. Epic, Kick Off, Demo, Sign-Off and Manual, Deploy,
 Release Certification and Review a Submission write a Markdown document from the epic, its documents, issues, test
 results and pull requests, saved on the epic (`lib/agentdocs.js`). Code agents ask which issue to work on. In the code
@@ -646,3 +648,256 @@ When TicketForge is opened at localhost, it can use **GitHub Copilot** through t
 3. Pick a Copilot model, or leave Copilot's default.
 
 Copilot runs without tools in an empty temporary folder: it only answers prompts and can't read or change files. Limits and sign-in problems switch to the next AI automatically, and the top-bar AI pill shows which AI is answering.
+
+## Test management (Xray-style)
+
+**Test management** in the project sidebar:
+- **Test repository:** reusable tests (keys like `T2-T7`) in folders. Each has a type, priority, labels, preconditions and numbered steps (action, data, expected result), and covers any number of issues. **Import from issues** turns the test cases issues already have into repository tests, linked to their issue, with one folder per epic.
+- **Test plans:** sets of tests for an epic, sprint or release, with a progress bar of their latest results. **Save and run** starts an execution.
+- **Test executions:** run tests step by step (✓ passed, ✗ failed, ⦸ blocked). The test's result follows its steps. Each test also takes a comment or evidence, and **Create defect** opens a Bug with the steps and failure, linked to the run and to the covered issues.
+- **Coverage:** each issue is OK (all its tests pass), NOK (one fails or is blocked), Not run, or Uncovered.
+
+Every issue's panel has a **Tests** section: link a test, create one, see each test's latest result, and the issue's coverage.
+
+Test management follows Xray for Jira and BrowserStack Test Management. It also has:
+- test environments, with coverage per environment;
+- an assignee per test run, and bulk updates;
+- BDD (Gherkin) tests;
+- JUnit XML results import;
+- TicketForge's own Playwright results feeding an "Automated runs" execution;
+- CSV import and export;
+- a traceability report.
+
+See [docs/test-management-parity.md](docs/test-management-parity.md) for the full comparison, including what isn't built yet.
+
+**AI in Test management** follows the company's test standard, set in Administration → Generation → **Test management**:
+- Pick a corporate standard to start from (ISTQB, Xray for Jira, BDD (Cucumber) or BrowserStack TM), then change any rule:
+  - format (steps, Gherkin or both) and title pattern;
+  - number of steps, an expected result per step, the test-data column and preconditions;
+  - Gherkin style, tests per issue, priority rule, allowed labels and test plan rules;
+  - your own company standard, as free text.
+- **Write tests with AI** writes repository tests for chosen issues, for review before they're added.
+- **Improve with AI** in the test editor rewrites a test to the standard (or as asked, e.g. "convert to Gherkin").
+- **Build plan with AI** follows the plan rules.
+
+### Model routing (Administration → AI → Model routing)
+
+Every AI call names its task, and each task uses a **tier**:
+- **High** (best model): tickets, documents and automation scripts.
+- **Standard**: epics from documents, splitting issues, the repository scan, test cases and test plans.
+- **Light** (fast and cheap): failure analysis, PR text, clarifying questions and small helper jobs. Light tasks skip extended thinking.
+
+Each tier maps to a model on every AI:
+- your Claude account: `opus` / `sonnet` / `haiku` by default;
+- GitHub Copilot;
+- each AI API. A blank field uses the provider's own model, e.g. set OpenAI's Light tier to `gpt-4.1-mini`.
+
+Claude Code agents are routed too:
+- **Coding agents** (Build, Frontend and Backend Developer, Fix a Bug, Architecture Record) use High.
+- **Test and helper agents** (Feature Tests, Test Automation, Free Worker) use Standard.
+- **Code review** (Review a Pull Request, Review Panel, UI/UX Review) uses High.
+- **Document agents** use Standard.
+
+A model picked on an agent in Administration → Agents still wins over routing. Usage for agent runs shows the cost Claude Code reports.
+
+Presets: **Best quality**, **Balanced** (the default) and **Economy**. The page also shows the calls, the volume of text and the model that answered for each task since the server started. When routing is on, it overrides each person's own model choice in the AI connection dialog. The code is in `lib/aitasks.js`.
+
+### AI failure analysis on automated tests
+
+When automated tests fail, the test-run comment on the issue includes an AI analysis of each failure, using the **Light** tier. It covers:
+- a category (product bug, test script, test data, environment or flaky), a confidence and an owner;
+- expected and actual results, the likely cause, the evidence, a fix and next steps;
+- for script problems, corrected script lines.
+
+The analysis works from the error, the script, the test case, the issue's acceptance criteria, the page the test ended on and the browser logs.
+
+The same analysis goes into the assignee's notification and email. From the comment you can copy it as a bug report, or rewrite the script and re-run. Turn it off in Test automation → Settings → "When a test fails". The code is in `lib/failures.js`.
+
+### Pull requests page
+
+Every pull and merge request linked to the project's issues, with what GitHub / GitLab says about it:
+- **On each row:** status, checks (passing, failing, running), reviews (approved, changes requested, review requested),
+  merge conflicts, *Ready to merge* (approved, checks green, no conflicts), size (+added −removed, files), comments, the
+  AI review verdict, branch → base, author, when it was opened and updated, and the linked issue.
+- **Needs attention:** one click shows the requests with failing checks, requested changes, conflicts, no review yet,
+  or ready to merge. The status cards (Active, Open, Draft, Merged, Declined, All) still filter by status.
+- **Find and arrange:** search (title, branch, issue, label, author), repository, sort (recently updated, oldest open
+  first, largest change, issue key) and group by status, repository or epic. Status, sort and grouping are remembered.
+- **Click a row** for its details: description, labels, every check (failed first, linked), reviewers, the AI review,
+  branch (copy), merge conflicts and the timeline.
+- **Actions:** Review with AI, Update with AI, refresh, open on GitHub / GitLab, and in "…": copy the branch or link,
+  open the issue, unlink.
+- Open requests last read 10 or more minutes ago refresh by themselves, one at a time, when the page opens (up to 12).
+  *Refresh open* reads them all now. GitHub details come through the signed-in `gh` CLI (or `GITHUB_TOKEN`); GitLab
+  through the project's GitLab token.
+
+### Issues page
+
+**Issues** (sidebar → Planning) is a flat, sortable table of every issue, like an issue navigator:
+- **Quick views:** All, Open, Assigned to me, Unassigned, Open bugs, Blocked, Failing tests, Updated this week, Done. Each shows its count.
+- **Filters:** search (key, summary, description), type, status, priority, assignee, epic, sprint, layer and label. Sub-tasks can be shown too.
+- **Sorting and columns:** click a column header to sort. A column chooser covers type, status, priority, assignee, epic, sprint, layer, points, labels, tests passing, PRs, reporter, due, updated and created.
+- **Saved views:** save the current filters, sort and columns as a view (kept in this browser).
+- **Editing:** change status and assignee inline, select rows for the usual bulk actions, and **Export CSV** of what's shown.
+
+### Find built features: from the code
+
+Test automation → **Find built features** works from the **code**. Without AI, it first takes an inventory of:
+- every page's headings, actions, fields, links and API calls;
+- the API endpoints (Next.js, Express, Fastify, Hono, NestJS, Laravel, Django);
+- the data models (Prisma, Drizzle, TypeORM, Sequelize, Mongoose, SQL migrations, Django), also from the **backend repository** when one is set.
+
+The AI groups that into epics and features, and writes each feature's tickets from its pages' code: real labels, fields, rules and endpoints.
+
+Git history and `.md` documents (release notes, feature notes) are hints for naming only. Every feature must cite code that exists in the repository. Anything only the documents mention is listed separately as **not found in the code** and is never added, and existing issues are only marked Done when the code proves it. The code is in `lib/codeinventory.js`.
+
+### Feature flags (Administration → Features, owner only)
+
+The owner can **lock** any feature for everyone. Each feature has a switch and an optional reason. Changes apply right away, and other open tabs pick them up within a minute.
+
+Features you can lock:
+- **Planning:** Issues page, Board, Timeline, Reports, Source documents.
+- **AI:** AI features (every AI action), Epic documents, Agents, Split issues.
+- **Quality:** Test cases page, Test management, Test automation, AI failure analysis, Repository sync.
+- **Development:** Coding agents, Pull requests.
+- **Data:** Export, Attachments.
+
+A locked feature:
+- disappears from the navigation, buttons and menus; opening its page directly shows a "locked" notice;
+- has its API routes refuse requests with `423 Locked`, for everyone including the owner. This is checked in the shared API wrapper (`lib/server/http.ts`).
+
+Locking **AI features** hides every AI control, because the `ai.use` permission counts only while AI is on. Test automation does the same for `test.run`, and Export for `export`.
+
+Data is never deleted: unlocking brings everything back as it was. Flags are stored in `app_meta` (`feature_flags`), and the catalog is in `lib/features.js`.
+
+### AI testing agents (Administration → Agents → Test)
+
+- **Self-healing Agent:** when an automated test fails because the page changed (renamed button, moved field, an extra step), it reads the page as it was at the failure and rewrites the script. It then re-runs it once and keeps the repaired script only if it passes. The result is marked **Self-healed**, and the old script can be reverted from the script dialog. Real app bugs are left failing: it never loosens an assertion. Turn it off per project in Test automation → Settings.
+- **Test Failure Analysis:** the AI note on every failed test (cause, evidence, fix).
+- **Test Selection Agent:** Test automation → **🎯 Smart selection**. It picks the tests worth running from code changes since the last run, recently changed issues and recent failures, within your budget, and gives a reason for each.
+
+Each one can be turned off in Administration → Agents.
+
+### Custom agents
+
+Administration → Agents → **Create agent**. Describe what the agent should do and the AI writes its Markdown rules, or paste or import a `.md` file in the Claude Code agent format:
+- a frontmatter block: `name`, `description`, `runner` (`code`, `review` or `document`), and optionally `model` and `icon`;
+- then the instructions.
+
+Where custom agents run:
+- **Code** agents appear in Write code with AI.
+- **Review** agents appear in Pull requests → Review with AI.
+- **Document** agents are hired for an epic.
+
+The lifecycle document agents nothing used any more were removed (Epic, Kick Off, UX Design, Demo, Sign-Off, Deploy, Release Certification, Review a Submission, Automation Scripts).
+
+### Which AI runs it ("Runs on") and custom AI configurations
+
+Every AI dialog, the issue panel's AI bar and the top bar show a **Runs on** picker:
+- **Auto:** model routing decides per task.
+- **A tier:** High, Standard or Light, showing the model it runs on here.
+- **A custom configuration.**
+
+The choice is per person, saved in the browser.
+
+Administration → AI → **Configurations** defines named setups: Claude account, GitHub Copilot or an AI API provider, plus a model, a reasoning level and standing instructions. Model routing can also send a whole task to one.
+
+### Saving AI usage
+
+- **App context** (Project settings → App context): a compact brief of the app, built once from the code (pages, endpoints, data models), the issues and the documents. Every AI prompt for the project includes it, so the AI stops re-discovering the app and uses the real names. You can edit it, and it warns when the code has new commits.
+- **Prompt caching:** with the Anthropic API, the stable part of every prompt (rules, app context) is cached and re-read at about a tenth of the price.
+- **Answer cache:** identical requests for safe tasks reuse the stored answer for 14 days. The tasks and the number of days are set in Model routing → Save usage. "Again" and "Rewrite" always ask fresh.
+
+The Model routing page shows reused answers and the tokens read from cache.
+
+### Test management: review workflow
+
+- Tests go **Draft → Ready for review → Approved**, with **Needs update** and **Deprecated**. The **Reviews** tab is the approval queue.
+- Editing an Approved test creates a new **version**. Earlier versions are kept and can be restored, and executions record which version ran.
+- Test management → **Workflow** has two rules: "Only Approved tests in plans and executions", and four-eyes approval (the last editor can't approve).
+
+### Backlog: Jira-style actions
+
+Every backlog row works like Jira's: click the field you want to change and pick from a small popup.
+- **Status**, **assignee** (search, *Assign to me*, *Unassigned*), **story points** (type a number or pick 1, 2, 3, 5,
+  8, 13, 21; *Clear estimate*) and **priority**, right on the row. Only the statuses the workflow allows are offered.
+- **"…" or right-click** a row: move it to the top or bottom of the backlog or to a sprint, assign to me, unassign,
+  change status, points, priority or epic, add or remove a **flag** (flagged issues are highlighted, as in Jira),
+  open, copy the issue link or key, duplicate, delete.
+- **Selecting several:** tick the boxes, **⌘/Ctrl-click** rows to add or remove them, **Shift-click** to select a range.
+  The row menu and the selection bar then act on all of them (status, assignee, priority, story points, flag, sprint,
+  epic, delete). Changes to many issues show a toast with **Undo** (⌘Z also works).
+- The same popups work on the Issues page, and right-click works on Board cards. Flags show on the board and in the
+  issue panel (*Add flag* / *Remove flag* in its menu), and are recorded in the issue history.
+- Rows are drawn 200 per group at first, with *Show more*, so a backlog of thousands opens at once.
+
+### Speed with thousands of people
+
+- **Teammates' changes arrive as "changes since my version".** Each browser asks every 10 s (a little random, and at
+  once when the tab comes back into view) whether the project changed, and then downloads only the issues and
+  sections saved since its version (`GET /api/projects/:id/changes?since=`), usually a few kB. Before, every change
+  made every open browser download the whole project again (20 MB for 2,000 issues).
+- **Nobody overwrites anybody.** Each save says which version of each issue and section it started from. If a teammate
+  saved the same issue meanwhile, the server answers 409 with their copy; the browser merges both people's changes
+  (both edited fields, both comments, both history entries, different epics or sprints) and saves again. When both
+  changed the same field, the person saving now wins. Saves of one project queue on the project row, so none is lost.
+- **Server caches** (per server, short-lived): the project version for 2 s, and each version of the whole project and
+  of "changes since" once, shared by everyone asking. A thousand people opening the same project cost one database
+  read. The project is downloaded gzipped (about 30–40 times smaller) and unpacked in the browser.
+- **Database:** issue and section versions (`rev` columns, `issue_tombstones` for deleted issues) and the project list's
+  counts come from small columns. Row-level security works out the user's access once per query instead of once per
+  row. All of this is added automatically on start; nothing to run.
+- **Browser:** rows redraw only when they change (menus, toasts and "Saved" don't redraw the list), and undo shares the
+  saved text of unchanged issues instead of copying the whole project for every change.
+- **An older TicketForge sharing the database** (a server not updated yet) doesn't record what it changed. Database
+  triggers record it for it (issue versions, deleted issues, changed sections), and a browser that sees the version
+  move with nothing listed reloads the project. Update every server anyway: an older server also puts back its own,
+  slower row-level security rules each time it starts.
+
+Measured on a local PostgreSQL with 2,000 issues (scripts not included): 100 people saving at the same moment
+finished in 0.2 s (p95 186 ms, was 819 ms); 30 people changing different settings at once lost none of them (before:
+28 lost); 2,000 version checks took 4 ms (was 138 ms); catching up after a teammate's change downloaded 9.7 kB
+(was 20 MB). In a production build with 1,500 issues and 742 rows on screen, changing a status took 4 ms and a
+search keystroke 17–37 ms.
+
+**Running it for a big team**
+- Run the production build (`npm run build` then `npm start`), not `npm run dev`.
+- Host the server in the same region as the database (every database round trip counts on a save).
+- Use Supabase's **Transaction pooler** (port 6543) and raise `PG_POOL_MAX` (for example 20 per server); run several
+  copies behind a load balancer if needed. The caches above are per copy and short-lived, so copies stay in step
+  within about 2 seconds.
+
+### Top bar and searchable dropdowns
+
+- **Top bar**, left to right: TicketForge, Projects and Administration, the project you're in (switch project);
+  **search** (⌘K / Ctrl+K: issues and epics by key or summary in a project, projects elsewhere; ↑↓ and Enter) and
+  **Create**; the project's save state, undo, redo and export; the **AI menu** (which AI is connected, a backup and why,
+  *Runs on* for your next AI actions, check the connection again, AI settings); notifications; your account (with the
+  light/dark theme). On a phone it keeps the icons only, and the search opens across the bar.
+- **Dropdowns with 8 or more choices** open with a search box: type to narrow the list, ↓ to move into it, Enter to pick
+  the first match. Shorter ones stay a plain list; `searchable` on `SF` forces it on or off.
+
+### Releases (versions)
+
+Jira-style versions: **Releases** in the project sidebar.
+- **Create version:** name, start and release dates, description. The list shows each version's status (Unreleased,
+  Released, Archived, *Overdue* when its release date has passed), progress (done / in progress / to do) and dates.
+- **Fix versions on issues:** in the issue panel (*Fix versions*), the backlog row menu (*Fix version…*), the selection
+  bar for many issues at once, or *Add issues* on a version. Rows show their version; the filter bar has a *Version*
+  filter (including *No version*).
+- **A version's page:** progress and story points, what still blocks it (unfinished issues, open pull requests, failing
+  tests), its issues by status (remove one with ×) and **release notes** (new features, improvements, bug fixes from
+  its done issues) to copy or download as Markdown.
+- **Release:** pick the release date and where unfinished issues go (another unreleased version, or out of this one).
+  Released versions can be archived or moved back to unreleased; deleting one removes it from its issues (⌘Z undoes).
+- Managing versions needs *Manage sprints* or *Edit project settings*; setting an issue's Fix version, *Edit issues*.
+
+### Activity (the project timeline)
+
+**Activity** in the project sidebar: every change in the project, newest first, grouped by day: issues created and
+every field change (with from → to), comments, links, test results, pull requests, and the project-level changes
+the server records on each save: sprints started and completed, epics, versions created, released and archived,
+workflow and members, project settings, test management, and deleted issues. Filter by type, person, time (24 hours,
+7 or 30 days) and text; click an issue to open it. Project-level entries are kept in the `activity` table (created
+automatically); changes made before this existed show from the issues' own history.
+

@@ -4,42 +4,56 @@ import { useEffect } from 'react';
 import { loadAgents, hireAgent } from './Agents';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
+import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
+import { RowPop } from './RowActions';
 import { Settings } from './ProjectSettings';
 import { Sources } from './Sources';
 import { Drawer } from './Drawer';
 import { Timeline } from './Timeline';
 import { Board } from './Board';
+import { TestManagement } from './TestRepo';
+import { PullRequests } from './PullRequests';
+import { Issues } from './Issues';
+import { Releases } from './Releases';
+import { Activity } from './Activity';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', automation: 'Test automation', source: 'Source documents', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, automation: Automation, source: Sources, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
   const tests = p.tickets.reduce((s: number, t: any) => s + t.testCases.length, 0);
   const mini = S.sideCollapsed;
-  const item = (v: string, icon: string, label: string, n?: number) => (
+  const item = (v: string, icon: string, label: string, n?: number) => (!feat(VIEW_FEATURE[v] || '') ? null :
     <Link key={v} className={`side-item ${view === v ? 'active' : ''}`} href={`/p/${p.id}/${v}`} title={mini ? `${label}${n !== undefined ? ` (${n})` : ''}` : undefined}
       aria-label={mini ? label : undefined} aria-current={view === v ? 'page' : undefined}>
       <Ico svg={icon} /><span className="side-text">{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
   );
+  // On small screens the navigation is a scrolling top bar: keep the current page's tab in view.
+  useEffect(() => { document.querySelector('.sidebar .side-item.active')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [view]);
   return (
     <div className={`side-wrap ${mini ? 'is-collapsed' : ''}`}>
     <nav className="sidebar" aria-label="Project">
       <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}
+      {item('issues', I.grid, 'Issues', p.tickets.filter((t: any) => !isSub(t) && !isDone(t)).length)}
       {item('backlog', I.backlog, 'Backlog', p.tickets.filter((t: any) => !isSub(t)).length)}
       {item('board', I.board, activeSprint() ? 'Active sprint' : 'Board')}
       {item('epics', I.epic, 'Epics', p.epics.length)}
+      {item('releases', I.pr, 'Releases', (p.releases || []).filter((r: any) => r.status === 'unreleased').length)}
       {item('timeline', I.calendar, 'Timeline')}
+      {item('activity', I.history, 'Activity')}
       {item('reports', I.chart, 'Reports')}
       <div className="side-label">Quality</div>
       {item('tests', I.test, 'Test cases', tests)}
+      {item('testmgmt', I.folder, 'Test management', (p.testRepo?.tests || []).length)}
       {item('automation', I.bot, 'Test automation')}
+      {feat('prs') && <div className="side-label">Development</div>}
+      {item('prs', I.pr, 'Pull requests', p.tickets.reduce((n: number, t: any) => n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length, 0))}
       <div className="side-label">Requirements</div>
       {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}
       <div className="side-foot">{item('settings', I.settings, 'Project settings')}</div>
@@ -48,6 +62,14 @@ function Sidebar({ view }: { view: string }) {
       title={mini ? 'Expand sidebar  [' : 'Collapse sidebar  ['}><Ico svg={I.chevron} /></button>
     </div>
   );
+}
+
+/** Pages that belong to a feature the owner can lock (Administration → Features). */
+const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', releases: 'releases', activity: 'activity', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs' };
+function LockedView({ label }: { label: string }) {
+  return <EmptyState icon={I.settings} tone="neutral" title={`${label} is locked`}
+    actions={S.user?.isOwner ? <Link className="btn primary" href="/admin/features">Manage features</Link> : <Link className="btn" href={`/p/${P().id}/backlog`}>Go to the backlog</Link>}>
+    <p>{S.user?.isOwner ? 'You locked this feature. Unlock it in Administration → Features.' : 'The owner locked this feature. Ask them if you need it.'}</p></EmptyState>;
 }
 
 /** The project couldn't be opened: missing, no access, or a failed request. */
@@ -103,9 +125,10 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
       <style>{statusColorCss()}</style>
       <Sidebar view={v} />
       <div className="main">
-        <section className="view"><View /></section>
+        <section className="view">{feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}</section>
         <Drawer />
       </div>
+      <RowPop />
     </div>
   );
 }

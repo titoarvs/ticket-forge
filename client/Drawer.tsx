@@ -4,21 +4,22 @@ import { useState } from 'react';
 import {
   S, emit, P, ago, fmtDate, allowedStatuses, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, LINK_TYPES, COLORS, epic, sprint, ticket, isSub, childrenOf, tcKey, spSum,
   statusNames, statusOf, statusColor, isDone, catOf, sCls, tCls, me, can, peopleNames, mutate, setField, logChange, logEvent, addMember, removeLink, addLink,
-  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, type Any,
+  clone, uid, newTest, historyText, openModal, toast, saveUi, setMenu, copyText, feat, type Any, releases, release,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState } from './ui';
+import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, AutoTextarea, Confirm, EmptyState, AiRunPicker } from './ui';
 import {
   openDrawer, runTicketAi, AskModal, duplicateIssue, confirmDeleteIssue, convertToSubtask, createSubtask, linkPr, refreshPr,
   saveComment, runTests, DeleteEpicModal, CreateIssueModal, NewWithClaudeModal,
 } from './actions';
+import { setFlag } from './RowActions';
 import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
 import { FbdSection, ArdSection } from './Fbd';
 import { openSplitIssues } from './Split';
-import { EpicAgents } from './Agents';
 import { codeReady, openCode, openUpdatePr } from './DevCode';
+import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
@@ -115,6 +116,7 @@ function IssuePanel({ t }: { t: Any }) {
     </>} menu={<>
       {can('issue.create') && <button onClick={() => duplicateIssue(t)}><Ico svg={I.copy} />Duplicate</button>}
       <button onClick={() => { navigator.clipboard?.writeText(t.key); toast(`Copied ${t.key}`); }}><Ico svg={I.copy} />Copy key</button>
+      {edit && <button onClick={() => setFlag([t.id], !t.flagged)}><Ico svg={I.flag} />{t.flagged ? 'Remove flag' : 'Add flag'}</button>}
       {edit && !isSub(t) && <button onClick={() => convertToSubtask(t)}><Ico svg={I.subtask} />Convert to sub-task…</button>}
       {can('issue.delete') && <><hr /><button style={{ color: 'var(--danger)' }} onClick={() => confirmDeleteIssue(t)}><Ico svg={I.trash} />Delete</button></>}
     </>} />
@@ -122,15 +124,16 @@ function IssuePanel({ t }: { t: Any }) {
       <TA title rows={1} aria-label="Summary" disabled={!edit} value={t.title} onChange={(ev) => field('title', ev.target.value.replace(/\n/g, ' '))} />
       <div className="dr-actions">
         <SF tone={catOf(t.status)} toneColor={statusColor(statusOf(t.status))} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(allowedStatuses(t))}</SF>
+        {t.flagged && <span className="flag is-flag" title="Flagged: needs attention"><Ico svg={I.flag} />Flagged</span>}
         {can('ai.use') && edit && <>
           <button className="btn ai" title="Improve the whole issue" onClick={() => runTicketAi(t, 'enhance')}><Ico svg={I.sparkle} />Enhance</button>
-          <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More Claude actions<Ico svg={I.chevron} /></button>}>
-            <div className="mh">Claude</div>
+          <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More AI actions<Ico svg={I.chevron} /></button>}>
+            <div className="mh">AI</div>
             <button onClick={() => runTicketAi(t, 'ac')}>Improve acceptance criteria</button>
             <button onClick={() => runTicketAi(t, 'tests')}>Regenerate test cases</button>
             {!isSub(t) && <button onClick={() => runTicketAi(t, 'split')}>Split into smaller issues</button>}<hr />
-            <button onClick={() => openModal(<AskModal t={t} />)}>Ask Claude to change this issue…</button>
-          </Menu></>}
+            <button onClick={() => openModal(<AskModal t={t} />)}>Ask AI to change this issue…</button>
+          </Menu><AiRunPicker compact /></>}
         {t.testCases.length > 0 && can('test.run') && <button className="btn" disabled={S.autoRun?.running} title="Run this issue's test cases in a browser" onClick={() => runTests(t.testCases.map((tc: Any) => ({ t, tc })))}><Ico svg={I.play} />Run tests</button>}
       </div>
       <div className="dr-cols">
@@ -200,11 +203,12 @@ function IssuePanel({ t }: { t: Any }) {
             {!t.testCases.length && <p className="muted small">No test cases yet. Use “Regenerate test cases” to let Claude write them.</p>}
           </div>
 
+          <TestsSection t={t} />
           <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span>
             {edit && <div className="tools">
-              {can('ai.use') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
+              {can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
                 : can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>)}
-              <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button></div>}</div>
+              {feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
             {t.prs.map((r: Any) => (
               <div key={r.id} className="pr-row"><Ico svg={I.pr} /><div className="pr-main"><a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
                 <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div></div>
@@ -274,6 +278,13 @@ function IssuePanel({ t }: { t: Any }) {
               {isSub(t) ? <span className="muted" style={{ padding: '6px 8px' }}>{sprint(t.sprintId)?.name || 'None'} <span className="small">(from parent)</span></span>
                 : <SF disabled={!edit && !can('sprint.manage')} value={t.sprintId || ''} onChange={(ev) => field('sprintId', ev.target.value || null)}><MenuItem value="">None</MenuItem>
                   {sprints.map((s: Any) => <MenuItem key={s.id} value={s.id}>{s.name}{s.state === 'active' ? ' (active)' : s.state === 'closed' ? ' (closed)' : ''}</MenuItem>)}</SF>}
+              {!isSub(t) && (releases().length > 0 || (t.fixVersions || []).length > 0) && <>
+                <span className="label">Fix versions</span>
+                <SF multiple disabled={!edit && !can('sprint.manage')} aria-label="Fix versions" value={(t.fixVersions || []).filter((v: string) => release(v))}
+                  renderValue={(v: Any) => (v.length ? <span className="fixv">{v.map((id: string) => <span key={id} className={`label-chip ${release(id)?.status === 'released' ? 'rel-done' : ''}`}>{release(id)?.name}</span>)}</span> : <span className="muted">None</span>)}
+                  onChange={(ev: Any) => field('fixVersions', ev.target.value)}>
+                  {releases().filter((r: Any) => r.status !== 'archived' || (t.fixVersions || []).includes(r.id)).map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}{r.status !== 'unreleased' ? ` (${r.status})` : ''}</MenuItem>)}</SF>
+              </>}
               {isSub(t) ? <>
                 <span className="label">Parent</span>
                 <SF disabled={!edit} value={t.parentId} onChange={(ev) => mutate(() => { const par = ticket(ev.target.value); setField(t, 'parentId', ev.target.value); if (par) { t.epicId = par.epicId; t.sprintId = par.sprintId; } })}>
@@ -287,7 +298,7 @@ function IssuePanel({ t }: { t: Any }) {
               </>}
               <span className="label">Development</span>
               <span className="dev-sum">{t.prs.length ? <><Ico svg={I.pr} /> {t.prs.length} pull request{t.prs.length > 1 ? 's' : ''} {[...new Set(t.prs.map((r: Any) => r.status))].map((s2: Any) => <span key={s2} className={`loz ${prCls(s2)}`}>{s2}</span>)}</>
-                : edit ? <a href="#" className="small" onClick={(ev) => { ev.preventDefault(); S.prForm = true; emit(); }}>Link pull request</a> : <span className="muted">None</span>}</span>
+                : edit && feat('prs') ? <a href="#" className="small" onClick={(ev) => { ev.preventDefault(); S.prForm = true; emit(); }}>Link pull request</a> : <span className="muted">None</span>}</span>
               <span className="label">Tests</span>
               <span className="dev-sum">{t.testCases.length ? `${t.testCases.filter((x: Any) => x.status === 'Pass').length}/${t.testCases.length} passing · ${t.testCases.filter((x: Any) => x.script).length} automated` : <span className="muted">None</span>}</span>
             </div>
@@ -301,6 +312,44 @@ function IssuePanel({ t }: { t: Any }) {
 
 const fmtMs = (ms: number) => (!ms ? '' : ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`);
 const hostOf = (u: string) => { try { return new URL(u).host; } catch { return u || ''; } };
+
+const CAT_CLS: Record<string, string> = { 'app-bug': 'bug', 'test-script': 'script', 'test-data': 'script', environment: 'env', flaky: 'env', 'needs-info': 'info' };
+const OWNER_TXT: Record<string, string> = { developer: 'Developer', qa: 'QA', devops: 'DevOps' };
+/** The AI's failure analysis on one failed test: what broke, why, the evidence and what to do next. */
+function FailAnalysis({ a, t, tcId, title }: { a: Any; t: Any; tcId: string; title: string }) {
+  const [more, setMore] = useState(false);
+  const tc = t.testCases.find((x: Any) => x.id === tcId);
+  const report = () => copyText([`${title}`, `Category: ${a.label} (${a.confidence} confidence) · Owner: ${OWNER_TXT[a.owner] || a.owner}`, a.summary,
+    a.failedStep && `Failed at: ${a.failedStep}`, a.expected && `Expected: ${a.expected}`, a.actual && `Actual: ${a.actual}`, a.cause && `Likely cause: ${a.cause}`,
+    a.evidence?.length && `Evidence:\n${a.evidence.map((e: string) => `- ${e}`).join('\n')}`, a.fix && `Fix: ${a.fix}`,
+    a.nextSteps?.length && `Next steps:\n${a.nextSteps.map((x: string, i: number) => `${i + 1}. ${x}`).join('\n')}`].filter(Boolean).join('\n\n'));
+  return (
+    <div className={`fa fa-${CAT_CLS[a.category] || 'info'}`}>
+      <div className="fa-h">
+        <Ico svg={I.sparkle} /><b>{a.label}</b>
+        <span className="fa-tag">{a.confidence} confidence</span>
+        <span className="fa-tag">Owner: {OWNER_TXT[a.owner] || a.owner}</span>
+      </div>
+      <p className="fa-sum">{a.summary}</p>
+      {(a.expected || a.actual) && <div className="fa-ea">
+        {a.expected && <div><span>Expected</span>{a.expected}</div>}
+        {a.actual && <div><span>Actual</span>{a.actual}</div>}</div>}
+      {a.cause && <div className="fa-row"><span>Likely cause</span><p>{a.cause}</p></div>}
+      {a.fix && <div className="fa-row"><span>Fix</span><p>{a.fix}</p></div>}
+      {more && <>
+        {a.failedStep && <div className="fa-row"><span>Failed at</span><p>{a.failedStep}</p></div>}
+        {a.evidence?.length > 0 && <div className="fa-row"><span>Evidence</span><ul>{a.evidence.map((e: string, i: number) => <li key={i}><code>{e}</code></li>)}</ul></div>}
+        {a.nextSteps?.length > 0 && <div className="fa-row"><span>Next steps</span><ol>{a.nextSteps.map((x: string, i: number) => <li key={i}>{x}</li>)}</ol></div>}
+        {a.scriptFix && <div className="fa-row"><span>Script fix</span><pre className="run-err-full">{a.scriptFix}</pre></div>}
+      </>}
+      <div className="fa-actions">
+        {(a.failedStep || a.evidence?.length || a.nextSteps?.length || a.scriptFix) && <button className="link-btn small" onClick={() => setMore(!more)}>{more ? 'Less' : 'Evidence and next steps'}</button>}
+        <button className="link-btn small" onClick={report}>Copy as bug report</button>
+        {tc && ['test-script', 'test-data', 'flaky'].includes(a.category) && can('test.run') && can('ai.use') && <button className="link-btn small" onClick={() => runTests([{ t, tc }], { regenerate: true })}>Rewrite the script and re-run</button>}
+      </div>
+    </div>
+  );
+}
 
 /** An automated test-run comment, made readable: a pass/fail summary, then each test with its error and screenshot. */
 function AutoBody({ c, t }: { c: Any; t: Any }) {
@@ -341,9 +390,11 @@ function AutoBody({ c, t }: { c: Any; t: Any }) {
               <div className="run-main">
                 <span className="run-title" title={r.title}>{r.title}</span>
                 <span className="run-sub"><a href={`#tc-${r.tcId}`} className="key" onClick={(e) => { e.preventDefault(); S.openTc.add(r.tcId); emit(); setTimeout(() => document.getElementById(`tc-${r.tcId}`)?.scrollIntoView({ block: 'center' }), 50); }}>{r.key}</a>
-                  {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}</span>
+                  {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}
+                  {r.healed && <span className="heal-chip" title={`Was failing: ${r.healed.error || ''}`}>🩹 Self-healed: {r.healed.reason}</span>}</span>
               </div>
             </div>
+            {bad && r.analysis && <FailAnalysis a={r.analysis} t={t} tcId={r.tcId} title={`${r.key} ${r.title}`} />}
             {bad && <div className="run-err">
               <code className="run-err-1">{first || 'Failed'}</code>
               {more && <button className="link-btn small" onClick={() => setOpen({ ...open, [r.tcId]: !open[r.tcId] })}>{open[r.tcId] ? 'Hide details' : 'Details'}</button>}
@@ -423,14 +474,13 @@ function EpicPanel({ e }: { e: Any }) {
       <div className="dr-actions">
         {can('issue.create') && <button className="btn" onClick={() => openModal(<CreateIssueModal epicId={e.id} />)}><Ico svg={I.plus} />Create issue</button>}
         {can('issue.create') && can('ai.use') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
-        {can('issue.create') && can('ai.use') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
+        {can('issue.create') && can('ai.use') && feat('split') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
-      <PsdSection epic={e} />
+      {feat('docs') && <><PsdSection epic={e} />
       <FbdSection epic={e} />
-      <ArdSection epic={e} />
-      <EpicAgents epic={e} />
+      <ArdSection epic={e} /></>}
       <div className="sec"><div className="sec-title"><h3>Dates</h3>
         {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>
         <div className="grid2 epic-dates">

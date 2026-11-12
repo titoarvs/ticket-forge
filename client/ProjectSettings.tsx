@@ -9,6 +9,7 @@ import { Header, CommitInput } from './views';
 import { ListEditor } from './ListEditor';
 import { WorkflowSettings } from './WorkflowEditor';
 import { DevSettings } from './DevCode';
+import { AppContextSettings } from './AppContext';
 import { allSources } from './Sources';
 import { PsdTemplateCard } from './Psd';
 import { ProjectFbdTemplateCard, ProjectArdTemplateCard } from './Fbd';
@@ -18,6 +19,7 @@ const SECTIONS: [string, string, string, string][] = [
   ['people', 'People', 'people', 'Who can be assigned issues'],
   ['workflow', 'Workflow', 'board', 'Statuses, board columns and transitions'],
   ['templates', 'Templates', 'doc', 'Problem Statement, Feature Brief and Architecture Record Design'],
+  ['context', 'App context', 'sparkle', 'What the AI knows about this app, reused in every prompt'],
   ['code', 'Code & GitHub', 'pr', 'Repository, coding agent and pull requests'],
   ['danger', 'Danger zone', 'trash', 'Delete the project'],
 ];
@@ -161,6 +163,7 @@ export function Settings() {
         {cur === 'templates' && <div className="set-templates">
           <p className="muted small" style={{ margin: '0 0 12px' }}>The templates this project’s documents follow. Without its own, a project uses the team’s templates from Administration → Generation. Documents already written don’t change.</p>
           <PsdTemplateCard project ed={ed} /><ProjectFbdTemplateCard ed={ed} /><ProjectArdTemplateCard ed={ed} /></div>}
+        {cur === 'context' && <AppContextSettings ed={ed} />}
         {cur === 'code' && <DevSettings ed={ed} />}
         {cur === 'danger' && <Danger />}
       </div>

@@ -2,6 +2,7 @@
 // Client state, data model helpers, history, undo, saving and sync.
 // State lives in one mutable object `S`; any change calls emit(), and components re-render via useStore().
 import { useSyncExternalStore, type ReactNode } from 'react';
+import { merge3 } from './merge';
 
 export type Any = any;
 
@@ -38,7 +39,7 @@ export const DEFAULT_WORKFLOW = [
   { id: 'inreview', name: 'In Review', category: 'inprogress' },
   { id: 'done', name: 'Done', category: 'done' },
 ];
-export const EMPTY_FILTER = () => ({ q: '', type: '', priority: '', status: '', epic: '', assignee: '' });
+export const EMPTY_FILTER = () => ({ q: '', type: '', priority: '', status: '', epic: '', assignee: '', version: '' });
 
 // ---------------------------------------------------------------- state
 export const S: Any = {
@@ -59,7 +60,7 @@ export const S: Any = {
   busy: null, autoRun: null, autoScope: 'all', autoRegen: false,
   undo: [] as string[], redo: [] as string[], lastSnap: { tag: '', at: 0 },
   saveTimer: null, saveText: '',
-  menu: null, modal: null as ReactNode, toasts: [] as Any[], tasks: [] as Any[],
+  menu: null, modal: null as ReactNode, toasts: [] as Any[], tasks: [] as Any[], trTab: 'repository',
   notifs: { items: [] as Any[], unread: 0 },
   nav: (href: string) => { location.href = href; },
 };
@@ -75,6 +76,7 @@ export function loadPrefs() {
   const ui = store.get('tf.ui', {});
   Object.assign(S, {
     settings: store.get('tf.settings', { provider: '', model: '' }),
+    aiRun: store.get('tf.aiRun', 'auto'),
     // Older saves stored the old fixed default (4); only a number the user picked on purpose is kept.
     genOpts: (({ testsPerTicket, testsPicked, ...g }: Any) => ({ ...S.genOpts, ...g, testsPerTicket: testsPicked ? testsPerTicket : null, testsPicked: Boolean(testsPicked) }))(store.get('tf.genOpts', S.genOpts)),
     groupBy: ui.groupBy || 'sprint', boardGroup: ui.boardGroup || 'none',
@@ -92,10 +94,10 @@ export async function api(url: string, { method = 'GET', body, raw, signal }: { 
   else if (body !== undefined) { opts.body = JSON.stringify(body); (opts.headers as Any)['Content-Type'] = 'application/json'; }
   const res = await fetch(url, opts);
   if (!res.ok) {
-    let msg = `${res.status} ${res.statusText}`;
-    try { msg = (await res.json()).error || msg; } catch { /* not json */ }
+    let msg = `${res.status} ${res.statusText}`, errBody: Any = null;
+    try { errBody = await res.json(); msg = errBody.error || msg; } catch { /* not json */ }
     if (res.status === 401 && S.user && !url.startsWith('/api/auth/')) { S.user = null; emit(); S.nav('/login'); }
-    const err: Any = new Error(msg); err.status = res.status;
+    const err: Any = new Error(msg); err.status = res.status; err.body = errBody;
     throw err;
   }
   return raw ? res : res.json();
@@ -108,7 +110,9 @@ export async function uploadOriginal(projectId: string, file: File, target?: 'or
   if (target) fd.append('target', target);
   return api(`/api/projects/${projectId}/files`, { method: 'POST', body: fd });
 }
-export const aiBody = (b: Any) => ({ ...b, provider: S.settings.provider || undefined, model: S.settings.model || undefined, project: b.project && slimProject(b.project) });
+export const aiBody = (b: Any) => ({ ...b, provider: S.settings.provider || undefined, model: S.settings.model || undefined, run: S.aiRun && S.aiRun !== 'auto' ? S.aiRun : undefined, project: b.project && slimProject(b.project) });
+/** Which AI runs the person's next AI actions: 'auto' (model routing), a tier, or 'cfg:<id>' (a custom configuration). */
+export function setAiRun(v: string) { S.aiRun = v || 'auto'; store.set('tf.aiRun', S.aiRun); emit(); }
 export function slimProject(p: Any) {
   return {
     ...p, sourceText: undefined, sources: undefined,
@@ -231,6 +235,9 @@ export const P = () => S.project;
 export const ticket = (id: string) => P()?.tickets.find((t: Any) => t.id === id);
 export const epic = (id: string) => P()?.epics.find((e: Any) => e.id === id);
 export const sprint = (id: string) => P()?.sprints.find((s: Any) => s.id === id);
+/** Releases (Jira "versions"): { id, name, description, startDate, releaseDate, status: unreleased | released | archived }. */
+export const releases = (): Any[] => P()?.releases || [];
+export const release = (id: string) => releases().find((r: Any) => r.id === id);
 export const isSub = (t: Any) => t?.type === 'Sub-task';
 export const childrenOf = (t: Any) => P().tickets.filter((x: Any) => x.parentId === t.id);
 export const epicTickets = (eid: string) => P().tickets.filter((t: Any) => t.epicId === eid && !isSub(t));
@@ -278,10 +285,32 @@ export const tCls = (s: string) => `t-${String(s).toLowerCase().replace(/\s/g, '
 export const openIssue = () => (S.drawer?.kind === 'issue' ? ticket(S.drawer.id) : null);
 export const openEpic = () => (S.drawer?.kind === 'epic' ? epic(S.drawer.id) : null);
 export const me = () => S.user?.name || 'You';
-export const can = (perm: string) => Boolean(S.user && (S.user.isOwner || S.user.permissions.includes(perm)));
+/** Feature flags (Administration → Features): features the owner locked are hidden for everyone. */
+export const feat = (id: string) => !(S.flags?.locked || []).includes(id);
+/** Permissions that mean nothing while their feature is locked. */
+const PERM_FEATURE: Record<string, string> = { 'ai.use': 'ai', 'test.run': 'automation', export: 'export' };
+export const can = (perm: string) => Boolean(S.user && (S.user.isOwner || S.user.permissions.includes(perm)) && (!PERM_FEATURE[perm] || feat(PERM_FEATURE[perm])));
+export async function loadFlags() { try { S.flags = await api('/api/features'); emit(); } catch { /* keep what we have */ } }
 export const peopleNames = (): string[] => [...new Set([...S.people.map((u: Any) => u.name), ...(P()?.members || []).map((m: Any) => m.name)])].filter(Boolean) as string[];
 export const keyOf = (id: string) => ticket(id)?.key || '';
 export const isBlocked = (t: Any) => t.links.some((l: Any) => l.type === 'is blocked by' && ticket(l.targetId) && !isDone(ticket(l.targetId)));
+let idxCache: Any = null;
+/**
+ * Lookups for drawing many rows: issues by id and sub-tasks by parent, built once per change instead of searching
+ * the whole project for every row (which gets slow with thousands of issues).
+ */
+export function idx(): { byId: Map<string, Any>; kids: Map<string, Any[]> } {
+  const p = P();
+  const c = idxCache;
+  if (c && c.tickets === p.tickets && c.len === p.tickets.length && c.rev === S.dataRev) return c;
+  const byId = new Map<string, Any>(), kids = new Map<string, Any[]>();
+  for (const t of p.tickets) {
+    byId.set(t.id, t);
+    if (t.parentId) { const l = kids.get(t.parentId); if (l) l.push(t); else kids.set(t.parentId, [t]); }
+  }
+  idxCache = { tickets: p.tickets, len: p.tickets.length, rev: S.dataRev, byId, kids };
+  return idxCache;
+}
 export function initials(name: string) {
   const w = String(name || '').trim().split(/\s+/).filter(Boolean);
   return ((w[0]?.[0] || '') + (w[1]?.[0] || '')).toUpperCase() || '?';
@@ -348,7 +377,7 @@ export function addMember(name: string) {
 export const FIELD_LABEL: Record<string, string> = {
   title: 'Summary', status: 'Status', priority: 'Priority', assignee: 'Assignee', reporter: 'Reporter', storyPoints: 'Story points',
   epicId: 'Epic', sprintId: 'Sprint', parentId: 'Parent', type: 'Issue type', labels: 'Labels', description: 'Description',
-  userStory: 'User story', acceptanceCriteria: 'Acceptance criteria', testCases: 'Test cases', dependencies: 'Dependencies',
+  userStory: 'User story', acceptanceCriteria: 'Acceptance criteria', testCases: 'Test cases', dependencies: 'Dependencies', flagged: 'Flag', fixVersions: 'Fix versions',
 };
 const TEXT_FIELDS = new Set(['description', 'userStory', 'acceptanceCriteria', 'testCases', 'dependencies', 'title']);
 export function fmtField(field: string, v: Any) {
@@ -357,6 +386,8 @@ export function fmtField(field: string, v: Any) {
   if (field === 'parentId') return keyOf(v) || 'None';
   if (field === 'labels') return (v || []).join(', ') || 'None';
   if (field === 'assignee') return v || 'Unassigned';
+  if (field === 'flagged') return v ? 'Flagged' : 'Not flagged';
+  if (field === 'fixVersions') return (v || []).map((id: string) => release(id)?.name || 'a deleted version').join(', ') || 'None';
   if (v === null || v === undefined || v === '') return 'None';
   return String(v);
 }
@@ -420,20 +451,30 @@ export function deleteIssues(ids: string[]) {
 
 // ---------------------------------------------------------------- filters
 export function filtered(list: Any[]) {
-  const { q, type, priority, status, epic: ep, assignee } = S.filter;
+  const { q, type, priority, status, epic: ep, assignee, version } = S.filter;
   const qq = q.trim().toLowerCase();
   return list.filter((t) => (!type || t.type === type) && (!priority || t.priority === priority) && (!status || t.status === status)
+    && (!version || (version === 'none' ? !(t.fixVersions || []).some((v: string) => release(v)) : (t.fixVersions || []).includes(version)))
     && (!ep || (ep === 'none' ? !epic(t.epicId) : t.epicId === ep)) && (!assignee || (assignee === 'none' ? !t.assignee : t.assignee === assignee))
     && (!qq || [t.key, t.title, t.userStory, t.description, t.assignee, ...t.labels, ...t.acceptanceCriteria].join(' ').toLowerCase().includes(qq)));
 }
 export const filtersActive = () => Object.values(S.filter).some(Boolean);
 
 // ---------------------------------------------------------------- undo / mutate
+// Undo keeps up to 100 earlier states. When nothing is unsaved, the last saved snapshot (every issue already as text)
+// is shared instead of turning the whole project into text again: no work per change, and the issues that didn't
+// change share one copy between all the states (a big project used to cost hundreds of MB of undo history).
+S.mutSeq = 0; S.baseSeq = -1;
+const isClean = () => Boolean(S.base) && !S.saveTimer && !S.saving && S.baseSeq === S.mutSeq;
+function currentState(): Any {
+  if (isClean()) return { meta: { ...S.base.meta }, tickets: new Map(S.base.tickets), order: S.base.order };
+  return JSON.stringify(P());
+}
 function snapshot(tag = '') {
   const now = Date.now();
   if (tag && tag === S.lastSnap.tag && now - S.lastSnap.at < 1500) { S.lastSnap.at = now; return; }
   S.lastSnap = { tag, at: now };
-  S.undo.push(JSON.stringify(P()));
+  S.undo.push(currentState());
   if (S.undo.length > 100) S.undo.shift();
   S.redo = [];
 }
@@ -441,34 +482,57 @@ function snapshot(tag = '') {
 export function mutate(fn: (p: Any) => void, { tag = '' }: { tag?: string; render?: string } = {}) {
   snapshot(tag);
   fn(P());
+  S.mutSeq += 1;
+  S.dataRev += 1;
   scheduleSave();
   emit();
 }
-function restore(json: string) {
-  const version = P().version;
-  S.project = JSON.parse(json);
-  S.project.version = version;
+function restore(state: Any) {
+  const { version, id, updatedAt } = P();
+  if (typeof state === 'string') S.project = JSON.parse(state);
+  else {
+    const p: Any = {};
+    for (const [k, v] of Object.entries(state.meta)) p[k] = JSON.parse(v as string);
+    p.tickets = JSON.parse(state.order).map((tid: string) => state.tickets.get(tid)).filter(Boolean).map((x: string) => JSON.parse(x));
+    S.project = p;
+  }
+  Object.assign(S.project, { version, id, updatedAt });
+  S.mutSeq += 1;
   S.lastSnap = { tag: '', at: 0 };
+  S.dataRev += 1;
   if (S.drawer && !(openIssue() || openEpic())) S.drawer = null;
   scheduleSave(); emit();
 }
-export function undo() { if (!S.undo.length) return; S.redo.push(JSON.stringify(P())); restore(S.undo.pop()); }
-export function redo() { if (!S.redo.length) return; S.undo.push(JSON.stringify(P())); restore(S.redo.pop()); }
+export function undo() { if (!S.undo.length) return; S.redo.push(currentState()); restore(S.undo.pop()); }
+export function redo() { if (!S.redo.length) return; S.undo.push(currentState()); restore(S.redo.pop()); }
 
 // ---------------------------------------------------------------- saving & sync (patches)
-const META_SKIP = new Set(['tickets', 'version', 'updatedAt', 'id']);
+// The browser keeps the whole project. Saving sends only what changed (a patch), with the version of each issue and
+// section it started from (S.revs). If a teammate saved the same issue meanwhile, the server refuses (409) and sends
+// their copy: both people's changes are merged (merge3) and saved again. Teammates' changes arrive as "changes
+// since my version" (a few kB) instead of the whole project, and are merged with unsaved edits the same way.
+const META_SKIP = new Set(['tickets', 'version', 'updatedAt', 'id', '_revs']);
+S.revs = { issues: {}, meta: {} } as { issues: Record<string, number>; meta: Record<string, number> };
+/** Takes the server's per-issue and per-section versions off a project as it arrives. */
+function takeRevs(p: Any) { const r = p?._revs || { issues: {}, meta: {} }; if (p) delete p._revs; return { issues: { ...(r.issues || {}) }, meta: { ...(r.meta || {}) } }; }
+/** Bumped when issues are added, removed or re-parented (render indexes, see idx()). */
+S.dataRev = 0;
+/** The project as text, per issue and section. Unchanged text is the same string as in the last snapshot (shared). */
 function snapshotOf(p: Any) {
+  const prev = S.base;
   const meta: Record<string, string> = {};
-  for (const [k, v] of Object.entries(p)) if (!META_SKIP.has(k)) meta[k] = JSON.stringify(v);
-  return { meta, tickets: new Map<string, string>(p.tickets.map((t: Any) => [t.id, JSON.stringify(t)])), order: JSON.stringify(p.tickets.map((t: Any) => t.id)) };
+  for (const [k, v] of Object.entries(p)) if (!META_SKIP.has(k)) { const t = JSON.stringify(v); meta[k] = prev?.meta[k] === t ? prev.meta[k] : t; }
+  const tickets = new Map<string, string>();
+  for (const t of p.tickets) { const x = JSON.stringify(t), o = prev?.tickets.get(t.id); tickets.set(t.id, o === x ? o : x); }
+  return { meta, tickets, order: JSON.stringify(p.tickets.map((t: Any) => t.id)) };
 }
-export function setBase(p = P()) { S.base = p ? snapshotOf(p) : null; }
+export function setBase(p = P()) { S.base = p ? snapshotOf(p) : null; S.baseSeq = S.mutSeq; }
 function diff(snap: Any) {
   const b = S.base;
   if (!b) return null;
-  const patch: Any = { meta: {}, upsert: [], remove: [] };
-  for (const [k, v] of Object.entries(snap.meta)) if (b.meta[k] !== v) patch.meta[k] = JSON.parse(v as string);
-  for (const [id, v] of snap.tickets) if (b.tickets.get(id) !== v) patch.upsert.push(JSON.parse(v));
+  const patch: Any = { meta: {}, upsert: [], remove: [], baseRevs: {}, metaRevs: {} };
+  for (const [k, v] of Object.entries(snap.meta)) if (b.meta[k] !== v) { patch.meta[k] = JSON.parse(v as string); if (b.meta[k] !== undefined) patch.metaRevs[k] = S.revs.meta[k] ?? 0; }
+  for (const [id, v] of snap.tickets) if (b.tickets.get(id) !== v) { patch.upsert.push(JSON.parse(v)); if (b.tickets.has(id)) patch.baseRevs[id] = S.revs.issues[id] ?? 0; }
   for (const id of b.tickets.keys()) if (!snap.tickets.has(id)) patch.remove.push(id);
   if (b.order !== snap.order) patch.order = JSON.parse(snap.order);
   const empty = !Object.keys(patch.meta).length && !patch.upsert.length && !patch.remove.length && !patch.order;
@@ -477,37 +541,162 @@ function diff(snap: Any) {
 export const hasLocalChanges = () => Boolean(P() && diff(snapshotOf(P())));
 export function setSaveText(t: string) { S.saveText = t; emit(); }
 export function scheduleSave() { clearTimeout(S.saveTimer); S.saveText = 'Saving…'; S.saveTimer = setTimeout(saveNow, 700); }
+
+/** Same clean-up as ensureProject, for one issue arriving from the server. */
+function ensureTicket(t: Any, p: Any) {
+  t.comments ??= []; t.history ??= []; t.links ??= []; t.prs ??= []; t.labels ??= []; t.acceptanceCriteria ??= [];
+  t.sprintId ??= null; t.parentId ??= null; t.reporter ??= ''; t.assignee ??= '';
+  t.createdAt ??= p.createdAt; t.updatedAt ??= t.createdAt;
+  if (!p.workflow.some((w: Any) => w.name === t.status)) t.status = p.workflow[0].name;
+  t.testCases = withIds(t.testCases);
+  return t;
+}
+/**
+ * Merges the server's copies into the project: an issue or section without unsaved edits simply takes theirs; one
+ * with edits gets both (merge3). The base becomes the server's copy, so only this person's edits are left to save.
+ * Returns how many issues changed on screen.
+ */
+function mergeRemote(p: Any, { tickets = [], remove = [], meta = {}, order, revs }: Any) {
+  const b = S.base;
+  let changed = 0;
+  for (const [k, v] of Object.entries(meta)) {
+    if (META_SKIP.has(k)) continue;
+    const mine = JSON.stringify(p[k]);
+    const dirty = b.meta[k] !== undefined && mine !== b.meta[k];
+    const next = dirty ? merge3(JSON.parse(b.meta[k]), p[k], v) : v;
+    if (JSON.stringify(next) !== mine) { p[k] = next; changed += 1; }
+    b.meta[k] = JSON.stringify(v);
+    if (revs?.meta?.[k] !== undefined) S.revs.meta[k] = revs.meta[k];
+  }
+  if (meta.workflow) ensureProject(p); // statuses renamed or removed: issues follow
+  const byId = new Map<string, number>(p.tickets.map((t: Any, i: number) => [t.id, i]));
+  for (const raw of tickets) {
+    const theirs = ensureTicket(raw, p);
+    const s = JSON.stringify(theirs);
+    const i = byId.get(theirs.id);
+    const baseStr = b.tickets.get(theirs.id);
+    if (i === undefined) {
+      if (baseStr === undefined) { p.tickets.push(theirs); byId.set(theirs.id, p.tickets.length - 1); changed += 1; } // new from a teammate
+      // else: deleted here and not saved yet: the deletion is saved next
+    } else {
+      const mine = p.tickets[i];
+      const mineStr = JSON.stringify(mine);
+      const dirty = baseStr !== undefined && mineStr !== baseStr;
+      const next = dirty ? merge3(JSON.parse(baseStr!), mine, theirs) : theirs;
+      // In place, so open dialogs and the drawer holding this issue keep working on the current copy.
+      if (JSON.stringify(next) !== mineStr) { for (const k of Object.keys(mine)) if (!(k in next)) delete mine[k]; Object.assign(mine, next); changed += 1; }
+    }
+    b.tickets.set(theirs.id, s);
+    if (revs?.issues?.[theirs.id] !== undefined) S.revs.issues[theirs.id] = revs.issues[theirs.id];
+  }
+  if (remove.length) {
+    const gone = new Set<string>(remove);
+    const before = p.tickets.length;
+    p.tickets = p.tickets.filter((t: Any) => !gone.has(t.id));
+    for (const t of p.tickets) t.links = t.links.filter((l: Any) => !gone.has(l.targetId));
+    for (const id of gone) { b.tickets.delete(id); delete S.revs.issues[id]; S.checked.delete(id); }
+    changed += before - p.tickets.length;
+  }
+  if (Array.isArray(order)) {
+    // Their order, unless this browser has a reorder of its own waiting to be saved (then that is saved next).
+    const localOrder = JSON.stringify(p.tickets.map((t: Any) => t.id));
+    if (localOrder === b.order || !b.order) {
+      const pos = new Map(order.map((id: string, i: number) => [id, i]));
+      const next = [...p.tickets].sort((x: Any, y: Any) => (pos.get(x.id) ?? 1e9) - (pos.get(y.id) ?? 1e9));
+      if (JSON.stringify(next.map((t: Any) => t.id)) !== localOrder) { p.tickets = next; changed += 1; }
+    }
+    b.order = JSON.stringify(order.filter((id: string) => b.tickets.has(id)));
+  } else if (tickets.length || remove.length) {
+    // New and removed issues change the order the server has: keep the base in step (no order to save for them).
+    const known = JSON.parse(b.order || '[]').filter((id: string) => b.tickets.has(id));
+    const have = new Set(known);
+    for (const t of tickets) if (!have.has(t.id) && b.tickets.has(t.id)) known.push(t.id);
+    b.order = JSON.stringify(known);
+  }
+  if (changed) { S.dataRev += 1; S.undo = []; S.redo = []; if (S.drawer && !(openIssue() || openEpic())) S.drawer = null; }
+  return changed;
+}
+
+let saveTries = 0;
 export async function saveNow() {
   clearTimeout(S.saveTimer); S.saveTimer = null;
   const p = P();
   if (!p || S.saving) { if (p) S.saveTimer = setTimeout(saveNow, 400); return; }
   const snap = snapshotOf(p);
+  const seq = S.mutSeq;
   const patch = diff(snap);
-  if (!patch) { setSaveText('Saved'); return; }
+  if (!patch) { S.base = snap; S.baseSeq = seq; setSaveText('Saved'); return; }
   S.saving = true;
   const before = p.version;
+  let again = false;
   try {
     const res = await api(`/api/projects/${p.id}`, { method: 'PATCH', body: patch });
     if (P() !== p) return;
     S.base = snap;
-    p.version = res.version;
+    S.baseSeq = seq;
+    for (const [id, r] of Object.entries(res.revs?.issues || {})) S.revs.issues[id] = r as number;
+    for (const [k, r] of Object.entries(res.revs?.meta || {})) S.revs.meta[k] = r as number;
+    for (const id of patch.remove) delete S.revs.issues[id];
+    saveTries = 0;
     setSaveText('Saved');
-    if (res.version !== before + 1) await pullRemote({ quiet: true });
+    if (res.version === before + 1) p.version = res.version;
+    else { S.saving = false; await pullRemote({ quiet: true }); } // teammates saved in between: fetch their changes
   } catch (e: Any) {
-    setSaveText('Save failed');
-    toast(`Not saved: ${e.message}`, 'err');
-    if (/permission/i.test(e.message)) await pullRemote({ force: true });
+    if (e.status === 409 && e.body?.conflict && P() === p && saveTries < 4) {
+      // A teammate saved some of the same issues: merge their copies with these edits, then save again.
+      saveTries += 1;
+      const c = e.body.conflict;
+      for (const id of c.deleted || []) { S.base.tickets.delete(id); delete S.revs.issues[id]; }
+      const deleted = (c.deleted || []).filter((id: string) => p.tickets.some((t: Any) => t.id === id));
+      if (deleted.length) {
+        const keys = deleted.map((id: string) => p.tickets.find((t: Any) => t.id === id)?.key).filter(Boolean);
+        p.tickets = p.tickets.filter((t: Any) => !deleted.includes(t.id));
+        toast(`${keys.join(', ')} ${keys.length === 1 ? 'was' : 'were'} deleted by a teammate, so ${keys.length === 1 ? 'that change wasn’t' : 'those changes weren’t'} saved.`, 'warn');
+      }
+      mergeRemote(p, { tickets: c.tickets || [], meta: c.meta || {}, revs: c.revs });
+      emit();
+      again = true;
+    } else {
+      saveTries = 0;
+      setSaveText('Save failed');
+      toast(`Not saved: ${e.message}`, 'err');
+      if (/permission/i.test(e.message)) { S.saving = false; await pullRemote({ force: true }); }
+    }
   } finally { S.saving = false; }
+  if (again) await saveNow();
 }
+
+/** Brings in teammates' changes: only what changed since this browser's version, merged with unsaved edits. */
 export async function pullRemote({ force = false, quiet = false } = {}) {
+  const p = P();
+  if (!p || S.saving) return;
+  if (force || !S.base) return pullFull({ force, quiet });
+  try {
+    const d = await api(`/api/projects/${p.id}/changes?since=${p.version}`);
+    if (P() !== p || S.saving) return;
+    if (d.full) return pullFull({ quiet });
+    if (d.version <= p.version) return;
+    // The version moved but nothing is listed: an older server saved without recording what changed. Reload.
+    if (!d.upsert?.length && !d.remove?.length && !Object.keys(d.meta || {}).length && !d.order) return pullFull({ quiet });
+    const changed = mergeRemote(p, { tickets: d.upsert || [], remove: d.remove || [], meta: d.meta || {}, order: d.order, revs: d.revs });
+    p.version = d.version;
+    if (changed && !quiet) S.saveText = 'Updated with teammates’ changes';
+    if (changed) emit();
+    if (hasLocalChanges()) { if (!S.saveTimer) scheduleSave(); } // merged edits still to save
+    else S.baseSeq = S.mutSeq;
+  } catch (e: Any) { if (e.status === 404) toast(e.message, 'err'); }
+}
+async function pullFull({ force = false, quiet = false } = {}) {
   const p = P();
   if (!p) return;
   if (!force && hasLocalChanges()) return;
   try {
-    const fresh = await api(`/api/projects/${p.id}`);
+    const fresh = await fetchProject(p.id);
     if (P() !== p || (!force && hasLocalChanges())) return;
+    S.revs = takeRevs(fresh);
     S.project = ensureProject(fresh);
     setBase();
+    S.dataRev += 1;
     S.undo = []; S.redo = [];
     if (S.drawer && !(openIssue() || openEpic())) S.drawer = null;
     if (!quiet) S.saveText = 'Updated with teammates’ changes';
@@ -518,14 +707,19 @@ let syncStarted = false;
 export function startSync() {
   if (syncStarted) return;
   syncStarted = true;
-  setInterval(async () => {
+  const check = async () => {
     const p = P();
     if (!p || S.saving || S.saveTimer || document.visibilityState !== 'visible') return;
     try {
       const { version } = await api(`/api/projects/${p.id}/version`);
       if (P() === p && version > p.version) await pullRemote();
     } catch { /* offline or signed out */ }
-  }, 10000);
+  };
+  // Every 10 s (a little random, so thousands of open tabs don't all ask in the same second), and at once when
+  // the tab comes back into view.
+  const loop = () => setTimeout(async () => { await check(); loop(); }, 8000 + Math.random() * 4000);
+  loop();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
 }
 
 /** Notifications for the signed-in user (bell in the top bar). */
@@ -539,13 +733,28 @@ export async function markNotifsRead(ids?: string[]) {
   await loadNotifs();
 }
 
+/** The whole project. Downloaded gzipped and unpacked here when the browser can (a big project is ~30× smaller). */
+export async function fetchProject(id: string): Promise<Any> {
+  if (typeof DecompressionStream === 'function') {
+    try {
+      const res = await api(`/api/projects/${id}?gz=1`, { raw: true });
+      if (res.headers.get('content-type')?.includes('octet-stream') && res.body) {
+        return JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text());
+      }
+      return await res.json();
+    } catch (e: Any) { if (e.status) throw e; /* unpacking failed: fall back to plain JSON */ }
+  }
+  return api(`/api/projects/${id}`);
+}
 /** Load a project (once) for the workspace. */
 export async function openProject(id: string) {
   if (S.project?.id === id || S.loadingProject === id) return;
   if (P()) await saveNow();
   S.loadingProject = id; S.projectError = null; emit();
   try {
-    const p = ensureProject(await api(`/api/projects/${id}`));
+    const raw = await fetchProject(id);
+    S.revs = takeRevs(raw);
+    const p = ensureProject(raw);
     Object.assign(S, { project: p, undo: [], redo: [], drawer: null, full: false, inlineCreate: null, filter: EMPTY_FILTER(), boardAll: false });
     S.checked.clear(); S.openTc.clear();
     setBase();
@@ -555,6 +764,6 @@ export async function openProject(id: string) {
 }
 export async function closeProject() {
   if (P()) await saveNow();
-  Object.assign(S, { project: null, drawer: null, people: [] });
+  Object.assign(S, { project: null, drawer: null, people: [], revs: { issues: {}, meta: {} } });
   emit();
 }

@@ -42,6 +42,8 @@ export function AgentCard({ a, onDetails, onHire, hireLabel = 'Hire' }: { a: Any
       <div className="agent-chips">
         <span className="agent-chip">{a.workspaceLabel}</span>
         {a.step && <span className="agent-chip step">{a.step}</span>}
+        {a.custom && <span className="agent-chip step">Custom</span>}
+        {a.runner === 'testing' && <span className={`agent-chip ${a.enabled ? 'step' : ''}`}>{a.enabled ? 'On in test runs' : 'Off'}</span>}
       </div>
       <footer className="agent-foot">
         {onDetails && <button className="agent-btn ghost" onClick={onDetails}>Details</button>}
@@ -66,7 +68,7 @@ async function runDoc(epic: Any, a: Any, instructions: string) {
     await readNdjson(res, (ev) => { if (ev.type === 'done') md = ev.markdown; else if (ev.type === 'error') throw new Error(ev.error); });
     if (!md) throw new Error(`${a.name} didn’t return a document.`);
     mutate(() => { epic.agentDocs = { ...(epic.agentDocs || {}), [a.id]: { name: a.name, markdown: md, generatedAt: new Date().toISOString(), generatedBy: me() } }; });
-    toast(`${a.name} is ready: ${epic.title}`);
+    toast(`${a.name} is ready: ${epic.title}`, 'ok', { action: { label: 'View', onClick: () => openModal(<DocViewModal epic={epic} a={a} />) } });
   } catch (e: Any) { toast(`${a.name}: ${e.message}`, 'err'); }
   finally { busy.delete(k); emit(); }
 }
@@ -147,60 +149,4 @@ export function hireAgent(a: Any, epic: Any) {
   return toast(`${a.name} can’t be hired here.`, 'err');
 }
 
-/** How far an agent's work on this epic is. */
-function progress(a: Any, epic: Any): { state: 'done' | 'partial' | 'todo' | 'na'; text: string; view?: () => void } {
-  const issues = P().tickets.filter((t: Any) => t.epicId === epic.id);
-  const tests = issues.flatMap((t: Any) => t.testCases || []);
-  if (a.runner === 'document') { const d = epic.agentDocs?.[a.id]; return d ? { state: 'done', text: `Written ${ago(d.generatedAt)}`, view: () => openModal(<DocViewModal epic={epic} a={a} />) } : { state: 'todo', text: 'Not written yet' }; }
-  if (a.runner === 'code' || a.runner === 'panel') { const prs = issues.filter((t: Any) => t.prs?.length).length; return issues.length ? { state: prs === issues.length ? 'done' : prs ? 'partial' : 'todo', text: `${prs} of ${issues.length} issues have a pull request` } : { state: 'na', text: 'No issues yet' }; }
-  switch (a.use) {
-    case 'psd': return epic.psd ? { state: 'done', text: `${epic.psd.status || 'Draft'} · ${ago(epic.psd.generatedAt)}`, view: () => openPsd(epic) } : { state: 'todo', text: 'Not written yet' };
-    case 'fbd': return epic.fbd ? { state: 'done', text: `${epic.fbd.status || 'Draft'} · ${ago(epic.fbd.generatedAt)}`, view: () => openFbd(epic) } : { state: 'todo', text: 'Not written yet' };
-    case 'tickets': return issues.length ? { state: 'done', text: `${issues.length} issues` } : { state: 'todo', text: 'No issues yet' };
-    case 'tests': { const w = issues.filter((t: Any) => t.testCases?.length).length; return !issues.length ? { state: 'na', text: 'No issues yet' } : { state: w === issues.length ? 'done' : w ? 'partial' : 'todo', text: `${w} of ${issues.length} issues have test cases` }; }
-    case 'automation': { const sc = tests.filter((tc: Any) => tc.script).length; return !tests.length ? { state: 'na', text: 'No test cases yet' } : { state: sc === tests.length ? 'done' : sc ? 'partial' : 'todo', text: `${sc} of ${tests.length} test cases have a script` }; }
-    case 'verify': { const run = tests.filter((tc: Any) => tc.status && tc.status !== 'Not run').length; const pass = tests.filter((tc: Any) => tc.status === 'Passed').length; return !tests.length ? { state: 'na', text: 'No test cases yet' } : { state: pass === tests.length ? 'done' : run ? 'partial' : 'todo', text: `${pass} of ${tests.length} passed · ${tests.length - run} not run` }; }
-  }
-  return { state: 'na', text: '' };
-}
-
-/** Epic panel → Agents: the feature's lifecycle, one row per agent, with Hire. */
-export function EpicAgents({ epic }: { epic: Any }) {
-  const data = useAgents();
-  const [open, setOpen] = useState<string | null>(null);
-  if (!data) return <div className="sec"><div className="sec-title"><Ico svg={I.bot} /><h3>Agents</h3></div><div className="muted small"><Spinner /> Loading…</div></div>;
-  const list = data.agents.filter((a: Any) => a.enabled && a.id !== 'review' && a.id !== 'free-worker');
-  const canHire = can('ai.use') && can('epic.manage');
-  const done = list.filter((a: Any) => progress(a, epic).state === 'done').length;
-  return (
-    <div className="sec epic-agents">
-      <div className="sec-title"><Ico svg={I.bot} /><h3>Agents</h3><span className="count">{done}/{list.length}</span>
-        <span className="muted small" style={{ marginLeft: 'auto' }}>Hire an agent for each step of this feature</span></div>
-      {data.phases.filter((ph: string) => list.some((a: Any) => a.phase === ph)).map((ph: string) => (
-        <div key={ph} className={`ea-phase ${phaseClass(ph)}`}>
-          <div className="ea-phase-name">{ph}</div>
-          {list.filter((a: Any) => a.phase === ph).map((a: Any) => {
-            const pg = progress(a, epic);
-            const running = agentBusy(epic.id, a.id);
-            return (
-              <div key={a.id} className={`ea-row s-${pg.state}`}>
-                <button className="ea-main" onClick={() => setOpen(open === a.id ? null : a.id)} aria-expanded={open === a.id}>
-                  <span className="agent-icon sm" aria-hidden>{a.icon}</span>
-                  <span className="ea-text"><b>{a.name}</b><span className="muted small">{running ? 'Working…' : pg.text}</span></span>
-                  <span className={`ea-dot s-${running ? 'run' : pg.state}`} aria-label={pg.state} />
-                </button>
-                <div className="ea-actions">
-                  {pg.view && <button className="btn sm subtle" onClick={pg.view}>View</button>}
-                  {canHire && <button className="agent-btn hire sm" disabled={running} onClick={() => hireAgent(a, epic)}>{running ? <Spinner /> : <Ico svg={I.bot} />}{pg.state === 'done' && a.runner !== 'code' ? 'Again' : 'Hire'}</button>}
-                </div>
-                {open === a.id && <div className="ea-more small"><p style={{ margin: '0 0 4px' }}>{a.summary}</p><ul>{a.does.map((d: string) => <li key={d}>{d}</li>)}</ul>
-                  {a.runner === 'document' && epic.agentDocs?.[a.id] && can('epic.manage') && <button className="btn sm subtle" onClick={() => openModal(<Confirm title={`Remove the ${a.name} document?`} label="Remove" text="You can undo with ⌘Z, or hire the agent again." onYes={() => mutate(() => { delete epic.agentDocs[a.id]; })} />)}><Ico svg={I.trash} />Remove document</button>}</div>}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
 void ticket;
