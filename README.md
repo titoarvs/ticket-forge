@@ -715,13 +715,21 @@ The same analysis goes into the assignee's notification and email. From the comm
 
 ### Pull requests page
 
-**Pull requests** (sidebar → Development) lists every pull and merge request linked to the project's issues. You can filter by status (Active, Open, Draft, Merged, Declined) or repository, and search. Each request shows its branch, author, linked issue (click it to open the issue) and the latest AI review verdict.
-
-Actions on each request:
-- **Review with AI**: a read-only Code review or UI/UX review agent reads the request's diff on a detached checkout of its branch and checks it against the issue's acceptance criteria. It writes a verdict and findings (blocking, should fix, nits). You can then post the review on the request as a comment.
-- **Update with AI**: change, enhance, address review comments, or rewrite the description.
-- **Refresh** the status from GitHub or GitLab, one request or all open ones.
-- **Link** a request to an issue.
+Every pull and merge request linked to the project's issues, with what GitHub / GitLab says about it:
+- **On each row:** status, checks (passing, failing, running), reviews (approved, changes requested, review requested),
+  merge conflicts, *Ready to merge* (approved, checks green, no conflicts), size (+added −removed, files), comments, the
+  AI review verdict, branch → base, author, when it was opened and updated, and the linked issue.
+- **Needs attention:** one click shows the requests with failing checks, requested changes, conflicts, no review yet,
+  or ready to merge. The status cards (Active, Open, Draft, Merged, Declined, All) still filter by status.
+- **Find and arrange:** search (title, branch, issue, label, author), repository, sort (recently updated, oldest open
+  first, largest change, issue key) and group by status, repository or epic. Status, sort and grouping are remembered.
+- **Click a row** for its details: description, labels, every check (failed first, linked), reviewers, the AI review,
+  branch (copy), merge conflicts and the timeline.
+- **Actions:** Review with AI, Update with AI, refresh, open on GitHub / GitLab, and in "…": copy the branch or link,
+  open the issue, unlink.
+- Open requests last read 10 or more minutes ago refresh by themselves, one at a time, when the page opens (up to 12).
+  *Refresh open* reads them all now. GitHub details come through the signed-in `gh` CLI (or `GITHUB_TOKEN`); GitLab
+  through the project's GitLab token.
 
 ### Issues page
 
@@ -868,4 +876,28 @@ search keystroke 17–37 ms.
   light/dark theme). On a phone it keeps the icons only, and the search opens across the bar.
 - **Dropdowns with 8 or more choices** open with a search box: type to narrow the list, ↓ to move into it, Enter to pick
   the first match. Shorter ones stay a plain list; `searchable` on `SF` forces it on or off.
+
+### Releases (versions)
+
+Jira-style versions: **Releases** in the project sidebar.
+- **Create version:** name, start and release dates, description. The list shows each version's status (Unreleased,
+  Released, Archived, *Overdue* when its release date has passed), progress (done / in progress / to do) and dates.
+- **Fix versions on issues:** in the issue panel (*Fix versions*), the backlog row menu (*Fix version…*), the selection
+  bar for many issues at once, or *Add issues* on a version. Rows show their version; the filter bar has a *Version*
+  filter (including *No version*).
+- **A version's page:** progress and story points, what still blocks it (unfinished issues, open pull requests, failing
+  tests), its issues by status (remove one with ×) and **release notes** (new features, improvements, bug fixes from
+  its done issues) to copy or download as Markdown.
+- **Release:** pick the release date and where unfinished issues go (another unreleased version, or out of this one).
+  Released versions can be archived or moved back to unreleased; deleting one removes it from its issues (⌘Z undoes).
+- Managing versions needs *Manage sprints* or *Edit project settings*; setting an issue's Fix version, *Edit issues*.
+
+### Activity (the project timeline)
+
+**Activity** in the project sidebar: every change in the project, newest first, grouped by day: issues created and
+every field change (with from → to), comments, links, test results, pull requests, and the project-level changes
+the server records on each save: sprints started and completed, epics, versions created, released and archived,
+workflow and members, project settings, test management, and deleted issues. Filter by type, person, time (24 hours,
+7 or 30 days) and text; click an issue to open it. Project-level entries are kept in the `activity` table (created
+automatically); changes made before this existed show from the issues' own history.
 

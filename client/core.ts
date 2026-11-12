@@ -39,7 +39,7 @@ export const DEFAULT_WORKFLOW = [
   { id: 'inreview', name: 'In Review', category: 'inprogress' },
   { id: 'done', name: 'Done', category: 'done' },
 ];
-export const EMPTY_FILTER = () => ({ q: '', type: '', priority: '', status: '', epic: '', assignee: '' });
+export const EMPTY_FILTER = () => ({ q: '', type: '', priority: '', status: '', epic: '', assignee: '', version: '' });
 
 // ---------------------------------------------------------------- state
 export const S: Any = {
@@ -235,6 +235,9 @@ export const P = () => S.project;
 export const ticket = (id: string) => P()?.tickets.find((t: Any) => t.id === id);
 export const epic = (id: string) => P()?.epics.find((e: Any) => e.id === id);
 export const sprint = (id: string) => P()?.sprints.find((s: Any) => s.id === id);
+/** Releases (Jira "versions"): { id, name, description, startDate, releaseDate, status: unreleased | released | archived }. */
+export const releases = (): Any[] => P()?.releases || [];
+export const release = (id: string) => releases().find((r: Any) => r.id === id);
 export const isSub = (t: Any) => t?.type === 'Sub-task';
 export const childrenOf = (t: Any) => P().tickets.filter((x: Any) => x.parentId === t.id);
 export const epicTickets = (eid: string) => P().tickets.filter((t: Any) => t.epicId === eid && !isSub(t));
@@ -374,7 +377,7 @@ export function addMember(name: string) {
 export const FIELD_LABEL: Record<string, string> = {
   title: 'Summary', status: 'Status', priority: 'Priority', assignee: 'Assignee', reporter: 'Reporter', storyPoints: 'Story points',
   epicId: 'Epic', sprintId: 'Sprint', parentId: 'Parent', type: 'Issue type', labels: 'Labels', description: 'Description',
-  userStory: 'User story', acceptanceCriteria: 'Acceptance criteria', testCases: 'Test cases', dependencies: 'Dependencies', flagged: 'Flag',
+  userStory: 'User story', acceptanceCriteria: 'Acceptance criteria', testCases: 'Test cases', dependencies: 'Dependencies', flagged: 'Flag', fixVersions: 'Fix versions',
 };
 const TEXT_FIELDS = new Set(['description', 'userStory', 'acceptanceCriteria', 'testCases', 'dependencies', 'title']);
 export function fmtField(field: string, v: Any) {
@@ -384,6 +387,7 @@ export function fmtField(field: string, v: Any) {
   if (field === 'labels') return (v || []).join(', ') || 'None';
   if (field === 'assignee') return v || 'Unassigned';
   if (field === 'flagged') return v ? 'Flagged' : 'Not flagged';
+  if (field === 'fixVersions') return (v || []).map((id: string) => release(id)?.name || 'a deleted version').join(', ') || 'None';
   if (v === null || v === undefined || v === '') return 'None';
   return String(v);
 }
@@ -447,9 +451,10 @@ export function deleteIssues(ids: string[]) {
 
 // ---------------------------------------------------------------- filters
 export function filtered(list: Any[]) {
-  const { q, type, priority, status, epic: ep, assignee } = S.filter;
+  const { q, type, priority, status, epic: ep, assignee, version } = S.filter;
   const qq = q.trim().toLowerCase();
   return list.filter((t) => (!type || t.type === type) && (!priority || t.priority === priority) && (!status || t.status === status)
+    && (!version || (version === 'none' ? !(t.fixVersions || []).some((v: string) => release(v)) : (t.fixVersions || []).includes(version)))
     && (!ep || (ep === 'none' ? !epic(t.epicId) : t.epicId === ep)) && (!assignee || (assignee === 'none' ? !t.assignee : t.assignee === assignee))
     && (!qq || [t.key, t.title, t.userStory, t.description, t.assignee, ...t.labels, ...t.acceptanceCriteria].join(' ').toLowerCase().includes(qq)));
 }

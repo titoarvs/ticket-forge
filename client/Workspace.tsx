@@ -17,9 +17,11 @@ import { Board } from './Board';
 import { TestManagement } from './TestRepo';
 import { PullRequests } from './PullRequests';
 import { Issues } from './Issues';
+import { Releases } from './Releases';
+import { Activity } from './Activity';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', timeline: 'Timeline', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, timeline: Timeline, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
@@ -42,7 +44,9 @@ function Sidebar({ view }: { view: string }) {
       {item('backlog', I.backlog, 'Backlog', p.tickets.filter((t: any) => !isSub(t)).length)}
       {item('board', I.board, activeSprint() ? 'Active sprint' : 'Board')}
       {item('epics', I.epic, 'Epics', p.epics.length)}
+      {item('releases', I.pr, 'Releases', (p.releases || []).filter((r: any) => r.status === 'unreleased').length)}
       {item('timeline', I.calendar, 'Timeline')}
+      {item('activity', I.history, 'Activity')}
       {item('reports', I.chart, 'Reports')}
       <div className="side-label">Quality</div>
       {item('tests', I.test, 'Test cases', tests)}
@@ -61,7 +65,7 @@ function Sidebar({ view }: { view: string }) {
 }
 
 /** Pages that belong to a feature the owner can lock (Administration → Features). */
-const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs' };
+const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', releases: 'releases', activity: 'activity', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs' };
 function LockedView({ label }: { label: string }) {
   return <EmptyState icon={I.settings} tone="neutral" title={`${label} is locked`}
     actions={S.user?.isOwner ? <Link className="btn primary" href="/admin/features">Manage features</Link> : <Link className="btn" href={`/p/${P().id}/backlog`}>Go to the backlog</Link>}>
