@@ -2724,3 +2724,55 @@ td.danger-text { color: var(--danger); }
 .rp-step { display: flex; align-items: center; gap: 6px; margin-top: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--mono); }
 .rp-view { margin-top: 8px; } .rp-view summary { cursor: pointer; color: var(--text-subtle); }
 .rp-md { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; margin-top: 8px; background: var(--bg); }
+
+/* Code & GitHub → Repository source: local folder or clone from Git */
+.rs-mode { margin-bottom: 10px; }
+.rs-mode button { display: inline-flex; align-items: center; gap: 6px; }
+.rs-clone { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 10px 12px; background: var(--bg-sunken); }
+.rs-cloned { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.rs-cloned .spacer { flex: 1; }
+
+/* Connect GitHub and the repository picker */
+.gh-acct { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.gh-acct img { border-radius: 50%; }
+.gh-acct .spacer { flex: 1; }
+.gc-steps { margin: 6px 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.gc-code { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0; }
+.gc-user-code { font: 600 28px/1.2 var(--mono); letter-spacing: .12em; padding: 10px 18px; border: 2px dashed var(--border-input); border-radius: var(--radius-lg); background: var(--bg-sunken); color: var(--text); cursor: pointer; }
+.gr-list { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); max-height: 56vh; overflow: auto; }
+.gr-list li + li { border-top: 1px solid var(--border); }
+.gr-list button { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 9px 12px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.gr-list button:hover { background: var(--hover); }
+.gr-list button:disabled { opacity: .5; cursor: default; }
+.gr-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.gr-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Code & GitHub: GitHub account and repository chooser */
+.gha-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-sunken); }
+.gha-row img { border-radius: 50%; }
+.gha-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-neutral); color: var(--text-subtle); }
+.gha-row.ok .gha-icon { background: var(--success-bg); color: var(--success); }
+.gha-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gha-row .spacer { flex: 1; }
+.gha-pat { margin-top: 10px; } .gha-pat summary { cursor: pointer; color: var(--text-subtle); }
+.rc-current { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; background: var(--bg-sunken); }
+.rc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.rc-top .spacer { flex: 1; }
+.rc-icon { width: 34px; height: 34px; border-radius: var(--radius); display: grid; place-items: center; background: var(--selected-bg); color: var(--selected-text); flex-shrink: 0; }
+.rc-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rc-name b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.rc-meta code { overflow-wrap: anywhere; }
+.rc-sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.rc-sources button { display: grid; grid-template-columns: 18px 1fr; gap: 2px 8px; align-items: start; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }
+.rc-sources button > :first-child { grid-column: 1; grid-row: 1 / span 2; margin-top: 2px; color: var(--text-subtle); }
+.rc-sources button > b { grid-column: 2; grid-row: 1; }
+.rc-sources button > span:last-child { grid-column: 2; grid-row: 2; }
+.rc-sources button:hover { background: var(--hover); }
+.rc-sources button.on { border-color: var(--selected-border); background: var(--selected-bg); }
+.rc-sources button.on > :first-child { color: var(--selected-text); }
+.rc-form { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.rc-form > p { flex-basis: 100%; }
+.rc-sub { font-size: 13px; margin: 16px 0 8px; }
+.rc-adv { margin-top: 8px; } .rc-adv summary { cursor: pointer; color: var(--text-subtle); }

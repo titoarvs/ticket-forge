@@ -380,6 +380,30 @@ can delegate to Feature Tests and Review as subagents. Follow-up rounds resume t
 (`--resume`), so the agent keeps its context. Administrators can turn each agent off and set its model, effort and
 extra instructions; a project’s model in Code & GitHub overrides the agent’s for jobs in that project.
 
+### Repository: your GitHub repositories, a Git URL, or a local folder
+
+Project settings → Code & GitHub is organised top to bottom:
+
+1. **GitHub account**: how TicketForge signs in to GitHub. **Connect GitHub** (sign in with your account through
+   GitHub's device flow: copy a short code, approve it on github.com/login/device), or it uses your `gh` sign-in on
+   this computer, `GITHUB_TOKEN`, or a personal access token (*Use a personal access token instead*). The token is
+   stored encrypted and used for cloning, pushing, pull requests and GitHub Actions. **Disconnect** forgets it.
+   One-time setup for Connect GitHub: an administrator creates a GitHub **OAuth App** (Settings → Developer settings →
+   OAuth Apps), ticks **Enable Device Flow**, and pastes its Client ID in the Connect GitHub dialog (or sets
+   `TICKETFORGE_GITHUB_CLIENT_ID`). No client secret is needed.
+2. **Repository**: a summary of the repository in use (name, *Cloned by TicketForge* or *Local folder*, path, default
+   branch, current branch, uncommitted changes) with **Update** (clones) or **Check** (folders) and **Change**. To set or
+   change it, pick a source:
+   - **Your GitHub repositories**: choose from every repository your sign-in can see (personal and organisations),
+     searchable; TicketForge clones it.
+   - **Git URL**: any https or SSH URL, or `owner/name`, with an optional branch; TicketForge clones it into its data
+     folder (`data/repos/`). Tokens are passed per command and never written into the clone; SSH URLs use your keys.
+   - **Folder on this computer**: a clone you already have (Browse… or type the path).
+   A new repository replaces the old one's name and base branch. Below it: **Branches and pull requests** (base
+   branch, branch prefix, Claude model, draft pull requests) and **Advanced** (the GitHub owner/name, found
+   automatically).
+3. **Coding agent**, the **Backend repository** (same three sources) and **CodeRabbit**.
+
 ### Code that follows your repository
 
 - **Learn from repository** (Project settings → Code & GitHub → Coding agent, and the backend repository card): a
