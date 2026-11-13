@@ -380,6 +380,36 @@ can delegate to Feature Tests and Review as subagents. Follow-up rounds resume t
 (`--resume`), so the agent keeps its context. Administrators can turn each agent off and set its model, effort and
 extra instructions; a project’s model in Code & GitHub overrides the agent’s for jobs in that project.
 
+### Code that follows your repository
+
+- **Learn from repository** (Project settings → Code & GitHub → Coding agent, and the backend repository card): a
+  read-only Claude Code agent reads the checkout (it can't change files) and writes the **Repository profile**: stack
+  and versions, where each kind of code lives, how one or two real features are built end to end, conventions,
+  data and migrations, tests, commands, what to reuse, and rules from the README / CONTRIBUTING / CLAUDE.md. You can
+  view, edit, download or clear it, and learn again after big changes (it records the commit it learned).
+- Every code job (and code review) gets the profile with its task, together with the issue, sub-tasks, epic, Feature
+  Brief and Architecture Record, so new code is built the way the repository already works.
+- **Repo-native Builder** (Create agent → Start from a template, or the button on an empty Agents page): a code agent
+  that reads the profile, finds the closest existing feature and uses it as the pattern (file placement, names,
+  libraries, data access, errors, tests), reuses existing helpers, adds no new dependencies unless needed, and says in
+  its summary which feature it followed and where it had to do something different.
+
+### Your own agents instead of the built-in ones
+
+- **Built-in agents** (Administration → Agents) lists TicketForge's agents: remove any of them, or all at once with
+  **Remove all built-in agents**. Removed agents leave the catalog and every picker; restore them at any time. Document
+  features (Problem Statement, Feature Brief, test cases…) keep working from the epic; testing agents that are removed
+  are simply off in test runs.
+- **Create agent**: describe it and the AI writes its rules, write the Markdown yourself, import a `.md` file, or
+  **start from a template**, including any built-in agent (also from a built-in agent's details: **Copy as custom
+  agent**), so you keep its rules and change what you want. The frontmatter takes `name`, `description`, `runner`
+  (`code` edits in a worktree, `review` read-only, `document` writes for an epic), `model`, `effort` and `icon`.
+- **Default agents** choose who does each job when nobody picks one: **Write code**, the **Frontend** and **Backend**
+  repositories, and **Review changes**. *Automatic* uses the built-in agent while it's there, otherwise your first
+  custom agent of the right kind (edits code / read-only). Write code with AI, bulk coding, Build both at once,
+  follow-ups, pull request updates and reviews all use them. Without any code agent, the code window says to create one.
+- Custom review agents also appear as extra review buttons on a code job and as reviewers for pull requests.
+
 ## Code with AI and pull requests
 
 Set up once per project in **Project settings → Code & GitHub**:
@@ -467,6 +497,31 @@ Tests run in the first browser available:
 
 On serverless hosting the tests run inside the request (no separate process) and a run can take up to 5
 minutes, so run a few issues at a time there. Failure screenshots are stored in the database as usual.
+
+### GitHub Actions
+
+Tests can run on **GitHub Actions** instead of this server (Test automation → Settings → GitHub Actions): no browser
+is needed where TicketForge runs, so it works on Vercel without Browserless. Free for public repositories and within
+your plan's Actions minutes for private ones.
+
+1. Enter a repository (`owner/name`) and press **Set up**. TicketForge creates a random run key, saves it encrypted,
+   stores it in the repository as the `TICKETFORGE_RUN_KEY` Actions secret, and opens a pull request adding
+   `.github/workflows/ticketforge-tests.yml` and `.github/ticketforge/` (the same runner TicketForge uses locally).
+2. Merge the pull request (GitHub only starts workflows that are on the default branch), press **Check**, and turn on
+   **Run tests on GitHub Actions**.
+
+Each run sends the scripts, App setup and test passwords **encrypted** with the run key (AES-256-GCM) as a
+workflow input; the workflow runs them in Playwright's container (with the run settings and retries) and uploads the
+results, also encrypted, as an artifact kept for one day. TicketForge downloads them and records them like any
+run: results, failure screenshots, comments and notifications. A run takes about a minute to start. On serverless
+hosting a request lasts at most 5 minutes; a longer run keeps going on GitHub and its results are collected
+automatically (or with **Collect results**). Self-healing isn't applied to GitHub Actions runs. Big batches are split
+into several runs to fit GitHub's input size limit.
+
+It uses the project's GitHub token (Project settings → Code & GitHub), `GITHUB_TOKEN`, or the `gh` sign-in on the
+computer. The token needs Actions, Contents, Pull requests, Secrets and Workflows (read and write) on the repository.
+For GitHub Enterprise Server set `TICKETFORGE_GITHUB_API` (e.g. `https://github.example.com/api/v3`). Run **Set up**
+again after updating TicketForge to update the runner (it opens a new pull request).
 
 The Settings tab and each run say which browser is in use. Writing scripts uses your Claude account when it
 works, and the AI APIs connected in Administration → AI when it isn't installed, isn't signed in, its sign-in
@@ -625,6 +680,34 @@ Project settings → Code & GitHub → **Backend repository**: tick "This projec
   - **Mark unmarked with AI** in the same card fills it for existing issues. ⌘Z undoes it.
 - **Write code with AI** shows **Frontend** and **Backend** tabs, one job per repository. Each agent is told which half of the app it is in, and the backend agent lists the APIs it added.
 - A Frontend + Backend issue starts on Backend. The frontend job then receives the backend job's summary, so it builds on the real API.
+- **Many issues at once**: select issues in the backlog and choose **Write code with AI**. Each issue gets its own
+  branch, worktree and agent (Frontend + Backend issues get an API contract and a job in each repository). Up to 3 agents
+  run at the same time; the rest wait in line (set `TICKETFORGE_CODE_PARALLEL`, 1 to 10, to change it). **Code jobs**
+  (on the Pull requests page) shows every job live: running, waiting, ready for review, with changes and cost; click
+  one to review it. A waiting job can be removed from the line, a running one stopped.
+- **CodeRabbit review**: after an agent finishes, **🐇 CodeRabbit review** runs the CodeRabbit CLI
+  (`coderabbit review --agent --uncommitted`) on the job's changes in the background (reviews can take several minutes).
+  Findings show in the job's **CodeRabbit** tab by severity (critical, major, minor, trivial, info) with file, lines and
+  fix instructions. For each one: **Fix with agent** (sends its fix instructions to the Build agent as a new round),
+  **File as bug** (a Bug issue with the location and fix, priority from the severity, labelled `coderabbit`, linked to
+  the issue), or **Dismiss**; or fix / file all critical and major findings at once. Findings and their status are
+  saved on the issue, and **Reports → Code review findings** counts them by status, severity and file, with the open
+  ones listed. Setup: install the CLI (`brew install coderabbit`) and run `coderabbit auth login` once, or save an
+  Agentic API key in Project settings → Code & GitHub → CodeRabbit (encrypted). `CODERABBIT_BIN` points to another
+  binary.
+- **CodeRabbit on pull requests**: if CodeRabbit's app reviews your repositories, **🐇 CodeRabbit** on a linked pull
+  request (issue panel → Development, or the Pull requests page) reads its review comments from GitHub or GitLab as
+  findings: severity, category, file and lines, the comment with its suggested diff, and the "Prompt for AI Agents" fix
+  instructions. Resolved threads show as *Resolved on PR* and outdated ones are flagged. The same actions apply: **Fix
+  with agent** starts a round on the pull request's own branch (open requests only), **File as bug**, **Dismiss**. Reading
+  again keeps each finding's status. The issue shows the open counts, and Reports includes these findings too. Private
+  repositories use the project's GitHub token or `gh` sign-in, or the GitLab token.
+- **Build both at once** (faster): for a Frontend + Backend issue, TicketForge first agrees a short API contract from the
+  issue (a few seconds), then runs the backend and frontend agents in parallel, each told to implement or call exactly
+  that contract. The contract shows in the panel. It takes about half the time of one after the other.
+- Speed: the coding agents (Build, Frontend, Backend, Fix a Bug) default to Sonnet at medium effort; Review and
+  Architecture Record stay on Opus. Change either in Administration → Agents. Each job's worktree links the installed
+  dependencies (node_modules, vendor, .venv) from your checkout, so the check command runs without installing.
 - **Pull requests from either repository:** "Commit, push and open PR/MR" opens a **GitHub pull request** or a **GitLab merge request** (gitlab.com or self-hosted), depending on the repository's origin.
   - GitLab needs an access token (scopes `api` and `write_repository`), saved in the Backend card or set as `GITLAB_TOKEN`.
   - Without a token, the branch is pushed with your own git sign-in and you get a link that opens the merge request on GitLab.

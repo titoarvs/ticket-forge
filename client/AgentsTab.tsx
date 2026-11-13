@@ -42,8 +42,44 @@ You are a database reviewer. Check every migration in the change.
 ## Output
 A list of findings grouped Blocking / Should fix, each with file:line and the fix.`;
 
+/** Ready-made agents to start from (besides the built-in ones). */
+const REPO_BUILDER = `---
+name: Repo-native Builder
+description: Builds an issue the way this repository already builds features, using the project's profile and an existing feature as the pattern
+runner: code
+model: sonnet
+effort: high
+icon: 🧬
+---
+You are a senior engineer on this team. You implement one issue so the change looks like the rest of this codebase:
+same structure, names, libraries, patterns and tests. You never invent a new way when the repository already has one.
+
+## Before you write code
+- Read the REPOSITORY PROFILE in your task (when there is one) and the issue, its sub-tasks, the epic and the Feature Brief.
+- Find the closest existing feature to this one (Grep for similar routes, components, models or names) and read it
+  end to end: entry point, API, service, data access, UI, tests. Name it in your plan: it is your pattern.
+- Check the profile against the code: when they differ, the code wins; mention it in your summary.
+- Plan with TodoWrite: one item per acceptance criterion, plus tests.
+
+## While you build
+- Put each file where the pattern feature put its equivalent; copy its naming, exports, imports and path aliases.
+- Reuse the repository's components, hooks, helpers, validators, error types and API clients before writing new ones.
+- Use the same data access, migrations, validation, permission checks and error handling as the pattern.
+- Style UI with the existing design tokens and components; handle loading, empty, error and success states.
+- Write tests in the repository's framework, next to where its tests live, in the same style as the pattern's tests.
+- No new dependencies, configs or folders unless the issue truly needs them; say why if you add one.
+
+## Before you finish
+- Run the check command and fix what fails.
+- Read your git diff as a reviewer: every acceptance criterion met, nothing unrelated changed, nothing generated edited.
+
+## Output
+A short summary: the pattern feature you followed (paths), what changed by file, how each acceptance criterion is met,
+tests added and their result, and anything where you had to depart from the repository's usual way (and why).`;
+const TEMPLATES: { id: string; label: string; md: string }[] = [{ id: '__repo', label: '🧬 Repo-native Builder (builds from the repository and project)', md: REPO_BUILDER }];
+
 /** Create or edit a custom agent: describe it and the AI writes its rules, or paste / import a .md file. */
-function CustomAgentModal({ a, onSaved }: { a?: Any; onSaved: (d: Any) => void }) {
+function CustomAgentModal({ a, onSaved, builtIns = [], start = '' }: { a?: Any; onSaved: (d: Any) => void; builtIns?: Any[]; start?: string }) {
   const [mode, setMode] = useState(a ? 'md' : 'describe');
   const [desc, setDesc] = useState('');
   const [kind, setKind] = useState('review');
@@ -54,14 +90,20 @@ function CustomAgentModal({ a, onSaved }: { a?: Any; onSaved: (d: Any) => void }
   const generate = () => run('gen', async () => { const r = await api('/api/admin/agents', { method: 'POST', body: aiBody({ action: 'generate', description: desc, kind }) }); setMd(r.md); setMode('md'); setCheck(null); });
   const verify = () => run('check', async () => { setCheck((await api('/api/admin/agents', { method: 'POST', body: { action: 'check', md } })).agent); });
   const save = () => run('save', async () => { const d = await api('/api/admin/agents', { method: 'POST', body: { action: 'save', id: a?.id, md } }); onSaved(d); closeModal(); toast(a ? `${a.name} updated` : 'Agent created'); });
+  const copyFrom = (id: string) => { if (!id) return; if (id === '__example') { setMd(SAMPLE); setMode('md'); setCheck(null); return; }
+    const tpl = TEMPLATES.find((x) => x.id === id); if (tpl) { setMd(tpl.md); setMode('md'); setCheck(null); return; } run('copy', async () => { setMd((await api('/api/admin/agents', { method: 'POST', body: { action: 'copy', id } })).md); setMode('md'); setCheck(null); }); };
+  useEffect(() => { if (start) copyFrom(start); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const file = (f?: File) => { if (f) f.text().then((t) => { setMd(t); setMode('md'); setCheck(null); }); };
   return (
     <Modal title={a ? `Edit ${a.name}` : 'Create an agent'} wide persistent actions={[{ label: 'Cancel' },
       ...(mode === 'describe' ? [{ label: busy === 'gen' ? 'Writing…' : 'Write its rules with AI', kind: 'ai' as const, disabled: !!busy || desc.trim().length < 10, onClick: generate }]
         : [{ label: busy === 'check' ? 'Checking…' : 'Check', disabled: !!busy || !md.trim(), onClick: verify }, { label: busy === 'save' ? 'Saving…' : a ? 'Save' : 'Create agent', kind: 'primary' as const, disabled: !!busy || !md.trim(), onClick: save }])]}>
-      {!a && <div className="seg" role="tablist" aria-label="How">
+      {!a && <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}><div className="seg" role="tablist" aria-label="How">
         <button role="tab" aria-selected={mode === 'describe'} className={mode === 'describe' ? 'on' : ''} onClick={() => setMode('describe')}>Describe it</button>
-        <button role="tab" aria-selected={mode === 'md'} className={mode === 'md' ? 'on' : ''} onClick={() => setMode('md')}>Markdown rules</button></div>}
+        <button role="tab" aria-selected={mode === 'md'} className={mode === 'md' ? 'on' : ''} onClick={() => setMode('md')}>Markdown rules</button></div>
+        <SF filter value="" onChange={(e) => copyFrom(e.target.value)} aria-label="Start from">
+          <MenuItem value="">{busy === 'copy' ? 'Copying…' : 'Start from a template…'}</MenuItem>{TEMPLATES.map((x) => <MenuItem key={x.id} value={x.id}>{x.label}</MenuItem>)}<MenuItem value="__example">Example: Migration Reviewer</MenuItem>
+          {builtIns.filter((b: Any) => ['code'].includes(b.runner)).map((b: Any) => <MenuItem key={b.id} value={b.id}>{b.icon} {b.name}{b.removed ? ' (removed built-in)' : ''}</MenuItem>)}</SF></div>}
       {mode === 'describe' ? <>
         <div className="upd-modes" role="radiogroup" aria-label="Kind">{KINDS.map(([k, l, d]) => (
           <button key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}><b>{l}</b><span className="muted small">{d}</span></button>))}</div>
@@ -83,7 +125,10 @@ function AgentDetails({ a, data, onSave, onHire, onData }: { a: Any; data: Any; 
   const code = a.runner === 'code' || a.runner === 'panel';
   const dirty = v.enabled !== a.enabled || (code && (v.model !== (a.model || '') || v.effort !== (a.effort || ''))) || v.instructions !== a.instructions;
   return (
-    <Modal title={a.name} wide left={a.custom ? <div className="row" style={{ gap: 6 }}>
+    <Modal title={a.name} wide left={!a.custom ? <div className="row" style={{ gap: 6 }}>
+        {a.runner === 'code' && <button className="btn" onClick={() => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} start={a.id} />)} title="A custom agent with this agent’s rules, for you to change">Copy as custom agent</button>}
+        <button className="btn danger-subtle" onClick={async () => { try { onData(await api('/api/admin/agents', { method: 'POST', body: { action: 'remove', ids: [a.id] } })); closeModal(); toast(`${a.name} removed. Restore it from Built-in agents.`); } catch (e: Any) { toast(e.message, 'err'); } }}>Remove</button>
+      </div> : a.custom ? <div className="row" style={{ gap: 6 }}>
         <button className="btn" onClick={() => openModal(<CustomAgentModal a={a} onSaved={onData} />)}>Edit rules</button>
         <button className="btn danger-subtle" onClick={async () => { try { onData(await api(`/api/admin/agents?id=${encodeURIComponent(a.id)}`, { method: 'DELETE' })); closeModal(); toast(`${a.name} removed`); } catch (e: Any) { toast(e.message, 'err'); } }}>Remove</button></div> : undefined}
       actions={[{ label: 'Close' }, { label: 'Hire', onClick: onHire, disabled: !a.enabled, hidden: a.runner === 'testing' }, { label: 'Save', kind: 'primary', disabled: !dirty, onClick: async () => { await onSave(a.id, v); closeModal(); } }]}>
@@ -174,6 +219,63 @@ function Card({ a, onDetails, onHire, onToggle, busy }: { a: Any; onDetails: () 
   );
 }
 
+/** Remove (hide) or restore TicketForge's built-in agents. Removed ones stay restorable. */
+function BuiltInsModal({ data: first, onData }: { data: Any; onData: (d: Any) => void }) {
+  const [data, setData] = useState<Any>(first);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState('');
+  const list: Any[] = data.builtIns || [];
+  const act = async (action: 'remove' | 'restore', ids: string[]) => {
+    if (!ids.length) return;
+    setBusy(action);
+    try { const d = await api('/api/admin/agents', { method: 'POST', body: { action, ids } }); onData(d); setData(d); setSel(new Set()); toast(`${ids.length} built-in agent${ids.length === 1 ? '' : 's'} ${action === 'remove' ? 'removed' : 'restored'}`); }
+    catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
+  };
+  const toggle = (id: string) => setSel((x) => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const active = list.filter((b) => !b.removed), removed = list.filter((b) => b.removed);
+  const kind = (b: Any) => (b.runner === 'code' ? (b.writes ? 'Edits code' : 'Reviews code') : b.runner === 'testing' ? 'Test runs' : b.runner === 'panel' ? 'Review panel' : 'Documents');
+  return <Modal title="Built-in agents" wide actions={[{ label: 'Close' }]}>
+    <p className="muted small" style={{ marginTop: 0 }}>TicketForge comes with these agents. Remove the ones you don’t want; your custom agents take over their jobs (set which under <b>Default agents</b>). Removed agents can be restored at any time. Document features (Problem Statement, Feature Brief…) keep working from the epic; they just leave this catalog.</p>
+    <div className="bi-bar">
+      <button className="btn danger-subtle" disabled={!!busy || !active.length} onClick={() => act('remove', active.map((b) => b.id))}>{busy === 'remove' ? <Spinner /> : null}Remove all built-in agents ({active.length})</button>
+      {removed.length > 0 && <button className="btn" disabled={!!busy} onClick={() => act('restore', removed.map((b) => b.id))}>Restore all ({removed.length})</button>}
+      <span className="spacer" />
+      {sel.size > 0 && <><button className="btn sm danger-subtle" disabled={!!busy} onClick={() => act('remove', [...sel].filter((id) => active.some((b) => b.id === id)))}>Remove selected</button>
+        <button className="btn sm" disabled={!!busy} onClick={() => act('restore', [...sel].filter((id) => removed.some((b) => b.id === id)))}>Restore selected</button></>}
+    </div>
+    <ul className="bi-list">{list.map((b) => <li key={b.id} className={b.removed ? 'removed' : ''}>
+      <label><input type="checkbox" checked={sel.has(b.id)} onChange={() => toggle(b.id)} /><span className="agent-icon sm" aria-hidden>{b.icon}</span><b>{b.name}</b><span className="muted small">{kind(b)}</span></label>
+      <span className={`bi-state ${b.removed ? 'off' : 'on'}`}>{b.removed ? 'Removed' : 'In use'}</span>
+      <button className="btn sm subtle" disabled={!!busy} onClick={() => act(b.removed ? 'restore' : 'remove', [b.id])}>{b.removed ? 'Restore' : 'Remove'}</button>
+    </li>)}</ul>
+  </Modal>;
+}
+
+/** Which agent does each code job: Write code, Frontend, Backend, Review. */
+function DefaultAgents({ data, onData }: { data: Any; onData: (d: Any) => void }) {
+  const [busy, setBusy] = useState(false);
+  const roles = data.roles || {};
+  const options = (writes: boolean) => data.agents.filter((a: Any) => a.runner === 'code' && !a.broken && a.enabled && Boolean(a.writes) === writes);
+  const set = async (key: string, id: string) => {
+    setBusy(true);
+    const next: Any = Object.fromEntries(Object.entries(roles).map(([k, r]: Any) => [k, r.chosen || '']));
+    next[key] = id;
+    try { onData(await api('/api/admin/agents', { method: 'POST', body: { action: 'roles', roles: Object.fromEntries(Object.entries(next).filter(([, v]) => v)) } })); toast('Default agents saved'); }
+    catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  const nameOf = (id: string) => data.agents.find((a: Any) => a.id === id)?.name || id;
+  return <section className="ag-roles">
+    <div className="ag-roles-h"><b>Default agents</b><span className="muted small">Who does each job when nobody picks an agent: Write code with AI, bulk coding, and the reviews of a code job.</span></div>
+    <div className="ag-roles-grid">{Object.entries(roles).map(([k, r]: Any) => <label key={k} className="field" style={{ margin: 0 }}>
+      <span>{r.label}</span>
+      <SF value={r.chosen || ''} disabled={busy} onChange={(e) => set(k, e.target.value)}>
+        <MenuItem value="">Automatic{r.agent ? ` (${nameOf(r.agent)})` : ''}</MenuItem>
+        {options(r.writes).map((a: Any) => <MenuItem key={a.id} value={a.id}>{a.icon} {a.name}{a.custom ? ' · custom' : ''}</MenuItem>)}</SF>
+      {!r.agent && <small className="bad-text">No {r.writes ? 'code' : 'review'} agent: create one{r.writes ? ' (kind: Code)' : ' (kind: Review)'}.</small>}
+    </label>)}</div>
+  </section>;
+}
+
 export function AgentsTab() {
   const [data, setData] = useState<Any>(null);
   const [err, setErr] = useState<Any>(null);
@@ -203,7 +305,7 @@ export function AgentsTab() {
   const hire = (a: Any) => openModal(<HireModal a={a} />);
   const onData = (d: Any) => { setData(d); setAgentsCache(d); };
   const details = (a: Any) => openModal(<AgentDetails a={a} data={data} onSave={save} onHire={() => hire(a)} onData={onData} />);
-  const create = () => openModal(<CustomAgentModal onSaved={onData} />);
+  const create = () => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} />);
   const setV = (v: string) => { setView(v); try { localStorage.setItem('tf.agents.view', v); } catch { /* storage off */ } };
   const qq = q.trim().toLowerCase();
   const all: Any[] = data.agents;
@@ -224,11 +326,17 @@ export function AgentsTab() {
         <p className="muted small">AI teammates for each step of a feature: plan, build, review, test and release. Turn them on or off, tune their model and instructions, or create your own.
           {data.updatedAt && <> Last changed by {data.updatedBy || 'an administrator'} {ago(data.updatedAt)}.</>}</p>
       </div>
-      {can('ai.use') && <button className="btn primary" onClick={create}><Ico svg={I.plus} />Create agent</button>}
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn" onClick={() => openModal(<BuiltInsModal data={data} onData={onData} />)}>Built-in agents{data.removed?.length ? ` (${data.removed.length} removed)` : ''}</button>
+        {can('ai.use') && <button className="btn primary" onClick={create}><Ico svg={I.plus} />Create agent</button>}
+      </div>
     </div>
     <div className="ag-stats">{stats.map(([l, n, tone]) => <div key={l} className={`ag-stat ${tone}`}><b>{n}</b><span>{l}</span></div>)}</div>
+    <DefaultAgents data={data} onData={onData} />
+    {!all.length && <EmptyState icon={I.bot} tone="neutral" title="No agents yet" actions={can('ai.use') ? <><button className="btn primary" onClick={() => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} start="__repo" />)}>🧬 Start with the Repo-native Builder</button><button className="btn" onClick={create}><Ico svg={I.plus} />Create your own</button></> : null}>
+      <p>All built-in agents are removed. Create your own: describe what it should do and the AI writes its rules, or start from a template. Restore built-in agents any time from <b>Built-in agents</b>.</p></EmptyState>}
 
-    <div className="ag-toolbar">
+    {all.length > 0 && <div className="ag-toolbar">
       <div className="ag-phases" role="tablist" aria-label="Phase">{['All', ...data.phases].map((p: string) => {
         const n = p === 'All' ? all.length : all.filter((a: Any) => a.phase === p).length;
         return <button key={p} role="tab" aria-selected={phase === p} className={`${phase === p ? 'on' : ''} ${p === 'All' ? 'ph-all' : phaseClass(p)}`} onClick={() => setPhase(p)}>
@@ -246,9 +354,9 @@ export function AgentsTab() {
           <button role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => setV('list')} title="List"><Ico svg={I.backlog} /></button>
         </div>
       </div>
-    </div>
+    </div>}
 
-    {!list.length ? <EmptyState compact icon={I.bot} tone="neutral" title="No agents match" actions={<button className="btn" onClick={() => { setPhase('All'); setTeam(''); setState(''); setQ(''); }}>Show all</button>} />
+    {!all.length ? null : !list.length ? <EmptyState compact icon={I.bot} tone="neutral" title="No agents match" actions={<button className="btn" onClick={() => { setPhase('All'); setTeam(''); setState(''); setQ(''); }}>Show all</button>} />
       : view === 'list' ? <div className="table-wrap"><table className="tbl ag-tbl">
         <thead><tr><th>Agent</th><th>Phase</th><th>Runs</th><th>Model</th><th>On</th><th /></tr></thead>
         <tbody>{list.map((a: Any) => (

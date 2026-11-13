@@ -6,7 +6,11 @@ const BROWSER_ROUTES = ['/api/automation/*', '/api/admin/browser', '/api/admin/g
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  outputFileTracingIncludes: Object.fromEntries(BROWSER_ROUTES.map((r) => [r, PLAYWRIGHT_FILES])),
+  outputFileTracingIncludes: {
+    ...Object.fromEntries(BROWSER_ROUTES.map((r) => [r, PLAYWRIGHT_FILES])),
+    // GitHub Actions setup copies the test runner's source files into the repository.
+    '/api/automation/github': [...PLAYWRIGHT_FILES, './lib/run-one.mjs', './lib/app-helpers.mjs', './lib/browser.mjs', './lib/totp.mjs', './node_modules/@playwright/test/package.json'],
+  },
   // Server-only packages with native parts, WASM or data files: load them from node_modules at runtime
   // instead of bundling them.
   serverExternalPackages: [

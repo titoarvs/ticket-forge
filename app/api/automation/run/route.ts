@@ -6,6 +6,7 @@ import { isLocked } from '@/lib/features.js';
 import { resolveAgent } from '@/lib/agents.js';
 import * as store from '@/lib/store.js';
 import { runAppSetup } from '@/lib/server/app-setup';
+import { githubRunner } from '@/lib/server/gh-runner';
 
 // Driving a browser takes a while: let this run up to 5 minutes on serverless hosting (Vercel).
 export const maxDuration = 300;
@@ -20,7 +21,9 @@ export const POST = api(async (req) => {
   if ((regenerate || items.some((i: any) => !i.tc?.script?.trim())) && !store.has(user, 'ai.use')) {
     throw new HttpError(403, 'Some tests have no script yet, and writing scripts uses Claude, which your role does not allow (ai.use). Run tests that already have scripts, or ask an administrator.');
   }
-  if (!(await engineStatus()).browser) throw new HttpError(400, noBrowser());
+  // GitHub Actions (Test automation → Settings): the browser runs there, so this server doesn't need one.
+  const github = b.runOn === 'github' ? await githubRunner(project?.id, { deadlineMs: 260_000 }) : null;
+  if (!github && !(await engineStatus()).browser) throw new HttpError(400, noBrowser());
   const origin = appUrl(req);
   // Pages, roles and login settings come from the saved project; passwords only for its saved application URL.
   const { app, warning } = await runAppSetup(project?.id, baseUrl);
@@ -43,7 +46,7 @@ export const POST = api(async (req) => {
       send(ev);
     };
     try {
-      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user, notes: String(b.notes || '').slice(0, 4000), heal });
+      await runAutomation({ items, baseUrl, regenerate, project, ai: aiOpts(b), emit, signal, app, user, notes: String(b.notes || '').slice(0, 4000), heal: heal && !github, github });
     } finally {
       if (results.size && project?.id) {
         try {
