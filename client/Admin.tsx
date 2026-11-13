@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
-import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection } from './ui';
+import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection, PlanLimits } from './ui';
 import { RoutingSection } from './AiRouting';
 import { ConfigsSection } from './AiConfigs';
 import { AdminSkeleton } from './skeletons';
@@ -483,7 +483,7 @@ function AiTab() {
   const [busy, setBusy] = useState('');
   const [showEnv, setShowEnv] = useState(false);
   const [envProv, setEnvProv] = useState('openai');
-  const [sec, setSec] = useSection('tf.adminAiSec', ['connection', 'routing', 'configs', 'providers', 'local'], 'connection');
+  const [sec, setSec] = useSection('tf.adminAiSec', ['connection', 'routing', 'models', 'usage', 'savings', 'configs', 'providers', 'local'], 'connection');
   const refresh = async () => { setBusy('refresh'); try { applyAi(await api('/api/admin/ai?fresh=1')); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
   if (!c) {
     return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await api('/api/admin/ai?fresh=1'))}>
@@ -502,7 +502,10 @@ function AiTab() {
   const now = c.mode === 'account' && !c.switched ? 'Your Claude account' : c.label;
   const items = [
     { key: 'connection', label: 'Connection', hint: 'Status, sign-in and test', icon: I.sparkle },
-    { key: 'routing', label: 'Model routing', hint: 'Which model each task uses', icon: I.chart, badge: c.routingOn ? null : <span className="loz">Off</span> },
+    { key: 'routing', label: 'Model routing', hint: 'Presets and the tier for each task', icon: I.chart, badge: c.routingOn ? null : <span className="loz">Off</span> },
+    { key: 'models', label: 'Models per tier', hint: 'High, Standard and Light on each AI', icon: I.bot },
+    { key: 'usage', label: 'Usage & suggestions', hint: 'Calls, tokens, cost and how to use less', icon: I.history },
+    { key: 'savings', label: 'Savings & limits', hint: 'Reused answers, budget and prices', icon: I.check, badge: c.budget?.over ? <span className="loz t-fail">Budget</span> : c.budget?.near ? <span className="loz t-blocked">{Math.round(c.budget.pct * 100)}%</span> : null },
     { key: 'configs', label: 'Configurations', hint: 'Named AI setups for AI buttons', icon: I.settings, badge: (c.settings?.configs || []).length ? <span className="count">{c.settings.configs.length}</span> : null },
     { key: 'providers', label: 'Providers', hint: 'AI APIs, in priority order', icon: I.grid, badge: (c.apis || []).some((x: Any) => x.cooldown) ? <span className="loz t-blocked">Limited</span> : null },
     ...(c.copilot ? [{ key: 'local', label: 'Local AI', hint: 'Claude Code or GitHub Copilot', icon: I.user }] : []),
@@ -511,8 +514,13 @@ function AiTab() {
     <div className="sec-layout">
       <SectionNav label="AI settings" items={items} value={sec} onChange={setSec} />
       <div className="sec-body">
-      {sec === 'routing' && <RoutingSection key={JSON.stringify(c.settings?.routing)} c={c} onSaved={applyAi} />}
-      {sec === 'local' && c.copilot && <div className="cards"><LocalAiCard c={c} /></div>}
+      {['routing', 'models', 'usage', 'savings'].includes(sec) && <RoutingSection key={`${sec}${JSON.stringify(c.settings?.routing)}`} c={c} onSaved={applyAi} part={sec as 'routing' | 'models' | 'usage' | 'savings'} go={setSec} />}
+      {sec === 'local' && c.copilot && <div className="cards"><LocalAiCard c={c} />
+        {c.account?.signedIn && <div className="card wide"><h3>Claude plan limits</h3>
+          <p className="sub">Your Claude {c.account?.subscriptionType ? `${String(c.account.subscriptionType).replace(/^./, (x: string) => x.toUpperCase())} ` : ''}plan’s usage, read from Anthropic with your Claude Code sign-in on this computer (the same numbers as Claude’s own usage page). The AI pill warns at 80%.{c.localEngine !== 'copilot' && c.copilot.available ? ' Near the weekly limit? Switch to Copilot with ⌥⇧A.' : ''}</p>
+          {c.planUsage ? <PlanLimits u={c.planUsage} /> : <p className="muted small">Not available: sign in to Claude Code with a Pro or Max plan to see these.</p>}
+          {c.planUsage?.checkedAt && <p className="muted small" style={{ marginBottom: 0 }}>Checked {new Date(c.planUsage.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · updates every minute.</p>}
+        </div>}</div>}
       {sec === 'configs' && <ConfigsSection c={c} onSaved={applyAi} />}
       {sec === 'providers' && <div className="cards"><ProvidersCard c={c} />
       <div className="card wide">

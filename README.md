@@ -647,6 +647,10 @@ When TicketForge is opened at localhost, it can use **GitHub Copilot** through t
    - **Claude Code**, optionally ticking "use GitHub Copilot when your Claude account is limited".
 3. Pick a Copilot model, or leave Copilot's default.
 
+**Switching quickly:** open the AI menu in the top bar and pick **Claude** or **Copilot** under *Local AI*, or press **⌥⇧A** (Alt+Shift+A) anywhere to flip between them. Owners and admins can switch; the choice applies to this computer's TicketForge.
+
+**Claude plan limits:** the AI menu and Administration → AI → Local AI show your Claude plan's **5-hour** and **weekly** usage, with reset times (the same numbers as Claude's own usage page). TicketForge reads them from Anthropic every minute using the sign-in Claude Code keeps on this computer (macOS Keychain, or `~/.claude/.credentials.json`). The sign-in is only sent to Anthropic, and the browser only gets percentages. At 80% the AI pill shows a badge such as "Weekly 85%"; at 95% it turns red. Set `CLAUDE_PLAN_USAGE=off` to turn this off.
+
 Copilot runs without tools in an empty temporary folder: it only answers prompts and can't read or change files. Limits and sign-in problems switch to the next AI automatically, and the top-bar AI pill shows which AI is answering.
 
 ## Test management (Xray-style)
@@ -900,4 +904,51 @@ the server records on each save: sprints started and completed, epics, versions 
 workflow and members, project settings, test management, and deleted issues. Filter by type, person, time (24 hours,
 7 or 30 days) and text; click an issue to open it. Project-level entries are kept in the `activity` table (created
 automatically); changes made before this existed show from the issues' own history.
+
+### AI usage: report, suggestions and limits
+
+Administration → AI has four sections for this:
+- **Model routing:** presets and the tier for each task.
+- **Models per tier.**
+- **Usage & suggestions.**
+- **Savings & limits:** reused answers, budget, *Try Standard first* and prices.
+
+What they contain:
+- **Usage report.** Every AI call is kept in the `ai_usage` table: who, which project, which task, engine and model,
+  tokens in and out (and read from the provider's prompt cache), time and cost. You see totals, a daily chart,
+  breakdowns by task, project, person and model, the 20 largest calls, and a CSV export. API calls report their real
+  tokens. The Claude account and Copilot don't, so their tokens are estimated from the text length; their "API
+  value" is what the same tokens would cost on the API. Claude Code agent runs show the cost they report.
+- **Suggestions** worked out from your actual usage, each with what it saves; some switch on with one click:
+  - build the App context for projects using AI without one;
+  - reuse answers for repeated tasks;
+  - try Standard first for High work;
+  - set a budget;
+  - no thinking on Light tasks;
+  - prices for unpriced models;
+  - tasks that send a lot per call;
+  - many failed calls.
+- **Spending limits:** a monthly budget for API spend.
+  - At 80% the AI menu in the top bar shows the percentage.
+  - At 100% it warns, moves High work to Standard, or pauses AI, as you choose. Owners are never stopped.
+- **Try Standard first** (also part of the *Smart savings* preset): tickets, test cases, epics, splitting and test plans
+  routed to High run on Standard, and are re-asked once on High only when the answer doesn't parse or comes back
+  empty. Step-ups are counted in the report.
+- **Prices:** Anthropic's current models are built in. Add your other models (OpenAI, Gemini, OpenRouter…) with their
+  prices; a model without one shows tokens only.
+
+Less sent per call:
+- Ticket actions send only the fields the action needs, as compact JSON: no test scripts, run results, history,
+  comments or pull requests. This is 16–54% fewer tokens on a plain issue, and up to ~90% on issues with automated
+  scripts.
+- Light jobs (questions, failure notes, test selection) get only the start of the App context.
+- Every task has its own output limit.
+- The browser no longer uploads the whole project with each AI request; the server reads it from the database.
+
+Fewer calls:
+- *Write test cases* for many issues sends 5 issues per request (10 issues: 2 requests instead of 10, about half the
+  tokens).
+- It skips issues whose summary, story, description and acceptance criteria haven't changed since their test cases
+  were written (*Write them anyway* is offered).
+- The tray shows an estimate when the job starts.
 

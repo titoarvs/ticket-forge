@@ -191,6 +191,8 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
     </Modal>
   );
 }
+/** An issue as AI requests need it: no history, comments, scripts or run results (smaller requests). */
+export const aiTicket = (t: Any) => ({ ...t, history: [], comments: [], prs: [], testCases: (t.testCases || []).map(({ script: _s, lastRun: _l, healed: _h, ...tc }: Any) => tc) });
 export function openCreateIssue(epicId?: string) {
   if (!P() || !can('issue.create')) return;
   const cur = epicId || (S.drawer?.kind === 'epic' ? S.drawer.id : '') || (S.filter.epic && S.filter.epic !== 'none' ? S.filter.epic : '') || '';
@@ -200,7 +202,7 @@ export function openCreateIssue(epicId?: string) {
 export async function writeWithClaude({ idea, fields = {}, type }: { idea: string; fields?: Any; type?: string | null }) {
   const answers = await askFirst({ kind: 'new-ticket', subject: 'the new issue', epicId: fields.epicId, text: idea });
   if (answers === null) return;
-  const res = await withBusy('Claude is writing the issue…', () => api('/api/ai/new-ticket', { method: 'POST', body: aiBody({ epicId: fields.epicId, idea, answers, project: P() }) }));
+  const res = await withBusy('Claude is writing the issue…', () => api('/api/ai/new-ticket', { method: 'POST', body: aiBody({ epicId: fields.epicId, idea, answers, projectId: P().id }) }));
   if (!res) return;
   const nt = applyAi(newTicket({ ...fields }), res.ticket);
   if (type) nt.type = type;
@@ -229,7 +231,7 @@ const ASK_SUBJECT: Record<string, string> = { enhance: 'the enhanced issue', ac:
 export async function runTicketAi(t: Any, op: string, instruction?: string) {
   const answers = await askFirst({ kind: op, subject: `${ASK_SUBJECT[op] || 'the issue'} for ${t.key}`, ticket: t, instructions: instruction });
   if (answers === null) return;
-  const res = await withBusy(AI_LABEL[op], () => api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: op, ticket: { ...t, history: [], comments: [] }, project: P(), instruction, answers }) }));
+  const res = await withBusy(AI_LABEL[op], () => api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: op, ticket: aiTicket(t), projectId: P().id, instruction, answers }) }));
   if (!res) return;
   if (op === 'split') {
     if (!res.tickets?.length) return toast('Claude did not return any issues.', 'err');
@@ -334,24 +336,45 @@ function ReviewRegroup({ proposed }: { proposed: Any[] }) {
     </Modal>
   );
 }
-export async function bulkTests() {
-  const ids = [...S.checked].filter((id: string) => ticket(id));
-  if (!ids.length) return;
+/** What the AI writes test cases from: when it hasn't changed, writing them again gives the same kind of result. */
+const testInputHash = (t: Any) => { let h = 5381; for (const c of JSON.stringify([t.title, t.userStory, t.description, t.acceptanceCriteria])) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
+/**
+ * Writes test cases for the selected issues, 5 issues per AI request. Issues whose summary, story, description and
+ * acceptance criteria haven't changed since their test cases were written are skipped (offered as "Write them anyway").
+ */
+export async function bulkTests(force = false) {
+  const all = [...S.checked].filter((id: string) => ticket(id)) as string[];
+  if (!all.length) return;
+  const unchanged = force ? [] : all.filter((id) => { const t = ticket(id); return t.testCases?.length && t.aiHash?.tests === testInputHash(t); });
+  const ids = all.filter((id) => !unchanged.includes(id));
+  const sel = [...all];
+  if (!ids.length) {
+    toast(`${unchanged.length === 1 ? 'This issue hasn’t' : `These ${unchanged.length} issues haven’t`} changed since their test cases were written.`, 'info',
+      { title: 'Nothing to write', action: { label: 'Write them anyway', onClick: () => { S.checked = new Set(sel); bulkTests(true); } } });
+    return;
+  }
   const answers = await askFirst({ kind: 'bulk-tests', subject: `test cases for ${ids.length} issue${ids.length > 1 ? 's' : ''}`, ticketIds: ids });
   if (answers === null) return;
-  let done = 0;
+  await saveNow(); // the server reads the saved issues
+  let written = 0;
+  const missed: string[] = [];
   await withBusy(`Claude is writing test cases for ${ids.length} issues…`, async () => {
-    for (const id of ids) {
-      const t = ticket(id);
-      setBusy(`Writing test cases ${done + 1} of ${ids.length}: ${t.key}`);
-      try {
-        const res = await api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: 'tests', ticket: { ...t, history: [], comments: [] }, project: P(), answers }) });
-        mutate(() => { const x = ticket(id); x.testCases = withIds(res.ticket.testCases.map(({ id: _i, ...tc }: Any) => tc)); logEvent(x, 'regenerated test cases with Claude'); });
-      } catch (e: Any) { toast(`${t.key}: ${e.message}`, 'err'); }
-      done += 1;
-    }
+    // About how much this costs, from the average test-writing request so far (5 issues per request).
+    const est = await api('/api/admin/ai/usage?estimate=tests').catch(() => null);
+    const calls = Math.ceil(ids.length / 5);
+    setBusy(`Writing test cases 1 of ${ids.length}${est?.calls ? ` · about ${calls} request${calls === 1 ? '' : 's'}, ~${Math.round((est.tokens * calls) / 1000)}k tokens${est.cost != null ? `, ≈ $${(est.cost * calls).toFixed(2)}` : ''}` : ''}`);
+    const res = await api('/api/ai/tests-batch', { method: 'POST', raw: true, body: aiBody({ projectId: P().id, ticketIds: ids, answers }) });
+    await readNdjson(res, (ev) => {
+      if (ev.type === 'batch') {
+        if (ev.results.length) mutate(() => { for (const r of ev.results) { const x = ticket(r.ticketId); if (!x) continue; x.testCases = withIds(r.testCases); x.aiHash = { ...(x.aiHash || {}), tests: testInputHash(x) }; logEvent(x, 'regenerated test cases with Claude'); } });
+        written += ev.results.length; missed.push(...(ev.missing || []));
+        if (ev.error) toast(`Test cases for ${ev.missing.join(', ')}: ${ev.error}`, 'err');
+        setBusy(`Writing test cases ${Math.min(ev.done + 1, ev.total)} of ${ev.total}`);
+      } else if (ev.type === 'error') throw new Error(ev.error);
+    });
   });
-  toast(`${done} issue${done === 1 ? "" : "s"} now have new test cases.`, "ok", { title: "Test cases written" });
+  toast(`${written} issue${written === 1 ? '' : 's'} now have new test cases.${unchanged.length ? ` ${unchanged.length} skipped: unchanged since their test cases were written.` : ''}${missed.length ? ` No test cases came back for ${missed.slice(0, 5).join(', ')}.` : ''}`,
+    missed.length ? 'warn' : 'ok', { title: 'Test cases written', ...(unchanged.length ? { action: { label: 'Write skipped too', onClick: () => { S.checked = new Set(unchanged); bulkTests(true); } } } : {}) });
 }
 
 // ---------------------------------------------------------------- pull requests & comments

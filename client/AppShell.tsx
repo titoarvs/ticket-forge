@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, hashColor, COLORS, type Any,
-  loadFlags, setAiRun,
+  loadFlags, setAiRun, toast,
 } from './core';
-import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, TypeIcon, TIER_NAME } from './ui';
+import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, TypeIcon, TIER_NAME, Spinner, PlanLimits, planPeak, resetLabel } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue, openDrawer } from './actions';
 import { AccountModal } from './Admin';
@@ -63,6 +63,43 @@ function connInfo() {
   return { ok, label, model, switched: Boolean(st.switched) };
 }
 
+/** Local only: switch this computer's AI between your Claude account and GitHub Copilot in one click. */
+export async function setLocalEngine(k: 'claude' | 'copilot') {
+  if (S.status?.localEngine === k || S.localSwitching) return;
+  S.localSwitching = k; emit();
+  try {
+    await api('/api/admin/ai', { method: 'PATCH', body: { localEngine: k } });
+    // The saved AI settings are current on the server already: no need for the slower full check (?fresh=1).
+    await refreshStatus();
+    toast(k === 'copilot' ? 'AI actions now run on GitHub Copilot.' : 'AI actions now run on your Claude account.', 'ok', { title: 'Local AI switched' });
+  } catch (e: Any) { toast(e?.message || 'Couldn’t switch the local AI', 'err'); }
+  finally { S.localSwitching = null; emit(); }
+}
+
+function LocalSwitch({ st }: { st: Any }) {
+  const cur = st.localEngine === 'copilot' ? 'copilot' : 'claude';
+  const cp = st.copilot || {};
+  const acct = st.account || {};
+  const opts: [('claude' | 'copilot'), string, string, boolean][] = [
+    ['claude', 'Claude', !acct.signedIn ? 'Not signed in' : acct.cooldown ? `Limited · back ${new Date(acct.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Claude Code', true],
+    ['copilot', 'Copilot', !cp.available ? 'Not installed' : cp.cooldown ? 'Limited' : (st.copilotModel || 'GitHub Copilot'), Boolean(cp.available)],
+  ];
+  return (
+    <div className="ai-local" onClick={(e) => e.stopPropagation()}>
+      <div className="mh">Local AI <small className="muted">this computer</small></div>
+      <div className="ai-local-seg" role="radiogroup" aria-label="Local AI">
+        {opts.map(([k, label, sub, ok]) => (
+          <button key={k} role="radio" aria-checked={cur === k} className={cur === k ? 'on' : ''} disabled={!ok || Boolean(S.localSwitching)}
+            title={!ok ? 'Install the GitHub Copilot CLI first (Administration → AI → Local AI)' : `Run AI actions on ${label}`} onClick={() => setLocalEngine(k)}>
+            {S.localSwitching === k ? <Spinner /> : <span className={`dot ${!ok ? 'bad' : (k === 'claude' ? acct.cooldown || !acct.signedIn : cp.cooldown) ? 'warn' : 'ok'}`} />}
+            <b>{label}</b><small>{sub}</small>
+          </button>))}
+      </div>
+      <p className="muted small">Shortcut: <kbd>⌥⇧A</kbd>. The other one stands in when this one hits its limit{cur === 'claude' && !st.copilotBackup ? ' (turn on “Copilot as backup” in Local AI)' : ''}.</p>
+    </div>
+  );
+}
+
 /**
  * The AI menu in the top bar: which AI the app is using now (and why, when it's a backup), which AI runs your next AI
  * actions ("Runs on"), a way to check the connection again and the AI settings.
@@ -85,6 +122,7 @@ function AiMenu() {
   ];
   const runName = runs.find((r) => r[0] === run)?.[1] || 'Auto';
   const open = S.menu === 'ai';
+  const peak = can('users.manage') ? planPeak(st?.planUsage) : null;
   return (
     <Menu id="ai" button={
       <button className={`ai-pill t-${tone} ${open ? 'on' : ''}`} onClick={() => setMenu('ai')} aria-haspopup="menu" aria-expanded={open}
@@ -93,6 +131,8 @@ function AiMenu() {
         <span className="ai-name">{name}</span>
         {run !== 'auto' && <span className="ai-runtag">{runName}</span>}
         {c.switched && <span className="ai-backup">Backup</span>}
+        {peak && peak.pct >= 80 && <span className={`ai-backup ${peak.pct >= 95 ? 'over' : ''}`} title={`Claude ${peak.name}: ${Math.round(peak.pct)}% used · ${resetLabel(peak.resetsAt)}`}>{peak.label} {Math.round(peak.pct)}%</span>}
+        {st?.budget?.near && <span className={`ai-backup ${st.budget.over ? 'over' : ''}`} title="Monthly AI budget">{Math.round(st.budget.pct * 100)}%</span>}
         <Ico svg={I.chevron} className="ai-chev" />
       </button>}>
       <div className="ai-menu-h" onClick={(e) => e.stopPropagation()}>
@@ -101,6 +141,12 @@ function AiMenu() {
           {c.switched && <p className="warn-text small">Backup: {why}. It switches back by itself.</p>}
           {!unknown && !c.ok && <p className="muted small">AI actions are off until an AI is connected.</p>}</div>
       </div>
+      {st?.copilot && can('users.manage') && <LocalSwitch st={st} />}
+      {st?.planUsage && can('users.manage') && <div className="ai-plan" onClick={(e) => e.stopPropagation()}>
+        <div className="mh">Claude plan limits{st.account?.subscriptionType ? <small className="muted"> · {String(st.account.subscriptionType).replace(/^./, (c: string) => c.toUpperCase())}</small> : null}</div>
+        <PlanLimits u={st.planUsage} compact /></div>}
+      {st?.budget?.near && <p className={st.budget.over ? 'warn-text small ai-budget' : 'muted small ai-budget'} onClick={(e) => e.stopPropagation()}>
+        AI budget: ${st.budget.spent.toFixed(2)} of ${st.budget.limit} this month ({Math.round(st.budget.pct * 100)}%).{st.budget.over ? (st.budget.action === 'pause' ? ' AI is paused for everyone but owners.' : st.budget.action === 'downgrade' ? ' High work now runs on Standard.' : '') : ''}</p>}
       {can('ai.use') && <><hr /><div className="mh">Runs on <small className="muted">your next AI actions</small></div>
         {runs.map(([k, label, model]) => <button key={k} role="menuitemradio" aria-checked={run === k} onClick={() => setAiRun(k)}>
           <span className="radio-dot">{run === k && <Ico svg={I.check} />}</span>{label}{model && <small>{model}</small>}</button>)}</>}
@@ -321,6 +367,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !inField && P()) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && P()) { e.preventDefault(); saveNow(); return; }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { const f = document.getElementById('tn-search'); if (f) { e.preventDefault(); f.focus(); } return; }
+      // ⌥⇧A (Alt+Shift+A): switch the local AI between your Claude account and GitHub Copilot.
+      if (e.altKey && e.shiftKey && e.code === 'KeyA' && S.status?.copilot && can('users.manage')) {
+        e.preventDefault();
+        const to = S.status.localEngine === 'copilot' ? 'claude' : 'copilot';
+        if (to === 'copilot' && !S.status.copilot.available) toast('Install the GitHub Copilot CLI first (Administration → AI → Local AI).', 'warn');
+        else setLocalEngine(to);
+        return;
+      }
       if (e.key === 'Escape') {
         if (S.pop) { S.pop = null; emit(); return; }
         if (S.menu) { S.menu = null; emit(); return; }

@@ -8,6 +8,7 @@ import { getRules } from '@/lib/genrules.js';
 // ?fresh=1 (the Refresh button): skip the caches, so the Claude sign-in and the AI settings are checked again now.
 export const GET = api(async (req: Request) => {
   await authed();
-  if (new URL(req.url).searchParams.get('fresh')) { await getAiSettings({ fresh: true }).catch(() => {}); if (aiMode() === 'account') await accountStatus({ fresh: true }).catch(() => {}); }
+  const fresh = Boolean(new URL(req.url).searchParams.get('fresh'));
+  if (fresh) { await getAiSettings({ fresh: true }).catch(() => {}); if (aiMode() === 'account') await accountStatus({ fresh: true }).catch(() => {}); }
   const rules = await getRules();
-  return { ...(await providerStatus()), supported: SUPPORTED, database: dbInfo.label, generation: { testsPerTicket: rules.tests.perTicket, reasoning: rules.reasoning } }; });
+  return { ...(await providerStatus({ planFresh: fresh })), supported: SUPPORTED, database: dbInfo.label, generation: { testsPerTicket: rules.tests.perTicket, reasoning: rules.reasoning } }; });

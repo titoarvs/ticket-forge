@@ -10,6 +10,15 @@ import { TF } from './fields';
 
 export type AskOpts = { kind: string; subject: string; epicId?: string | null; ticket?: Any; ticketIds?: string[]; text?: string; instructions?: string; projectless?: boolean };
 
+// The same questions request already on its way is shared (a dialog opened twice in a row costs one AI call).
+const inflight = new Map<string, Promise<Any>>();
+function questions(body: Any) {
+  const key = JSON.stringify(body);
+  let p = inflight.get(key);
+  if (!p) { p = api('/api/ai/questions', { method: 'POST', body }); inflight.set(key, p); p.finally(() => setTimeout(() => inflight.delete(key), 3000)).catch(() => {}); }
+  return p;
+}
+
 export function useQuestions(o: AskOpts, onNone?: () => void) {
   const [qs, setQs] = useState<Any[] | null>(null);
   const [err, setErr] = useState('');
@@ -18,7 +27,7 @@ export function useQuestions(o: AskOpts, onNone?: () => void) {
     let live = true;
     const body = aiBody({ kind: o.kind, projectId: o.projectless ? undefined : P()?.id, epicId: o.epicId, ticketIds: o.ticketIds, text: o.text, instructions: o.instructions,
       ticket: o.ticket ? { ...o.ticket, history: undefined, comments: undefined } : undefined });
-    api('/api/ai/questions', { method: 'POST', body }).then((r) => {
+    questions(body).then((r: Any) => {
       if (!live) return;
       setQs(r.questions || []);
       if (!r.questions?.length) onNone?.();

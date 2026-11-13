@@ -63,7 +63,13 @@ export async function clientIp() {
   return h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip') || 'local';
 }
 export const appUrl = (req: Request) => (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '');
-export const aiOpts = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined, run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined, fresh: b?.fresh === true || b?.regenerate === true || undefined });
+export const aiOpts = (b: any) => {
+  const c: any = currentContext();
+  const pid = b?.projectId || b?.project?.id;
+  if (!c.projectId && typeof pid === 'string' && /^[\w-]{1,64}$/.test(pid)) c.projectId = pid;
+  return aiOptsOf(b);
+};
+const aiOptsOf = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined, run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined, fresh: b?.fresh === true || b?.regenerate === true || undefined });
 
 type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
@@ -85,7 +91,9 @@ export function api(fn: Handler) {
       const user = await currentUser();
       // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
       const local = isLocalHost(req.headers.get('x-forwarded-host') || req.headers.get('host'));
-      const out = await asUser(user?.id, () => resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({})), user, { local });
+      // The project this request is about (for AI usage per project): from the address, or set by aiOpts from the body.
+      const projectId = decodeURIComponent(new URL(req.url).pathname.match(/^\/api\/projects\/([^/]+)/)?.[1] || '') || null;
+      const out = await asUser(user?.id, () => resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({})), user, { local, projectId });
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);
