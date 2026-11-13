@@ -404,6 +404,28 @@ Project settings → Code & GitHub is organised top to bottom:
    automatically).
 3. **Coding agent**, the **Backend repository** (same three sources) and **CodeRabbit**.
 
+### Code jobs on the deployed TicketForge (GitHub Actions)
+
+On a deployed TicketForge (Vercel, or opened from another computer) there is no checkout and no Claude Code, so
+**Write code with AI** runs on **GitHub Actions** instead (and a project on your computer can choose that too:
+Project settings → Code & GitHub → **Where code jobs run**).
+
+1. **Repository**: choose one of your GitHub repositories (or paste its URL / `owner/name`). Nothing is cloned on the
+   server; it's used through GitHub.
+2. **Where code jobs run → Set up**: TicketForge stores the `TICKETFORGE_RUN_KEY` secret and your Claude key as
+   repository secrets: your **Claude subscription token** (Pro/Max: run `claude setup-token` in a terminal on your
+   computer, sign in, paste the `sk-ant-oat01-…` token; saved as `CLAUDE_CODE_OAUTH_TOKEN`). Code jobs use **only** your
+   Claude subscription: the workflow never passes an API key to Claude Code and stops if the token is missing, and opens a pull request adding `.github/workflows/ticketforge-code.yml` and
+   `.github/ticketforge/code.mjs`. Merge it and press **Check**.
+3. **Write code with AI** (also bulk coding and Build both at once): the job, with the same agent instructions, issue
+   context and repository profile as a local job, is sent encrypted to the workflow. GitHub's machine checks out the
+   repository, installs the dependencies, runs Claude Code on the issue's branch, then commits and pushes it. The
+   result (summary, changed files, diff) comes back encrypted. **Ask for changes** runs another round on the same
+   branch; **Open pull request** opens it as you through the GitHub API; **Discard** deletes the branch.
+
+Jobs are kept in the database (`code_jobs`), so they survive serverless restarts. Reviews, CodeRabbit and committing
+locally need TicketForge on your computer.
+
 ### Code that follows your repository
 
 - **Learn from repository** (Project settings → Code & GitHub → Coding agent, and the backend repository card): a

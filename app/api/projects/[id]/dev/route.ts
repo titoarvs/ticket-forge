@@ -5,6 +5,8 @@ import { inspectRepo, githubToken, listFolders, learnRepo, cloneRepo } from '@/l
 import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets.js';
 import { codeRabbitStatus } from '@/lib/coderabbit.js';
 import { getClientId, saveClientId, startDeviceLogin, pollDeviceLogin, listRepos } from '@/lib/github-connect.js';
+import { codeRunnerStatus, setupCodeRunner } from '@/lib/gh-code.js';
+import { newRunKey } from '@/lib/gh-actions.js';
 
 // Project settings → Code & GitHub: checks the local repository folder and keeps the project's GitHub token.
 const localOnly = () => !SERVERLESS && Boolean((currentContext() as any).local);
@@ -30,6 +32,25 @@ export const POST = api(async (req, p) => {
   if (b.action === 'browse') {
     if (!localOnly()) throw new HttpError(400, 'Browsing folders works only when TicketForge runs on your computer (opened at localhost).');
     return listFolders(String(b.path || ''));
+  }
+  // Where code jobs run → GitHub Actions: status and setup (secrets + a pull request with the workflow).
+  if (b.action === 'codeRunnerStatus' || b.action === 'codeRunnerSetup') {
+    const project: any = await store.getProject(p.id);
+    const repo = String(b.repo || project.dev?.repo || '').trim();
+    const token = (await getProjectSecret(p.id, 'githubToken')) || process.env.GITHUB_TOKEN || '';
+    try {
+      if (b.action === 'codeRunnerStatus') return await codeRunnerStatus({ repo, token, hasKey: await hasProjectSecret(p.id, 'ghRunnerKey') });
+      let key = await getProjectSecret(p.id, 'ghRunnerKey');
+      if (!key) { key = newRunKey(); await setProjectSecret(p.id, 'ghRunnerKey', key, user); }
+      // Claude subscription only (CLAUDE_CODE_OAUTH_TOKEN): code jobs never use billed API usage.
+      const claudeSecrets: any[] = [];
+      const oat = String(b.claudeToken || '').trim();
+      if (oat) {
+        if (!/^sk-ant-oat/.test(oat)) throw new HttpError(400, 'That doesn’t look like a Claude subscription token (run claude setup-token; it starts with sk-ant-oat01-).');
+        claudeSecrets.push({ name: 'CLAUDE_CODE_OAUTH_TOKEN', value: oat });
+      }
+      return await setupCodeRunner({ repo, token, key, claudeSecrets });
+    } catch (e: any) { throw new HttpError(e.status || 400, e.message); }
   }
   // Connect GitHub (device sign-in) and the repository picker.
   if (b.action === 'ghClientId') {
