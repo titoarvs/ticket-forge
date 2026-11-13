@@ -440,6 +440,30 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .hist { align-items: flex-start; font-size: 13px; }
 .hist-change { margin-top: 4px; color: var(--text-subtle); }
 .hist-change span { background: var(--bg-neutral); border-radius: 3px; padding: 0 4px; }
+/* Issue versions (Activity → Versions) */
+.ver-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ver-bar .btn { margin-left: auto; }
+.ver-list { list-style: none; margin: 0; padding: 0; }
+.ver-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 4px; border-top: 1px solid var(--border); font-size: 13px; }
+.ver-row.on { background: var(--selected-bg); }
+.ver-row .MuiCheckbox-root { padding: 4px; margin: -4px 0; }
+.ver-main { flex: 1 1 160px; min-width: 0; }
+.ver-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ver-main .muted { overflow-wrap: anywhere; }
+.ver-ops { display: flex; gap: 4px; margin-left: auto; }
+.ver-fields { display: grid; grid-template-columns: minmax(110px, max-content) 1fr; gap: 8px 16px; margin: 0; font-size: 13px; }
+.ver-fields > div { display: contents; }
+.ver-fields dt { color: var(--text-subtle); font-weight: 600; }
+.ver-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.ver-diff-wrap { overflow-x: auto; }
+.ver-diff { table-layout: fixed; font-size: 13px; }
+.ver-diff th[scope="col"]:first-child { width: 26%; }
+.ver-diff th { white-space: normal; }
+.ver-diff tbody th { text-align: left; font-weight: 600; color: var(--text-subtle); padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ver-diff td { vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ver-diff td.ver-old { background: var(--danger-bg); }
+.ver-diff td.ver-new { background: var(--success-bg); }
+@media (max-width: 480px) { .ver-fields { grid-template-columns: 1fr; gap: 2px 0; } .ver-fields dd { margin-bottom: 8px; } }
 .act-mini { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; border-radius: var(--radius); cursor: pointer; font-size: 13px; }
 .act-mini:hover { background: var(--hover); }
 .textarea.code { font: 12.5px/1.55 var(--mono); white-space: pre; tab-size: 2; }
