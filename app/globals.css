@@ -2464,3 +2464,16 @@ td.danger-text { color: var(--danger); }
 .au-in.num { width: 90px; }
 @media (max-width: 640px) { .au-sugg li { flex-wrap: wrap; } .au-grid { grid-template-columns: 1fr; } }
 .ai-budget { margin: 0; padding: 0 16px 8px; } .ai-backup.over { color: var(--danger); background: var(--danger-bg); }
+.rt-next { margin: 10px 0 0; }
+
+/* AI menu: Local AI switch (Claude account ⇄ GitHub Copilot) */
+.ai-local { padding: 0 0 6px; }
+.ai-local-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 2px 16px 0; }
+.ai-menu .ai-local-seg button, .ai-local-seg button { display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: center; text-align: left; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); width: auto; min-height: 0; }
+.ai-local-seg button .dot, .ai-local-seg button .spinner { grid-row: span 2; }
+.ai-local-seg button b { font-size: 13px; line-height: 1.2; }
+.ai-local-seg button small { grid-column: 2; font-size: 11px; color: var(--text-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+.ai-local-seg button.on { border-color: var(--brand); background: var(--selected-bg); box-shadow: inset 0 0 0 1px var(--brand); }
+.ai-local-seg button:disabled { opacity: .55; cursor: not-allowed; }
+.ai-local p { margin: 6px 0 0; padding: 0 16px; max-width: 300px; }
+.ai-local kbd { font: 11px var(--mono, ui-monospace, monospace); padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; }

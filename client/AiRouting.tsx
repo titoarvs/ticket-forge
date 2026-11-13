@@ -21,7 +21,13 @@ const PRESETS: { key: string; label: string; desc: string; tiers: (t: Any) => st
   { key: 'economy', label: 'Economy', desc: 'Light for most work; Standard for tickets, documents, scripts and coding agents.', tiers: (t) => (['tickets', 'docs', 'automation', 'code', 'agent-tests', 'review'].includes(t.id) ? 'standard' : 'light') },
 ];
 
-export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => void }) {
+type Part = 'routing' | 'models' | 'usage' | 'savings';
+/**
+ * One part of the AI page's model routing settings (they share one draft and one Save bar):
+ * routing (presets, tier per task) · models (the model behind each tier) · usage (report and suggestions) ·
+ * savings (reused answers, try Standard first, budget, prices).
+ */
+export function RoutingSection({ c, onSaved, part = 'routing', go }: { c: Any; onSaved: (st: Any) => void; part?: Part; go?: (k: string) => void }) {
   const saved = c.settings?.routing;
   const [r, setR] = useState<Any>(() => structuredClone(saved));
   const [busy, setBusy] = useState('');
@@ -60,7 +66,7 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
 
   return (
     <div className="cards">
-      <div className="card wide">
+      {part === 'routing' && <div className="card wide">
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}><h3>Model routing</h3>
             <p className="sub" style={{ marginBottom: 10 }}>Each kind of AI work uses a tier: <b>High</b> for work that needs the best model, <b>Standard</b> for everyday work and <b>Light</b> for small,
@@ -93,10 +99,11 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
                 </tr>];
             })}</tbody></table></div>
           <CB label="Light tasks never use extended thinking (fastest and cheapest)" checked={r.lightFast} disabled={off} onChange={(e: Any) => setR({ ...r, lightFast: e.target.checked })} />
+          {go && <p className="muted small rt-next">Which model a tier means on each AI: <a href="#" onClick={(e) => { e.preventDefault(); go('models'); }}>Models per tier</a>. How much each task uses: <a href="#" onClick={(e) => { e.preventDefault(); go('usage'); }}>Usage & suggestions</a>.</p>}
         </div>
-      </div>
+      </div>}
 
-      <div className={`card wide ${off ? 'rt-off' : ''}`}><h3>Models for each tier</h3>
+      {part === 'models' && <div className={`card wide ${off ? 'rt-off' : ''}`}><h3>Models for each tier</h3>
         <p className="sub">Which model each AI uses for a tier. A blank API field uses that provider’s own model.</p>
         <div className="rt-scroll rt-models"><table className="rt-tbl">
           <thead><tr><th>AI</th>{tiers.map((k) => <th key={k}>{TIER_LABEL[k]}</th>)}</tr></thead>
@@ -115,10 +122,11 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
             {c.mode !== 'account' && !apis.length && <tr><td colSpan={4} className="muted small">No AI APIs yet: add one under Providers.</td></tr>}
           </tbody></table></div>
         {c.mode !== 'account' && <p className="muted small" style={{ marginBottom: 0 }}>Your Claude account and GitHub Copilot rows show when TicketForge is opened on your own computer (localhost).</p>}
-      </div>
+        {off && <p className="warn-text small" style={{ marginBottom: 0 }}>Model routing is off, so these aren’t used. Turn it on in <a href="#" onClick={(e) => { e.preventDefault(); go?.('routing'); }}>Model routing</a>.</p>}
+      </div>}
 
-      <div className="card wide"><h3>Save usage</h3>
-        <p className="sub">Three things keep AI costs down: model routing above, <b>prompt caching</b> (the stable part of every prompt, such as rules and the project’s App context, is cached by the AI API and re-read at about a tenth of the price; always on), and <b>reusing answers</b> to identical requests.</p>
+      {part === 'savings' && <div className="card wide"><h3>Reuse answers</h3>
+        <p className="sub">Besides model routing, two things keep AI costs down: <b>prompt caching</b> (the stable part of every prompt, such as rules and the project’s App context, is cached by the AI API and re-read at about a tenth of the price; always on), and <b>reusing answers</b> to identical requests.</p>
         <CB label={<><b>Reuse answers to identical requests</b> <span className="muted">— the same task, choice of model and input within the days below gets the stored answer, at no AI cost. “Again” and “Rewrite” always ask fresh.</span></>} checked={r.cache} onChange={(e: Any) => setR({ ...r, cache: e.target.checked })} />
         <div className={`row ${r.cache ? '' : 'rt-off'}`} style={{ gap: 12, alignItems: 'center', margin: '6px 0 4px 32px', flexWrap: 'wrap' }}>
           <label className="small">Keep answers for <input className="rt-days" type="number" min={1} max={90} value={r.cacheDays} disabled={!r.cache} onChange={(e) => setR({ ...r, cacheDays: Number(e.target.value) || 14 })} /> days</label>
@@ -130,17 +138,18 @@ export function RoutingSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
           {c.usage?.tokens && <span>Prompt caching: <b>{Math.round((c.usage.tokens.cacheRead || 0) / 1000)}k</b> tokens read from cache vs {Math.round((c.usage.tokens.input || 0) / 1000)}k sent fresh</span>}
           {(c.cacheStore?.entries || 0) > 0 && <button className="btn sm subtle" disabled={!!busy} onClick={() => run('cclear', async () => onSaved(await api('/api/admin/ai', { method: 'POST', body: { action: 'cache-clear' } })))}>Clear stored answers</button>}
         </div>
-      </div>
+      </div>}
 
-      <UsageReport routing={saved} apply={apply} />
+      {part === 'usage' && <UsageReport routing={saved} apply={apply} view="usage" go={go} />}
+      {part === 'savings' && <UsageReport routing={saved} apply={apply} view="limits" go={go} />}
 
-      <div className={`gen-bar ${dirty ? 'dirty' : ''}`}>
-        <span className="muted small">{dirty ? 'Unsaved changes' : saved.enabled ? 'Model routing is on' : 'Model routing is off'}</span>
+      {part !== 'usage' && <div className={`gen-bar ${dirty ? 'dirty' : ''}`}>
+        <span className="muted small">{dirty ? 'Unsaved changes' : part === 'savings' ? 'Reuse answers: saved' : saved.enabled ? 'Model routing is on' : 'Model routing is off'}</span>
         <div className="spacer" />
         <button className="btn subtle" disabled={!!busy} onClick={reset}><Ico svg={I.undo} />Reset to defaults</button>
         {dirty && <button className="btn" disabled={!!busy} onClick={() => setR(structuredClone(saved))}>Discard</button>}
-        <button className="btn primary" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? <><Spinner />Saving…</> : 'Save routing'}</button>
-      </div>
+        <button className="btn primary" disabled={!dirty || !!busy} onClick={save}>{busy === 'save' ? <><Spinner />Saving…</> : 'Save'}</button>
+      </div>}
     </div>
   );
 }
