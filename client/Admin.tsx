@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
-import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection } from './ui';
+import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection, PlanLimits } from './ui';
 import { RoutingSection } from './AiRouting';
 import { ConfigsSection } from './AiConfigs';
 import { AdminSkeleton } from './skeletons';
@@ -515,7 +515,12 @@ function AiTab() {
       <SectionNav label="AI settings" items={items} value={sec} onChange={setSec} />
       <div className="sec-body">
       {['routing', 'models', 'usage', 'savings'].includes(sec) && <RoutingSection key={`${sec}${JSON.stringify(c.settings?.routing)}`} c={c} onSaved={applyAi} part={sec as 'routing' | 'models' | 'usage' | 'savings'} go={setSec} />}
-      {sec === 'local' && c.copilot && <div className="cards"><LocalAiCard c={c} /></div>}
+      {sec === 'local' && c.copilot && <div className="cards"><LocalAiCard c={c} />
+        {c.account?.signedIn && <div className="card wide"><h3>Claude plan limits</h3>
+          <p className="sub">Your Claude {c.account?.subscriptionType ? `${String(c.account.subscriptionType).replace(/^./, (x: string) => x.toUpperCase())} ` : ''}plan’s usage, read from Anthropic with your Claude Code sign-in on this computer (the same numbers as Claude’s own usage page). The AI pill warns at 80%.{c.localEngine !== 'copilot' && c.copilot.available ? ' Near the weekly limit? Switch to Copilot with ⌥⇧A.' : ''}</p>
+          {c.planUsage ? <PlanLimits u={c.planUsage} /> : <p className="muted small">Not available: sign in to Claude Code with a Pro or Max plan to see these.</p>}
+          {c.planUsage?.checkedAt && <p className="muted small" style={{ marginBottom: 0 }}>Checked {new Date(c.planUsage.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · updates every minute.</p>}
+        </div>}</div>}
       {sec === 'configs' && <ConfigsSection c={c} onSaved={applyAi} />}
       {sec === 'providers' && <div className="cards"><ProvidersCard c={c} />
       <div className="card wide">

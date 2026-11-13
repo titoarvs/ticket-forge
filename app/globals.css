@@ -2477,3 +2477,19 @@ td.danger-text { color: var(--danger); }
 .ai-local-seg button:disabled { opacity: .55; cursor: not-allowed; }
 .ai-local p { margin: 6px 0 0; padding: 0 16px; max-width: 300px; }
 .ai-local kbd { font: 11px var(--mono, ui-monospace, monospace); padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; }
+
+/* Claude plan usage limits (5-hour, weekly) */
+.plan-limits { display: grid; gap: 10px; }
+.plan-limits.compact { gap: 8px; }
+.pl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; }
+.plan-limits.compact .pl-top { font-size: 12px; }
+.pl-name { color: var(--text); white-space: nowrap; }
+.pl-meta { color: var(--text-subtle); white-space: nowrap; display: inline-flex; gap: 8px; }
+.pl-meta b { color: var(--text); font-weight: 600; min-width: 32px; text-align: right; }
+.pl-bar { height: 6px; border-radius: 999px; background: var(--neutral-bg, rgba(127,127,127,.18)); overflow: hidden; margin-top: 5px; }
+.pl-bar i { display: block; height: 100%; border-radius: inherit; background: var(--brand); transition: width .4s ease; }
+.pl-row.t-warn .pl-bar i { background: var(--warning, #e2b203); } .pl-row.t-warn .pl-meta b { color: var(--warning-text, #e2b203); }
+.pl-row.t-bad .pl-bar i { background: var(--danger); } .pl-row.t-bad .pl-meta b { color: var(--danger); }
+.pl-err { margin: 0; }
+.ai-plan { padding: 4px 16px 10px; min-width: 300px; }
+.ai-plan .mh { padding: 0 0 6px; }

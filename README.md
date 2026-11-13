@@ -649,6 +649,8 @@ When TicketForge is opened at localhost, it can use **GitHub Copilot** through t
 
 **Switching quickly:** open the AI menu in the top bar and pick **Claude** or **Copilot** under *Local AI*, or press **⌥⇧A** (Alt+Shift+A) anywhere to flip between them. Owners and admins can switch; the choice applies to this computer's TicketForge.
 
+**Claude plan limits:** the AI menu and Administration → AI → Local AI show your Claude plan's **5-hour** and **weekly** usage, with reset times (the same numbers as Claude's own usage page). TicketForge reads them from Anthropic every minute using the sign-in Claude Code keeps on this computer (macOS Keychain, or `~/.claude/.credentials.json`). The sign-in is only sent to Anthropic, and the browser only gets percentages. At 80% the AI pill shows a badge such as "Weekly 85%"; at 95% it turns red. Set `CLAUDE_PLAN_USAGE=off` to turn this off.
+
 Copilot runs without tools in an empty temporary folder: it only answers prompts and can't read or change files. Limits and sign-in problems switch to the next AI automatically, and the top-bar AI pill shows which AI is answering.
 
 ## Test management (Xray-style)
