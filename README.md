@@ -404,6 +404,16 @@ Project settings → Code & GitHub is organised top to bottom:
    automatically).
 3. **Coding agent**, the **Backend repository** (same three sources) and **CodeRabbit**.
 
+### Claude subscription as an AI provider
+
+Administration → AI → **Add provider** → **Claude subscription (Claude Code)** uses your Claude Pro/Max plan instead
+of a billed API: TicketForge runs the real Claude Code on the server, signed in with a token from `claude setup-token`
+(`sk-ant-oat01-…`, stored encrypted; or `CLAUDE_CODE_OAUTH_TOKEN` in the environment). Put it first to use it before
+the APIs; when the plan's usage limit is reached, TicketForge moves to the next provider until it resets. It needs
+Claude Code installed where TicketForge runs (your computer or a VPS); serverless hosting such as Vercel can't run
+it. A subscription token is refused as an Anthropic API key, and an API key as a subscription token. The plan is
+meant for your own use: for a whole team, use a team plan or an API.
+
 ### Code jobs on the deployed TicketForge (GitHub Actions)
 
 On a deployed TicketForge (Vercel, or opened from another computer) there is no checkout and no Claude Code, so
