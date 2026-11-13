@@ -40,9 +40,11 @@ jobs:
           TF_KEY: ${{ secrets.TICKETFORGE_RUN_KEY }}
           TF_PAYLOAD: ${{ inputs.payload }}
           TF_OUT: ${{ runner.temp }}/ticketforge
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
+          # Claude subscription only: never billed API usage.
+          unset ANTHROPIC_API_KEY
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then echo "::error::The CLAUDE_CODE_OAUTH_TOKEN secret is missing. Paste your token from claude setup-token in TicketForge (Where code jobs run → Set up)."; exit 1; fi
           cp .github/ticketforge/code.mjs "${{ runner.temp }}/ticketforge-code.mjs"
           node "${{ runner.temp }}/ticketforge-code.mjs"
       - name: Upload the result
