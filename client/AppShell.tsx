@@ -7,7 +7,7 @@ import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, hashColor, COLORS, type Any,
   loadFlags, setAiRun, toast,
 } from './core';
-import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, TypeIcon, TIER_NAME, Spinner } from './ui';
+import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, TypeIcon, TIER_NAME, Spinner, PlanLimits, planPeak, resetLabel } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue, openDrawer } from './actions';
 import { AccountModal } from './Admin';
@@ -122,6 +122,7 @@ function AiMenu() {
   ];
   const runName = runs.find((r) => r[0] === run)?.[1] || 'Auto';
   const open = S.menu === 'ai';
+  const peak = can('users.manage') ? planPeak(st?.planUsage) : null;
   return (
     <Menu id="ai" button={
       <button className={`ai-pill t-${tone} ${open ? 'on' : ''}`} onClick={() => setMenu('ai')} aria-haspopup="menu" aria-expanded={open}
@@ -130,6 +131,7 @@ function AiMenu() {
         <span className="ai-name">{name}</span>
         {run !== 'auto' && <span className="ai-runtag">{runName}</span>}
         {c.switched && <span className="ai-backup">Backup</span>}
+        {peak && peak.pct >= 80 && <span className={`ai-backup ${peak.pct >= 95 ? 'over' : ''}`} title={`Claude ${peak.name}: ${Math.round(peak.pct)}% used · ${resetLabel(peak.resetsAt)}`}>{peak.label} {Math.round(peak.pct)}%</span>}
         {st?.budget?.near && <span className={`ai-backup ${st.budget.over ? 'over' : ''}`} title="Monthly AI budget">{Math.round(st.budget.pct * 100)}%</span>}
         <Ico svg={I.chevron} className="ai-chev" />
       </button>}>
@@ -140,6 +142,9 @@ function AiMenu() {
           {!unknown && !c.ok && <p className="muted small">AI actions are off until an AI is connected.</p>}</div>
       </div>
       {st?.copilot && can('users.manage') && <LocalSwitch st={st} />}
+      {st?.planUsage && can('users.manage') && <div className="ai-plan" onClick={(e) => e.stopPropagation()}>
+        <div className="mh">Claude plan limits{st.account?.subscriptionType ? <small className="muted"> · {String(st.account.subscriptionType).replace(/^./, (c: string) => c.toUpperCase())}</small> : null}</div>
+        <PlanLimits u={st.planUsage} compact /></div>}
       {st?.budget?.near && <p className={st.budget.over ? 'warn-text small ai-budget' : 'muted small ai-budget'} onClick={(e) => e.stopPropagation()}>
         AI budget: ${st.budget.spent.toFixed(2)} of ${st.budget.limit} this month ({Math.round(st.budget.pct * 100)}%).{st.budget.over ? (st.budget.action === 'pause' ? ' AI is paused for everyone but owners.' : st.budget.action === 'downgrade' ? ' High work now runs on Standard.' : '') : ''}</p>}
       {can('ai.use') && <><hr /><div className="mh">Runs on <small className="muted">your next AI actions</small></div>
