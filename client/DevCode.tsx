@@ -164,6 +164,8 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
   </SetCard>;
 }
 
+/** On the deployed app nothing is cloned: GitHub repositories are used through GitHub (Actions and the API). */
+const DEPLOYED_HINT: Record<string, string> = { github: 'Pick one from your account; used through GitHub, nothing to clone.', url: 'A GitHub URL or owner/name; used through GitHub.', folder: 'Only when TicketForge runs on that computer.' };
 const SOURCES: [string, string, string][] = [
   ['github', 'Your GitHub repositories', 'Pick one from your account; TicketForge clones it for you.'],
   ['url', 'Git URL', 'Any https or SSH URL (GitHub, GitLab, others); TicketForge clones it.'],
@@ -178,7 +180,10 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
   const key = side === 'backend' ? 'devBackend' : 'dev';
   const local = env?.local !== false;
   const isClone = d.source?.type === 'clone';
-  const [mode, setMode] = useState<string>(d.localPath ? '' : (side === 'backend' ? 'url' : 'github'));
+  // On the deployed app a GitHub repository is used through GitHub, even when it was cloned on someone's computer.
+  const isGh = d.source?.type === 'github' || (!local && Boolean(d.repo) && (d.provider || 'GitHub') === 'GitHub');
+  const has = Boolean(d.localPath || (isGh && d.repo));
+  const [mode, setMode] = useState<string>(d.localPath || (d.source?.type === 'github' && d.repo) ? '' : (side === 'backend' ? 'url' : 'github'));
   const [status, setStatus] = useState<Any>(null);
   const [busy, setBusy] = useState('');
   const [step, setStep] = useState('');
@@ -200,7 +205,7 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
     try { const r = await api(base, { method: 'POST', body: { action: 'inspect', localPath: p } }); setStatus({ ok: true, ...r }); return r; }
     catch (e: Any) { setStatus({ ok: false, error: e.message }); if (!quiet) setErr(e.message); return null; } finally { if (!quiet) setBusy(''); }
   };
-  useEffect(() => { if (d.localPath && local) inspect(d.localPath, true); }, [d.localPath, local]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (d.localPath && local && d.source?.type !== 'github') inspect(d.localPath, true); }, [d.localPath, local]); // eslint-disable-line react-hooks/exhaustive-deps
   const useFolder = async (p: string) => {
     setErr('');
     const r = await inspect(p);
@@ -215,52 +220,121 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
       if (got) { apply(got, { type: 'clone', url: src, branch: br, clonedAt: new Date().toISOString() }); setStatus({ ok: true, ...got }); setMode(''); setUrl(''); toast(`${isClone && d.source?.url === src ? 'Updated' : 'Cloned'} ${got.repo || 'the repository'}`); }
     } catch (e: Any) { setErr(e.message); } finally { setBusy(''); setStep(''); }
   };
+  // Deployed: a GitHub repository is used through GitHub (Actions and the API), with no copy on this server.
+  const pickRemote = (fullName: string, defaultBranch = '') => { apply({ path: '', repo: fullName, provider: 'GitHub', defaultBranch: defaultBranch || 'main' }, { type: 'github' }); setStatus(null); setMode(''); setUrl(''); toast(`Using ${fullName} on GitHub`); };
+  const ghName = (u: string) => (u.trim().match(/^(?:https?:\/\/github\.com\/|git@github\.com:)?([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i) || [])[1] || '';
   const working = busy === 'clone';
   const name = d.repo || String(d.localPath || '').split('/').pop();
+  void has;
   return <div className="rc">
-    {d.localPath && !mode && <div className="rc-current">
+    {has && !mode && <div className="rc-current">
       <div className="rc-top">
-        <span className="rc-icon"><Ico svg={isClone ? I.pr : I.folder} /></span>
+        <span className="rc-icon"><Ico svg={isClone || isGh ? I.pr : I.folder} /></span>
         <div className="rc-name"><b>{name}</b>
-          <span className="rc-badges"><span className="ag-chip tiny">{isClone ? 'Cloned by TicketForge' : 'Local folder'}</span>{d.provider && <span className="ag-chip tiny">{d.provider}</span>}</span></div>
+          <span className="rc-badges"><span className="ag-chip tiny">{isGh ? 'On GitHub' : isClone ? 'Cloned by TicketForge' : 'Local folder'}</span>{d.provider && <span className="ag-chip tiny">{d.provider}</span>}</span></div>
         <span className="spacer" />
-        {ed && <>{isClone ? <button className="btn sm" disabled={!local || !!busy} onClick={() => clone(d.source.url, d.source.branch || '')}>{working ? <Spinner /> : <Ico svg={I.refresh} />}Update</button>
+        {ed && <>{isGh ? null : isClone ? <button className="btn sm" disabled={!local || !!busy} onClick={() => clone(d.source.url, d.source.branch || '')}>{working ? <Spinner /> : <Ico svg={I.refresh} />}Update</button>
           : <button className="btn sm" disabled={!local || !!busy} onClick={() => inspect(d.localPath)}>{busy === 'check' ? <Spinner /> : null}Check</button>}
-          <button className="btn sm subtle" disabled={!!busy} onClick={() => { setErr(''); setMode(isClone ? (d.source?.url && /github/i.test(d.source.url) ? 'github' : 'url') : 'folder'); }}>Change</button></>}
+          <button className="btn sm subtle" disabled={!!busy} onClick={() => { setErr(''); setMode(isGh ? 'github' : isClone ? (d.source?.url && /github/i.test(d.source.url) ? 'github' : 'url') : 'folder'); }}>Change</button></>}
       </div>
       <div className="rc-meta small muted">
-        <code title={d.localPath}>{d.localPath}</code>
+        {isGh ? <span>Used through GitHub: code jobs run on GitHub Actions{d.baseBranch ? <> · base branch <code>{d.baseBranch}</code></> : null}</span> : <code title={d.localPath}>{d.localPath}</code>}
         {status?.ok && <span>default branch <code>{status.defaultBranch}</code> · on <code>{status.currentBranch}</code>{status.uncommitted ? ` · ${status.uncommitted} uncommitted change${status.uncommitted === 1 ? '' : 's'} (never touched)` : ''}</span>}
         {isClone && d.source?.clonedAt && <span>updated {ago(d.source.clonedAt)}</span>}
       </div>
       {status && !status.ok && <div className="warn-banner danger" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>{status.error}</span></div>}
     </div>}
-    {(mode || !d.localPath) && <div className="rc-pick">
+    {(mode || !has) && <div className="rc-pick">
       <div className="rc-sources" role="radiogroup" aria-label="Where the repository comes from">{SOURCES.map(([k, l, h]) => (
-        <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} disabled={!ed} onClick={() => { setMode(k); setErr(''); }}>
-          <Ico svg={k === 'folder' ? I.folder : I.pr} /><b>{l}</b><span className="muted small">{h}</span></button>))}</div>
+        <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} disabled={!ed || (k === 'folder' && !local)} onClick={() => { setMode(k); setErr(''); }}>
+          <Ico svg={k === 'folder' ? I.folder : I.pr} /><b>{l}</b><span className="muted small">{local ? h : DEPLOYED_HINT[k]}</span></button>))}</div>
       {mode === 'github' && <div className="rc-form">
         {canList ? <><p className="small muted" style={{ margin: 0 }}>Personal and organisation repositories your GitHub sign-in can see.</p>
-          <button className="btn primary" disabled={!ed || !local || working} onClick={() => openModal(<RepoPickerModal onPick={(r) => clone(r.cloneUrl, '')} />)}><Ico svg={I.search} />Choose a repository</button></>
+          <button className="btn primary" disabled={!ed || working} onClick={() => openModal(<RepoPickerModal onPick={(r) => (local && dev().runner !== 'github' ? clone(r.cloneUrl, '') : pickRemote(r.fullName, r.defaultBranch))} />)}><Ico svg={I.search} />Choose a repository</button></>
           : <><p className="small muted" style={{ margin: 0 }}>Connect GitHub first (GitHub account, above), or use a Git URL.</p>
             <button className="btn primary" disabled={!ed} onClick={() => openModal(<GitHubConnectModal env={env} onDone={(a) => { setDev('githubAccount', { ...a, connectedAt: new Date().toISOString() }); setEnv({ ...env, hasToken: true }); }} />)}><Ico svg={I.pr} />Connect GitHub</button></>}
       </div>}
       {mode === 'url' && <div className="rc-form dev-path">
         <label className="field" style={{ flex: 2, margin: 0 }}><span>Repository URL</span><TF disabled={!ed || working} value={url} spellCheck={false} placeholder="https://github.com/owner/repo, git@gitlab.com:group/repo.git or owner/repo" onChange={(e) => setUrl(e.target.value)} /></label>
         <label className="field" style={{ flex: 1, margin: 0 }}><span>Branch (optional)</span><TF disabled={!ed || working} value={branch} spellCheck={false} placeholder="default branch" onChange={(e) => setBranch(e.target.value)} /></label>
-        <button className="btn primary" disabled={!ed || !local || working || !url.trim()} onClick={() => clone(url.trim(), branch.trim())}>Clone</button>
+        <button className="btn primary" disabled={!ed || working || !url.trim()} onClick={() => { if (local) clone(url.trim(), branch.trim()); else if (ghName(url)) pickRemote(ghName(url), branch.trim()); else setErr('From the deployed TicketForge, use a GitHub repository (owner/name or its GitHub URL).'); }}>{local ? 'Clone' : 'Use'}</button>
       </div>}
       {mode === 'folder' && <div className="rc-form dev-path">
         <label className="field" style={{ flex: 1, margin: 0 }}><span>Folder</span><TF disabled={!ed} value={folder} spellCheck={false} placeholder="/Users/you/code/my-app" onChange={(e) => setFolder(e.target.value)} /></label>
         <button className="btn" disabled={!ed || !local} onClick={() => openModal(<FolderPicker start={folder || d.localPath || ''} onPick={(p) => { setFolder(p); useFolder(p); }} />)}><Ico svg={I.folder} />Browse…</button>
         <button className="btn primary" disabled={!ed || !local || !folder.trim() || !!busy} onClick={() => useFolder(folder.trim())}>{busy === 'check' ? <><Spinner />Checking…</> : 'Use this folder'}</button>
       </div>}
-      {!local && <p className="small muted" style={{ margin: '8px 0 0' }}>Cloning and local folders work when TicketForge runs on your computer (opened at localhost).</p>}
-      {d.localPath && mode && <button className="btn sm subtle" style={{ marginTop: 8 }} disabled={working} onClick={() => { setMode(''); setErr(''); }}>Keep {name}</button>}
+      {!local && <p className="small muted" style={{ margin: '8px 0 0' }}>Deployed: your GitHub repositories and GitHub URLs are used through GitHub (no copy here); folders on a computer work when TicketForge runs on that computer.</p>}
+      {has && mode && <button className="btn sm subtle" style={{ marginTop: 8 }} disabled={working} onClick={() => { setMode(''); setErr(''); }}>Keep {name}</button>}
     </div>}
     {working && <div className="rp-step small muted"><Spinner /> {step}</div>}
     {err && <div className="warn-banner danger" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>{err}</span></div>}
   </div>;
+}
+
+/**
+ * Project settings → Code & GitHub → Where code jobs run: on this computer (Claude Code next to the checkout) or on
+ * GitHub Actions (works from the deployed TicketForge). GitHub Actions is set up with a pull request (the workflow)
+ * and repository secrets (the run key and a Claude key).
+ */
+function CodeRunnerCard({ ed, env }: { ed: boolean; env: Any }) {
+  const d = dev();
+  const local = env?.local !== false;
+  const onGh = !local || d.runner === 'github';
+  const [status, setStatus] = useState<Any>(null);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [claudeKey, setClaudeKey] = useState('');
+  const base = `/api/projects/${P().id}/dev`;
+  const check = async () => {
+    if (!d.repo) return;
+    setBusy('check'); setErr('');
+    try { setStatus(await api(base, { method: 'POST', body: { action: 'codeRunnerStatus' } })); } catch (e: Any) { setErr(e.message); } finally { setBusy(''); }
+  };
+  useEffect(() => { if (onGh && d.repo) check(); }, [onGh, d.repo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setup = async () => {
+    setBusy('setup'); setErr('');
+    try {
+      const r = await api(base, { method: 'POST', body: { action: 'codeRunnerSetup', claudeToken: claudeKey.trim() } });
+      setClaudeKey('');
+      toast(`${r.created ? 'Opened' : 'Updated'} pull request #${r.pr.number}. Merge it, then press Check.`, 'ok', { title: 'Code runner ready to merge', action: { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') } });
+      await check();
+    } catch (e: Any) { setErr(e.message); } finally { setBusy(''); }
+  };
+  const needsClaude = status?.checks?.some((c: Any) => c.label === 'Claude' && !c.ok);
+  return <SetCard id="code-runner" title="Where code jobs run" desc="Write code with AI runs a Claude Code agent on the repository. On this computer it works next to the checkout; on GitHub Actions it runs on GitHub’s machines, so it also works from the deployed TicketForge.">
+    <div className="rc-sources" role="radiogroup" aria-label="Where code jobs run">
+      <button role="radio" aria-checked={!onGh} className={!onGh ? 'on' : ''} disabled={!ed || !local} onClick={() => setDev('runner', 'here')}>
+        <Ico svg={I.folder} /><b>This computer</b><span className="muted small">{local ? 'Claude Code next to the repository; live progress; reviews and CodeRabbit.' : 'Only when TicketForge runs on your computer (localhost).'}</span></button>
+      <button role="radio" aria-checked={onGh} className={onGh ? 'on' : ''} disabled={!ed || !local} onClick={() => setDev('runner', 'github')}>
+        <Ico svg={I.pr} /><b>GitHub Actions</b><span className="muted small">{local ? 'On GitHub’s machines; works from the deployed app. Commits go to the issue’s branch.' : 'Used here: this TicketForge is deployed.'}</span></button>
+    </div>
+    {onGh && <div className="crun">
+      {!d.repo ? <p className="small muted" style={{ margin: 0 }}>Choose the GitHub repository above first.</p> : <>
+        {status && <ul className="ghr-checks">{status.checks.map((c: Any) => <li key={c.label} className={c.ok ? 'ok' : 'bad'}><span className={`dot ${c.ok ? 'ok' : 'bad'}`} /><b>{c.label}</b><span className="muted">{c.detail}</span></li>)}</ul>}
+        {status?.setupPr && !status.ready && <div className="warn-banner" style={{ marginTop: 8 }}><Ico svg={I.pr} /><span>Merge <a href={status.setupPr.url} target="_blank" rel="noopener noreferrer">pull request #{status.setupPr.number}</a> into {status.defaultBranch}, then press Check. GitHub only starts workflows that are on the default branch.</span></div>}
+        {status?.ready && <div className="ok-banner" style={{ marginTop: 8 }}><Ico svg={I.check} /><span>Ready: Write code with AI runs on GitHub Actions in <b>{d.repo}</b>.</span></div>}
+        {ed && (!status?.ready || needsClaude) && <div className="crun-setup">
+          <div className="field" style={{ margin: 0 }}><span>Claude subscription token (CLAUDE_CODE_OAUTH_TOKEN)</span>
+            <ol className="small ck-steps">
+              <li>On your computer, in a terminal: <code className="ck-cmd">claude setup-token</code> <button className="btn sm subtle" onClick={() => { try { navigator.clipboard.writeText('claude setup-token'); toast('Command copied'); } catch { /* clipboard off */ } }}>Copy</button></li>
+              <li>Sign in with your Claude account (Pro or Max) in the browser window it opens.</li>
+              <li>Copy the token it prints (it starts with <code>sk-ant-oat01-</code>, valid for a year) and paste it here.</li>
+            </ol>
+            <TF type="password" autoComplete="off" value={claudeKey} placeholder={status?.checks?.some((c: Any) => c.label === 'Claude' && c.ok) ? 'Replace the saved token (optional)' : 'sk-ant-oat01-…'} onChange={(e) => setClaudeKey(e.target.value)} />
+            {claudeKey.trim() && !/^sk-ant-oat/.test(claudeKey.trim()) && <small className="bad-text">That doesn’t look like a subscription token (they start with sk-ant-oat01-).</small>}
+            <small className="muted">Saved on the repository as the <code>CLAUDE_CODE_OAUTH_TOKEN</code> GitHub Actions secret; code jobs use only your Claude subscription (never billed API usage) and count toward your plan’s limits. TicketForge doesn’t keep it. Anyone who can change the repository’s workflows could use it, so use a repository only your team controls.</small>
+          </div>
+        </div>}
+        <div className="row" style={{ gap: 8, marginTop: 10 }}>
+          <button className="btn" disabled={!!busy} onClick={check}>{busy === 'check' ? <><Spinner />Checking…</> : 'Check'}</button>
+          {ed && <button className="btn primary" disabled={!!busy} onClick={setup}>{busy === 'setup' ? <><Spinner />Setting up…</> : status?.ready ? 'Update the runner' : 'Set up'}</button>}
+        </div>
+        <p className="muted small" style={{ margin: '8px 0 0' }}>Set up adds the <code>TICKETFORGE_RUN_KEY</code> secret, your Claude key, and opens a pull request with <code>.github/workflows/ticketforge-code.yml</code>. Each job pushes its commits to the issue’s branch; you review the diff in TicketForge and open the pull request from here. The GitHub token needs Actions, Contents, Pull requests, Secrets and Workflows access.</p>
+      </>}
+      {err && <div className="warn-banner danger" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>{err}</span></div>}
+    </div>}
+  </SetCard>;
 }
 
 /** Project settings → Code & GitHub. */
@@ -269,7 +343,7 @@ export function DevSettings({ ed }: { ed: boolean }) {
   const [env, setEnv] = useState<Any>(null);
   useEffect(() => { api(`/api/projects/${P().id}/dev`).then(setEnv).catch(() => setEnv({})); }, []);
   return <>
-    {env && !env.local && <div className="warn-banner"><Ico svg={I.warn} /><span>Writing code works only when TicketForge runs on your computer (opened at localhost), next to the repository. You can still fill in these settings here.</span></div>}
+    {env && !env.local && <div className="ok-banner"><Ico svg={I.check} /><span>This TicketForge is deployed: choose a GitHub repository and code jobs run on GitHub Actions (set up under <b>Where code jobs run</b>). Folders on a computer and cloning work when TicketForge runs on your computer.</span></div>}
     <GitHubAccountCard ed={ed} env={env} setEnv={setEnv} />
     <SetCard id="repo" title="Repository" desc="Where the code agents work: one of your GitHub repositories, any Git URL, or a folder on this computer. Each issue gets its own branch and git worktree, so the checkout and any uncommitted work are never touched.">
       <RepoChooser side="frontend" ed={ed} env={env} setEnv={setEnv} />
@@ -287,6 +361,7 @@ export function DevSettings({ ed }: { ed: boolean }) {
         </div>
       </details>
     </SetCard>
+    <CodeRunnerCard ed={ed} env={env} />
     <SetCard id="agent" title="Coding agent" desc="What the code agents (Build a Ticket, Feature Tests, Review…) may run and how your team writes code. They read and edit files only in the issue’s worktree; they can’t commit, push, switch branches or browse the web. What each agent does is set in Administration → Agents.">
       <label className="field"><span>Check command (optional)</span><TF disabled={!ed} value={d.checkCommand || ''} placeholder="e.g. npm test, or npm run lint" spellCheck={false} onChange={(e) => setDev('checkCommand', e.target.value)} />
         <small className="muted">The only command it may run, to check its work. Leave empty and it only reads and edits code.</small></label>
@@ -448,7 +523,7 @@ function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boole
 }
 
 /** Whether "Write code with AI" can be offered for issues in this project. */
-export const codeReady = () => feat('code') && Boolean(dev().localPath);
+export const codeReady = () => feat('code') && Boolean(dev().localPath || dev().repo);
 
 const STATUS: Record<string, string> = { committed: 'Committed locally', report: 'Report ready', starting: 'Starting…', queued: 'Waiting for a free agent slot', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
 
@@ -540,7 +615,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
         for (const g of got) { if (!g) continue; const [k, id, r] = g; if (next[k]?.id !== id) continue; next[k] = { ...r, log: [...(next[k]?.log || []), ...r.log] }; }
         return next;
       });
-    }, 1500);
+    }, live.some(([, j]) => j.remote) ? 6000 : 1500);
     return () => clearTimeout(h);
   }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { logRef.current?.scrollTo({ top: 1e9 }); }, [job?.log?.length]);
@@ -650,6 +725,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             <span className="cj-branch" title={`${job.branch} → ${job.base}`}><Ico svg={I.pr} /><code>{job.branch}</code><span className="muted">→</span><code>{job.base}</code></span>
             <span><Ico svg={I.folder} />{job.repo || 'local repository'}</span>
             <span><Ico svg={I.clock} />Started {ago(job.startedAt)}</span>
+            {job.remote && <span><Ico svg={I.external} />{job.runUrl ? <a href={job.runUrl} target="_blank" rel="noopener noreferrer">GitHub Actions run</a> : 'GitHub Actions'}</span>}
             {job.costUsd ? <span>${job.costUsd.toFixed(2)}</span> : null}
           </div>
         </div>
@@ -708,7 +784,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           <TA rows={2} value={follow} placeholder="Ask for changes: e.g. also handle the empty state, and rename the hook to usePayslips" onChange={(e) => setFollow(e.target.value)} />
           <button className="btn ai" disabled={!follow.trim() || !!busy} onClick={async () => { if (await act('follow', { action: 'follow', text: follow })) setFollow(''); }}><Ico svg={I.sparkle} />Make changes</button>
         </div>}
-        {job.status === 'review' && !job.pr && <div className="review-actions">
+        {job.status === 'review' && !job.pr && !job.remote && <div className="review-actions">
           {roles.review && <button className="agent-btn hire sm" disabled={!!busy} onClick={() => act('review', { action: 'review' })} title={`Reviewed by ${agents.find((a: Any) => a.id === roles.review)?.name || 'the review agent'}`}>🔍 {job.reviews?.length ? 'Review again' : 'Review changes'}</button>}
           {roles.review && agents.some((a: Any) => a.id === 'review-panel' && a.enabled) && <button className="agent-btn hire sm" disabled={!!busy} onClick={() => { setReviewTab(0); act('review', { action: 'review', panel: true }); }} title="Three Review agents in parallel: correctness, security, tests & acceptance">🤝 Review panel</button>}
           {agents.some((a: Any) => a.id === 'ui-review' && a.enabled) && <button className="agent-btn hire sm" disabled={!!busy} onClick={() => act('review', { action: 'review', agent: 'ui-review' })} title="Usability, accessibility, states, copy and responsive layout">🧐 UI/UX review</button>}
@@ -734,8 +810,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           <div className="row" style={{ gap: 8 }}>
             <CB label="Draft" checked={draft} onChange={(e: Any) => setDraft(e.target.checked)} />
             <span className="spacer" />
-            <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>
-            <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</button>
+            {!job.remote && <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>}
+            <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />{job.remote ? 'Open pull request' : <>Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</>}</button>
           </div>
         </div>}
         {job.pr && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}</span></div>}
@@ -868,7 +944,7 @@ export function CodeJobs() {
       <span><b>{n(['running', 'starting'])}</b> running</span><span><b>{n(['queued'])}</b> waiting</span>
       <span><b>{n(['review', 'report'])}</b> ready for review</span><span><b>{n(['pr', 'committed'])}</b> shipped</span>
       {n(['failed', 'cancelled', 'empty']) > 0 && <span className="bad"><b>{n(['failed', 'cancelled', 'empty'])}</b> need attention</span>}
-      <span className="spacer" /><span className="muted small">{data.queue.running} of {data.queue.max} agent slots busy</span>
+      <span className="spacer" /><span className="muted small">{data.queue.max === 'GitHub' ? 'Runs on GitHub Actions' : `${data.queue.running} of ${data.queue.max} agent slots busy`}</span>
     </div>
     <div className="jobs-list">{jobs.map((j: Any) => {
       const t = P().tickets.find((x: Any) => x.id === j.ticketId);

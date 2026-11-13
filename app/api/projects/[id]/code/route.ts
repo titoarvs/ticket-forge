@@ -6,6 +6,122 @@ import { publicAgents, agentForRole, requireRole } from '@/lib/agents.js';
 import { getProjectSecret } from '@/lib/secrets.js';
 import { ardContext } from '@/lib/ard.js';
 import { markdownToDocx } from '@/lib/md-docx.js';
+import { codeTask, branchFor, writePrText } from '@/lib/devagent.js';
+import { gh as ghApi } from '@/lib/gh-actions.js';
+import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs.js';
+
+// ---------------------------------------------------------------- code jobs on GitHub Actions
+// Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code next to a checkout, so
+// code jobs run on GitHub Actions (lib/gh-code.js); on your computer a project can choose that too.
+const localHere = () => !SERVERLESS && Boolean((currentContext() as any).local);
+const remoteMode = (project: any) => !localHere() || project?.dev?.runner === 'github';
+async function ghFor(project: any, dev: any) {
+  const [token, key] = await Promise.all([getProjectSecret(project.id, 'githubToken'), getProjectSecret(project.id, 'ghRunnerKey')]);
+  if (!key) throw new HttpError(400, 'Set up code jobs on GitHub Actions first: Project settings → Code & GitHub → Where code jobs run.');
+  if (!dev?.repo) throw new HttpError(400, 'Choose the GitHub repository first: Project settings → Code & GitHub → Repository.');
+  const tok = token || process.env.GITHUB_TOKEN || '';
+  const info: any = await ghApi('GET', `repos/${dev.repo}`, { token: tok }).catch((e: any) => { throw new HttpError(400, e.message); });
+  return { token: tok, key, ref: info.default_branch, defaultBranch: info.default_branch };
+}
+async function userOk(p: any, perms: string[]) {
+  const user = await authed();
+  store.requireAccess(user, p.id);
+  const missing = perms.filter((x) => !store.has(user, x));
+  if (missing.length) throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
+  return user;
+}
+const remoteDev = (project: any, side: string) => (side === 'backend' ? (project.devBackend?.enabled && project.devBackend?.repo ? { draft: project.dev?.draft, ...project.devBackend } : null) : project.dev || {});
+async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '' }: any) {
+  const dev = remoteDev(project, side);
+  if (!dev?.repo) throw new HttpError(400, side === 'backend' ? 'Set the backend repository first.' : 'Choose the GitHub repository first (Project settings → Code & GitHub).');
+  const gh = await ghFor(project, dev);
+  const id = agentId || await requireRole(side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build');
+  const ctx = context || [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n');
+  const task: any = await codeTask({ ticket, agentId: id, instructions, round: 1, context: ctx, dev });
+  task.agentId = id; task.commitTitle = ticket.title;
+  return publicRemote(await startRemoteJob({ projectId: project.id, ticket, side, dev, gh, task, branch: branchFor(ticket, dev), user, base: dev.baseBranch || gh.defaultBranch }));
+}
+/** GET for remote jobs (job, diff, list, an issue's jobs). Returns null when the request isn't for them. */
+async function remoteGet(p: any, sp: URLSearchParams) {
+  const project: any = await store.getProject(p.id);
+  const id = sp.get('jobId');
+  if (id && !isRemoteId(id)) return null;
+  if (!id && !remoteMode(project)) return null;
+  await userOk(p, []);
+  if (id) {
+    let j = await loadJob(id);
+    if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
+    if (sp.get('diff')) return new Response(remoteDiff(j, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    if (['starting', 'queued', 'running'].includes(j.status)) j = await refreshJob(j, await ghFor(project, remoteDev(project, j.side))).catch(() => j);
+    return publicRemote(j, Number(sp.get('since') || 0));
+  }
+  if (sp.get('list')) {
+    const jobs = await remoteJobsForProject(p.id);
+    return { jobs: jobs.map((j: any) => ({ ...publicRemote(j), log: undefined, last: j.log?.[j.log.length - 1]?.text || '' })), queue: { running: jobs.filter((j: any) => ['queued', 'running'].includes(j.status)).length, waiting: 0, max: 'GitHub' } };
+  }
+  const ticketId = String(sp.get('ticketId') || '');
+  const all = ticketId ? await remoteJobsFor(p.id, ticketId) : [];
+  const newest = (side: string) => publicRemote(all.find((j: any) => (j.side || 'frontend') === side)) || null;
+  const { agents } = await publicAgents();
+  return { remote: true, job: newest('frontend'), jobs: { frontend: newest('frontend'), backend: newest('backend') }, backend: Boolean(remoteDev(project, 'backend')),
+    agents: agents.filter((a: any) => a.runner === 'code' && !a.broken && a.writes),
+    roles: { build: await agentForRole('build'), frontend: await agentForRole('frontend'), backend: await agentForRole('backend'), review: null } };
+}
+/** POST for remote jobs. Returns undefined when the request isn't for them. */
+async function remotePost(req: Request, p: any, b: any) {
+  const project: any = await store.getProject(p.id);
+  const forJob = b.jobId && isRemoteId(b.jobId);
+  if (!forJob && !(remoteMode(project) && ['start', 'start-both', 'start-many'].includes(b.action))) {
+    if (!localHere() && !['docx'].includes(b.action) && !b.prId) throw new HttpError(400, 'This works only for code jobs on your computer.');
+    return undefined;
+  }
+  if (b.action === 'start' || b.action === 'start-both' || b.action === 'start-many') {
+    const user = await userOk(p, ['ai.use', 'issue.edit']);
+    const ids: string[] = b.action === 'start-many' ? (Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String).slice(0, 50) : [String(b.ticketId || '')];
+    const started: any[] = [], skipped: any[] = [];
+    for (const tid of ids) {
+      const ticket = project.tickets.find((t: any) => t.id === tid);
+      if (!ticket) { skipped.push({ key: tid, reason: 'not saved yet' }); continue; }
+      const both = remoteDev(project, 'backend') && (b.action === 'start-both' || ticket.layer === 'both');
+      const sides = both ? ['backend', 'frontend'] : [b.side === 'backend' || (b.action === 'start-many' && ticket.layer === 'backend' && remoteDev(project, 'backend')) ? 'backend' : 'frontend'];
+      for (const side of sides) {
+        try { started.push(await startRemoteFor(project, ticket, { side, user, instructions: String(b.instructions || '').slice(0, 4000), agentId: b.agentId ? String(b.agentId) : '' })); }
+        catch (e: any) { if (b.action === 'start') throw e; skipped.push({ key: ticket.key, reason: e.message }); }
+      }
+    }
+    if (b.action === 'start') return started[0];
+    if (b.action === 'start-both') return { jobs: Object.fromEntries(started.map((j: any) => [j.side, j])), contract: '' };
+    return { started, skipped, queue: { max: 'GitHub' } };
+  }
+  const user = await userOk(p, b.action === 'prDraft' ? ['ai.use'] : ['issue.edit']);
+  const j = await loadJob(String(b.jobId));
+  if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
+  const dev = remoteDev(project, j.side);
+  const gh = await ghFor(project, dev);
+  if (b.action === 'follow') {
+    if (!store.has(user, 'ai.use')) throw new HttpError(403, 'You don’t have permission to do this (ai.use).');
+    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { id: j.ticketId, key: j.ticketKey, title: j.ticketKey };
+    const task: any = await codeTask({ ticket, agentId: j.agentId, instructions: String(b.text || '').slice(0, 4000), round: (j.rounds || 1) + 1, dev, previousSummary: j.summary });
+    task.agentId = j.agentId; task.commitTitle = String(b.text || '').split('\n')[0].slice(0, 80);
+    return publicRemote(await followRemote(j, { gh, task, user, text: String(b.text || '').slice(0, 4000) }));
+  }
+  if (b.action === 'cancel') return publicRemote(await cancelRemote(j, gh));
+  if (b.action === 'discard') return publicRemote(await discardRemote(j, gh));
+  if (b.action === 'prDraft') {
+    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { key: j.ticketKey, title: j.ticketKey };
+    return writePrText({ ticket, diff: String(j.diff || ''), summary: j.summary, side: j.side === 'backend' ? 'backend' : '', provider: 'GitHub', appLink: `${appUrl(req)}/p/${p.id}/backlog`, ai: aiOpts(b) });
+  }
+  if (b.action === 'pr') {
+    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { key: j.ticketKey, title: j.ticketKey };
+    const link = `${appUrl(req)}/p/${p.id}/backlog?issue=${encodeURIComponent(j.ticketId)}`;
+    const body = String(b.body || '').trim() || [`Implements **${ticket.key}: ${ticket.title}** (${link}).`, ticket.userStory, ticket.acceptanceCriteria?.length ? `### Acceptance criteria\n${ticket.acceptanceCriteria.map((a: string) => `- ${a}`).join('\n')}` : '', j.summary ? `### What the agent did\n${String(j.summary).slice(0, 20000)}` : '', '_Written by the TicketForge agent on GitHub Actions; reviewed in TicketForge._'].filter(Boolean).join('\n\n');
+    const r = await prRemote(j, gh, { title: String(b.title || `${ticket.key}: ${ticket.title}`).slice(0, 250), body, draft: b.draft !== false });
+    return { job: publicRemote(await loadJob(j.id)), ...r };
+  }
+  throw new HttpError(400, 'Not available for code jobs on GitHub Actions yet (reviews, CodeRabbit and local commits need TicketForge on your computer).');
+}
+
+
 
 // Code generation and pull requests for an issue (local only): TicketForge agents (lib/agents.js) run as Claude Code
 // agents in a git worktree of the project's repo.
@@ -74,8 +190,10 @@ ${contract}` : 'The backend and frontend are being built AT THE SAME TIME in sep
 }
 
 export const GET = api(async (req, p) => {
-  await guard(p, []);
   const sp = new URL(req.url).searchParams;
+  const remote = await remoteGet(p, sp);
+  if (remote) return remote;
+  await guard(p, []);
   const id = sp.get('jobId');
   if (id && sp.get('diff')) return new Response(await jobDiff(id, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   if (sp.get('list')) return { jobs: listJobs(p.id), queue: queueInfo() };
@@ -90,6 +208,8 @@ export const GET = api(async (req, p) => {
 
 export const POST = api(async (req, p) => {
   const b = await body(req);
+  const remote = await remotePost(req, p, b);
+  if (remote !== undefined) return remote;
   const own = (id: string) => { const j = getJob(id); if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).'); return j; };
   if (b.action === 'start') {
     const user = await guard(p, ['ai.use', 'issue.edit']);

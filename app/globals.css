@@ -2776,3 +2776,12 @@ td.danger-text { color: var(--danger); }
 .rc-form > p { flex-basis: 100%; }
 .rc-sub { font-size: 13px; margin: 16px 0 8px; }
 .rc-adv { margin-top: 8px; } .rc-adv summary { cursor: pointer; color: var(--text-subtle); }
+
+/* Where code jobs run */
+.crun { margin-top: 12px; }
+.crun-setup { margin-top: 12px; }
+
+/* Code runner: Claude sign-in for GitHub Actions */
+.ck-kind { margin: 4px 0 8px; }
+.ck-steps { margin: 4px 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.ck-cmd { padding: 1px 6px; border-radius: 4px; background: var(--bg-neutral); }
