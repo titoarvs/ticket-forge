@@ -19,6 +19,7 @@ import { PsdSection } from './Psd';
 import { FbdSection, ArdSection } from './Fbd';
 import { openSplitIssues } from './Split';
 import { codeReady, openCode, openUpdatePr } from './DevCode';
+import { PrFindingChips, openPrFindings } from './CodeRabbit';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { VersionHistory } from './Versions';
@@ -212,10 +213,11 @@ function IssuePanel({ t }: { t: Any }) {
               {feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
             {t.prs.map((r: Any) => (
               <div key={r.id} className="pr-row"><Ico svg={I.pr} /><div className="pr-main"><a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
-                <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div></div>
+                <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div><PrFindingChips t={t} r={r} /></div>
                 <span className={`loz ${prCls(r.status)}`}>{r.status}</span>
                 {edit && can('ai.use') && codeReady() && ['Open', 'Draft'].includes(r.status) && ['GitHub', 'GitLab'].includes(r.provider) &&
                   <button className="btn sm ai" title={`Change, enhance or re-describe this ${r.provider === 'GitLab' ? 'merge request' : 'pull request'} with AI`} onClick={() => openUpdatePr(t, r)}><Ico svg={I.sparkle} />Update</button>}
+                {['GitHub', 'GitLab'].includes(r.provider) && <button className="btn sm subtle" title="Read CodeRabbit's review comments on it: fix them with an agent, file them as bugs, or dismiss them" onClick={() => openPrFindings(t, r)}>🐇 CodeRabbit</button>}
                 {edit && <><button className="icon-btn" title="Refresh status" onClick={() => refreshPr(t, r.id)}><Ico svg={I.refresh} /></button>
                   <button className="icon-btn" title="Unlink" onClick={() => mutate(() => { t.prs = t.prs.filter((x: Any) => x.id !== r.id); logEvent(t, `unlinked pull request ${r.title}`); })}><Ico svg={I.close} /></button></>}
               </div>

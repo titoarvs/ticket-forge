@@ -1,8 +1,9 @@
-import { api, authed, body, HttpError } from '@/lib/server/http';
+import { api, authed, body, HttpError, ndjson } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { inspectRepo, githubToken, listFolders } from '@/lib/devagent.js';
+import { inspectRepo, githubToken, listFolders, learnRepo } from '@/lib/devagent.js';
 import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets.js';
+import { codeRabbitStatus } from '@/lib/coderabbit.js';
 
 // Project settings → Code & GitHub: checks the local repository folder and keeps the project's GitHub token.
 const localOnly = () => !SERVERLESS && Boolean((currentContext() as any).local);
@@ -11,7 +12,8 @@ export const GET = api(async (_req, p) => {
   const user = await authed();
   store.requireAccess(user, p.id);
   const saved = await getProjectSecret(p.id, 'githubToken');
-  return { local: localOnly(), hasGitlabToken: await hasProjectSecret(p.id, 'gitlabToken'), envGitlabToken: Boolean(process.env.GITLAB_TOKEN), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN) };
+  return { local: localOnly(), hasGitlabToken: await hasProjectSecret(p.id, 'gitlabToken'), envGitlabToken: Boolean(process.env.GITLAB_TOKEN), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN),
+    coderabbit: localOnly() ? { ...(await codeRabbitStatus({ fresh: new URL(_req.url).searchParams.has('fresh') })), bin: undefined, hasKey: await hasProjectSecret(p.id, 'coderabbitKey') } : null };
 });
 
 export const POST = api(async (req, p) => {
@@ -27,6 +29,20 @@ export const POST = api(async (req, p) => {
     if (!localOnly()) throw new HttpError(400, 'Browsing folders works only when TicketForge runs on your computer (opened at localhost).');
     return listFolders(String(b.path || ''));
   }
+  // Learn from repository: a read-only Claude Code agent writes the Repository Profile (streamed: steps, then the profile).
+  if (b.action === 'learn') {
+    if (!localOnly()) throw new HttpError(400, 'Learning a repository works only when TicketForge runs on your computer (opened at localhost).');
+    if (!store.has(user, 'ai.use')) throw new HttpError(403, 'Learning a repository uses AI, which your role doesn’t allow (ai.use).');
+    const project: any = await store.getProject(p.id);
+    const dev = b.side === 'backend' ? project.devBackend : project.dev;
+    if (!dev?.localPath) throw new HttpError(400, 'Set the repository folder first.');
+    return ndjson(req, async (send, signal) => {
+      try {
+        const r = await learnRepo({ localPath: dev.localPath, signal, onStep: (text: string) => send({ type: 'step', text }) });
+        send({ type: 'profile', ...r, learnedAt: new Date().toISOString() });
+      } catch (e: any) { send({ type: 'error', message: e.message }); }
+    });
+  }
   if (b.action === 'saveToken') {
     const token = String(b.token || '').trim();
     if (!/^(gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)) throw new HttpError(400, 'That doesn’t look like a GitHub token (they start with ghp_, github_pat_ …).');
@@ -40,6 +56,13 @@ export const POST = api(async (req, p) => {
     return { hasGitlabToken: true };
   }
   if (b.action === 'clearGitlabToken') { await setProjectSecret(p.id, 'gitlabToken', '', user); return { hasGitlabToken: false }; }
+  if (b.action === 'saveCoderabbitKey') {
+    const key = String(b.key || '').trim();
+    if (!/^[\w.-]{16,300}$/.test(key)) throw new HttpError(400, 'That doesn’t look like a CodeRabbit API key (Agentic API keys usually start with cr-).');
+    await setProjectSecret(p.id, 'coderabbitKey', key, user);
+    return { hasKey: true };
+  }
+  if (b.action === 'clearCoderabbitKey') { await setProjectSecret(p.id, 'coderabbitKey', '', user); return { hasKey: false }; }
   if (b.action === 'clearToken') { await setProjectSecret(p.id, 'githubToken', '', user); return { hasToken: false }; }
   throw new HttpError(400, 'Unknown action');
 });

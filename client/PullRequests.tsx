@@ -8,8 +8,9 @@ import { S, P, useStore, api, aiBody, can, toast, openModal, closeModal, ago, em
 import { Ico, I, Modal, Spinner, EmptyState, TypeIcon, LayerChip, Avatar, Swatch, Confirm, Menu } from './ui';
 import { TF, TA, SF, MenuItem } from './fields';
 import { openDrawer, linkPr, refreshPr } from './actions';
-import { openCode, openUpdatePr, codeReady } from './DevCode';
+import { openCode, openUpdatePr, codeReady, openCodeJobs } from './DevCode';
 import { useAgents } from './Agents';
+import { PrFindingChips, openPrFindings } from './CodeRabbit';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
 const ref = (r: Any) => (r.number ? `${r.provider === 'GitLab' ? '!' : '#'}${r.number}` : '');
@@ -23,6 +24,8 @@ function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
   const noun = pr.provider === 'GitLab' ? 'merge request' : 'pull request';
   const agents = useAgents();
   const custom = (agents?.agents || []).filter((a: Any) => a.custom && a.runner === 'code' && !a.writes && a.enabled);
+  // Built-in reviewers that were removed (Administration → Agents) give way to the custom ones.
+  useEffect(() => { if (agents && agent === 'review' && !(agents.agents || []).some((a: Any) => a.id === 'review' && a.enabled) && custom[0]) setAgent(custom[0].id); }, [agents]); // eslint-disable-line react-hooks/exhaustive-deps
   const go = async () => {
     setBusy(true);
     try {
@@ -35,7 +38,8 @@ function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
       <p className="muted small" style={{ marginTop: 0 }}><b>{pr.title}</b> · {pr.repo} · <code>{pr.branch}</code> → <code>{pr.base}</code>. The reviewer reads the {noun}’s diff and code on its own branch,
         checks it against {t.key}’s acceptance criteria and writes findings (blocking, should fix, nits). It never changes code. You can post the review on the {noun} afterwards.</p>
       <div className="upd-modes" role="radiogroup" aria-label="Reviewer">
-        {([['review', '🔍 Code review', 'Correctness, security, tests and the acceptance criteria.'], ['ui-review', '🧐 UI/UX review', 'Usability, accessibility, states, copy and responsive layout.']] as [string, string, string][]).map(([k, l, d]) => (
+        {([['review', '🔍 Code review', 'Correctness, security, tests and the acceptance criteria.'], ['ui-review', '🧐 UI/UX review', 'Usability, accessibility, states, copy and responsive layout.']] as [string, string, string][])
+          .filter(([k]) => !agents || (agents.agents || []).some((a: Any) => a.id === k && a.enabled) || (k === 'review' && !custom.length)).map(([k, l, d]) => (
           <button key={k} role="radio" aria-checked={agent === k} className={agent === k ? 'on' : ''} onClick={() => setAgent(k)}><b>{l}</b><span className="muted small">{d}</span></button>))}
         {custom.map((a: Any) => <button key={a.id} role="radio" aria-checked={agent === a.id} className={agent === a.id ? 'on' : ''} onClick={() => setAgent(a.id)}><b>{a.icon} {a.name}</b><span className="muted small">{a.summary} · custom</span></button>)}
       </div>
@@ -237,7 +241,7 @@ export function PullRequests() {
               {r.updatedAt && <span>updated {ago(r.updatedAt)}</span>}
             </div>
             <div className="pr-l3">
-              <ChecksChip c={r.checks} /><ReviewChip r={r} />
+              <ChecksChip c={r.checks} /><ReviewChip r={r} /><PrFindingChips t={t} r={r} />
               {f.conflicts && <span className="pr-chip t-fail"><Ico svg={I.warn} />Conflicts</span>}
               {f.ready && <span className="pr-chip t-pass">Ready to merge</span>}
               <SizeChip s={r.size} />
@@ -248,6 +252,7 @@ export function PullRequests() {
           </div>
           <div className="pr-acts">
             {ai && canAi(r) && <button className="btn sm ai" onClick={() => openModal(<ReviewModal t={t} pr={r} />)} title="A read-only review agent reviews the diff against the issue"><Ico svg={I.sparkle} />Review</button>}
+            {['GitHub', 'GitLab'].includes(r.provider) && <button className="btn sm subtle" onClick={() => openPrFindings(t, r)} title="CodeRabbit's review comments: fix with an agent, file as bugs, or dismiss">🐇 CodeRabbit</button>}
             {ai && edit && canAi(r) && <button className="btn sm" onClick={() => openUpdatePr(t, r)} title="Change, enhance, address review comments or re-describe it with AI">Update</button>}
             {edit && <button className="icon-btn" title="Refresh from the host" aria-label="Refresh" disabled={!!busy || !!progress} onClick={() => refreshPr(t, r.id)}><Ico svg={I.refresh} /></button>}
             <a className="icon-btn" href={r.url} target="_blank" rel="noopener noreferrer" title={`Open on ${r.provider || 'the host'}`} aria-label={`Open on ${r.provider || 'the host'}`}><Ico svg={I.external} /></a>
@@ -270,6 +275,7 @@ export function PullRequests() {
       <div className="page-h"><h1>Pull requests</h1><span className="spacer" />
         {progress ? <span className="muted small pr-progress"><Spinner />Updating from GitHub/GitLab… {progress.done} of {progress.total}</span>
           : edit && rows.some((x) => ACTIVE.includes(x.r.status)) && <button className="btn" disabled={!!busy} onClick={() => refreshList(rows.filter((x) => ACTIVE.includes(x.r.status)), false)}><Ico svg={I.refresh} />Refresh open</button>}
+        {ai && <button className="btn" onClick={openCodeJobs}><Ico svg={I.bot} />Code jobs</button>}
         {edit && <button className="btn primary" onClick={() => openModal(<LinkModal />)}><Ico svg={I.plus} />Link pull request</button>}
       </div>
       <p className="muted small" style={{ marginTop: -6 }}>Every pull and merge request linked to this project’s issues, with their checks, reviews and conflicts from GitHub / GitLab.

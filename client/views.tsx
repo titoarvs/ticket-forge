@@ -1,6 +1,6 @@
 'use client';
 // Project views: Summary, Backlog, Board, Epics, Reports, Test cases, Test automation, Source, Settings.
-import { memo, useState, type DragEvent, type ReactNode } from 'react';
+import { memo, useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   S, emit, P, ago, fmtDate, TYPES, PRIORITIES, TC_TYPES, TC_STATUS, CATEGORIES, epic, sprint, isSub, childrenOf, epicTickets, noEpic,
@@ -11,7 +11,7 @@ import { StatusCell, AssigneeCell, PointsCell, PriorityCell, MoreCell, rowContex
 import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, Swatch, LayerChip, Confirm, Spinner, AutoTextarea, EmptyState, Modal, Menu } from './ui';
 import {
   openDrawer, moveTicket, inlineCreate, createSprint, deleteSprint, SprintModal, CompleteSprintModal, NewWithClaudeModal, RegroupModal,
-  addEpic, bulkTests, runTests, installBrowser, ScriptModal, openCreateIssue,
+  addEpic, bulkTests, runTests, runsOnGitHub, collectGitHubRun, installBrowser, ScriptModal, openCreateIssue,
 } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { AppSetup } from './AppSetup';
@@ -20,10 +20,13 @@ import { RunSettingsCard } from './RepoSync';
 import { FeatureModal } from './FeatureModal';
 import { SmartSelectModal } from './TestSelect';
 import { RemoteBrowser } from './RemoteBrowser';
+import { GitHubRunner } from './GitHubRunner';
 import { epicRange } from './Timeline';
 import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy, openDoc, openWriteDoc, downloadDocDocx, docBusy, writeMissingDocs } from './Fbd';
 import { openPsd, openWritePsd, downloadPsd, writeMissingPsds, psdBusy } from './Psd';
 import { ItemText } from './ListEditor';
+import { BulkCodeModal, codeReady } from './DevCode';
+import { CodeReviewReport } from './CodeRabbit';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -322,6 +325,7 @@ const BulkBarView = memo(function BulkBarView({ ids }: { ids: string[]; sig: str
         <button className="btn sm" onClick={() => setFlag(ids, !ids.every((id) => ticket(id)?.flagged))}><Ico svg={I.flag} />{ids.every((id) => ticket(id)?.flagged) ? 'Remove flag' : 'Add flag'}</button>
       </>}
       {can('ai.use') && can('issue.edit') && <button className="btn sm ai" onClick={() => bulkTests()}><Ico svg={I.sparkle} />Write test cases</button>}
+      {can('ai.use') && can('issue.edit') && feat('code') && codeReady() && <button className="btn sm ai" onClick={() => openModal(<BulkCodeModal ids={ids} />)}><Ico svg={I.sparkle} />Write code with AI</button>}
       {can('test.run') && <button className="btn sm" onClick={() => runTests(p.tickets.filter((x: Any) => S.checked.has(x.id)).flatMap((x: Any) => x.testCases.map((tc: Any) => ({ t: x, tc }))))}><Ico svg={I.play} />Run tests</button>}
       {can('issue.delete') && <button className="btn sm danger-subtle" onClick={() => openModal(<Confirm title={`Delete ${ids.length} issues?`} label="Delete" text="Their sub-tasks are deleted too. You can undo with ⌘Z."
         onYes={() => { let n = 0; mutate(() => { n = deleteIssues(ids); }); S.checked.clear(); emit(); toast(`Deleted ${n} issues`); }} />)}><Ico svg={I.trash} />Delete</button>}
@@ -685,6 +689,7 @@ export function Reports() {
               <td className="num">{s.committedPoints ?? '–'}</td><td className="num">{s.completedPoints ?? '–'}</td></tr>
           ))}</tbody></table> : <EmptyState compact icon={I.chart} tone="neutral" title="No sprints yet"
             actions={<Link className="btn" href={`/p/${p.id}/backlog`}>Go to backlog</Link>}><p>Create and complete sprints in the backlog to see velocity here.</p></EmptyState>}</div>
+      <CodeReviewReport />
     </div>
   </>;
 }
@@ -782,10 +787,13 @@ export function Automation() {
   const items = automationItems(S.autoScope);
   const all = p.tickets.flatMap((t: Any) => t.testCases);
   const ran = all.filter((x: Any) => x.lastRun);
+  const canRun = Boolean(eng?.browser) || runsOnGitHub();
+  // A GitHub Actions run that outlived its request: collect its results when the page opens.
+  useEffect(() => { if (p.automation.ghPending && !S.autoRun?.running) collectGitHubRun(); }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return <>
     <Header title="Test automation" right={can('test.run') && (run?.running ? <button className="btn danger" onClick={() => run.ctrl?.abort()}><Ico svg={I.stop} />Stop</button>
-      : <>{can('ai.use') && <button className="btn ai" disabled={!eng?.browser} onClick={() => openModal(<SmartSelectModal />)} title="The Test Selection Agent picks the tests worth running for the latest changes">🎯 Smart selection</button>}
-        <button className="btn primary" disabled={!items.length || !eng?.browser} onClick={() => runTests(items, { regenerate: S.autoRegen })}><Ico svg={I.play} />Run {items.length} test{items.length === 1 ? '' : 's'}</button></>)} />
+      : <>{can('ai.use') && <button className="btn ai" disabled={!canRun} onClick={() => openModal(<SmartSelectModal />)} title="The Test Selection Agent picks the tests worth running for the latest changes">🎯 Smart selection</button>}
+        <button className="btn primary" disabled={!items.length || !canRun} onClick={() => runTests(items, { regenerate: S.autoRegen })}><Ico svg={I.play} />Run {items.length} test{items.length === 1 ? '' : 's'}</button></>)} />
     <div className="tabbar auto-tabs" role="tablist" aria-label="Test automation">{AUTO_TABS.map(([k, label, icon]) => (
       <button key={k} type="button" role="tab" aria-selected={tab === k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>
         <Ico svg={icon} />{label}{k === 'failures' && failing > 0 ? <span className="count bad">{failing}</span> : k === 'setup' ? <span className="count">{(p.automation.app?.pages || []).length}</span> : null}
@@ -848,6 +856,7 @@ export function Automation() {
         <CB label="Comment on the issue" disabled={!can('project.settings')} checked={p.automation.onPass?.comment !== false}
           onChange={(e: Any) => mutate((pp) => { pp.automation.onPass = { ...(pp.automation.onPass || {}), comment: e.target.checked }; })} />
       </div>
+      {(can('project.settings') || can('test.run')) && <GitHubRunner />}
       {can('users.manage') && <RemoteBrowser />}
     </div>
     </>}
