@@ -21,6 +21,7 @@ import { openSplitIssues } from './Split';
 import { codeReady, openCode, openUpdatePr } from './DevCode';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
+import { VersionHistory } from './Versions';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
 const close = () => { S.drawer = null; S.full = false; emit(); };
@@ -232,7 +233,8 @@ function IssuePanel({ t }: { t: Any }) {
               onBlur={(ev) => field('dependencies', ev.target.value.split('\n').map((s) => s.trim()).filter(Boolean))} /></div>
 
           <div className="sec"><div className="sec-title"><h3>Activity</h3></div>
-            <div className="seg">{[['comments', 'Comments'], ['history', 'History'], ['all', 'All']].map(([v, l]) => <button key={v} className={S.actTab === v ? 'on' : ''} onClick={() => { S.actTab = v; saveUi(); emit(); }}>{l}</button>)}</div>
+            <div className="seg">{[['comments', 'Comments'], ['history', 'History'], ['versions', 'Versions'], ['all', 'All']].map(([v, l]) => <button key={v} className={S.actTab === v ? 'on' : ''} aria-pressed={S.actTab === v} onClick={() => { S.actTab = v; saveUi(); emit(); }}>{l}</button>)}</div>
+            {S.actTab === 'versions' ? <VersionHistory key={t.id} t={t} /> : <>
             {S.actTab !== 'history' && can('issue.comment') && <div className="composer"><Avatar name={me()} size={32} /><div style={{ flex: 1, minWidth: 0 }}>
               <CommentEditor key={t.id} compactUntilFocus placeholder="Add a comment…" onSave={(v) => saveComment(t, v)} /></div></div>}
             {activity.map((a: Any) => (a.kind === 'c' ? (
@@ -252,6 +254,7 @@ function IssuePanel({ t }: { t: Any }) {
             {!activity.length && (S.actTab === 'history'
               ? <EmptyState compact icon={I.history} tone="neutral" title="No changes yet"><p>Edits to this issue are recorded here.</p></EmptyState>
               : <EmptyState compact icon={I.comment} tone="neutral" title="No comments yet"><p>Start the conversation about this issue below.</p></EmptyState>)}
+            </>}
           </div>
         </div>
 
