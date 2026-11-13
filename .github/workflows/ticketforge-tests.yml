@@ -1,0 +1,46 @@
+# Runs TicketForge's Playwright tests (written by TicketForge: Test automation → Settings → GitHub Actions).
+# TicketForge starts it through the API with an encrypted run; the results go back as an encrypted artifact.
+name: TicketForge tests
+run-name: TicketForge ${{ inputs.run_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: TicketForge run id
+        required: true
+      payload:
+        description: Encrypted test run (from TicketForge)
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: ticketforge-${{ inputs.run_id }}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/ticketforge
+      - name: Install Playwright Test
+        working-directory: .github/ticketforge
+        run: npm install --no-save --no-audit --no-fund --loglevel=error @playwright/test@1.65.0
+      - name: Run the tests
+        working-directory: .github/ticketforge
+        env:
+          TF_KEY: ${{ secrets.TICKETFORGE_RUN_KEY }}
+          TF_PAYLOAD: ${{ inputs.payload }}
+        run: node run.mjs
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ticketforge-${{ inputs.run_id }}
+          path: .github/ticketforge/out/results.bin
+          retention-days: 1
+          if-no-files-found: ignore
