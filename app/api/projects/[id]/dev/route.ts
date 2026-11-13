@@ -1,9 +1,10 @@
 import { api, authed, body, HttpError, ndjson } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { inspectRepo, githubToken, listFolders, learnRepo } from '@/lib/devagent.js';
+import { inspectRepo, githubToken, listFolders, learnRepo, cloneRepo } from '@/lib/devagent.js';
 import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets.js';
 import { codeRabbitStatus } from '@/lib/coderabbit.js';
+import { getClientId, saveClientId, startDeviceLogin, pollDeviceLogin, listRepos } from '@/lib/github-connect.js';
 
 // Project settings → Code & GitHub: checks the local repository folder and keeps the project's GitHub token.
 const localOnly = () => !SERVERLESS && Boolean((currentContext() as any).local);
@@ -13,6 +14,7 @@ export const GET = api(async (_req, p) => {
   store.requireAccess(user, p.id);
   const saved = await getProjectSecret(p.id, 'githubToken');
   return { local: localOnly(), hasGitlabToken: await hasProjectSecret(p.id, 'gitlabToken'), envGitlabToken: Boolean(process.env.GITLAB_TOKEN), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN),
+    githubConnect: { configured: Boolean((await getClientId()).clientId), source: (await getClientId()).source },
     coderabbit: localOnly() ? { ...(await codeRabbitStatus({ fresh: new URL(_req.url).searchParams.has('fresh') })), bin: undefined, hasKey: await hasProjectSecret(p.id, 'coderabbitKey') } : null };
 });
 
@@ -28,6 +30,32 @@ export const POST = api(async (req, p) => {
   if (b.action === 'browse') {
     if (!localOnly()) throw new HttpError(400, 'Browsing folders works only when TicketForge runs on your computer (opened at localhost).');
     return listFolders(String(b.path || ''));
+  }
+  // Connect GitHub (device sign-in) and the repository picker.
+  if (b.action === 'ghClientId') {
+    if (!store.has(user, 'users.manage')) throw new HttpError(403, 'Only an administrator can set the GitHub OAuth App.');
+    const r = await saveClientId(String(b.clientId || ''));
+    return { configured: Boolean(r.clientId), source: r.source };
+  }
+  if (b.action === 'ghConnectStart') return startDeviceLogin(p.id);
+  if (b.action === 'ghConnectPoll') {
+    const r: any = await pollDeviceLogin(String(b.id || ''), p.id);
+    if (r.state !== 'done') return r;
+    await setProjectSecret(p.id, 'githubToken', r.token, user);
+    return { state: 'done', account: r.account, scopes: r.scopes };
+  }
+  if (b.action === 'ghRepos') return { repos: await listRepos((await getProjectSecret(p.id, 'githubToken')) || process.env.GITHUB_TOKEN || '', { q: String(b.q || '') }) };
+  // Clone from Git: TicketForge clones the repository into its data folder (or updates its clone) and uses it.
+  if (b.action === 'clone') {
+    if (!localOnly()) throw new HttpError(400, 'Cloning works only when TicketForge runs on your computer (opened at localhost).');
+    const side = b.side === 'backend' ? 'backend' : 'frontend';
+    const [token, gitlabToken] = await Promise.all([getProjectSecret(p.id, 'githubToken'), getProjectSecret(p.id, 'gitlabToken')]);
+    return ndjson(req, async (send) => {
+      try {
+        const r = await cloneRepo({ projectId: p.id, side, source: String(b.source || ''), branch: String(b.branch || '').trim(), token: token || process.env.GITHUB_TOKEN || '', gitlabToken: gitlabToken || process.env.GITLAB_TOKEN || '', onStep: (text: string) => send({ type: 'step', text }) });
+        send({ type: 'repo', ...r });
+      } catch (e: any) { send({ type: 'error', message: e.message }); }
+    });
   }
   // Learn from repository: a read-only Claude Code agent writes the Repository Profile (streamed: steps, then the profile).
   if (b.action === 'learn') {
