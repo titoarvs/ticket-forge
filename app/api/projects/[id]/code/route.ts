@@ -8,6 +8,7 @@ import { ardContext } from '@/lib/ard.js';
 import { markdownToDocx } from '@/lib/md-docx.js';
 import { codeTask, branchFor, writePrText } from '@/lib/devagent.js';
 import { gh as ghApi } from '@/lib/gh-actions.js';
+import { myAi } from '@/lib/user-ai.js';
 import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs.js';
 
 // ---------------------------------------------------------------- code jobs on GitHub Actions
@@ -30,6 +31,8 @@ async function userOk(p: any, perms: string[]) {
   if (missing.length) throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
   return user;
 }
+/** The requester's own Claude subscription token (My AI), when they set one and allow it for code jobs. */
+const ownToken = async () => { const m: any = await myAi().catch(() => null); return m?.token && m.enabled && m.codeJobs ? m.token : ''; };
 const remoteDev = (project: any, side: string) => (side === 'backend' ? (project.devBackend?.enabled && project.devBackend?.repo ? { draft: project.dev?.draft, ...project.devBackend } : null) : project.dev || {});
 async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '' }: any) {
   const dev = remoteDev(project, side);
@@ -39,6 +42,7 @@ async function startRemoteFor(project: any, ticket: any, { side, user, instructi
   const ctx = context || [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n');
   const task: any = await codeTask({ ticket, agentId: id, instructions, round: 1, context: ctx, dev });
   task.agentId = id; task.commitTitle = ticket.title;
+  task.oauthToken = await ownToken();
   return publicRemote(await startRemoteJob({ projectId: project.id, ticket, side, dev, gh, task, branch: branchFor(ticket, dev), user, base: dev.baseBranch || gh.defaultBranch }));
 }
 /** GET for remote jobs (job, diff, list, an issue's jobs). Returns null when the request isn't for them. */
@@ -103,6 +107,7 @@ async function remotePost(req: Request, p: any, b: any) {
     const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { id: j.ticketId, key: j.ticketKey, title: j.ticketKey };
     const task: any = await codeTask({ ticket, agentId: j.agentId, instructions: String(b.text || '').slice(0, 4000), round: (j.rounds || 1) + 1, dev, previousSummary: j.summary });
     task.agentId = j.agentId; task.commitTitle = String(b.text || '').split('\n')[0].slice(0, 80);
+    task.oauthToken = await ownToken();
     return publicRemote(await followRemote(j, { gh, task, user, text: String(b.text || '').slice(0, 4000) }));
   }
   if (b.action === 'cancel') return publicRemote(await cancelRemote(j, gh));

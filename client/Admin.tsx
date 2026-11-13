@@ -346,7 +346,7 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
             placeholder={keepsKey ? `Saved, ends with ${saved.keyHint}. Leave blank to keep it` : sub ? 'sk-ant-oat01-… from claude setup-token' : p.site ? `Paste your key from ${p.site}` : 'Paste your API key'} /></label>
       </div>
       {sub && <div className="sub-note small">
-        <p style={{ margin: '0 0 6px' }}>Uses your <b>Claude Pro or Max plan</b> (no API billing): TicketForge runs Claude Code on this server, signed in with your token.</p>
+        <p style={{ margin: '0 0 6px' }}><b>Shared:</b> everyone’s AI requests use this plan. To use your subscription only for yourself, set it up in <b>My AI</b> (your avatar menu) instead; each person can add their own there. TicketForge runs Claude Code on this server, signed in with the token (no API billing).</p>
         <ol style={{ margin: '0 0 6px', paddingLeft: 18 }}>
           <li>In a terminal on your computer run <code>claude setup-token</code> and sign in with your Claude account.</li>
           <li>Paste the <code>sk-ant-oat01-…</code> token it prints here (shown once; valid for a year).</li>

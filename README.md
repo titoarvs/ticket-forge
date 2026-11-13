@@ -404,6 +404,22 @@ Project settings → Code & GitHub is organised top to bottom:
    automatically).
 3. **Coding agent**, the **Backend repository** (same three sources) and **CodeRabbit**.
 
+### My AI: each person's own Claude subscription
+
+Your avatar → **My AI** lets each person add **their own** Claude Pro/Max subscription token (`claude setup-token`,
+`sk-ant-oat01-…`). It's stored encrypted in `user_ai`, readable only by that person (row-level security), never sent to
+the browser (only its last 4 characters), and never used for anyone else's requests.
+
+- **Your AI requests** run on your subscription first (Claude Code with your token). If it isn't available (usage
+  limit, expired token), they use the team's AI from Administration → AI, unless you turn that off, in which case they
+  stop with the reason.
+- **Your code jobs on GitHub Actions** run with your token too: it travels inside the encrypted job, is masked in the
+  run's log, and replaces any shared `CLAUDE_CODE_OAUTH_TOKEN` on the repository. A shared repository token is now
+  optional (for people without their own).
+- Using it for TicketForge's AI features needs Claude Code installed where TicketForge runs (your computer or a VPS);
+  on serverless hosting it's used for your code jobs only.
+- The admin-level **Claude subscription, shared with everyone** provider still exists for one plan used by all.
+
 ### Claude subscription as an AI provider
 
 Administration → AI → **Add provider** → **Claude subscription (Claude Code)** uses your Claude Pro/Max plan instead

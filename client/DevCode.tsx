@@ -315,7 +315,8 @@ function CodeRunnerCard({ ed, env }: { ed: boolean; env: Any }) {
         {status?.setupPr && !status.ready && <div className="warn-banner" style={{ marginTop: 8 }}><Ico svg={I.pr} /><span>Merge <a href={status.setupPr.url} target="_blank" rel="noopener noreferrer">pull request #{status.setupPr.number}</a> into {status.defaultBranch}, then press Check. GitHub only starts workflows that are on the default branch.</span></div>}
         {status?.ready && <div className="ok-banner" style={{ marginTop: 8 }}><Ico svg={I.check} /><span>Ready: Write code with AI runs on GitHub Actions in <b>{d.repo}</b>.</span></div>}
         {ed && (!status?.ready || needsClaude) && <div className="crun-setup">
-          <div className="field" style={{ margin: 0 }}><span>Claude subscription token (CLAUDE_CODE_OAUTH_TOKEN)</span>
+          <div className="field" style={{ margin: 0 }}><span>Shared Claude subscription token (optional)</span>
+            <p className="muted small" style={{ margin: '0 0 6px', fontWeight: 400 }}>Each person’s code jobs use <b>their own</b> Claude subscription from <b>My AI</b> (avatar menu). A shared token here is only for people who haven’t set up their own; leave it empty so everyone uses their own.</p>
             <ol className="small ck-steps">
               <li>On your computer, in a terminal: <code className="ck-cmd">claude setup-token</code> <button className="btn sm subtle" onClick={() => { try { navigator.clipboard.writeText('claude setup-token'); toast('Command copied'); } catch { /* clipboard off */ } }}>Copy</button></li>
               <li>Sign in with your Claude account (Pro or Max) in the browser window it opens.</li>

@@ -2788,3 +2788,4 @@ td.danger-text { color: var(--danger); }
 
 /* Administration → AI → Claude subscription provider */
 .sub-note { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-sunken); padding: 10px 12px; margin: 0 0 12px; }
+.myai-opts { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
