@@ -1,7 +1,7 @@
 import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent.js';
+import { issueContext, startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent.js';
 import { publicAgents } from '@/lib/agents.js';
 import { getProjectSecret } from '@/lib/secrets.js';
 import { ardContext } from '@/lib/ard.js';
@@ -69,7 +69,7 @@ export const POST = api(async (req, p) => {
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
     const agentId = String(b.agentId || 'build');
-    const context = [sideNote(project, ticket, side), agentId === 'architecture-record' ? await ardContext(project, ticket) : ''].filter(Boolean).join('\n\n');
+    const context = [sideNote(project, ticket, side), agentId === 'architecture-record' ? await ardContext(project, ticket) : issueContext(project, ticket)].filter(Boolean).join('\n\n');
     return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user, agentId, context, side });
   }
   if (b.action === 'docx') { // a read-only agent's report (e.g. the Architecture Record Design) as a Word document
