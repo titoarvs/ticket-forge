@@ -11,6 +11,7 @@ import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, TypeIco
 import { AppSkeleton, NotifSkeleton } from './skeletons';
 import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue, openDrawer } from './actions';
 import { AccountModal } from './Admin';
+import { MyAiModal } from './MyAi';
 import { useThemeMode } from './theme';
 
 const EXPORTS: (string[] | null)[] = [
@@ -285,6 +286,7 @@ export function TopNav() {
             <hr />
           </>}
           <button onClick={() => openModal(<AccountModal />)}><Ico svg={I.settings} />Your account &amp; password</button>
+          <button onClick={() => openModal(<MyAiModal />)}><Ico svg={I.sparkle} />My AI (your Claude subscription)</button>
           <button onClick={(e) => { e.stopPropagation(); toggle(); }}><Ico svg={mode === 'dark' ? I.sun : I.moon} />{mode === 'dark' ? 'Light theme' : 'Dark theme'}</button>
           <hr />
           <button onClick={logout}><Ico svg={I.external} />Log out</button>
