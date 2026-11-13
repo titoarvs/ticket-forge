@@ -180,7 +180,8 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
   const key = side === 'backend' ? 'devBackend' : 'dev';
   const local = env?.local !== false;
   const isClone = d.source?.type === 'clone';
-  const isGh = d.source?.type === 'github';
+  // On the deployed app a GitHub repository is used through GitHub, even when it was cloned on someone's computer.
+  const isGh = d.source?.type === 'github' || (!local && Boolean(d.repo) && (d.provider || 'GitHub') === 'GitHub');
   const has = Boolean(d.localPath || (isGh && d.repo));
   const [mode, setMode] = useState<string>(d.localPath || (d.source?.type === 'github' && d.repo) ? '' : (side === 'backend' ? 'url' : 'github'));
   const [status, setStatus] = useState<Any>(null);
@@ -204,7 +205,7 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
     try { const r = await api(base, { method: 'POST', body: { action: 'inspect', localPath: p } }); setStatus({ ok: true, ...r }); return r; }
     catch (e: Any) { setStatus({ ok: false, error: e.message }); if (!quiet) setErr(e.message); return null; } finally { if (!quiet) setBusy(''); }
   };
-  useEffect(() => { if (d.localPath && local && !isGh) inspect(d.localPath, true); }, [d.localPath, local]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (d.localPath && local && d.source?.type !== 'github') inspect(d.localPath, true); }, [d.localPath, local]); // eslint-disable-line react-hooks/exhaustive-deps
   const useFolder = async (p: string) => {
     setErr('');
     const r = await inspect(p);
