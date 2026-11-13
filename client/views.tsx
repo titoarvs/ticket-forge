@@ -321,7 +321,7 @@ const BulkBarView = memo(function BulkBarView({ ids }: { ids: string[]; sig: str
         {releases().some((r: Any) => r.status !== 'archived') && <button className="btn sm" onClick={(e) => openPop('version', ids, e.currentTarget)}>Fix version…</button>}
         <button className="btn sm" onClick={() => setFlag(ids, !ids.every((id) => ticket(id)?.flagged))}><Ico svg={I.flag} />{ids.every((id) => ticket(id)?.flagged) ? 'Remove flag' : 'Add flag'}</button>
       </>}
-      {can('ai.use') && can('issue.edit') && <button className="btn sm ai" onClick={bulkTests}><Ico svg={I.sparkle} />Write test cases</button>}
+      {can('ai.use') && can('issue.edit') && <button className="btn sm ai" onClick={() => bulkTests()}><Ico svg={I.sparkle} />Write test cases</button>}
       {can('test.run') && <button className="btn sm" onClick={() => runTests(p.tickets.filter((x: Any) => S.checked.has(x.id)).flatMap((x: Any) => x.testCases.map((tc: Any) => ({ t: x, tc }))))}><Ico svg={I.play} />Run tests</button>}
       {can('issue.delete') && <button className="btn sm danger-subtle" onClick={() => openModal(<Confirm title={`Delete ${ids.length} issues?`} label="Delete" text="Their sub-tasks are deleted too. You can undo with ⌘Z."
         onYes={() => { let n = 0; mutate(() => { n = deleteIssues(ids); }); S.checked.clear(); emit(); toast(`Deleted ${n} issues`); }} />)}><Ico svg={I.trash} />Delete</button>}
