@@ -6,9 +6,10 @@ import { listJobs } from '@/lib/devagent.js';
 // Every code job in your workspace's projects (the ones you can open): on this computer (in memory) and on GitHub
 // Actions (code_jobs), newest first, with the project and issue they belong to. For the Code jobs page.
 const LIVE = ['starting', 'queued', 'running'];
-export const GET = api(async () => {
+export const GET = api(async (req) => {
   const user = await authed();
-  const projects: any[] = await store.listProjects(user);
+  const only = new URL(req.url).searchParams.get('project'); // one project (the backlog's coding indicators)
+  const projects: any[] = (await store.listProjects(user)).filter((p: any) => !only || p.id === only);
   const byId = new Map(projects.map((p) => [p.id, p]));
   const ids = projects.map((p) => p.id);
   const local = ids.flatMap((id) => listJobs(id).map((j: any) => ({ ...j, where: 'local' })));

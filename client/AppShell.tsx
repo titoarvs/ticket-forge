@@ -256,9 +256,8 @@ export function TopNav() {
         <Link className="brand" href="/projects" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} /><span className="hide-md">TicketForge</span></Link>
         <WorkspaceSwitcher />
         <nav className="tn-nav" aria-label="Main">
-          <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin && !pathname.startsWith('/code-jobs') ? 'active' : ''}`} href="/projects"><Ico svg={I.folder} /><span className="hide-sm">Projects</span></Link>
-          {can('ai.use') && <Link className={`navlink hide-sm ${pathname.startsWith('/code-jobs') ? 'active' : ''}`} href="/code-jobs" title="Code jobs: every code generation in your projects" aria-label="Code jobs"><Ico svg={I.bot} /><span className="hide-md">Code jobs</span></Link>}
-          {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href={S.user?.isOwner ? '/admin/users' : '/admin/ai'}><Ico svg={I.settings} />Administration</Link>}
+          <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/projects" title="Projects" aria-label="Projects"><Ico svg={I.folder} /><span className="tn-txt hide-sm">Projects</span></Link>
+          {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href={S.user?.isOwner ? '/admin/users' : '/admin/ai'} title="Administration" aria-label="Administration"><Ico svg={I.settings} /><span className="tn-txt">Administration</span></Link>}
         </nav>
         {inProject && <><span className="tn-sep" aria-hidden>/</span><ProjectSwitcher p={p} /></>}
       </div>

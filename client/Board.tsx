@@ -13,6 +13,7 @@ import { openDrawer, CompleteSprintModal } from './actions';
 import { SF, MenuItem } from './fields';
 import { Header, FilterBar, daysLeft, rowDnd, zoneDnd } from './views';
 import { rowContextMenu } from './RowActions';
+import { CodeChip, codeSig } from './codeStatus';
 
 const COLLAPSED_W = 44;
 
@@ -52,6 +53,7 @@ const Card = memo(function Card({ t, showEpic, zoneKey, active, v, kidsDone, kid
         <Avatar name={t.assignee} />
         <TypeIcon type={t.type} /><span className={`key ${done ? 'done' : ''}`}>{t.key}</span>
         <span className="right">
+          <CodeChip t={t} />
           {t.prs.length > 0 && <span className="mini" title={`${t.prs.length} pull request${t.prs.length > 1 ? 's' : ''}`}><Ico svg={I.pr} />{t.prs.length}</span>}
           {t.comments?.length > 0 && <span className="mini" title={`${t.comments.length} comment${t.comments.length > 1 ? 's' : ''}`}><Ico svg={I.comment} />{t.comments.length}</span>}
           {tests > 0 && <span className="mini" title={`${passing} of ${tests} test cases passing`}><Ico svg={I.check} />{passing}/{tests}</span>}
@@ -172,7 +174,7 @@ export function Board() {
                 return <div key={`${l.id}-${w.id}`} className={`bcol ${c ? 'collapsed' : ''} ${wi === 0 ? 'first' : ''} ${li === lanes.length - 1 ? 'last' : ''}`} data-drop-status={w.name} {...zoneDnd(zone)}>
                   {c && <button className="bcol-strip body" onClick={() => toggleCol(w.id)} title={`Expand ${w.name}`} aria-label={`Expand column ${w.name}`}>
                     <span className="bcol-vname">{w.name}</span>{items.length > 0 && <span className="bcol-n">{items.length}</span>}</button>}
-                  {!c && items.map((t: Any) => <Card key={t.id} t={t} kidsDone={kidCount.get(t.id)?.[0] || 0} kids={kidCount.get(t.id)?.[1] || 0} showEpic={group !== 'epic'} zoneKey={zk} active={S.drawer?.id === t.id} v={`${t.updatedAt}|${t.flagged ? 1 : 0}|${t.status}|${t.title}|${t.assignee}|${t.storyPoints}|${t.priority}|${t.epicId}|${t.prs.length}|${(t.links || []).length}|${(t.labels || []).join()}|${(t.comments || []).length}|${(t.testCases || []).map((x: Any) => x.status).join()}`} />)}
+                  {!c && items.map((t: Any) => <Card key={t.id} t={t} kidsDone={kidCount.get(t.id)?.[0] || 0} kids={kidCount.get(t.id)?.[1] || 0} showEpic={group !== 'epic'} zoneKey={zk} active={S.drawer?.id === t.id} v={`${codeSig(t)}|${t.updatedAt}|${t.flagged ? 1 : 0}|${t.status}|${t.title}|${t.assignee}|${t.storyPoints}|${t.priority}|${t.epicId}|${t.prs.length}|${(t.links || []).length}|${(t.labels || []).join()}|${(t.comments || []).length}|${(t.testCases || []).map((x: Any) => x.status).join()}`} />)}
                   {!c && createOk && <QuickCreate id={`${l.id}|${w.id}`} status={w.name} fields={{ ...sprintFields, ...l.fields }} />}
                 </div>;
               })),

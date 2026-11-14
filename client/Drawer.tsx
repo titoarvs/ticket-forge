@@ -24,6 +24,7 @@ import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { VersionHistory } from './Versions';
 import { useAutoTour } from './tour';
+import { CodeChip } from './codeStatus';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
 const close = () => { S.drawer = null; S.full = false; emit(); };
@@ -208,7 +209,7 @@ function IssuePanel({ t }: { t: Any }) {
           </div>
 
           <TestsSection t={t} />
-          <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span>
+          <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span><CodeChip t={t} />
             {edit && <div className="tools">
               {can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" data-tour="drawer-code" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
                 : can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>)}

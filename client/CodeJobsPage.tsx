@@ -3,7 +3,7 @@
 // Actions. Filter to what's running or waiting for review, stop a job, or open it to review the changes.
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { S, api, toast, ago, useStore, closeProject, type Any } from './core';
+import { S, P, api, toast, ago, useStore, closeProject, type Any } from './core';
 import { Ico, I, Spinner, EmptyState, ErrorState } from './ui';
 import { TF, SF, MenuItem } from './fields';
 
@@ -17,7 +17,8 @@ const LABEL: Record<string, string> = {
 };
 type Filter = 'live' | 'review' | 'all';
 
-export function CodeJobsPage() {
+/** The Code jobs page. With `projectId` it is that project's page (Development → Code jobs): its jobs only, links stay in the project. */
+export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   useStore();
   const [d, setD] = useState<Any>(null);
   const [error, setError] = useState<Any>(null);
@@ -29,17 +30,18 @@ export function CodeJobsPage() {
 
   const load = async () => {
     try {
-      const r = await api('/api/code-jobs');
+      const url = `/api/code-jobs${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`;
+      const r = await api(url);
       setD(r); setError(null);
       // Jobs on GitHub Actions update when someone asks about them: ask for the running ones, then show the news.
       const gh = r.jobs.filter((j: Any) => j.live && j.where === 'github').slice(0, 8);
       if (gh.length) {
         await Promise.all(gh.map((j: Any) => api(`/api/projects/${j.projectId}/code?jobId=${encodeURIComponent(j.id)}&since=999999`).catch(() => null)));
-        setD(await api('/api/code-jobs'));
+        setD(await api(url));
       }
     } catch (e: Any) { setError(e); }
   };
-  useEffect(() => { closeProject(); load(); return () => clearTimeout(timer.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!projectId) closeProject(); load(); return () => clearTimeout(timer.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Every few seconds while something is running; otherwise now and then (jobs started elsewhere show up).
   useEffect(() => {
     if (!d) return undefined;
@@ -61,11 +63,13 @@ export function CodeJobsPage() {
     catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
   };
   const openHref = (j: Any) => `/p/${j.projectId}/backlog?issue=${encodeURIComponent(j.ticketId)}&code=${j.side || 'frontend'}`;
+  const scoped = Boolean(projectId);
   const tabs: [Filter, string, number][] = [['live', 'Running now', n(LIVE)], ['review', 'Ready for review', n(REVIEW)], ['all', 'All recent', jobs.length]];
 
   return (
     <div className="page"><div className="page-inner cjp">
-      <div className="page-h"><div><h1>Code jobs</h1><p className="muted small" style={{ margin: '2px 0 0' }}>What AI agents are writing across your projects{S.user?.workspaceName ? ` in ${S.user.workspaceName}` : ''}, live.</p></div>
+      <div className="page-h"><div><h1>Code jobs</h1><p className="muted small" style={{ margin: '2px 0 0' }}>{scoped ? `What AI agents are writing for ${P()?.name || 'this project'}, live. Open a job to review its changes, then open the pull request.` : `What AI agents are writing across your projects${S.user?.workspaceName ? ` in ${S.user.workspaceName}` : ''}, live.`}</p></div>
+        {scoped && <Link className="btn" href={`/p/${projectId}/prs`} style={{ marginLeft: 12 }}><Ico svg={I.pr} />Pull requests</Link>}
         <div className="spacer" /><button className="btn" onClick={load}><Ico svg={I.undo} />Refresh</button></div>
       {!d ? <div className="card" style={{ padding: 20 }}><Spinner /> Loading code jobs…</div> : <>
         <div className="cjp-sum">
@@ -79,7 +83,7 @@ export function CodeJobsPage() {
           <div className="seg" role="tablist" aria-label="Show">{tabs.map(([k, l, c]) => (
             <button key={k} role="tab" aria-selected={filter === k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l}{c ? ` (${c})` : ''}</button>))}</div>
           <span className="spacer" />
-          {projects.length > 1 && <SF filter value={project} onChange={(e) => setProject(String(e.target.value))} aria-label="Project" displayEmpty>
+          {!scoped && projects.length > 1 && <SF filter value={project} onChange={(e) => setProject(String(e.target.value))} aria-label="Project" displayEmpty>
             <MenuItem value="">All projects</MenuItem>{projects.map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}</SF>}
           <TF search sx={{ width: 220 }} placeholder="Search issue, project, agent" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
@@ -96,7 +100,7 @@ export function CodeJobsPage() {
                 <span className={`cj-badge s-${j.status}`}>{j.live ? <Spinner /> : <Ico svg={TROUBLE.includes(j.status) ? I.warn : I.check} />}{LABEL[j.status] || j.status}</span>
                 <div className="job-main">
                   <div className="job-l1"><code>{j.ticketKey}</code><span className="job-title">{j.title}</span>
-                    <span className="cjp-proj" title={j.projectName}>{j.projectName}</span>
+                    {!scoped && <span className="cjp-proj" title={j.projectName}>{j.projectName}</span>}
                     {j.side === 'backend' && <span className="layer-chip l-backend">Backend</span>}</div>
                   <div className="job-l2 muted small">
                     <span>{j.where === 'github' ? 'GitHub Actions' : 'This computer'}</span>
@@ -123,3 +127,6 @@ export function CodeJobsPage() {
     </div></div>
   );
 }
+
+/** Development → Code jobs inside a project. */
+export function ProjectCodeJobs() { return <CodeJobsPage projectId={P().id} />; }

@@ -593,7 +593,7 @@ locally need TicketForge on your computer.
 
 ## Code with AI and pull requests
 
-**Code jobs page** (top bar → *Code jobs*, `/code-jobs`): every code generation in your workspace's projects, on
+**Code jobs page** (top bar → *Code jobs*, `/code-jobs`; inside a project it is *Development → Code jobs*, with that project's jobs only, and the *Code jobs* button on the Pull requests page goes there): every code generation in your workspace's projects, on
 this computer and on GitHub Actions, in one list that updates live (every few seconds while something runs). It shows
 counts of what's working, waiting, ready for review, shipped and needing attention, filters (*Running now*, *Ready
 for review*, *All recent*), a project filter and search. Each job can be stopped, opened to review its changes (the

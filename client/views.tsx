@@ -28,6 +28,7 @@ import { ItemText } from './ListEditor';
 import { BulkCodeModal, codeReady } from './DevCode';
 import { CodeReviewReport } from './CodeRabbit';
 import { useAutoTour } from './tour';
+import { CodeChip, codeSig } from './codeStatus';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -209,7 +210,7 @@ function toggleCheck(id: string, on: boolean) { if (on) S.checked.add(id); else 
 /** What a row shows, as one string: the row redraws only when this changes (thousands of rows stay fast). */
 function rowSig(t: Any, x: { e: Any; kids: [number, number]; blocked: boolean; active: boolean; checked: boolean; showEpic: boolean; compact: boolean; popped: boolean }) {
   return [t.updatedAt, t.key, t.type, t.title, t.status, t.assignee, t.storyPoints, t.priority, t.flagged ? 1 : 0, t.layer, (t.labels || []).slice(0, 2).join(','), (t.fixVersions || []).join(','),
-    x.e ? `${x.e.id}${x.e.title}${x.e.color}` : '', t.prs.length, x.kids[0], x.kids[1], +x.blocked, +x.active, +x.checked, +x.showEpic, +x.compact, +x.popped].join('|');
+    x.e ? `${x.e.id}${x.e.title}${x.e.color}` : '', t.prs.length, codeSig(t), x.kids[0], x.kids[1], +x.blocked, +x.active, +x.checked, +x.showEpic, +x.compact, +x.popped].join('|');
 }
 /** Things every row depends on (workflow colours and transitions, permissions, the current user). */
 const pageSig = () => `${JSON.stringify(P().workflow)}|${P().flowMode}|${S.user?.id}|${(S.user?.permissions || []).length}|${S.user?.name}|${releases().map((r: Any) => r.id + r.name + r.status).join()}`;
@@ -256,6 +257,7 @@ const RowView = memo(function RowView({ t, e, kc, blocked, active, checked, comp
         {full && (t.fixVersions || []).length > 0 && <span className="fixv-row">{(t.fixVersions || []).map((v: string) => release(v)).filter(Boolean).slice(0, 2).map((r: Any) => <span key={r.id} className={`ver-chip ${r.status === 'released' ? 'rel-done' : ''}`} title={`Fix version ${r.name}`}>{r.name}</span>)}</span>}
         {full && <span className="lbls">{(t.labels || []).slice(0, 2).map((l: string) => <span key={l} className="label-chip">{l}</span>)}</span>}
         {kc[1] > 0 && <span className="mini" title={`${kc[0]} of ${kc[1]} sub-tasks done`}><Ico svg={I.subtask} />{kc[0]}/{kc[1]}</span>}
+        <CodeChip t={t} compact={compact} />
         {t.prs.length > 0 && <span className="mini" title={`${t.prs.length} pull request(s)`}><Ico svg={I.pr} />{t.prs.length}</span>}
         {e && <ELoz e={e} />}
         {full ? <StatusCell t={t} /> : <StatusLoz s={t.status} />}
