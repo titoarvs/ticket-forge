@@ -6,6 +6,8 @@ const BROWSER_ROUTES = ['/api/automation/*', '/api/admin/browser', '/api/admin/g
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // NEXT_DIST_DIR lets a test build go to its own folder, so it never replaces the build a running `next start` uses.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   outputFileTracingIncludes: {
     ...Object.fromEntries(BROWSER_ROUTES.map((r) => [r, PLAYWRIGHT_FILES])),
     // GitHub Actions setup copies the test runner's source files into the repository.
