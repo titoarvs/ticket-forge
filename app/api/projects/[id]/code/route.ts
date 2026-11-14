@@ -9,13 +9,15 @@ import { markdownToDocx } from '@/lib/md-docx.js';
 import { codeTask, branchFor, writePrText } from '@/lib/devagent.js';
 import { gh as ghApi } from '@/lib/gh-actions.js';
 import { myAi } from '@/lib/user-ai.js';
+import { brainForCode } from '@/lib/brain.js';
 import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs.js';
 
 // ---------------------------------------------------------------- code jobs on GitHub Actions
 // Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code next to a checkout, so
-// code jobs run on GitHub Actions (lib/gh-code.js); on your computer a project can choose that too.
+// code jobs run on GitHub Actions (lib/gh-code.js). On your computer they run here, unless you switched to GitHub
+// Actions (the X-TF-Run-On header from the browser; see runPlace in client/core.ts).
 const localHere = () => !SERVERLESS && Boolean((currentContext() as any).local);
-const remoteMode = (project: any) => !localHere() || project?.dev?.runner === 'github';
+const remoteMode = (_project?: any) => !localHere() || (currentContext() as any).runOn === 'github';
 async function ghFor(project: any, dev: any) {
   const [token, key] = await Promise.all([getProjectSecret(project.id, 'githubToken'), getProjectSecret(project.id, 'ghRunnerKey')]);
   if (!key) throw new HttpError(400, 'Set up code jobs on GitHub Actions first: Project settings → Code & GitHub → Where code jobs run.');
@@ -23,6 +25,15 @@ async function ghFor(project: any, dev: any) {
   const tok = token || process.env.GITHUB_TOKEN || '';
   const info: any = await ghApi('GET', `repos/${dev.repo}`, { token: tok }).catch((e: any) => { throw new HttpError(400, e.message); });
   return { token: tok, key, ref: info.default_branch, defaultBranch: info.default_branch };
+}
+/**
+ * The project brain for a code job (lib/brain.js): the notes linked to the issue as a block for the prompt, and for jobs
+ * on this computer the notes themselves as files in the worktree's .ticketforge/brain/ folder (never committed).
+ */
+async function brainFor(project: any, ticket: any, local: boolean) {
+  const r: any = await brainForCode(project.id, ticket, { max: local ? 5000 : 7000 });
+  if (!r.block) return { text: '', files: null };
+  return { text: local ? `${r.block}\nMore notes about this issue are in .ticketforge/brain/ (start with README.md there): read them when you need more context. Don't edit, stage or commit that folder.` : r.block, files: local ? r.files : null };
 }
 async function userOk(p: any, perms: string[]) {
   const user = await authed();
@@ -39,7 +50,8 @@ async function startRemoteFor(project: any, ticket: any, { side, user, instructi
   if (!dev?.repo) throw new HttpError(400, side === 'backend' ? 'Set the backend repository first.' : 'Choose the GitHub repository first (Project settings → Code & GitHub).');
   const gh = await ghFor(project, dev);
   const id = agentId || await requireRole(side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build');
-  const ctx = context || [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n');
+  const brain = await brainFor(project, ticket, false);
+  const ctx = [context || [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n'), brain.text].filter(Boolean).join('\n\n');
   const task: any = await codeTask({ ticket, agentId: id, instructions, round: 1, context: ctx, dev });
   task.agentId = id; task.commitTitle = ticket.title;
   task.oauthToken = await ownToken();
@@ -174,7 +186,8 @@ async function startForIssue(project: any, ticket: any, { both = false, instruct
   const { agents } = await publicAgents();
   // The chosen agent, else the project's agent for that repository (Administration → Agents → Default agents).
   const pick = async (role: string) => (agentId && agents.some((a: any) => a.id === agentId && a.enabled) ? agentId : requireRole(be ? role : 'build'));
-  const ctx = issueContext(project, ticket);
+  const brain = await brainFor(project, ticket, true);
+  const ctx = [issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
   if (be && fe && (both || ticket.layer === 'both')) {
     const contract = await apiContract({ project, ticket, ai }).catch(() => '');
     const shared = contract ? `API CONTRACT (agreed before both jobs started; the backend and frontend are being built AT THE SAME TIME in separate jobs):
@@ -182,15 +195,15 @@ ${contract}` : 'The backend and frontend are being built AT THE SAME TIME in sep
     const beNote = `${sideNote(project, ticket, 'backend')}\n\n${shared}${contract ? '\nImplement these endpoints exactly as written (method, path, fields, status codes), so the frontend works without changes. If the contract contradicts an endpoint that already exists, keep the existing response shape, add only the new fields, and say so at the top of your summary.' : ''}`;
     const feNote = `REPOSITORY: this is the FRONTEND of the project (${fe.repo || fe.localPath}). Build only the user interface and its calls to the API; the backend (${be.repo || be.localPath}) is a separate job running now.\n\n${shared}${contract ? '\nCall these endpoints exactly as written. Don\'t wait for or mock a different API. For endpoints that already exist in the app, keep reading their current response shape and only use the added fields.' : ''}`;
     const [backend, frontend] = await Promise.all([
-      startJob({ projectId: project.id, ticket, dev: be, instructions, user, agentId: await pick('backend'), context: [beNote, ctx].join('\n\n'), side: 'backend' }),
-      startJob({ projectId: project.id, ticket, dev: fe, instructions, user, agentId: await pick('frontend'), context: [feNote, ctx].join('\n\n'), side: 'frontend' }),
+      startJob({ projectId: project.id, ticket, dev: be, instructions, user, agentId: await pick('backend'), context: [beNote, ctx].join('\n\n'), side: 'backend', brainFiles: brain.files }),
+      startJob({ projectId: project.id, ticket, dev: fe, instructions, user, agentId: await pick('frontend'), context: [feNote, ctx].join('\n\n'), side: 'frontend', brainFiles: brain.files }),
     ]);
     return { jobs: { backend, frontend }, contract };
   }
   const side = be && (ticket.layer === 'backend' || !fe) ? 'backend' : 'frontend';
   const dev = side === 'backend' ? be : fe;
   if (!dev?.localPath) throw new HttpError(400, 'Set the local repository folder in Project settings → Code & GitHub first.');
-  const job = await startJob({ projectId: project.id, ticket, dev, instructions, user, agentId: await pick(side), context: [sideNote(project, ticket, side), ctx].filter(Boolean).join('\n\n'), side });
+  const job = await startJob({ projectId: project.id, ticket, dev, instructions, user, agentId: await pick(side), context: [sideNote(project, ticket, side), ctx].filter(Boolean).join('\n\n'), side, brainFiles: brain.files });
   return { jobs: { [side]: job } };
 }
 
@@ -225,8 +238,9 @@ export const POST = api(async (req, p) => {
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
     const agentId = String(b.agentId || await requireRole(side === 'backend' && backendDev(project) ? 'backend' : 'build'));
-    const context = [sideNote(project, ticket, side), agentId === 'architecture-record' ? await ardContext(project, ticket) : issueContext(project, ticket)].filter(Boolean).join('\n\n');
-    return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user, agentId, context, side });
+    const brain = await brainFor(project, ticket, true);
+    const context = [sideNote(project, ticket, side), agentId === 'architecture-record' ? await ardContext(project, ticket) : issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
+    return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user, agentId, context, side, brainFiles: brain.files });
   }
   // Frontend + Backend issues, both at once: one API contract first (a few seconds), then both jobs in parallel.
   if (b.action === 'start-both') {
@@ -311,7 +325,8 @@ export const POST = api(async (req, p) => {
     }
     if (!ask) throw new HttpError(400, 'Say what to change.');
     const context = [sideNote(project, ticket, where.side), `UPDATING AN OPEN ${pr.provider === 'GitLab' ? 'MERGE' : 'PULL'} REQUEST: ${pr.url} (branch ${target.branch} → ${target.base}). The request's changes are already committed on this branch. Make only the changes asked for below; don't redo the original work.`].filter(Boolean).join('\n\n');
-    const job = await startJob({ projectId: p.id, ticket, dev: where.dev, instructions: ask, user, agentId: String(b.agentId || await requireRole(where.side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build')), context, side: where.side, target });
+    const brain = await brainFor(project, ticket, true);
+    const job = await startJob({ projectId: p.id, ticket, dev: where.dev, instructions: ask, user, agentId: String(b.agentId || await requireRole(where.side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build')), context: [context, brain.text].filter(Boolean).join('\n\n'), side: where.side, target, brainFiles: brain.files });
     setUpdateLabel(job.id, label);
     return job;
   }

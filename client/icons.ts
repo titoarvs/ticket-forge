@@ -62,6 +62,7 @@ export const I = {
   bot: s('<rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 5V2.5M5.5 9h.01M10.5 9h.01M6 11.2h4"/>'),
   clock: s('<circle cx="8" cy="8" r="5.8"/><path d="M8 4.8V8l2.2 1.4"/>'),
   comment: s('<path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5z"/>'),
+  brain: s('<circle cx="4" cy="4.5" r="1.7"/><circle cx="12" cy="4" r="1.7"/><circle cx="8" cy="12" r="1.9"/><circle cx="3.6" cy="11" r="1.3"/><path d="M5.6 4.4l4.7-.3M5 5.9l2.2 4.4M11.2 5.5L8.9 10.2M5 11.3l1.1.4"/>'),
   history: s('<path d="M2.5 8a5.5 5.5 0 105.5-5.5c-2 0-3.7 1-4.7 2.6"/><path d="M2.8 2.5v2.8h2.8M8 5.3V8l2 1.3"/>'),
   external: s('<path d="M9.5 2.5h4v4M13.5 2.5L8 8M12 9.5v3c0 .6-.4 1-1 1H3.5c-.6 0-1-.4-1-1V5c0-.6.4-1 1-1h3"/>'),
   refresh: s('<path d="M13.5 3v3.2h-3.2M2.5 13V9.8h3.2"/><path d="M12.9 6.2A5.5 5.5 0 003.2 5M3.1 9.8a5.5 5.5 0 009.7 1.2"/>'),

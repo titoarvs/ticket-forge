@@ -2,7 +2,7 @@
 // Test automation → Settings → GitHub Actions: run the Playwright tests on GitHub's machines instead of this server.
 // Setup sets a repository secret and opens a pull request with the workflow; once it's merged, runs go there.
 import { useEffect, useState } from 'react';
-import { P, api, can, mutate, toast, ago, useStore, type Any } from './core';
+import { P, api, can, mutate, toast, ago, useStore, runPlace, setRunPlace, isDeployed, type Any } from './core';
 import { Ico, I, Spinner } from './ui';
 import { TF } from './fields';
 import { collectGitHubRun } from './actions';
@@ -34,7 +34,8 @@ export function GitHubRunner() {
       await check();
     } catch (e: Any) { setError(e.message); } finally { setBusy(''); }
   };
-  const on = p.automation?.runOn === 'github';
+  const deployed = isDeployed();
+  const on = runPlace() === 'github';
   const pending = p.automation?.ghPending;
   return (
     <div className="rb ghr">
@@ -54,8 +55,8 @@ export function GitHubRunner() {
       {status?.setupPr && !status.ready && <div className="warn-banner" style={{ marginTop: 8 }}><Ico svg={I.pr} /><span>Merge <a href={status.setupPr.url} target="_blank" rel="noopener noreferrer">pull request #{status.setupPr.number}</a> into {status.defaultBranch}, then press Check. GitHub only starts workflows that are on the default branch.</span></div>}
       <div className="ghr-switch">
         <label className="row" style={{ gap: 8, alignItems: 'center' }}>
-          <input type="checkbox" checked={on} disabled={!ed || (!on && !status?.ready)} onChange={(e) => { saveCfg(); mutate((pp: Any) => { pp.automation.runOn = e.target.checked ? 'github' : 'here'; }); toast(e.target.checked ? 'Tests now run on GitHub Actions' : 'Tests run on this server’s browser again'); }} />
-          <span><b>Run tests on GitHub Actions</b> <span className="muted small">{!status?.ready && !on ? '(finish the setup first)' : `in ${repo || cfg.repo} @ ${ref || cfg.ref || 'the default branch'}`}</span></span>
+          <input type="checkbox" checked={on} disabled={deployed || (!on && !status?.ready && !cfg.repo)} onChange={(e) => { if (e.target.checked && ed) saveCfg(); setRunPlace(e.target.checked ? 'github' : 'local'); toast(e.target.checked ? 'Tests and code jobs now run on GitHub Actions' : 'Tests and code jobs run on this computer again'); }} />
+          <span><b>Run on GitHub Actions</b> <span className="muted small">{deployed ? '(always, on the deployed TicketForge)' : !status?.ready && !on && !cfg.repo ? '(finish the setup first)' : `in ${repo || cfg.repo} @ ${ref || cfg.ref || 'the default branch'} · your choice on this computer`}</span></span>
         </label>
       </div>
       {pending && <div className="warn-banner" style={{ marginTop: 10 }}><Spinner /><span>A run started {ago(pending.at)} is still on GitHub Actions{pending.runs?.[0]?.url ? <> (<a href={pending.runs[0].url} target="_blank" rel="noopener noreferrer">open</a>)</> : null}.</span>

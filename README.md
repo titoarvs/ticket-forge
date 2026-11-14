@@ -534,6 +534,13 @@ meant for your own use: for a whole team, use a team plan or an API.
 
 ### Code jobs on the deployed TicketForge (GitHub Actions)
 
+**Where code jobs and test runs go.** The deployed TicketForge always uses GitHub Actions. On your computer
+(localhost) they run on this computer by default: Claude Code next to your checkout, and Playwright in a local
+browser. To send them to GitHub Actions instead, use Project settings → Code & GitHub → *Where code jobs run*,
+Test automation → *Run on GitHub Actions*, or the account menu (*Code & tests: …*). The choice covers code jobs and
+test runs together, belongs to you, and is remembered in your browser rather than saved in the project, so it never
+changes what the deployed app or your teammates do.
+
 On a deployed TicketForge (Vercel, or opened from another computer) there is no checkout and no Claude Code, so
 **Write code with AI** runs on **GitHub Actions** instead (and a project on your computer can choose that too:
 Project settings → Code & GitHub → **Where code jobs run**).
@@ -763,10 +770,12 @@ client/                    React components (client side)
   Home.tsx Admin.tsx       Projects + create-from-document pages, Administration
   Workspace.tsx views.tsx  Project sidebar and views (Summary, Backlog, Board, Epics, Reports, Tests, Automation, Settings)
   Drawer.tsx               Issue and epic panels
+  Brain.tsx markdown.tsx   The Brain page (notes, graph, editor) and the Markdown renderer with [[wikilinks]]
 lib/                       Server modules
   server/http.ts           Route-handler helpers: sessions, permissions, streaming, setup
   db.js auth.js store.js   Database (Supabase/Postgres or local), users & invites, projects & permission checks
   claude.js prompts.js generate.js   Claude providers and prompts
+  brain.js                 The project brain: notes built from the project, retrieval for prompts, Obsidian import/export, folder sync
   automation.js runner.mjs Playwright test automation
   exporters.js parse.js github.js    Exports, document parsing, PR lookup
 scripts/db-push.js         Copies the local database to DATABASE_URL
@@ -1161,6 +1170,52 @@ the server records on each save: sprints started and completed, epics, versions 
 workflow and members, project settings, test management, and deleted issues. Filter by type, person, time (24 hours,
 7 or 30 days) and text; click an issue to open it. Project-level entries are kept in the `activity` table (created
 automatically); changes made before this existed show from the issues' own history.
+
+### Brain (the project's knowledge vault)
+
+**Brain** in the project sidebar: an Obsidian-compatible vault of Markdown notes linked with `[[wikilinks]]`, so the AI
+and the code agents never miss a project's context.
+
+- **What's in it.** One note per thing TicketForge knows, each with frontmatter (`title`, `type`, `key`, `status`,
+  `tags`, `updated`, `origin`): an *Index* and *Project Overview* (summary, assumptions, open questions), every epic
+  and issue (user story, description, acceptance criteria, status, sprint, Fix versions, dependencies, links, sub-tasks,
+  test cases, pull requests, recent comments), releases, source documents, the epic documents (Problem Statement,
+  Feature Brief, Architecture Record), the decisions (`AD-xx`) and open decisions (`Qxx`) written in them, the
+  project's open questions, the **App context** and the **Repository profile** from *Learn from repository*. Links go
+  both ways: issue ↔ epic, issue ↔ dependencies and links, epic ↔ release, decision ↔ issue, question ↔ issue.
+- **Always up to date.** The notes are rebuilt from the project whenever its version changes (when the Brain page or an
+  AI task reads them), or with **Refresh brain**. Only changed notes are written. Generated notes are read-only.
+- **Your own notes.** **New note** (types: note, decision, question, document; tags; status). Type `[[` to link a note.
+  They're kept in *Notes/* (or the folder they were imported to) and a refresh never touches them. A missing link shows
+  dashed; click it to create that note.
+- **The viewer.** A list with search (titles, keys, tags and full text), filters by type and tag; the note rendered as
+  Markdown with clickable wikilinks, its outgoing links and backlinks; **Open PRJ-12** for issues and epics; and an
+  interactive **Graph** (drag, pan, zoom, "around the open note") drawn on a canvas, with no extra dependency. Light and
+  dark themes, and phone width (list, then note).
+- **AI uses it.** Before ticket writing and enhancing, test cases (backlog and test management), splits, test plans,
+  Problem Statements, Feature Briefs, ARDs, document agents and test scripts, TicketForge picks the notes for the task:
+  the notes of its issue or epic, the notes they link to and that link to them (one and two hops; decisions, questions,
+  documents and team notes at two hops), and the best keyword matches. They go at the start of the prompt as a compact
+  **PROJECT BRAIN** block (about 9,000 characters at most, less for light tasks). The system prompt, with the App
+  context, stays the same text, so provider prompt caching keeps working; the block itself is deterministic (same
+  project, same task, same text), so cached answers still match. **What the AI reads** on an issue or epic note shows
+  the exact block. Turn it off per project in **Brain settings**.
+- **Code jobs.** Jobs on this computer get the block in their prompt and the notes as files in the worktree's
+  `.ticketforge/brain/` folder (with a README listing them); that folder is never staged or committed. Jobs on GitHub
+  Actions get the block in their (encrypted) prompt.
+- **Obsidian.** **Download for Obsidian** gives a zip: unzip it and choose *Open folder as vault* (folders per type,
+  frontmatter, wikilinks, `Index.md`). **Import Obsidian notes** takes `.md` files or a vault `.zip`: notes become your
+  own (frontmatter and `#tags` kept; notes TicketForge wrote, `origin: ticketforge`, are skipped because they come back
+  on their own).
+- **Folder sync (on this computer only).** When TicketForge is opened at localhost (never on the hosted or SaaS app),
+  **Brain settings → Sync with a folder** keeps a folder, such as one inside your Obsidian vault, in step: generated
+  notes are written to it; your notes go both ways (the side that changed since the last sync wins; when both changed,
+  the newer one), new files become notes, and deletions on one side since the last sync are applied to the other.
+- **Permissions and data.** Reading needs access to the project; writing and importing notes needs *Edit issues* or
+  *Edit project settings*; downloading needs *Export*; folder sync and the settings need *Edit project settings*. Notes
+  are stored in `brain_notes` and `brain_state` (created automatically) per project, with the same row-level security
+  as issues: project access, and the restrictive workspace policy (`tfw_tenant`). The owner can lock the feature in
+  **Administration → Features → Project brain**, which also stops adding notes to prompts.
 
 ### AI usage: report, suggestions and limits
 

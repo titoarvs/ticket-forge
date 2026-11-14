@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
+import { switchWorkspace } from './WorkspaceSwitcher';
 import { WorkspaceSkeleton } from './skeletons';
 import { Summary, Backlog, Epics, Reports, Tests, Automation } from './views';
 import { RowPop } from './RowActions';
@@ -19,9 +20,10 @@ import { PullRequests } from './PullRequests';
 import { Issues } from './Issues';
 import { Releases } from './Releases';
 import { Activity } from './Activity';
+import { Brain } from './Brain';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, brain: Brain, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
@@ -56,6 +58,7 @@ function Sidebar({ view }: { view: string }) {
       {item('prs', I.pr, 'Pull requests', p.tickets.reduce((n: number, t: any) => n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length, 0))}
       <div className="side-label">Requirements</div>
       {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}
+      {item('brain', I.brain, 'Brain')}
       <div className="side-foot">{item('settings', I.settings, 'Project settings')}</div>
     </nav>
     <button type="button" className="side-toggle" onClick={() => toggleSidebar()} aria-expanded={!mini} aria-label={mini ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -65,7 +68,7 @@ function Sidebar({ view }: { view: string }) {
 }
 
 /** Pages that belong to a feature the owner can lock (Administration → Features). */
-const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', releases: 'releases', activity: 'activity', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs' };
+const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', releases: 'releases', activity: 'activity', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs', brain: 'brain' };
 function LockedView({ label }: { label: string }) {
   return <EmptyState icon={I.settings} tone="neutral" title={`${label} is locked`}
     actions={S.user?.isOwner ? <Link className="btn primary" href="/admin/features">Manage features</Link> : <Link className="btn" href={`/p/${P().id}/backlog`}>Go to the backlog</Link>}>
@@ -77,6 +80,14 @@ function ProjectError({ id }: { id: string }) {
   const e = S.projectError;
   const back = <Link className="btn" href="/projects">Back to projects</Link>;
   if (e.status === 404 || e.status === 403) {
+    if (e.elsewhere) {
+      return (
+        <EmptyState icon={I.folder} tone="neutral" title={`This project is in ${e.elsewhere.name}`}
+          actions={<><button className="btn primary" onClick={() => switchWorkspace(e.elsewhere.id, location.pathname)}>Switch to {e.elsewhere.name}</button>{back}</>}>
+          <p>You’re working in <b>{S.user?.workspaceName}</b> right now. Switch workspaces to open it.</p>
+        </EmptyState>
+      );
+    }
     return (
       <EmptyState icon={I.folder} tone="neutral" title="Project not found" actions={<Link className="btn primary" href="/projects">Back to projects</Link>}>
         <p>It may have been deleted, or you don’t have access to it. If you think you should, ask an administrator to add you.</p>

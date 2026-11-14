@@ -2,7 +2,7 @@
 // Code & GitHub: a project's local repository and GitHub settings, and the "Write code with AI" job for an issue:
 // Claude Code implements it in its own git worktree, you review the diff, TicketForge opens the pull request.
 import { useEffect, useRef, useState } from 'react';
-import { readNdjson, S, P, feat, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, type Any } from './core';
+import { readNdjson, S, P, feat, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, runPlace, setRunPlace, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm, SetCard, LAYER_LABEL } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
@@ -16,7 +16,7 @@ export const hasBackend = () => Boolean(be().enabled && be().localPath);
 const setDev = (k: string, v: Any) => mutate((pp) => { pp.dev = { ...(pp.dev || {}), [k]: v }; }, { tag: `dev.${k}` });
 
 /** Pick a folder on this computer: click through folders (git repositories are marked), then choose one. */
-function FolderPicker({ start, onPick }: { start: string; onPick: (path: string) => void }) {
+export function FolderPicker({ start, onPick, title = 'Choose the repository folder', hint }: { start: string; onPick: (path: string) => void; title?: string; hint?: string }) {
   const [at, setAt] = useState<Any>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ function FolderPicker({ start, onPick }: { start: string; onPick: (path: string)
   useEffect(() => { go(start); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const crumbs = at ? at.path.split('/').filter(Boolean).map((part: string, i: number, all: string[]) => ({ name: part, path: `/${all.slice(0, i + 1).join('/')}` })) : [];
   return (
-    <Modal title="Choose the repository folder" wide actions={[{ label: 'Cancel' }, { label: at?.git ? 'Use this repository' : 'Use this folder', kind: 'primary', disabled: !at, onClick: () => { closeModal(); onPick(at.path); } }]}>
+    <Modal title={title} wide actions={[{ label: 'Cancel' }, { label: at?.git && !hint ? 'Use this repository' : 'Use this folder', kind: 'primary', disabled: !at, onClick: () => { closeModal(); onPick(at.path); } }]}>
       {at && <>
         <div className="fp-places">{at.places.map((p: Any) => <button key={p.path} className={`btn sm ${at.path === p.path ? 'primary' : 'subtle'}`} onClick={() => go(p.path)}>{p.name}</button>)}</div>
         <div className="fp-crumbs">{crumbs.map((c: Any, i: number) => <span key={c.path}>{i > 0 && <span className="muted">/</span>}<button className="link-btn" onClick={() => go(c.path)}>{c.name}</button></span>)}
@@ -41,7 +41,7 @@ function FolderPicker({ start, onPick }: { start: string; onPick: (path: string)
             <Ico svg={I.folder} /><span className="fp-name">{e.name}</span>{e.git && <span className="label-chip fp-git">git</span>}</button>)}
           {!at.entries.length && <p className="muted small" style={{ padding: 10, margin: 0 }}>No folders in here.</p>}
         </div>
-        <p className="muted small" style={{ margin: '8px 0 0' }}>Open the folder of the project’s clone (marked <b>git</b>), then choose it. Only folder names are shown; files are never read here.</p>
+        <p className="muted small" style={{ margin: '8px 0 0' }}>{hint || <>Open the folder of the project’s clone (marked <b>git</b>), then choose it.</>} Only folder names are shown; files are never read here.</p>
       </>}
       {!at && <div className="muted"><Spinner /> Loading…</div>}
     </Modal>
@@ -250,7 +250,7 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
           <Ico svg={k === 'folder' ? I.folder : I.pr} /><b>{l}</b><span className="muted small">{local ? h : DEPLOYED_HINT[k]}</span></button>))}</div>
       {mode === 'github' && <div className="rc-form">
         {canList ? <><p className="small muted" style={{ margin: 0 }}>Personal and organisation repositories your GitHub sign-in can see.</p>
-          <button className="btn primary" disabled={!ed || working} onClick={() => openModal(<RepoPickerModal onPick={(r) => (local && dev().runner !== 'github' ? clone(r.cloneUrl, '') : pickRemote(r.fullName, r.defaultBranch))} />)}><Ico svg={I.search} />Choose a repository</button></>
+          <button className="btn primary" disabled={!ed || working} onClick={() => openModal(<RepoPickerModal onPick={(r) => (local && runPlace() !== 'github' ? clone(r.cloneUrl, '') : pickRemote(r.fullName, r.defaultBranch))} />)}><Ico svg={I.search} />Choose a repository</button></>
           : <><p className="small muted" style={{ margin: 0 }}>Connect GitHub first (GitHub account, above), or use a Git URL.</p>
             <button className="btn primary" disabled={!ed} onClick={() => openModal(<GitHubConnectModal env={env} onDone={(a) => { setDev('githubAccount', { ...a, connectedAt: new Date().toISOString() }); setEnv({ ...env, hasToken: true }); }} />)}><Ico svg={I.pr} />Connect GitHub</button></>}
       </div>}
@@ -280,7 +280,7 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
 function CodeRunnerCard({ ed, env }: { ed: boolean; env: Any }) {
   const d = dev();
   const local = env?.local !== false;
-  const onGh = !local || d.runner === 'github';
+  const onGh = !local || runPlace() === 'github';
   const [status, setStatus] = useState<Any>(null);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -303,10 +303,11 @@ function CodeRunnerCard({ ed, env }: { ed: boolean; env: Any }) {
   };
   const needsClaude = status?.checks?.some((c: Any) => c.label === 'Claude' && !c.ok);
   return <SetCard id="code-runner" title="Where code jobs run" desc="Write code with AI runs a Claude Code agent on the repository. On this computer it works next to the checkout; on GitHub Actions it runs on GitHub’s machines, so it also works from the deployed TicketForge.">
+    <p className="muted small" style={{ margin: '0 0 8px' }}>{local ? <>Your choice on this computer, for code jobs <b>and</b> test runs (it’s remembered in this browser, not saved in the project). The deployed TicketForge always uses GitHub Actions.</> : <>This TicketForge is deployed, so code jobs and test runs always use GitHub Actions.</>}</p>
     <div className="rc-sources" role="radiogroup" aria-label="Where code jobs run">
-      <button role="radio" aria-checked={!onGh} className={!onGh ? 'on' : ''} disabled={!ed || !local} onClick={() => setDev('runner', 'here')}>
+      <button role="radio" aria-checked={!onGh} className={!onGh ? 'on' : ''} disabled={!local} onClick={() => { setRunPlace('local'); toast('Code jobs and test runs now run on this computer'); }}>
         <Ico svg={I.folder} /><b>This computer</b><span className="muted small">{local ? 'Claude Code next to the repository; live progress; reviews and CodeRabbit.' : 'Only when TicketForge runs on your computer (localhost).'}</span></button>
-      <button role="radio" aria-checked={onGh} className={onGh ? 'on' : ''} disabled={!ed || !local} onClick={() => setDev('runner', 'github')}>
+      <button role="radio" aria-checked={onGh} className={onGh ? 'on' : ''} disabled={!local} onClick={() => { setRunPlace('github'); toast('Code jobs and test runs now run on GitHub Actions'); }}>
         <Ico svg={I.pr} /><b>GitHub Actions</b><span className="muted small">{local ? 'On GitHub’s machines; works from the deployed app. Commits go to the issue’s branch.' : 'Used here: this TicketForge is deployed.'}</span></button>
     </div>
     {onGh && <div className="crun">

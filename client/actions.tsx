@@ -6,6 +6,7 @@ import {
   P, ticket, epic, isSub, childrenOf, epicTickets, activeSprint, openSprints, tcKey, spSum, isDone, me, can, peopleNames,
   uid, clone, nowIso, dateInput, COLORS, TYPES, PRIORITIES, nextTicketKey, nextEpicKey, newTicket, withIds, applyAi,
   addMember, logEvent, setField, addLink, deleteIssues, canMove, moveError, type Any,
+  runPlace,
 } from './core';
 import { askFirst } from './Clarify';
 import { recordAutomationResult } from './TestRepo';
@@ -504,8 +505,8 @@ function BaseUrlModal({ resolve }: { resolve: (v: string | null) => void }) {
 }
 const askBaseUrl = () => new Promise<string | null>((resolve) => openModal(<BaseUrlModal resolve={resolve} />));
 
-/** Where tests run for this project: 'github' (GitHub Actions, Test automation → Settings) or 'here'. */
-export const runsOnGitHub = () => P().automation?.runOn === 'github' && Boolean(P().automation?.github?.repo);
+/** Tests run on GitHub Actions when it's set up for the project and you run on GitHub (always, on the deployed app). */
+export const runsOnGitHub = () => runPlace() === 'github' && Boolean(P().automation?.github?.repo);
 
 /** One event of a test run stream (also used when collecting a GitHub Actions run later). */
 function runEvent(ev: Any, run: Any, push: (m: string, l?: string) => void, baseUrl: string) {
