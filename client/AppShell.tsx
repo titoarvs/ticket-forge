@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   S, emit, useStore, api, loadPrefs, startSync, saveNow, undo, redo, P, can, setMenu, openModal, ago, loadNotifs, markNotifsRead, toggleSidebar, hashColor, COLORS, type Any,
-  loadFlags, setAiRun, toast,
+  loadFlags, setAiRun, toast, runPlace, setRunPlace, isDeployed,
 } from './core';
 import { Ico, I, Menu, Avatar, Toasts, TaskTray, EmptyState, ErrorState, TypeIcon, TIER_NAME, Spinner, PlanLimits, planPeak, resetLabel } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
@@ -294,6 +294,9 @@ export function TopNav() {
           <button onClick={() => openModal(<MyAiModal />)}><Ico svg={I.sparkle} />My AI (your Claude subscription)</button>
           <button onClick={(e) => { e.stopPropagation(); toggle(); }}><Ico svg={mode === 'dark' ? I.sun : I.moon} />{mode === 'dark' ? 'Light theme' : 'Dark theme'}</button>
           <hr />
+          {!isDeployed() && <button onClick={(e) => { e.stopPropagation(); const to = runPlace() === 'github' ? 'local' : 'github'; setRunPlace(to); toast(to === 'github' ? 'Code jobs and test runs now run on GitHub Actions' : 'Code jobs and test runs now run on this computer'); }}
+            title="Where Write code with AI and test runs go (this browser only; the deployed app always uses GitHub Actions)">
+            <Ico svg={runPlace() === 'github' ? I.pr : I.folder} />{runPlace() === 'github' ? 'Code & tests: GitHub Actions' : 'Code & tests: this computer'}</button>}
           <button onClick={() => { S.menu = null; emit(); setTimeout(() => { if (!startTourHere()) toast('There’s no tour for this page.'); }, 150); }}><Ico svg={I.sparkle} />Show me around</button>
           <button onClick={async () => { S.menu = null; emit(); await resetTours(); toast('Tours will show again on each page.'); setTimeout(startTourHere, 150); }}><Ico svg={I.undo} />Restart all tours</button>
           <button onClick={() => window.open('/terms', '_blank', 'noopener')}><Ico svg={I.doc} />Terms of Use</button>

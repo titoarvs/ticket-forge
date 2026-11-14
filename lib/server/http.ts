@@ -103,7 +103,7 @@ export function api(fn: Handler) {
         const locked = await lockedFeatureFor(new URL(req.url).pathname);
         if (locked) throw new HttpError(423, lockedMessage(locked));
         return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
-      }, user, { local, projectId });
+      }, user, { local, projectId, runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local' });
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);

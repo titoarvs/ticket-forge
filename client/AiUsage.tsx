@@ -12,16 +12,72 @@ const usd = (x: number | null | undefined) => (x == null ? '—' : x < 0.01 && x
 const IMPACT: Record<string, string> = { high: 'Big saving', medium: 'Good saving', low: 'Housekeeping' };
 const ENGINE: Record<string, string> = { api: 'AI API', account: 'Claude account', copilot: 'GitHub Copilot', cache: 'Reused answer', '': 'Unknown' };
 
-function Breakdown({ title, rows, label }: { title: string; rows: Any[]; label?: (r: Any) => string }) {
-  if (!rows?.length) return null;
+const IMPACT_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+/** Suggestions, most useful first: savings you can switch on, then housekeeping (folded when there's anything bigger). */
+function Suggestions({ list, days, busy, onTurnOn, go }: { list: Any[]; days: number; busy: string; onTurnOn: (s: Any) => void; go?: (k: string) => void }) {
+  const sorted = [...list].sort((a, b) => (IMPACT_ORDER[a.impact] ?? 3) - (IMPACT_ORDER[b.impact] ?? 3) || Number(Boolean(b.action)) - Number(Boolean(a.action)));
+  const main = sorted.filter((s) => s.impact !== 'low');
+  const minor = sorted.filter((s) => s.impact === 'low');
+  const item = (s: Any) => <li key={s.id} className={`imp-${s.impact}`}>
+    <span className={`loz ${s.impact === 'high' ? 't-pass' : s.impact === 'medium' ? 's-inprogress' : ''}`}>{IMPACT[s.impact]}</span>
+    <div><b>{s.title}</b><p className="muted small">{s.text}</p>
+      {s.projects && <div className="au-links">{s.projects.map((p: Any) => <a key={p.id} className="btn sm" href={`/p/${p.id}/settings`}>{p.name}: App context</a>)}</div>}</div>
+    {s.action ? <button className="btn sm primary" disabled={!!busy} onClick={() => onTurnOn(s)}>{busy === s.id ? <Spinner /> : 'Turn on'}</button>
+      : ['budget', 'prices'].includes(s.id) && go ? <button className="btn sm" onClick={() => go('savings')}>Open Savings & limits</button> : null}
+  </li>;
+  return (
+    <div className="card wide au-card au-sugg">
+      <div className="au-card-h"><h3><Ico svg={I.sparkle} /> Suggestions</h3>
+        <span className="muted small">{list.length ? `${list.length} from the last ${days} days` : `nothing to change from the last ${days} days`}</span></div>
+      {!list.length ? <p className="muted small" style={{ margin: 0 }}><Ico svg={I.check} /> Your AI setup already uses the savings TicketForge knows about.</p> : <>
+        {main.length > 0 && <ul>{main.map(item)}</ul>}
+        {minor.length > 0 && (main.length
+          ? <details className="au-minor"><summary className="small">{minor.length} housekeeping item{minor.length === 1 ? '' : 's'}</summary><ul>{minor.map(item)}</ul></details>
+          : <ul>{minor.map(item)}</ul>)}
+      </>}
+    </div>
+  );
+}
+
+/** Tokens per day across the whole period (days without calls show as gaps, so the shape is honest). */
+function Days({ rows, days }: { rows: Any[]; days: number }) {
+  const by = new Map(rows.map((r) => [r.day, r]));
+  const all: Any[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    all.push(by.get(day) || { day, calls: 0, tokens: 0, cost: 0 });
+  }
+  const max = Math.max(...all.map((x) => x.tokens), 1);
+  const every = days > 31 ? 14 : 7;
+  return <div className="au-days" role="img" aria-label={`Tokens per day over the last ${days} days`}>{all.map((x, i) => (
+    <div key={x.day} title={`${x.day}: ${x.calls} call${x.calls === 1 ? '' : 's'} · ${k(x.tokens)} tokens · ${usd(x.cost)}`}>
+      <i style={{ height: x.tokens ? `${Math.max(4, (x.tokens / max) * 100)}%` : 0 }} />
+      {((i % every === 0 && all.length - 1 - i >= every / 2) || i === all.length - 1) && <span>{new Date(`${x.day}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>}
+    </div>))}</div>;
+}
+
+const VIEWS: [string, string][] = [['byTask', 'Task'], ['byProject', 'Project'], ['byUser', 'Person'], ['byModel', 'Model'], ['byEngine', 'Engine']];
+/** Where the AI goes, one breakdown at a time. */
+function Breakdowns({ d }: { d: Any }) {
+  const [v, setV] = useState('byTask');
+  const rows: Any[] = d[v] || [];
+  const label = (r: Any) => (v === 'byTask' ? r.label : v === 'byEngine' ? ENGINE[r.key] || r.key : r.key);
   const max = Math.max(...rows.map((r) => r.tokens), 1);
-  return <div className="au-break"><h4>{title}</h4>
-    <table className="rt-tbl"><thead><tr><th>{title.replace(/^By /, '')}</th><th>Calls</th><th>Tokens</th><th>API cost</th></tr></thead>
-      <tbody>{rows.slice(0, 10).map((r) => <tr key={String(r.key)}>
-        <td><div className="au-name">{label ? label(r) : r.key}</div><div className="au-bar"><i style={{ width: `${(r.tokens / max) * 100}%` }} /></div></td>
-        <td>{r.calls}{r.cached ? <div className="muted small">{r.cached} reused</div> : null}</td>
-        <td>{k(r.tokens)}{r.cacheRead ? <div className="muted small">{k(r.cacheRead)} cached</div> : null}</td>
-        <td>{usd(r.cost)}{r.equiv ? <div className="muted small" title="What the Claude account runs would cost on the API">≈ {usd(r.equiv)} on account</div> : null}</td></tr>)}</tbody></table></div>;
+  return (
+    <div className="card wide au-card">
+      <div className="au-card-h"><h3>Where it goes</h3><span className="spacer" />
+        <div className="seg" role="tablist" aria-label="Break down by">{VIEWS.map(([key, l]) => (
+          <button key={key} role="tab" aria-selected={v === key} className={v === key ? 'on' : ''} onClick={() => setV(key)}>{l}</button>))}</div></div>
+      {!rows.length ? <p className="muted small">Nothing to show.</p> :
+        <table className="rt-tbl au-break"><thead><tr><th>{VIEWS.find(([key]) => key === v)?.[1]}</th><th className="num">Calls</th><th className="num">Tokens</th><th className="num">API cost</th></tr></thead>
+          <tbody>{rows.slice(0, 15).map((r) => <tr key={String(r.key)}>
+            <td><div className="au-name">{label(r)}</div><div className="au-bar"><i style={{ width: `${(r.tokens / max) * 100}%` }} /></div></td>
+            <td className="num">{r.calls}{r.cached ? <div className="muted small">{r.cached} reused</div> : null}{r.errors ? <div className="muted small">{r.errors} failed</div> : null}</td>
+            <td className="num">{k(r.tokens)}{r.cacheRead ? <div className="muted small">{k(r.cacheRead)} cached</div> : null}</td>
+            <td className="num">{usd(r.cost)}{r.equiv ? <div className="muted small" title="What the Claude account runs would cost on the API">≈ {usd(r.equiv)} on account</div> : null}</td></tr>)}</tbody></table>}
+    </div>
+  );
 }
 
 /** view 'usage': suggestions and the usage report · 'limits': budget, try Standard first and prices. */
@@ -48,44 +104,45 @@ export function UsageReport({ routing, apply, view = 'usage', go }: { routing: A
   if (err) return <div className="card wide"><h3>Usage</h3><p className="warn-text small">Couldn’t load the usage report: {err}</p></div>;
   if (!d) return <div className="card wide"><h3>{view === 'usage' ? 'Usage' : 'Spending limits'}</h3><p className="muted small"><Spinner /> Loading…</p></div>;
   const t = d.totals;
-  const maxDay = Math.max(...d.byDay.map((x: Any) => x.tokens), 1);
   const b = d.budget;
   return <>
-    {view === 'usage' && d.suggestions?.length > 0 && <div className="card wide au-sugg"><h3><Ico svg={I.sparkle} /> Suggestions to use less AI</h3>
-      <p className="sub">From the last {d.days} days of AI calls in this workspace.</p>
-      <ul>{d.suggestions.map((s: Any) => <li key={s.id} className={`imp-${s.impact}`}>
-        <span className={`loz ${s.impact === 'high' ? 't-pass' : s.impact === 'medium' ? 's-inprogress' : ''}`}>{IMPACT[s.impact]}</span>
-        <div><b>{s.title}</b><p className="muted small">{s.text}</p>
-          {s.projects && <div className="au-links">{s.projects.map((p: Any) => <a key={p.id} className="btn sm" href={`/p/${p.id}/settings`}>{p.name}: App context</a>)}</div>}</div>
-        {s.action ? <button className="btn sm primary" disabled={!!busy} onClick={() => doSuggestion(s)}>{busy === s.id ? <Spinner /> : 'Turn on'}</button>
-          : ['budget', 'prices'].includes(s.id) && go ? <button className="btn sm" onClick={() => go('savings')}>Open Savings & limits</button> : null}
-      </li>)}</ul></div>}
-
-    {view === 'usage' && <div className="card wide">
-      <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><h3 style={{ margin: 0 }}>Usage</h3><span className="muted small">every AI call, kept in the database</span><span className="spacer" />
+    {view === 'usage' && <div className="au-wrap">
+      {/* 1. Period and export, for everything below */}
+      <div className="au-toolbar">
+        <div><h3 style={{ margin: 0 }}>AI usage</h3><span className="muted small">Every AI call in this workspace, with tokens and cost.</span></div>
+        <span className="spacer" />
         <SF filter value={String(days)} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">{[7, 30, 90].map((n) => <MenuItem key={n} value={String(n)}>Last {n} days</MenuItem>)}</SF>
-        <a className="btn sm" href={`/api/admin/ai/usage?days=${days}&format=csv`}><Ico svg={I.download} />CSV</a></div>
-      {!t.calls ? <EmptyState compact icon={I.chart} tone="neutral" title="No AI calls in this period"><p>Calls are recorded from now on, with their tokens and cost.</p></EmptyState> : <>
+        <a className="btn sm" href={`/api/admin/ai/usage?days=${days}&format=csv`}><Ico svg={I.download} />Export CSV</a>
+      </div>
+
+      {!t.calls ? <div className="card wide"><EmptyState compact icon={I.chart} tone="neutral" title="No AI calls in this period"><p>Calls are recorded from now on, with their tokens and cost.</p></EmptyState></div> : <>
+        {/* 2. The headline numbers */}
         <div className="au-kpis">
-          <div><b>{t.calls}</b><span>AI calls</span></div>
-          <div><b>{k(t.input + t.cacheRead)}</b><span>tokens in{t.cacheRead ? ` · ${Math.round((t.cacheRead / Math.max(1, t.input + t.cacheRead)) * 100)}% from cache` : ''}</span></div>
-          <div><b>{k(t.output)}</b><span>tokens out</span></div>
-          <div><b>{usd(t.cost)}</b><span>API cost</span></div>
-          <div title="What the Claude account runs would have cost on the API"><b>{usd(t.equiv)}</b><span>Claude account (API value)</span></div>
-          <div><b>{t.cached}</b><span>reused answers{t.cachedChars ? ` · ~${k(Math.round(t.cachedChars / 4))} tokens saved` : ''}</span></div>
-          {t.escalated > 0 && <div><b>{t.escalated}</b><span>stepped up to High ({Math.round((t.escalated / t.calls) * 100)}%)</span></div>}
-          {t.errors > 0 && <div className="bad"><b>{t.errors}</b><span>failed</span></div>}
+          <div><span>AI calls</span><b>{t.calls.toLocaleString()}</b>
+            <small>{[t.errors ? `${t.errors} failed` : '', t.escalated ? `${t.escalated} stepped up to High` : ''].filter(Boolean).join(' · ') || 'all answered'}</small></div>
+          <div><span>Tokens</span><b>{k(t.input + t.cacheRead + t.output)}</b>
+            <small>{k(t.input + t.cacheRead)} in · {k(t.output)} out{t.cacheRead ? ` · ${Math.round((t.cacheRead / Math.max(1, t.input + t.cacheRead)) * 100)}% from cache` : ''}</small></div>
+          <div><span>Cost</span><b>{usd(t.cost)}</b>
+            <small title="What the Claude account runs would have cost on the API">{t.equiv ? `+ ${usd(t.equiv)} of Claude account use` : 'AI API spend'}{t.unpriced ? ` · ${t.unpriced} without a price` : ''}</small></div>
+          <div><span>Saved</span><b>{t.cached.toLocaleString()}</b>
+            <small>reused answers{t.cachedChars ? ` · ~${k(Math.round(t.cachedChars / 4))} tokens` : ''}</small></div>
         </div>
-        {t.estimated > 0 && <p className="muted small">{t.estimated} calls ran on the Claude account or Copilot, which don’t report tokens: those are estimated from the text length.</p>}
-        <div className="au-days" role="img" aria-label="Tokens per day">{d.byDay.map((x: Any) => <div key={x.day} title={`${x.day}: ${x.calls} calls · ${k(x.tokens)} tokens · ${usd(x.cost)}`}>
-          <i style={{ height: `${Math.max(3, (x.tokens / maxDay) * 100)}%` }} /><span>{x.day.slice(8)}</span></div>)}</div>
-        <div className="au-grid">
-          <Breakdown title="By task" rows={d.byTask} label={(r) => r.label} />
-          <Breakdown title="By project" rows={d.byProject} />
-          <Breakdown title="By person" rows={d.byUser} />
-          <Breakdown title="By model" rows={d.byModel} />
+        {t.estimated > 0 && <p className="muted small au-note">{t.estimated} call{t.estimated === 1 ? '' : 's'} ran on the Claude account or Copilot, which don’t report tokens: those tokens are estimated from the text length.</p>}
+
+        {/* 3. What to change, most useful first */}
+        <Suggestions list={d.suggestions || []} days={d.days} busy={busy} onTurnOn={doSuggestion} go={go} />
+
+        {/* 4. Over time */}
+        <div className="card wide au-card">
+          <div className="au-card-h"><h3>Over time</h3><span className="muted small">tokens per day · hover for details</span></div>
+          <Days rows={d.byDay} days={d.days} />
         </div>
-        <details className="au-top"><summary>The 20 largest calls</summary>
+
+        {/* 5. Where it goes: one breakdown at a time */}
+        <Breakdowns d={d} />
+
+        {/* 6. The biggest single calls */}
+        <details className="card wide au-top"><summary><h3 style={{ display: 'inline' }}>Largest calls</h3> <span className="muted small">the 20 calls that used the most</span></summary>
           <table className="rt-tbl"><thead><tr><th>When</th><th>Task</th><th>Project · person</th><th>Model</th><th>Tokens in / out</th><th>Cost</th></tr></thead>
             <tbody>{d.top.map((r: Any, i: number) => <tr key={i}><td className="small">{new Date(r.at).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
               <td>{r.label}</td><td className="small">{r.project || '—'} · {r.user_name || 'system'}</td><td className="small"><code>{r.model || ENGINE[r.engine]}</code></td>

@@ -13,6 +13,14 @@ export const store = {
   get(k: string, d: Any) { try { return JSON.parse(localStorage.getItem(k) as string) ?? d; } catch { return d; } },
   set(k: string, v: Any) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
+/**
+ * Where code jobs and test runs go. The deployed TicketForge can only use GitHub Actions; on your computer they run
+ * here by default, and you can switch to GitHub Actions (your choice, remembered in this browser).
+ */
+export const isDeployed = () => S.status?.local === false || Boolean(S.status?.serverless);
+export const runPlace = (): 'local' | 'github' => (isDeployed() ? 'github' : store.get('tf.runOn', 'local') === 'github' ? 'github' : 'local');
+export function setRunPlace(v: 'local' | 'github') { store.set('tf.runOn', v); emit(); }
+
 export function ago(iso?: string) {
   if (!iso) return '';
   const s = Math.round((Date.now() - Date.parse(iso)) / 1000);
@@ -89,7 +97,8 @@ export function toggleSidebar(force?: boolean) { S.sideCollapsed = force ?? !S.s
 
 // ---------------------------------------------------------------- api & feedback
 export async function api(url: string, { method = 'GET', body, raw, signal }: { method?: string; body?: Any; raw?: boolean; signal?: AbortSignal } = {}): Promise<Any> {
-  const opts: RequestInit = { method, headers: {}, signal };
+  // Tells the server where code jobs and test runs go for this person (see runPlace).
+  const opts: RequestInit = { method, headers: { 'X-TF-Run-On': runPlace() }, signal };
   if (body instanceof FormData) opts.body = body;
   else if (body !== undefined) { opts.body = JSON.stringify(body); (opts.headers as Any)['Content-Type'] = 'application/json'; }
   const res = await fetch(url, opts);
@@ -763,7 +772,14 @@ export async function openProject(id: string) {
     S.checked.clear(); S.openTc.clear();
     setBase();
     S.people = await api(`/api/projects/${id}/people`).catch(() => []);
-  } catch (e: Any) { S.projectError = { id, status: e.status, message: e.message }; }
+  } catch (e: Any) {
+    S.projectError = { id, status: e.status, message: e.message };
+    // Not in this workspace: is it in another workspace of yours? Then the page offers to switch there.
+    if (e.status === 404) {
+      const w = await api(`/api/workspaces/locate?project=${encodeURIComponent(id)}`).catch(() => null);
+      if (w?.workspace) S.projectError.elsewhere = w.workspace;
+    }
+  }
   finally { S.loadingProject = null; emit(); }
 }
 export async function closeProject() {

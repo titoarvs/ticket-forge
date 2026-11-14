@@ -9,11 +9,25 @@ import { BlankProjectModal, AiSettingsModal } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { askFirst } from './Clarify';
 import { useAutoTour } from './tour';
+import { switchWorkspace } from './WorkspaceSwitcher';
 
 async function loadProjects() {
   try { S.projects = await api('/api/projects'); S.projectsLoaded = true; S.projectsError = null; }
   catch (e: Any) { if (!S.projectsLoaded) S.projectsError = e; else toast(`Couldn’t refresh projects: ${e.message}`, 'err'); }
   emit();
+}
+
+/** Your other workspaces with projects, so projects that are "missing" here are one click away. */
+function OtherWorkspaces({ here }: { here: number }) {
+  const others = (S.auth?.workspaces || []).filter((w: Any) => w.id !== S.user?.workspaceId && w.projects > 0);
+  if (!others.length || here > 3) return null;
+  return (
+    <div className="ws-hint" role="note">
+      <Ico svg={I.folder} />
+      <span>Looking for other projects? They’re in your other workspace{others.length > 1 ? 's' : ''}:</span>
+      {others.map((w: Any) => <button key={w.id} className="btn sm" onClick={() => switchWorkspace(w.id)}>{w.name} · {w.projects} project{w.projects === 1 ? '' : 's'}</button>)}
+    </div>
+  );
 }
 
 export function ProjectsPage() {
@@ -36,13 +50,14 @@ export function ProjectsPage() {
     onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); toast('Project deleted'); loadProjects(); } catch (e: Any) { toast(e.message, 'err'); } }} />);
   return (
     <div className="page"><div className="page-inner">
-      <div className="page-h"><h1>Projects</h1><div className="spacer" />
+      <div className="page-h"><div><h1>Projects</h1>{(S.auth?.workspaces || []).length > 1 && <p className="muted small" style={{ margin: '2px 0 0' }}>In <b>{S.user?.workspaceName}</b></p>}</div><div className="spacer" />
         {can('project.create') && <>
           <button className="btn" onClick={() => fileRef.current?.click()}><Ico svg={I.upload} />Import backup</button>
           <input ref={fileRef} type="file" hidden accept=".json" onChange={(e) => { const f = e.target.files?.[0]; if (f) importJson(f); }} />
           <Link className="btn primary" href="/new" data-tour="home-create">Create project</Link>
         </>}
       </div>
+      {S.projectsLoaded && <OtherWorkspaces here={S.projects.length} />}
       {!S.projectsLoaded ? (S.projectsError
         ? <ErrorState title="Couldn’t load your projects" error={S.projectsError} onRetry={loadProjects}><p>Check your connection and try again.</p></ErrorState>
         : <ProjectsSkeleton />)
