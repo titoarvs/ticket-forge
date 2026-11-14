@@ -661,7 +661,15 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     const r = await act('pr', { action: 'pr', title, draft, body: prBody.trim() || undefined });
     if (!r?.pr) return;
     setJob(r.job);
-    mutate(() => { t.prs.push({ id: uid(), ...r.pr, checkedAt: nowIso() }); logEvent(t, `opened pull request ${r.pr.repo} #${r.pr.number} with code written by AI`, 'Development'); });
+    const noun = job.provider === 'GitLab' ? 'merge request' : 'pull request';
+    if (r.pr.compare) {
+      // Pushed with your git setup; the request opens on GitHub/GitLab (no token to open it from here).
+      mutate(() => { logEvent(t, `pushed ${r.pr.branch} with code written by AI`, 'Development'); });
+      toast(`Pushed ${r.pr.branch}. Open the ${noun} on ${job.provider || 'GitHub'} to finish.`, 'ok', { title: 'Branch pushed', action: { label: `Open ${noun}`, onClick: () => window.open(r.pr.url, '_blank', 'noopener') } });
+      window.open(r.pr.url, '_blank', 'noopener');
+      return;
+    }
+    mutate(() => { t.prs.push({ id: uid(), ...r.pr, checkedAt: nowIso() }); logEvent(t, `opened ${noun} ${r.pr.repo} #${r.pr.number} with code written by AI`, 'Development'); });
     toast(`Opened ${r.pr.repo} #${r.pr.number}`);
   };
   const running = job && ['starting', 'queued', 'running'].includes(job.status);
@@ -815,8 +823,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             {!job.remote && <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>}
             <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />{job.remote ? 'Open pull request' : <>Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</>}</button>
           </div>
+          <div className="muted small">{job.remote ? 'Opens the pull request for the branch the job pushed on GitHub Actions.' : <>Commits with your git name and email, pushes <code>{job.branch}</code> to the repository’s <code>origin</code> with your own git setup (SSH key or credential helper; the project’s token only if that’s refused), then opens the {job.provider === 'GitLab' ? 'merge request' : 'pull request'}.</>}
+          </div>
         </div>}
-        {job.pr && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}</span></div>}
+        {job.pr?.compare && <div className="ok-banner"><Ico svg={I.check} /><span>Committed and pushed <code>{job.branch}</code> with your git setup. <a href={job.pr.url} target="_blank" rel="noopener noreferrer">Open the {job.provider === 'GitLab' ? 'merge request' : 'pull request'} on {job.provider || 'GitHub'}</a> to finish; link it to this issue in Development once it’s open.</span></div>}
+        {job.pr && !job.pr.compare && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}</span></div>}
       </>}
     </Modal>
   );
