@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { loadAgents, hireAgent } from './Agents';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, type Any } from './core';
+import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, can, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { switchWorkspace } from './WorkspaceSwitcher';
 import { WorkspaceSkeleton } from './skeletons';
@@ -23,9 +23,10 @@ import { Activity } from './Activity';
 import { Brain } from './Brain';
 import { openCode } from './DevCode';
 import { watchCodeStatus, stopWatching } from './codeStatus';
+import { ProjectCodeJobs } from './CodeJobsPage';
 
-export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
-const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, brain: Brain, settings: Settings };
+export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', codejobs: 'Code jobs', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
+const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, codejobs: ProjectCodeJobs, source: Sources, brain: Brain, settings: Settings };
 
 function Sidebar({ view }: { view: string }) {
   const p = P();
@@ -56,8 +57,9 @@ function Sidebar({ view }: { view: string }) {
       {item('tests', I.test, 'Test cases', tests)}
       {item('testmgmt', I.folder, 'Test management', (p.testRepo?.tests || []).length)}
       {item('automation', I.bot, 'Test automation')}
-      {feat('prs') && <div className="side-label">Development</div>}
+      {(feat('prs') || (feat('code') && can('ai.use'))) && <div className="side-label">Development</div>}
       {item('prs', I.pr, 'Pull requests', p.tickets.reduce((n: number, t: any) => n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length, 0))}
+      {can('ai.use') && item('codejobs', I.bot, 'Code jobs')}
       <div className="side-label">Requirements</div>
       {item('source', I.doc, 'Source documents', (p.sourceText ? 1 : 0) + (p.sources || []).length)}
       {item('brain', I.brain, 'Brain')}
@@ -70,7 +72,7 @@ function Sidebar({ view }: { view: string }) {
 }
 
 /** Pages that belong to a feature the owner can lock (Administration → Features). */
-const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', releases: 'releases', activity: 'activity', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs', brain: 'brain' };
+const VIEW_FEATURE: Record<string, string> = { issues: 'issues', board: 'board', timeline: 'timeline', releases: 'releases', activity: 'activity', reports: 'reports', source: 'source', tests: 'tests', testmgmt: 'testmgmt', automation: 'automation', prs: 'prs', codejobs: 'code', brain: 'brain' };
 function LockedView({ label }: { label: string }) {
   return <EmptyState icon={I.settings} tone="neutral" title={`${label} is locked`}
     actions={S.user?.isOwner ? <Link className="btn primary" href="/admin/features">Manage features</Link> : <Link className="btn" href={`/p/${P().id}/backlog`}>Go to the backlog</Link>}>

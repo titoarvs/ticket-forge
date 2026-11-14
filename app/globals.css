@@ -3064,3 +3064,56 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .code-ind.c-merged, .code-ind.is-done { background: color-mix(in srgb, var(--success, #1f845a) 16%, transparent); color: var(--success, #1f845a); border-color: color-mix(in srgb, var(--success, #1f845a) 38%, transparent); }
 .code-ind.c-failed { background: color-mix(in srgb, var(--danger, #c9372c) 14%, transparent); color: var(--danger, #c9372c); border-color: color-mix(in srgb, var(--danger, #c9372c) 32%, transparent); }
 .sec-title .code-ind { margin-left: 8px; }
+
+/* ================================================================ Responsive workspace shell (top bar, project layout)
+   One place for how the header and the project screen adapt, from desktop to phone:
+   1360px and below: the main links and the logo show only their icons; 900px: the workspace shows only its initial and Create loses
+   its label; 720px: the header keeps search, Create, the AI pill, notifications and your account. The workspace
+   switcher never disappears, and nothing in the header can overlap. */
+/* The workspace switcher stays on every screen (an older phone rule hides the project switcher the same way). */
+.topnav .tn-left > .menu-wrap:has(.ws-chip) { display: inline-flex; flex: none; }
+.ws-chip { flex: none; }
+.topnav .tn-center { flex: 1 1 0; min-width: 0; }
+@media (min-width: 721px) { .tn-search { min-width: 0; flex: 1 1 380px; max-width: 380px; } }
+.topnav .tn-left, .topnav .tn-right { flex-shrink: 0; }
+.topnav .tn-left { min-width: 0; }
+@media (max-width: 1360px) {
+  .tn-nav .navlink { padding-left: 9px; padding-right: 9px; }
+  .tn-nav .navlink .tn-txt { display: none; }
+  .topnav .brand .hide-md { display: none; }
+}
+@media (max-width: 900px) {
+  .ws-chip .ws-name { display: none; }
+  .ws-chip { padding: 0 6px 0 4px; gap: 4px; }
+  .topnav { gap: 6px; padding: 0 10px; }
+}
+@media (max-width: 720px) {
+  .tn-nav { margin-left: 0; }
+  .topnav .tn-left { gap: 4px; }
+  .topnav .tn-center { flex: 0 0 auto; gap: 4px; }
+}
+/* Phones: undo and redo (also on the keyboard) give way so search, Create, AI, notifications and your account all fit. */
+@media (max-width: 480px) {
+  .tn-edit .icon-btn[aria-label="Undo"], .tn-edit .icon-btn[aria-label="Redo"] { display: none; }
+  .tn-edit { padding-right: 4px; }
+  .topnav { padding: 0 8px; gap: 4px; }
+}
+@media (max-width: 360px) {
+  .tn-edit, .tn-sep { display: none; }
+  .ai-pill { width: 30px; }
+}
+/* Rows on phones: the actions wrap in a tidy line, and the code badge replaces the pull request count. */
+@media (max-width: 560px) {
+  .irow .code-ind + .mini { display: none; }
+  .irow .right { gap: 6px; row-gap: 6px; }
+  .page-h { flex-wrap: wrap; }
+}
+/* Issue panel on phones: section headers wrap their buttons onto a second line instead of running off the screen. */
+@media (max-width: 640px) {
+  .sec-title { flex-wrap: wrap; row-gap: 6px; }
+  .sec-title .tools { flex-wrap: wrap; margin-left: 0; width: 100%; }
+}
+@media (max-width: 640px) {
+  .cjp-bar .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .cjp-bar .seg button { white-space: nowrap; padding: 4px 10px; font-size: 12.5px; }
+}

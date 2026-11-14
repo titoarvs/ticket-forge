@@ -8,7 +8,8 @@ import { S, P, useStore, api, aiBody, can, toast, openModal, closeModal, ago, em
 import { Ico, I, Modal, Spinner, EmptyState, TypeIcon, LayerChip, Avatar, Swatch, Confirm, Menu } from './ui';
 import { TF, TA, SF, MenuItem } from './fields';
 import { openDrawer, linkPr, refreshPr } from './actions';
-import { openCode, openUpdatePr, codeReady, openCodeJobs } from './DevCode';
+import { openCode, openUpdatePr, codeReady } from './DevCode';
+import Link from 'next/link';
 import { useAgents } from './Agents';
 import { PrFindingChips, openPrFindings } from './CodeRabbit';
 
@@ -275,7 +276,7 @@ export function PullRequests() {
       <div className="page-h"><h1>Pull requests</h1><span className="spacer" />
         {progress ? <span className="muted small pr-progress"><Spinner />Updating from GitHub/GitLab… {progress.done} of {progress.total}</span>
           : edit && rows.some((x) => ACTIVE.includes(x.r.status)) && <button className="btn" disabled={!!busy} onClick={() => refreshList(rows.filter((x) => ACTIVE.includes(x.r.status)), false)}><Ico svg={I.refresh} />Refresh open</button>}
-        {ai && <button className="btn" onClick={openCodeJobs}><Ico svg={I.bot} />Code jobs</button>}
+        {ai && <Link className="btn" href={`/p/${p.id}/codejobs`} title="Every code generation for this project: running, ready for review, shipped"><Ico svg={I.bot} />Code jobs</Link>}
         {edit && <button className="btn primary" onClick={() => openModal(<LinkModal />)}><Ico svg={I.plus} />Link pull request</button>}
       </div>
       <p className="muted small" style={{ marginTop: -6 }}>Every pull and merge request linked to this project’s issues, with their checks, reviews and conflicts from GitHub / GitLab.
