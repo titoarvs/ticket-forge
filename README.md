@@ -593,6 +593,13 @@ locally need TicketForge on your computer.
 
 ## Code with AI and pull requests
 
+**Code jobs page** (top bar → *Code jobs*, `/code-jobs`): every code generation in your workspace's projects, on
+this computer and on GitHub Actions, in one list that updates live (every few seconds while something runs). It shows
+counts of what's working, waiting, ready for review, shipped and needing attention, filters (*Running now*, *Ready
+for review*, *All recent*), a project filter and search. Each job can be stopped, opened to review its changes (the
+issue opens with its code job), or followed to its GitHub Actions run and pull request. You only see projects you
+have access to.
+
 Set up once per project in **Project settings → Code & GitHub**:
 - **Local folder**: a clone of the project's GitHub repository on the computer running TicketForge. **Browse…** opens a
   folder picker (Home, Desktop, Documents…; git repositories are marked) and checks the folder you choose. You can

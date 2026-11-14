@@ -1,8 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "ticketforge", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 5173 },
-    { "name": "brain-mock-ai", "runtimeExecutable": "node", "runtimeArgs": ["/private/tmp/claude-501/-Users-arvinayson-Desktop-Practice-Automated-Tickets/639041b1-1535-477d-9362-985457fd9f4c/scratchpad/mock/mock-ai.mjs", "/private/tmp/claude-501/-Users-arvinayson-Desktop-Practice-Automated-Tickets/639041b1-1535-477d-9362-985457fd9f4c/scratchpad/mock/log.jsonl"], "port": 5199 },
-    { "name": "brain-test", "runtimeExecutable": "env", "runtimeArgs": ["DATABASE_URL=", "SUPABASE_DB_URL=", "TICKETFORGE_DATA=/private/tmp/claude-501/-Users-arvinayson-Desktop-Practice-Automated-Tickets/639041b1-1535-477d-9362-985457fd9f4c/scratchpad/tfdata", "TICKETFORGE_MODE=", "AI_MODE=api", "AI_PROVIDER=custom", "AI_BASE_URL=http://127.0.0.1:5199/v1", "AI_MODEL=mock", "AI_API_KEY=", "ANTHROPIC_API_KEY=", "OPENAI_API_KEY=", "SMTP_HOST=", "SMTP_USER=", "SMTP_PASS=", "SENDGRID_API_KEY=", "STRIPE_SECRET_KEY=", "STRIPE_WEBHOOK_SECRET=", "GITHUB_TOKEN=", "GITLAB_TOKEN=", "APP_URL=", "SIGNUP_MODE=", "REQUIRE_EMAIL_VERIFICATION=", "npx", "next", "start", "-p", "5191"], "port": 5191, "url": "http://127.0.0.1:5191" }
+    { "name": "ticketforge", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 5173 }
   ]
 }

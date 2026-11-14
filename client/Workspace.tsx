@@ -21,6 +21,7 @@ import { Issues } from './Issues';
 import { Releases } from './Releases';
 import { Activity } from './Activity';
 import { Brain } from './Brain';
+import { openCode } from './DevCode';
 
 export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
 const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, brain: Brain, settings: Settings };
@@ -111,6 +112,7 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   const issueParam = params.get('issue');
   const epicParam = params.get('epic');
   const hireParam = params.get('hire');
+  const codeParam = params.get('code'); // from the Code jobs page: also open the issue's code job (frontend | backend)
   const loaded = P()?.id === id;
   // Changing page closes the issue/epic panel and any row popup, so the next page doesn't open with the last
   // page's issue beside it. (Runs before the ?issue / ?epic effects below, which may open one for the new page.)
@@ -129,7 +131,11 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   }, [loaded, epicParam, hireParam]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!loaded || !issueParam) return;
-    if (ticket(issueParam)) { Object.assign(S, { drawer: { kind: 'issue', id: issueParam }, menu: null }); emit(); }
+    const t = ticket(issueParam);
+    if (t) {
+      Object.assign(S, { drawer: { kind: 'issue', id: issueParam }, menu: null }); emit();
+      if (codeParam) openCode(t, codeParam === 'backend' ? 'backend' : 'frontend');
+    }
     router.replace(`/p/${id}/${view || 'backlog'}`, { scroll: false });
   }, [loaded, issueParam]); // eslint-disable-line react-hooks/exhaustive-deps
   const v = VIEWS[view] ? view : 'backlog';
