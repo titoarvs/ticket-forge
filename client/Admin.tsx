@@ -10,11 +10,12 @@ import { AdminSkeleton } from './skeletons';
 import { GenerationTab } from './GenerationTab';
 import { AgentsTab } from './AgentsTab';
 import { FeaturesTab } from './FeatureFlags';
+import { BillingTab } from './Billing';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['email', 'Email & database', I.doc]];
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['billing', 'Billing', I.chart], ['email', 'Email & database', I.doc]];
 /** Tabs only the owner sees: people (users and invites) and feature flags. */
-const OWNER_TABS = ['users', 'invites', 'features'];
+const OWNER_TABS = ['users', 'invites', 'features', 'billing'];
 const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
 
 const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
@@ -46,19 +47,19 @@ export default function AdminPage({ tab }: { tab: string }) {
   const [q, setQ] = useState('');
   useEffect(() => { closeProject(); reload(); }, []);
   const tt = tab === 'claude' ? 'ai' : tab;
-  const tabs = TABS.filter(([k]) => S.user?.isOwner || !OWNER_TABS.includes(k));
+  const tabs = TABS.filter(([k]) => (S.user?.isOwner || !OWNER_TABS.includes(k)) && (k !== 'billing' || S.auth?.saas));
   const t = tabs.some(([k]) => k === tt) ? tt : tabs[0][0];
   if (!A.loaded) {
     if (!A.error) return <AdminSkeleton />;
     return <div className="page"><div className="page-inner">
       <ErrorState title="Couldn’t load Administration" error={A.error} onRetry={async () => { A.error = null; emit(); await reload(); }}
-        actions={<Link className="btn" href="/">Back to projects</Link>}><p>Users, roles and invites couldn’t be loaded.</p></ErrorState>
+        actions={<Link className="btn" href="/projects">Back to projects</Link>}><p>Users, roles and invites couldn’t be loaded.</p></ErrorState>
     </div></div>;
   }
   const pending = A.invites.filter((i: Any) => inviteState(i)[0] === 'Pending').length;
   return (
     <div className="page"><div className="page-inner">
-      <div className="crumbs"><Link href="/">Projects</Link><span>/</span><span>Administration</span></div>
+      <div className="crumbs"><Link href="/projects">Projects</Link><span>/</span><span>Administration</span></div>
       <div className="page-h"><h1>Administration</h1><div className="spacer" />{S.user?.isOwner && <button className="btn primary" onClick={() => openModal(<InviteModal />)}><Ico svg={I.plus} />Invite people</button>}</div>
       <div className="tabbar">{tabs.map(([k, l, ic]) => (
         <Link key={k} className={`tab ${t === k ? 'active' : ''}`} href={`/admin/${k}`}><Ico svg={ic} />{l}
@@ -70,6 +71,7 @@ export default function AdminPage({ tab }: { tab: string }) {
       {t === 'generation' && <GenerationTab />}
       {t === 'agents' && <AgentsTab />}
       {t === 'features' && <FeaturesTab />}
+      {t === 'billing' && <BillingTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
   );
@@ -137,8 +139,9 @@ function AccessModal({ u }: { u: Any }) {
 function LinkModal({ title, res }: { title: string; res: Any }) {
   return (
     <Modal title={title} actions={[{ label: 'Done', kind: 'primary' }]}>
+      {res.linkHidden ? <p style={{ marginTop: 0 }}>{res.emailed ? <><Ico svg={I.check} /> Emailed to them.</> : <>{res.emailError || 'Email isn’t configured.'}</>} This person also belongs to other workspaces, so the link goes only to their email.</p> : <>
       <p style={{ marginTop: 0 }}>{res.emailed ? <><Ico svg={I.check} /> Emailed. You can also share the link directly:</> : <>{res.emailError || 'Email isn’t configured.'} Share this link with them:</>}</p>
-      <div className="row" style={{ flexWrap: 'nowrap' }}><TF readOnly value={res.link} onFocus={(e) => e.target.select()} /><button className="btn" onClick={() => copyText(res.link)}><Ico svg={I.copy} />Copy</button></div>
+      <div className="row" style={{ flexWrap: 'nowrap' }}><TF readOnly value={res.link} onFocus={(e) => e.target.select()} /><button className="btn" onClick={() => copyText(res.link)}><Ico svg={I.copy} />Copy</button></div></>}
     </Modal>
   );
 }

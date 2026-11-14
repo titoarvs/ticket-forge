@@ -8,6 +8,7 @@ import { ProjectsSkeleton } from './skeletons';
 import { BlankProjectModal, AiSettingsModal } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { askFirst } from './Clarify';
+import { useAutoTour } from './tour';
 
 async function loadProjects() {
   try { S.projects = await api('/api/projects'); S.projectsLoaded = true; S.projectsError = null; }
@@ -20,6 +21,7 @@ export function ProjectsPage() {
   const [q, setQ] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { closeProject(); loadProjects(); }, []);
+  useAutoTour('home', Boolean(S.projectsLoaded));
   const list = S.projects.filter((p: Any) => !q || `${p.name} ${p.key}`.toLowerCase().includes(q.toLowerCase()));
   const importJson = async (file: File) => {
     try {
@@ -38,7 +40,7 @@ export function ProjectsPage() {
         {can('project.create') && <>
           <button className="btn" onClick={() => fileRef.current?.click()}><Ico svg={I.upload} />Import backup</button>
           <input ref={fileRef} type="file" hidden accept=".json" onChange={(e) => { const f = e.target.files?.[0]; if (f) importJson(f); }} />
-          <Link className="btn primary" href="/new">Create project</Link>
+          <Link className="btn primary" href="/new" data-tour="home-create">Create project</Link>
         </>}
       </div>
       {!S.projectsLoaded ? (S.projectsError
@@ -61,7 +63,7 @@ export function ProjectsPage() {
       </> : (
         <EmptyState icon={I.folder} title={can('project.create') ? 'Create your first project' : 'No projects yet'}
           actions={can('project.create') && <>
-            <Link className="btn primary" href="/new"><Ico svg={I.sparkle} />Create from a document</Link>
+            <Link className="btn primary" href="/new" data-tour="home-create"><Ico svg={I.sparkle} />Create from a document</Link>
             <button className="btn" onClick={() => openModal(<BlankProjectModal />)}>Blank project</button></>}>
           <p>{can('project.create') ? 'Upload a requirements document and Claude turns it into epics, issues, acceptance criteria and test cases.' : 'You don’t have access to any projects yet. Ask an administrator to add you to one.'}</p>
         </EmptyState>
@@ -87,6 +89,7 @@ export function CreateProjectPage() {
   const o = S.genOpts, g = S.gen, st = S.status;
   const setOpt = (k: string, v: Any) => { S.genOpts = { ...S.genOpts, [k]: v }; store.set('tf.genOpts', { ...S.genOpts, projectKey: '' }); emit(); };
   useEffect(() => { closeProject(); }, []);
+  useAutoTour('new');
 
   const upload = async (file: File) => {
     const fd = new FormData();
@@ -134,14 +137,14 @@ export function CreateProjectPage() {
   const c = connLabel();
   return (
     <div className="page"><div className="page-inner">
-      <div className="crumbs"><Link href="/">Projects</Link><span>/</span><span>Create project</span></div>
+      <div className="crumbs"><Link href="/projects">Projects</Link><span>/</span><span>Create project</span></div>
       <div className="page-h"><h1>Create a project from a document</h1></div>
       <div className="create-grid">
         <div>
           {!providerOk && st && <div className="warn-banner"><Ico svg={I.warn} /><span>{st.mode === 'account'
             ? <>AI isn’t ready: {st.account?.cli?.available ? <>Claude Code isn’t signed in. Run <code>claude</code> in a terminal and sign in with your Claude account.</> : <>Claude Code isn’t installed on this computer. Run <code>npm install -g @anthropic-ai/claude-code</code>, then <code>claude</code> to sign in.</>}</>
             : <>No AI API is set up for this address. {can('users.manage') ? <>Set it up in <Link href="/admin/ai">Administration → AI</Link>.</> : 'Ask an administrator to set it up.'}</>}</span></div>}
-          <div className={`dropzone ${over ? 'over' : ''}`} onClick={() => fileRef.current?.click()}
+          <div data-tour="new-dropzone" className={`dropzone ${over ? 'over' : ''}`} onClick={() => fileRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
             onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; if (f) upload(f); }}>
             {reading ? <div className="row" style={{ justifyContent: 'center' }}><Spinner /> Reading document…</div> : <>
@@ -171,7 +174,7 @@ export function CreateProjectPage() {
           <label className="field"><span>Extra instructions for this project (optional)</span>
             <TA value={o.instructions} onChange={(e) => setOpt('instructions', e.target.value)} placeholder="e.g. We use React + Node. Label issues frontend/backend. Add an epic for analytics." /></label>
           <div className="row">
-            {can('ai.use') ? <button className="btn primary" disabled={g?.running} onClick={generate}><Ico svg={I.sparkle} />Generate backlog</button>
+            {can('ai.use') ? <button className="btn primary" data-tour="new-generate" disabled={g?.running} onClick={generate}><Ico svg={I.sparkle} />Generate backlog</button>
               : <span className="muted small">Your role can’t use Claude to generate backlogs.</span>}
             {g?.running ? <button className="btn" onClick={() => g.ctrl.abort()}>Cancel</button> : <button className="btn subtle" onClick={() => openModal(<BlankProjectModal />)}>Create a blank project instead</button>}
           </div>

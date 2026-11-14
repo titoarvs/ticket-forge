@@ -23,6 +23,7 @@ import { PrFindingChips, openPrFindings } from './CodeRabbit';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { VersionHistory } from './Versions';
+import { useAutoTour } from './tour';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
 const close = () => { S.drawer = null; S.full = false; emit(); };
@@ -89,6 +90,7 @@ function ResizeHandle() {
 
 // ---------------------------------------------------------------- issue
 function IssuePanel({ t }: { t: Any }) {
+  useAutoTour('drawer');
   const p = P();
   const edit = can('issue.edit');
   const parent = isSub(t) ? ticket(t.parentId) : null;
@@ -128,15 +130,15 @@ function IssuePanel({ t }: { t: Any }) {
         <SF tone={catOf(t.status)} toneColor={statusColor(statusOf(t.status))} aria-label="Status" disabled={!edit} value={t.status} onChange={(ev) => field('status', ev.target.value)}>{opts(allowedStatuses(t))}</SF>
         {t.flagged && <span className="flag is-flag" title="Flagged: needs attention"><Ico svg={I.flag} />Flagged</span>}
         {can('ai.use') && edit && <>
-          <button className="btn ai" title="Improve the whole issue" onClick={() => runTicketAi(t, 'enhance')}><Ico svg={I.sparkle} />Enhance</button>
-          <Menu id="ai" left button={<button className="btn ai" onClick={() => setMenu('ai')}><Ico svg={I.sparkle} />More AI actions<Ico svg={I.chevron} /></button>}>
+          <button className="btn ai" data-tour="drawer-enhance" title="Improve the whole issue" onClick={() => runTicketAi(t, 'enhance')}><Ico svg={I.sparkle} />Enhance</button>
+          <Menu id="drawer-ai" left button={<button className="btn ai" onClick={() => setMenu('drawer-ai')}><Ico svg={I.sparkle} />More AI actions<Ico svg={I.chevron} /></button>}>
             <div className="mh">AI</div>
             <button onClick={() => runTicketAi(t, 'ac')}>Improve acceptance criteria</button>
             <button onClick={() => runTicketAi(t, 'tests')}>Regenerate test cases</button>
             {!isSub(t) && <button onClick={() => runTicketAi(t, 'split')}>Split into smaller issues</button>}<hr />
             <button onClick={() => openModal(<AskModal t={t} />)}>Ask AI to change this issue…</button>
           </Menu><AiRunPicker compact /></>}
-        {t.testCases.length > 0 && can('test.run') && <button className="btn" disabled={S.autoRun?.running} title="Run this issue's test cases in a browser" onClick={() => runTests(t.testCases.map((tc: Any) => ({ t, tc })))}><Ico svg={I.play} />Run tests</button>}
+        {t.testCases.length > 0 && can('test.run') && <button className="btn" data-tour="drawer-tests" disabled={S.autoRun?.running} title="Run this issue's test cases in a browser" onClick={() => runTests(t.testCases.map((tc: Any) => ({ t, tc })))}><Ico svg={I.play} />Run tests</button>}
       </div>
       <div className="dr-cols">
         <div className="dr-main">
@@ -208,7 +210,7 @@ function IssuePanel({ t }: { t: Any }) {
           <TestsSection t={t} />
           <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span>
             {edit && <div className="tools">
-              {can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
+              {can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" data-tour="drawer-code" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
                 : can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>)}
               {feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
             {t.prs.map((r: Any) => (
@@ -237,7 +239,7 @@ function IssuePanel({ t }: { t: Any }) {
           <div className="sec"><div className="sec-title"><h3>Activity</h3></div>
             <div className="seg">{[['comments', 'Comments'], ['history', 'History'], ['versions', 'Versions'], ['all', 'All']].map(([v, l]) => <button key={v} className={S.actTab === v ? 'on' : ''} aria-pressed={S.actTab === v} onClick={() => { S.actTab = v; saveUi(); emit(); }}>{l}</button>)}</div>
             {S.actTab === 'versions' ? <VersionHistory key={t.id} t={t} /> : <>
-            {S.actTab !== 'history' && can('issue.comment') && <div className="composer"><Avatar name={me()} size={32} /><div style={{ flex: 1, minWidth: 0 }}>
+            {S.actTab !== 'history' && can('issue.comment') && <div className="composer" data-tour="composer"><Avatar name={me()} size={32} /><div style={{ flex: 1, minWidth: 0 }}>
               <CommentEditor key={t.id} compactUntilFocus placeholder="Add a comment…" onSave={(v) => saveComment(t, v)} /></div></div>}
             {activity.map((a: Any) => (a.kind === 'c' ? (
               <div key={a.c.id} className={`comment ${a.c.system ? 'auto' : ''}`}>{a.c.system ? <span className="avatar bot" title="Automation"><Ico svg={I.bot} /></span> : <Avatar name={a.c.author} size={32} />}<div style={{ flex: 1, minWidth: 0 }}>

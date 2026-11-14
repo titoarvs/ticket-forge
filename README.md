@@ -332,6 +332,108 @@ unless you change it for that run.
 - **Your account**: the avatar menu (top right) has your account, password change and log out. Forgot your
   password? Use the link on the sign-in page.
 
+## Workspaces (one TicketForge, many companies)
+
+Each company works in its own **workspace**: its own projects, people, roles, invites, AI providers and agents,
+feature flags, generation rules and templates, AI usage and budget, and test-run screenshots. People have one login
+and can belong to several workspaces; their role, project access and owner status are per workspace.
+
+- **Switching**: the workspace menu in the top bar lists your workspaces. Switching reloads the app, so nothing
+  from the previous workspace stays on screen.
+- **Creating**: on the hosted service (`TICKETFORGE_MODE=saas`) anyone signed in can create a workspace from that
+  menu; self-hosted, only owners can. Open sign-up creates one for each new company.
+- **Inviting someone who already has an account**: they confirm with their own password and the workspace is added
+  to their login. An owner can't see a password-reset link, or rename the account, for someone who also belongs to
+  other workspaces: the link goes only to that person's email.
+- **Removing someone** removes them from this workspace only. An account left with no workspace is deleted.
+- **Existing data**: on first start the `ws-1` migration (recorded in `schema_migrations`) creates the `default`
+  workspace owned by the current owner, makes every existing account a member with the role and access it had, and
+  re-keys roles per workspace. Settings of the default workspace keep their original keys in `app_meta`; other
+  workspaces' settings are stored as `ws:<id>:<key>`.
+- **How isolation is enforced**:
+  - In the app: every query filters by the request's workspace, and every `/api/projects/<id>/…` request is
+    checked against it (another workspace's project is a 404). Project ids are unique across workspaces; a taken id
+    gets a new one from the server.
+  - In PostgreSQL (Supabase): the request's workspace is set for each transaction (`app.workspace_id`), and
+    restrictive `tfw_tenant` row-level security policies hide other workspaces' projects, issues, activity,
+    versions, files, screenshots, code jobs, roles and invites even from someone with access to all projects. Users
+    are visible only to themselves and their co-workers. The local database has no row-level security, so there the
+    app's own checks are the protection.
+- **Hosted service (SaaS) safety**:
+  - AI never uses the server's own Claude sign-in. Each workspace sets up its own AI providers, or people use My AI.
+  - Code jobs and repository folders never run on the server itself. Repositories connect through GitHub, and code
+    jobs run on GitHub Actions.
+  - Server-wide `GITHUB_TOKEN`, `GH_TOKEN` and `GITLAB_TOKEN` are ignored, and so is the server's `gh` sign-in.
+  - Test runs refuse apps on private or internal addresses. This checks the address you enter, not pages a test
+    script opens later, so for full protection run tests on GitHub Actions or a remote browser.
+  - Server-wide AI keys (such as `ANTHROPIC_API_KEY`) are available to every workspace, and each call counts
+    toward the workspace's plan (see Plans and billing).
+- **Before deploying**: back up the database (`pg_dump`). Stop or upgrade every running copy of the app that uses
+  the same database: an older copy re-creates the old permission functions, which don't know about workspaces.
+
+## Plans and billing (Stripe)
+
+On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-hosted, and the service's own
+`default` workspace, have no limits.
+
+- **Plans** are in `lib/plans.js`: Free, Pro and Team, with limits on projects, members (people plus pending
+  invites), platform AI actions per month, AI code jobs per month and storage. The prices and limits there are
+  placeholders. A new company's first workspace gets a 14-day Pro trial (`TRIAL_DAYS`); further workspaces of the
+  same owner start on Free.
+- **What counts as an AI action**: only calls that use the service's own AI keys (environment variables).
+  Providers a workspace adds in Administration → AI, and people's own Claude subscriptions (My AI), don't count.
+  Monthly allowances are taken atomically, so many requests at once never go over, and a failed call gives its
+  allowance back.
+- **Going over a limit** returns HTTP 402 `{ code: 'limit' }`, and the app shows an Upgrade prompt. Owners can go
+  to the plans from there; others are asked to contact their owner. Nothing already there is removed: a workspace
+  over its limit after a downgrade just can't add more.
+- **Billing page**: Administration → Billing (workspace owner) shows the plan, what renews when, and usage against
+  each limit. **Choose a plan** opens Stripe Checkout; **Manage billing** opens the Stripe Customer Portal (card,
+  invoices, plan changes, cancelling).
+- **Webhook**: `POST /api/stripe/webhook`. It checks the `Stripe-Signature` (HMAC, 5-minute window) and handles
+  each event once (`billing_events`). It reads the subscription back from Stripe before changing the plan. Events:
+  `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid` and
+  `invoice.payment_failed`. A failed payment keeps the plan while Stripe retries (the Billing page warns); a
+  cancelled or unpaid subscription returns the workspace to Free.
+- **Setup**:
+  1. In Stripe, create a product with monthly and yearly prices for Pro and Team.
+  2. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTH`, `STRIPE_PRICE_PRO_YEAR`,
+     `STRIPE_PRICE_TEAM_MONTH` and `STRIPE_PRICE_TEAM_YEAR`. Optionally set `PLAN_CURRENCY` (default USD).
+  3. In Stripe, add a webhook endpoint `https://<your domain>/api/stripe/webhook` with the events above.
+  4. Turn on the Customer Portal in Stripe's settings.
+  To try it locally: `stripe listen --forward-to localhost:5173/api/stripe/webhook` with test keys, and the card
+  4242 4242 4242 4242.
+
+## Public site, legal pages, sign-up and the guided tour
+
+- **Home page**: signed-out visitors to `/` see the product page (features, how it works, pricing). Signed-in
+  people go straight to `/projects` (the projects list moved there).
+- **Legal pages**: `/terms`, `/privacy` and `/cookies`, written in `lib/legal/*.ts`. They are **templates** with
+  placeholders such as `[Company name]`, `[Address]` and `[Contact email]`: fill them in and have them reviewed by
+  qualified counsel before you rely on them. Links are in the footer of the public and sign-in pages and in the
+  account menu. Fonts are served from this site (`next/font`), and there are no analytics or advertising cookies,
+  so no cookie banner is needed.
+- **Consent**: setup, accepting an invite and sign-up have an unticked box to accept the Terms of Use and Privacy
+  Policy; the server refuses without it. Each acceptance is stored in `legal_acceptances` (document, version,
+  time, IP address, browser). When you change a document, bump its version in `lib/legal/versions.js`
+  (`material: true`): everyone is asked to accept the new version the next time they open the app. Accounts made
+  before consent existed are asked once too. On the hosted service (`TICKETFORGE_MODE=saas`) the prompt can't be
+  put off; self-hosted, people can choose "Remind me later".
+- **Sign-up** (`/signup`), set with `SIGNUP_MODE`:
+  - `closed` (self-hosted default): invitation only.
+  - `waitlist`: people leave their name, email and company. The owner sees the requests at `GET /api/admin/signups`
+    and invites them.
+  - `open` (SaaS default): anyone creates an account and gets their own workspace (see Workspaces below).
+  On a server with no accounts yet, sign-up creates the owner, the same as `/setup`. The form is rate-limited and
+  has a hidden field for bots.
+- **Guided tour** (Reactour): new people get a short tour the first time they reach the projects list, the
+  create-project page, a project's backlog and an issue. Steps for features someone can't use are skipped. Finished
+  or skipped tours are remembered per person on the server (`user_prefs`). Account menu → **Show me around**
+  starts the tour for the page you are on; **Restart all tours** shows them all again. Accounts created before the
+  tours were added don't see them automatically.
+- **Settings**: `TICKETFORGE_MODE` (`selfhost` | `saas`), `SIGNUP_MODE` (`closed` | `waitlist` | `open`),
+  `PLATFORM_NAME`, `PLATFORM_ADMIN_EMAILS`. Plans and prices for the pricing page are in `lib/plans.js`.
+
 ## Email (SMTP)
 
 Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` in `.env` and restart. Examples:

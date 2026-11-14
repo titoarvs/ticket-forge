@@ -14,7 +14,7 @@ export const GET = api(async (req) => {
   const user = await authed();
   const sp = new URL(req.url).searchParams;
   const projectId = String(sp.get('projectId') || '');
-  store.requireAccess(user, projectId);
+  await store.requireProject(user, projectId);
   const repo = String(sp.get('repo') || '').trim();
   const [token, key] = await Promise.all([getProjectSecret(projectId, 'githubToken'), getProjectSecret(projectId, 'ghRunnerKey')]);
   try { return await runnerStatus({ repo, token: token || '', hasKey: Boolean(key) }); }
@@ -26,7 +26,7 @@ export const POST = api(async (req) => {
   const projectId = String(b.projectId || '');
   if (b.action === 'setup') {
     const user = await perm('project.settings');
-    store.requireAccess(user, projectId);
+    await store.requireProject(user, projectId);
     const repo = String(b.repo || '').trim();
     let key = await getProjectSecret(projectId, 'ghRunnerKey');
     if (!key) { key = newRunKey(); await setProjectSecret(projectId, 'ghRunnerKey', key, user); }
@@ -35,7 +35,7 @@ export const POST = api(async (req) => {
   }
   if (b.action === 'collect') {
     const user = await perm('test.run');
-    store.requireAccess(user, projectId);
+    await store.requireProject(user, projectId);
     const github = await githubRunner(projectId, { deadlineMs: 260_000 });
     const pending = b.pending || {};
     if (!Array.isArray(pending.runs) || !pending.runs.length) throw new HttpError(400, 'Nothing to collect.');
