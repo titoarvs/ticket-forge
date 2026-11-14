@@ -19,7 +19,7 @@ export const POST = api(async (req, p) => {
   const ex = EXPORTS[p.format];
   if (!ex) throw new HttpError(400, 'Unknown export format');
   const b = await body(req);
-  if (b?.id) store.requireAccess(user, b.id);
+  if (b?.id) await store.requireProject(user, b.id);
   const project = assignKeys(b);
   const out = await ex.fn(project);
   return new Response(out, { headers: { 'Content-Type': ex.type, 'Content-Disposition': `attachment; filename="${slug(project.name)}.${ex.ext}"` } });

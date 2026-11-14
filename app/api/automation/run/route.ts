@@ -15,7 +15,7 @@ export const POST = api(async (req) => {
   const user = await perm('test.run');
   const b = await body(req);
   const { items, baseUrl, regenerate, project } = b;
-  if (project?.id) store.requireAccess(user, project.id);
+  if (project?.id) await store.requireProject(user, project.id);
   if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) throw new HttpError(400, 'Set a base URL (http:// or https://) for the app under test.');
   if (!Array.isArray(items) || !items.length) throw new HttpError(400, 'No test cases to run.');
   if ((regenerate || items.some((i: any) => !i.tc?.script?.trim())) && !store.has(user, 'ai.use')) {

@@ -1,5 +1,5 @@
 'use client';
-// Sign-in screens: first-run setup, login, forgot/reset password, accept invite.
+// Sign-in screens: first-run setup, login, sign-up (request access), forgot/reset password, accept invite.
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -7,9 +7,10 @@ import { S, emit, useStore, api, toast, type Any } from './core';
 import { Ico, I, Toasts, Sk, Loading } from './ui';
 import { bootSession, ServerDown } from './AppShell';
 import { AuthSkeleton } from './skeletons';
+import { Footer } from './Footer';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-type Mode = 'setup' | 'login' | 'forgot' | 'reset' | 'invite';
+type Mode = 'setup' | 'login' | 'signup' | 'forgot' | 'reset' | 'invite';
 
 function Card({ title, sub, children, foot }: { title: string; sub?: ReactNode; children?: ReactNode; foot?: ReactNode }) {
   return (
@@ -18,7 +19,16 @@ function Card({ title, sub, children, foot }: { title: string; sub?: ReactNode; 
       <h1>{title}</h1>{sub && <p className="muted">{sub}</p>}
       {children}
       {foot && <div className="auth-foot">{foot}</div>}
-    </div></div>
+    </div><Footer compact /></div>
+  );
+}
+/** The unticked box people must tick to accept the Terms of Use and Privacy Policy (links open in a new tab). */
+function Consent({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="consent">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} required data-testid="accept-terms" />
+      <span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms of Use</a> and the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+    </label>
   );
 }
 function Field({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
@@ -29,7 +39,8 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
   useStore();
   const router = useRouter();
   const params = useSearchParams();
-  const [f, setF] = useState({ name: '', email: '', pass: '', pass2: '' });
+  const [f, setF] = useState({ name: '', email: '', pass: '', pass2: '', company: '', note: '', website: '' });
+  const [accept, setAccept] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<Any>(null);
@@ -41,7 +52,7 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
     if (!S.ready || S.bootError) return;
     if (S.auth?.setupRequired && mode !== 'setup') router.replace('/setup');
     else if (!S.auth?.setupRequired && mode === 'setup') router.replace('/login');
-    else if (S.user && mode === 'login') router.replace(params.get('next') || '/');
+    else if (S.user && (mode === 'login' || mode === 'signup')) router.replace(params.get('next') || '/projects');
   }, [S.ready, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (mode !== 'invite' || !token) return;
@@ -53,19 +64,27 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
     S.user = res.user;
     await bootSession();
     toast(`Welcome, ${res.user.name}`);
-    router.replace(mode === 'login' ? params.get('next') || '/' : '/');
+    router.replace(mode === 'login' ? params.get('next') || '/projects' : '/projects');
   };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setErr(''); setBusy(true);
     try {
-      if (mode === 'setup') await done(await api('/api/auth/setup', { method: 'POST', body: { name: f.name, email: f.email, password: f.pass } }));
+      const needsConsent = mode === 'setup' || mode === 'invite' || mode === 'signup';
+      if (needsConsent && !accept) throw new Error('Please tick the box to accept the Terms of Use and Privacy Policy.');
+      if (mode === 'setup') await done(await api('/api/auth/setup', { method: 'POST', body: { name: f.name, email: f.email, password: f.pass, company: f.company, acceptTerms: accept } }));
+      else if (mode === 'signup') {
+        const plan = params.get('plan');
+        const note = [f.note.trim(), plan && /^[a-z]{2,12}$/.test(plan) ? `Interested in the ${plan} plan.` : ''].filter(Boolean).join('\n');
+        const r = await api('/api/auth/signup', { method: 'POST', body: { name: f.name, email: f.email, company: f.company, note, password: f.pass, website: f.website, acceptTerms: accept } });
+        if (r.user) await done(r); else setSent(r);
+      }
       else if (mode === 'login') await done(await api('/api/auth/login', { method: 'POST', body: { email: f.email, password: f.pass } }));
       else if (mode === 'forgot') setSent(await api('/api/auth/forgot', { method: 'POST', body: { email: f.email } }));
       else if (mode === 'reset') {
         if (f.pass !== f.pass2) throw new Error('The passwords don’t match.');
         await done(await api('/api/auth/reset', { method: 'POST', body: { token, password: f.pass } }));
-      } else if (mode === 'invite') await done(await api(`/api/invites/${encodeURIComponent(token!)}/accept`, { method: 'POST', body: { name: f.name, password: f.pass } }));
+      } else if (mode === 'invite') await done(await api(`/api/invites/${encodeURIComponent(token!)}/accept`, { method: 'POST', body: { name: f.name, password: f.pass, acceptTerms: accept } }));
     } catch (e2: Any) { setErr(e2.message); }
     finally { setBusy(false); }
   };
@@ -84,8 +103,33 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
       {form(<>
         <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
         <Field label="Work email" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
+        <Field label="Company or team name (optional)" autoComplete="organization" value={f.company} onChange={set('company')} />
         <Field label="Password (at least 8 characters)" type="password" autoComplete="new-password" value={f.pass} onChange={set('pass')} />
+        <Consent checked={accept} onChange={setAccept} />
       </>, 'Create owner account')}</Card>;
+  } else if (mode === 'signup') {
+    const sm = S.auth?.signupMode || 'closed';
+    if (sm === 'closed') body = <Card title="Sign-up is by invitation" sub="Accounts on this TicketForge are created by invitation. Ask your administrator to invite you." foot={<Link href="/login">Go to sign in</Link>} />;
+    else if (sent) body = <Card title="Thanks, we’ve got your request" foot={<Link href="/">Back to the home page</Link>}>
+      <div className="auth-ok"><Ico svg={I.check} /><div>We’ll email <b>{f.email || 'you'}</b> an invitation as soon as your workspace is ready.</div></div></Card>;
+    else if (sm === 'open') body = <Card title="Create your workspace" sub="Your company’s own space in TicketForge: your projects, people and AI settings, kept apart from everyone else’s." foot={<><span className="muted">Already have an account?</span><Link href="/login">Sign in</Link></>}>
+      {form(<>
+        <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
+        <Field label="Work email" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
+        <Field label="Company or team name" autoComplete="organization" value={f.company} onChange={set('company')} />
+        <Field label="Password (at least 8 characters)" type="password" autoComplete="new-password" value={f.pass} onChange={set('pass')} />
+        <input className="hp-field" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" value={f.website} onChange={set('website')} />
+        <Consent checked={accept} onChange={setAccept} />
+      </>, 'Create workspace')}</Card>;
+    else body = <Card title="Request access to TicketForge" sub="Tell us who you are and we’ll send you an invitation to create your account." foot={<><span className="muted">Already have an account?</span><Link href="/login">Sign in</Link></>}>
+      {form(<>
+        <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
+        <Field label="Work email" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
+        <Field label="Company (optional)" autoComplete="organization" value={f.company} onChange={set('company')} />
+        <Field label="What will you use it for? (optional)" value={f.note} onChange={set('note')} />
+        <input className="hp-field" tabIndex={-1} autoComplete="off" aria-hidden="true" name="website" value={f.website} onChange={set('website')} />
+        <Consent checked={accept} onChange={setAccept} />
+      </>, 'Request access')}</Card>;
   } else if (mode === 'forgot') {
     body = <Card title="Forgot your password?" sub="Enter your email and we’ll send you a link to reset it." foot={<Link href="/login">Back to sign in</Link>}>
       {sent ? <div className="auth-ok"><Ico svg={I.check} /><div>If an account exists for that email, a reset link is on its way.
@@ -104,14 +148,20 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
       <Sk h={36} />
     </Loading></Card>;
     else if (invite.error) body = <Card title="Invite unavailable" sub={invite.error} foot={<Link href="/login">Go to sign in</Link>} />;
-    else body = <Card title="Join your team on TicketForge" sub={<><b>{invite.inviter}</b> invited <b>{invite.email}</b> as <b>{invite.role}</b>.</>}>
+    else body = <Card title={invite.workspace ? `Join ${invite.workspace} on TicketForge` : 'Join your team on TicketForge'} sub={<><b>{invite.inviter}</b> invited <b>{invite.email}</b> as <b>{invite.role}</b>.</>}>
       {form(<>
         {invite.message && <blockquote className="auth-quote">{invite.message}</blockquote>}
-        <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
-        <Field label="Create a password (at least 8 characters)" type="password" autoComplete="new-password" value={f.pass} onChange={set('pass')} />
-      </>, 'Accept invite')}</Card>;
+        {invite.existingAccount ? <>
+          <p className="muted small" style={{ marginTop: 0 }}>You already have a TicketForge account. Enter your password to add this workspace to it.</p>
+          <Field label="Your password" type="password" autoFocus autoComplete="current-password" value={f.pass} onChange={set('pass')} />
+        </> : <>
+          <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
+          <Field label="Create a password (at least 8 characters)" type="password" autoComplete="new-password" value={f.pass} onChange={set('pass')} />
+        </>}
+        <Consent checked={accept} onChange={setAccept} />
+      </>, invite.existingAccount ? 'Join workspace' : 'Accept invite')}</Card>;
   } else {
-    body = <Card title="Sign in" sub="Sign in to continue to TicketForge." foot={<><Link href="/forgot">Forgot password?</Link><span className="muted">·</span><span className="muted">New here? Ask an administrator for an invite.</span></>}>
+    body = <Card title="Sign in" sub="Sign in to continue to TicketForge." foot={<><Link href="/forgot">Forgot password?</Link><span className="muted">·</span>{S.auth?.signupMode && S.auth.signupMode !== 'closed' ? <><span className="muted">New here?</span><Link href="/signup">{S.auth.signupMode === 'open' ? 'Create a workspace' : 'Request access'}</Link></> : <span className="muted">New here? Ask an administrator for an invite.</span>}</>}>
       {form(<>
         <Field label="Email" type="email" autoFocus autoComplete="username" value={f.email} onChange={set('email')} />
         <Field label="Password" type="password" autoComplete="current-password" value={f.pass} onChange={set('pass')} />

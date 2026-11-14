@@ -27,6 +27,7 @@ import { openPsd, openWritePsd, downloadPsd, writeMissingPsds, psdBusy } from '.
 import { ItemText } from './ListEditor';
 import { BulkCodeModal, codeReady } from './DevCode';
 import { CodeReviewReport } from './CodeRabbit';
+import { useAutoTour } from './tour';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -61,7 +62,7 @@ export function zoneDnd(zone: Any) {
 
 export function Header({ title, right, sub }: { title: string; right?: ReactNode; sub?: ReactNode }) {
   return <>
-    <div className="crumbs"><Link href="/">Projects</Link><span>/</span><Link href={`/p/${P().id}/summary`}>{P().name}</Link></div>
+    <div className="crumbs"><Link href="/projects">Projects</Link><span>/</span><Link href={`/p/${P().id}/summary`}>{P().name}</Link></div>
     <div className="page-h"><h1>{title}</h1>{sub}<div className="spacer" />{right}</div>
   </>;
 }
@@ -337,6 +338,7 @@ const BulkBarView = memo(function BulkBarView({ ids }: { ids: string[]; sig: str
 /** Rows drawn per group at first; "Show more" draws the next ones (a backlog of thousands opens at once). */
 const ROW_CAP = 200;
 export function Backlog() {
+  useAutoTour('project');
   const groups = backlogGroups();
   const act = activeSprint();
   const toggle = (id: string) => { if (S.collapsed.has(id)) S.collapsed.delete(id); else S.collapsed.add(id); saveUi(); emit(); };
@@ -346,7 +348,7 @@ export function Backlog() {
   visibleIds = groups.flatMap((g: Any) => (S.collapsed.has(g.id) ? [] : g.items.slice(0, capOf(g)).map((t: Any) => t.id)));
   return <>
     <Header title="Backlog" right={can('ai.use') && can('issue.create') && <>
-      <button className="btn ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>
+      <button className="btn ai" data-tour="backlog-ai" onClick={() => openModal(<FeatureModal />)} title="Plan new epics and issues from a description or document"><Ico svg={I.plus} />Add feature with AI</button>
       <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal />)}><Ico svg={I.sparkle} />Write issue with AI</button></>} />
     <FilterBar group={{ value: S.groupBy, options: [['sprint', 'Sprint'], ['epic', 'Epic'], ['status', 'Status'], ['none', 'None']], onChange: (v) => { S.groupBy = v; saveUi(); emit(); } }} />
     <BulkBar />

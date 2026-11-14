@@ -130,7 +130,7 @@ function People({ ed }: { ed: boolean }) {
 function Danger() {
   const p = P();
   const del = () => openModal(<Confirm title="Delete project?" label="Delete project" text={`“${p.name}” and all of its ${p.tickets.length} issues, ${p.epics.length} epics, sprints and test cases will be permanently deleted. This can’t be undone.`}
-    onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); S.project = null; S.base = null; emit(); toast('Project deleted'); S.nav('/'); } catch (e: Any) { toast(e.message, 'err'); } }} />);
+    onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); S.project = null; S.base = null; emit(); toast('Project deleted'); S.nav('/projects'); } catch (e: Any) { toast(e.message, 'err'); } }} />);
   return (
     <SetCard id="delete" tone="danger" title="Delete this project" desc="Permanently removes the project with all of its epics, issues, sprints, test cases, source documents and failure screenshots."
       right={<button className="btn danger" onClick={del}><Ico svg={I.trash} />Delete project</button>}>

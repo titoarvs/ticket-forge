@@ -8,7 +8,7 @@ export const POST = api(async (req) => {
   const u = await perm('ai.use');
   const b = await body(req);
   if (!b.projectId || !Array.isArray(b.ticketIds) || !b.ticketIds.length) throw new HttpError(400, 'Which issues?');
-  store.requireAccess(u, String(b.projectId));
+  await store.requireProject(u, String(b.projectId));
   const project = await store.getProject(String(b.projectId));
   const ai = aiOpts(b);
   return ndjson(req, async (send, signal) => {

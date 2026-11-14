@@ -13,6 +13,10 @@ import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue, openDra
 import { AccountModal } from './Admin';
 import { MyAiModal } from './MyAi';
 import { useThemeMode } from './theme';
+import { TourHost, startTourHere, resetTours } from './tour';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { showUpgrade } from './Billing';
+import { planLimitHandler } from './core';
 
 const EXPORTS: (string[] | null)[] = [
   ['xlsx', 'Excel workbook', '.xlsx'], ['docx', 'Word document', '.docx'], ['pdf', 'PDF report', '.pdf'], ['html', 'HTML report', '.html'],
@@ -126,7 +130,7 @@ function AiMenu() {
   const peak = can('users.manage') ? planPeak(st?.planUsage) : null;
   return (
     <Menu id="ai" button={
-      <button className={`ai-pill t-${tone} ${open ? 'on' : ''}`} onClick={() => setMenu('ai')} aria-haspopup="menu" aria-expanded={open}
+      <button data-tour="ai-pill" className={`ai-pill t-${tone} ${open ? 'on' : ''}`} onClick={() => setMenu('ai')} aria-haspopup="menu" aria-expanded={open}
         title={c.switched ? `Using ${c.label} because your Claude account ${cool?.reason || 'is unavailable'}` : `AI: ${name}${c.model ? ` · ${c.model}` : ''} · runs on ${runName}`}>
         <span className={`dot ${tone}`} /><Ico svg={I.sparkle} className="ai-ic" />
         <span className="ai-name">{name}</span>
@@ -174,7 +178,7 @@ export function ProjectSwitcher({ p }: { p: Any }) {
       <button onClick={() => S.nav(`/p/${p.id}/backlog`)}><span className="proj-avatar xs" style={{ background: hashColor(p.key, COLORS) }}>{String(p.key).slice(0, 2)}</span>{p.name}<small>{p.key}</small></button>
       {others.length > 0 && <><hr /><div className="mh">Switch to</div>
         {others.slice(0, 8).map((x: Any) => <button key={x.id} onClick={() => S.nav(`/p/${x.id}/backlog`)}><span className="proj-avatar xs" style={{ background: hashColor(x.key, COLORS) }}>{String(x.key).slice(0, 2)}</span>{x.name}<small>{x.key}</small></button>)}</>}
-      <hr /><button onClick={() => S.nav('/')}><Ico svg={I.folder} />All projects</button>
+      <hr /><button onClick={() => S.nav('/projects')}><Ico svg={I.folder} />All projects</button>
     </Menu>
   );
 }
@@ -213,7 +217,7 @@ function HeaderSearch({ inProject }: { inProject: boolean }) {
   }
   const pick = (h?: Hit) => { if (!h) return; h.go(); setQ(''); setOpen(false); (document.activeElement as HTMLElement)?.blur(); };
   return (
-    <div className="tn-search" ref={ref}>
+    <div className="tn-search" ref={ref} data-tour="tn-search">
       <Ico svg={I.search} className="tn-search-ic" />
       <input id="tn-search" type="search" autoComplete="off" placeholder={inProject ? 'Search issues' : 'Search projects'} aria-label={inProject ? 'Search issues by key or summary' : 'Search projects'}
         value={q} onFocus={() => { setOpen(true); loadProjects(); }} onBlur={() => setOpen(false)} onChange={(e) => { setQ(e.target.value); setActive(0); setOpen(true); }}
@@ -249,9 +253,10 @@ export function TopNav() {
   return (
     <header className="topnav">
       <div className="tn-left">
-        <Link className="brand" href="/" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} /><span className="hide-md">TicketForge</span></Link>
+        <Link className="brand" href="/projects" title="All projects"><span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} /><span className="hide-md">TicketForge</span></Link>
+        <WorkspaceSwitcher />
         <nav className="tn-nav" aria-label="Main">
-          <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/"><Ico svg={I.folder} /><span className="hide-sm">Projects</span></Link>
+          <Link className={`navlink ${!pathname.startsWith('/p/') && !inAdmin ? 'active' : ''}`} href="/projects"><Ico svg={I.folder} /><span className="hide-sm">Projects</span></Link>
           {can('users.manage') && <Link className={`navlink hide-sm ${inAdmin ? 'active' : ''}`} href={S.user?.isOwner ? '/admin/users' : '/admin/ai'}><Ico svg={I.settings} />Administration</Link>}
         </nav>
         {inProject && <><span className="tn-sep" aria-hidden>/</span><ProjectSwitcher p={p} /></>}
@@ -259,12 +264,12 @@ export function TopNav() {
       <div className="tn-center">
         <HeaderSearch inProject={inProject} />
         {(inProject ? can('issue.create') : can('project.create')) && (
-          <button className="btn primary tn-create" title={inProject ? 'Create issue (C)' : 'Create project'}
+          <button className="btn primary tn-create" data-tour="tn-create" title={inProject ? 'Create issue (C)' : 'Create project'}
             onClick={() => (inProject ? openCreateIssue() : S.nav('/new'))}><Ico svg={I.plus} /><span className="hide-sm">{inProject ? 'Create' : 'New project'}</span></button>
         )}
       </div>
       <div className="tn-right">
-        {inProject && <div className="tn-group tn-edit">
+        {inProject && <div className="tn-group tn-edit" data-tour="tn-edit">
           <span className={`save-state ${saving ? 'saving' : failed ? 'failed' : 'saved'}`} title={S.saveText || 'All changes saved'} role="status">
             {saving ? <span className="spinner sm" /> : <Ico svg={failed ? I.warn : I.check} />}<span className="hide-md">{S.saveText || 'Saved'}</span></span>
           <button className="icon-btn" title="Undo (⌘Z)" aria-label="Undo" disabled={!S.undo.length} onClick={undo}><Ico svg={I.undo} /></button>
@@ -278,7 +283,7 @@ export function TopNav() {
         </div>}
         <AiMenu />
         <Notifications />
-        <Menu id="account" button={<button className="me-chip" aria-label="Account menu" title={`${S.user.name}: account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /><Ico svg={I.chevron} className="me-chev hide-sm" /></button>}>
+        <Menu id="account" button={<button className="me-chip" data-tour="account" aria-label="Account menu" title={`${S.user.name}: account`} onClick={() => setMenu('account')}><Avatar name={S.user.name} /><Ico svg={I.chevron} className="me-chev hide-sm" /></button>}>
           <div className="acct"><Avatar name={S.user.name} size={36} /><div><b>{S.user.name}</b><span className="muted small">{S.user.email}</span><span className="label-chip">{S.user.roleName}{S.user.isOwner ? ' · Owner' : ''}</span></div></div><hr />
           {can('users.manage') && <>
             <button onClick={() => S.nav(S.user?.isOwner ? '/admin/users' : '/admin/ai')}><Ico svg={I.people} />Administration</button>
@@ -288,6 +293,11 @@ export function TopNav() {
           <button onClick={() => openModal(<AccountModal />)}><Ico svg={I.settings} />Your account &amp; password</button>
           <button onClick={() => openModal(<MyAiModal />)}><Ico svg={I.sparkle} />My AI (your Claude subscription)</button>
           <button onClick={(e) => { e.stopPropagation(); toggle(); }}><Ico svg={mode === 'dark' ? I.sun : I.moon} />{mode === 'dark' ? 'Light theme' : 'Dark theme'}</button>
+          <hr />
+          <button onClick={() => { S.menu = null; emit(); setTimeout(() => { if (!startTourHere()) toast('There’s no tour for this page.'); }, 150); }}><Ico svg={I.sparkle} />Show me around</button>
+          <button onClick={async () => { S.menu = null; emit(); await resetTours(); toast('Tours will show again on each page.'); setTimeout(startTourHere, 150); }}><Ico svg={I.undo} />Restart all tours</button>
+          <button onClick={() => window.open('/terms', '_blank', 'noopener')}><Ico svg={I.doc} />Terms of Use</button>
+          <button onClick={() => window.open('/privacy', '_blank', 'noopener')}><Ico svg={I.doc} />Privacy Policy</button>
           <hr />
           <button onClick={logout}><Ico svg={I.external} />Log out</button>
         </Menu>
@@ -304,7 +314,7 @@ function Notifications() {
   };
   return (
     <Menu id="notifs" button={
-      <button className="icon-btn bell" aria-label={`Notifications${unread ? ` (${unread} unread)` : ''}`} title="Notifications" onClick={() => { setMenu('notifs'); loadNotifs(); }}>
+      <button className="icon-btn bell" data-tour="bell" aria-label={`Notifications${unread ? ` (${unread} unread)` : ''}`} title="Notifications" onClick={() => { setMenu('notifs'); loadNotifs(); }}>
         <Ico svg={I.bell} />{unread > 0 && <span className="bell-count">{unread > 99 ? '99+' : unread}</span>}
       </button>}>
       <div className="notif-head"><b>Notifications</b>{unread > 0 && <button className="link-btn small" onClick={(e) => { e.stopPropagation(); markNotifsRead(); }}>Mark all as read</button>}</div>
@@ -350,6 +360,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   useEffect(() => { S.nav = (h: string) => router.push(h); }, [router]);
+  useEffect(() => { planLimitHandler.fn = showUpgrade; return () => { planLimitHandler.fn = null; }; }, []);
   useEffect(() => {
     // Links from the previous version used hash routes (/#/invite/…, /#/reset/…, /#/p/…).
     const legacy = location.hash.match(/^#(\/(?:invite|reset|p|admin|new)\b.*)$/);
@@ -405,14 +416,53 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (S.bootError) return <main id="app"><div className="page"><ServerDown /></div><Toasts /></main>;
   if (!S.ready || !S.user) return <AppSkeleton />;
   return (
-    <>
+    <TourHost>
       <TopNav />
       <main id="app">{children}</main>
       {S.modal as Any}
+      <LegalPrompt />
       <Toasts />
       <TaskTray />
       <RunPill />
-    </>
+    </TourHost>
+  );
+}
+
+const DOC_TITLE: Record<string, string> = { terms: 'Terms of Use', privacy: 'Privacy Policy' };
+/**
+ * Asks people to accept the Terms of Use and Privacy Policy when they haven't yet (accounts from before consent
+ * existed) or after a material change. On the hosted service (SaaS) it can't be put off; self-hosted, it can.
+ */
+function LegalPrompt() {
+  const [accept, setAccept] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [later, setLater] = useState(false);
+  const legal = S.auth?.legal;
+  const needs: string[] = legal?.needs || [];
+  if (!needs.length || (later && !S.auth?.saas)) return null;
+  const changed = Boolean(S.user?.termsAcceptedAt);
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const r = await api('/api/me/legal', { method: 'POST', body: { accept: true } });
+      S.auth.legal = r.legal; S.user.termsAcceptedAt = new Date().toISOString(); emit();
+      toast('Thanks, you’re all set.');
+    } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  return (
+    <div className="legal-overlay" role="dialog" aria-modal="true" aria-labelledby="legal-h">
+      <div className="legal-card">
+        <h2 id="legal-h">{changed ? 'We’ve updated our terms' : 'Please review our terms'}</h2>
+        <p className="muted">{changed ? 'The documents below have changed. Please read them and accept to keep using TicketForge.' : 'Before you carry on, please read and accept the documents below.'}</p>
+        <ul className="legal-docs">{needs.map((d) => <li key={d}><a href={`/${d}`} target="_blank" rel="noopener">{DOC_TITLE[d] || d}</a><span className="muted small"> · version {legal?.versions?.[d]}</span></li>)}</ul>
+        <label className="consent"><input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} data-testid="accept-legal" />
+          <span>I have read and agree to the {needs.map((d) => DOC_TITLE[d] || d).join(' and ')}.</span></label>
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+          {!S.auth?.saas && <button className="btn subtle" onClick={() => setLater(true)}>Remind me later</button>}
+          <button className="btn primary" disabled={!accept || busy} onClick={submit}>{busy ? 'Saving…' : 'Accept and continue'}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

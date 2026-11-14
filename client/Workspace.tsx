@@ -36,7 +36,7 @@ function Sidebar({ view }: { view: string }) {
   useEffect(() => { document.querySelector('.sidebar .side-item.active')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [view]);
   return (
     <div className={`side-wrap ${mini ? 'is-collapsed' : ''}`}>
-    <nav className="sidebar" aria-label="Project">
+    <nav className="sidebar" aria-label="Project" data-tour="sidebar">
       <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}
@@ -75,10 +75,10 @@ function LockedView({ label }: { label: string }) {
 /** The project couldn't be opened: missing, no access, or a failed request. */
 function ProjectError({ id }: { id: string }) {
   const e = S.projectError;
-  const back = <Link className="btn" href="/">Back to projects</Link>;
+  const back = <Link className="btn" href="/projects">Back to projects</Link>;
   if (e.status === 404 || e.status === 403) {
     return (
-      <EmptyState icon={I.folder} tone="neutral" title="Project not found" actions={<Link className="btn primary" href="/">Back to projects</Link>}>
+      <EmptyState icon={I.folder} tone="neutral" title="Project not found" actions={<Link className="btn primary" href="/projects">Back to projects</Link>}>
         <p>It may have been deleted, or you don’t have access to it. If you think you should, ask an administrator to add you.</p>
       </EmptyState>
     );

@@ -5,6 +5,7 @@ import * as auth from '@/lib/auth.js';
 import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION } from '@/lib/db.js';
 import * as store from '@/lib/store.js';
 import { isLocalHost } from '@/lib/claude.js';
+import { isSaas, scrubSharedTokens } from '@/lib/platform.js';
 
 const G = globalThis as any;
 
@@ -12,6 +13,7 @@ const G = globalThis as any;
 export function ready(): Promise<void> {
   if (G.__tfReadyFor !== SCHEMA_VERSION) { G.__tfReady = null; G.__tfReadyFor = SCHEMA_VERSION; }
   G.__tfReady ??= (async () => {
+    scrubSharedTokens();
     await migrate();
     await auth.seedRoles();
     const n = await asSystem(() => store.importJsonProjects());
@@ -46,9 +48,9 @@ export async function perm(...perms: string[]) {
   return u;
 }
 
-export async function startSession(userId: string) {
+export async function startSession(userId: string, ws: string | null = null) {
   const h = await headers();
-  const s = await auth.createSession(userId, h.get('user-agent') || '');
+  const s = await auth.createSession(userId, h.get('user-agent') || '', ws);
   const jar = await cookies();
   jar.set(auth.SESSION_COOKIE, s.token, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: s.maxAge, secure: /^https:/.test(process.env.APP_URL || '') });
 }
@@ -84,16 +86,24 @@ export function api(fn: Handler) {
         const origin = req.headers.get('origin');
         if (origin && new URL(origin).host !== req.headers.get('host')) throw new HttpError(403, 'Cross-site request blocked');
       }
-      // Feature flags: a feature the owner locked refuses its API routes for everyone.
-      const locked = await lockedFeatureFor(new URL(req.url).pathname);
-      if (locked) throw new HttpError(423, lockedMessage(locked));
       // Every query in this request runs as the signed-in user, so database row-level security applies.
       const user = await currentUser();
       // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
-      const local = isLocalHost(req.headers.get('x-forwarded-host') || req.headers.get('host'));
+      // On the hosted service (SaaS) never: the server's own Claude sign-in must not answer for other companies.
+      const local = !isSaas() && isLocalHost(req.headers.get('x-forwarded-host') || req.headers.get('host'));
       // The project this request is about (for AI usage per project): from the address, or set by aiOpts from the body.
       const projectId = decodeURIComponent(new URL(req.url).pathname.match(/^\/api\/projects\/([^/]+)/)?.[1] || '') || null;
-      const out = await asUser(user?.id, () => resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({})), user, { local, projectId });
+      // Workspaces: a project of another workspace doesn't exist as far as this request is concerned.
+      if (projectId && user) {
+        const w = await store.projectWorkspace(projectId);
+        if (w && w !== user.workspace_id) throw new HttpError(404, 'Project not found');
+      }
+      const out = await asUser(user?.id, async () => {
+        // Feature flags: a feature the workspace owner locked refuses its API routes for everyone in that workspace.
+        const locked = await lockedFeatureFor(new URL(req.url).pathname);
+        if (locked) throw new HttpError(423, lockedMessage(locked));
+        return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
+      }, user, { local, projectId });
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (e: any) {
       if (!e.status || e.status >= 500) console.error(e);
@@ -113,7 +123,7 @@ export function ndjson(req: Request, run: (send: (o: any) => void, signal: Abort
       const send = (o: any) => { if (open) { try { controller.enqueue(enc.encode(`${JSON.stringify(o)}\n`)); } catch { open = false; } } };
       const ping = setInterval(() => send({ type: 'ping' }), 15000);
       try { await run(send, ctrl.signal); }
-      catch (e: any) { if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message }); }
+      catch (e: any) { if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) }); }
       finally { clearInterval(ping); open = false; try { controller.close(); } catch { /* closed */ } }
     },
     cancel() { ctrl.abort(); },

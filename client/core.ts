@@ -98,6 +98,7 @@ export async function api(url: string, { method = 'GET', body, raw, signal }: { 
     try { errBody = await res.json(); msg = errBody.error || msg; } catch { /* not json */ }
     if (res.status === 401 && S.user && !url.startsWith('/api/auth/')) { S.user = null; emit(); S.nav('/login'); }
     const err: Any = new Error(msg); err.status = res.status; err.body = errBody;
+    if (res.status === 402 && errBody?.code === 'limit') onPlanLimit(errBody);
     throw err;
   }
   return raw ? res : res.json();
@@ -119,6 +120,9 @@ export function slimProject(p: Any) {
     tickets: p.tickets.map((t: Any) => ({ ...t, history: undefined, comments: undefined, testCases: t.testCases.map((tc: Any) => ({ ...tc, script: undefined, lastRun: undefined })) })),
   };
 }
+/** A plan limit was reached (SaaS): the app shows the upgrade prompt (set by client/Billing.tsx). */
+export const planLimitHandler: { fn: ((info: Any) => void) | null } = { fn: null };
+function onPlanLimit(info: Any) { try { planLimitHandler.fn?.(info); } catch { /* the error message still shows */ } }
 export async function readNdjson(res: Response, onEvent: (ev: Any) => void | Promise<void>) {
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
@@ -131,7 +135,7 @@ export async function readNdjson(res: Response, onEvent: (ev: Any) => void | Pro
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i).trim();
       buf = buf.slice(i + 1);
-      if (line) { const ev = JSON.parse(line); if (ev.type !== 'ping') await onEvent(ev); }
+      if (line) { const ev = JSON.parse(line); if (ev.type === 'error' && ev.code === 'limit') onPlanLimit(ev); if (ev.type !== 'ping') await onEvent(ev); }
     }
   }
 }
