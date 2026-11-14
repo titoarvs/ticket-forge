@@ -113,6 +113,8 @@ async function remotePost(req: Request, p: any, b: any) {
   const j = await loadJob(String(b.jobId));
   if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
   const dev = remoteDev(project, j.side);
+  // Stop must work even when GitHub or the runner setup isn't reachable right now.
+  if (b.action === 'cancel') return publicRemote(await cancelRemote(j, await ghFor(project, dev).catch(() => null)));
   const gh = await ghFor(project, dev);
   if (b.action === 'follow') {
     if (!store.has(user, 'ai.use')) throw new HttpError(403, 'You don’t have permission to do this (ai.use).');
@@ -122,7 +124,6 @@ async function remotePost(req: Request, p: any, b: any) {
     task.oauthToken = await ownToken();
     return publicRemote(await followRemote(j, { gh, task, user, text: String(b.text || '').slice(0, 4000) }));
   }
-  if (b.action === 'cancel') return publicRemote(await cancelRemote(j, gh));
   if (b.action === 'discard') return publicRemote(await discardRemote(j, gh));
   if (b.action === 'prDraft') {
     const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { key: j.ticketKey, title: j.ticketKey };
