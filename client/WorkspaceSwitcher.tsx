@@ -45,7 +45,7 @@ export function WorkspaceSwitcher() {
   // One workspace and nothing to do with it: no switcher, just room for the rest of the bar.
   if (list.length <= 1 && !canCreate && !S.user?.isOwner) return null;
   return (
-    <Menu id="workspace" left button={
+    <Menu id="workspace" left style={{ flex: 'none', minWidth: 0 }} button={
       <button className="ws-chip" data-tour="workspace" aria-haspopup="menu" aria-expanded={S.menu === 'workspace'} title={`Workspace: ${name}`} onClick={() => setMenu('workspace')}>
         <span className="ws-avatar" aria-hidden>{name.slice(0, 1).toUpperCase()}</span><span className="ws-name hide-sm">{name}</span><Ico svg={I.chevron} />
       </button>}>
