@@ -22,6 +22,7 @@ import { Releases } from './Releases';
 import { Activity } from './Activity';
 import { Brain } from './Brain';
 import { openCode } from './DevCode';
+import { watchCodeStatus, stopWatching } from './codeStatus';
 
 export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
 const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, source: Sources, brain: Brain, settings: Settings };
@@ -138,6 +139,8 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
     }
     router.replace(`/p/${id}/${view || 'backlog'}`, { scroll: false });
   }, [loaded, issueParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Coding indicators on issues (rows, cards, the issue panel): fresh while this project is open.
+  useEffect(() => { if (!loaded) return undefined; watchCodeStatus(id); return () => stopWatching(); }, [loaded, id]);
   const v = VIEWS[view] ? view : 'backlog';
   if (S.projectError?.id === id) return <div className="page"><ProjectError id={id} /></div>;
   if (!P() || P().id !== id) return <WorkspaceSkeleton view={v} />;

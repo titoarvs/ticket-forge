@@ -2,6 +2,7 @@
 // Code & GitHub: a project's local repository and GitHub settings, and the "Write code with AI" job for an issue:
 // Claude Code implements it in its own git worktree, you review the diff, TicketForge opens the pull request.
 import { useEffect, useRef, useState } from 'react';
+import { refreshCodeStatus } from './codeStatus';
 import { readNdjson, S, P, feat, api, startTask, aiBody, setField, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, uid, nowIso, logEvent, ago, emit, runPlace, setRunPlace, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm, SetCard, LAYER_LABEL } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
@@ -626,13 +627,13 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   useEffect(() => { if (job?.coderabbit?.status === 'done') saveReview(t, job); }, [job?.coderabbit?.status, job?.coderabbit?.round]); // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (kind: string, body: Any) => {
     setBusy(kind);
-    try { const r = await api(base, { method: 'POST', body: { ...body, jobId: job?.id } }); if (r?.id) setJob((j: Any) => ({ ...r, log: kind === 'start' ? r.log : [...(j?.log || []), ...r.log.slice(j?.logSize ?? 0)] })); return r; }
+    try { const r = await api(base, { method: 'POST', body: { ...body, jobId: job?.id } }); refreshCodeStatus(); if (r?.id) setJob((j: Any) => ({ ...r, log: kind === 'start' ? r.log : [...(j?.log || []), ...r.log.slice(j?.logSize ?? 0)] })); return r; }
     catch (e: Any) { toast(e.message, 'err'); return null; } finally { setBusy(''); }
   };
   // Frontend + Backend issue: agree the API, then build both repositories in parallel.
   const startBoth = async () => {
     setBusy('both');
-    try { const r = await api(base, { method: 'POST', body: { action: 'start-both', ticketId: t.id, instructions: text } }); setJobs((js) => ({ ...js, ...r.jobs })); setContract(r.contract || ''); }
+    try { const r = await api(base, { method: 'POST', body: { action: 'start-both', ticketId: t.id, instructions: text } }); refreshCodeStatus(); setJobs((js) => ({ ...js, ...r.jobs })); setContract(r.contract || ''); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
   };
   const idle = (k: string) => !jobs[k] || jobs[k].status === 'discarded';
@@ -909,7 +910,7 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
     setBusy(true);
     try {
       const r = await api(base, { method: 'POST', body: aiBody({ action: 'start-many', ticketIds: tickets.map((x: Any) => x.id), instructions: text, agentId }) });
-      setResult(r);
+      setResult(r); refreshCodeStatus();
       mutate(() => { for (const x of tickets) if (r.started.some((j: Any) => j.ticketId === x.id)) logEvent(x, 'started writing code with AI (batch)', 'Development'); });
       S.checked.clear(); emit();
     } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
