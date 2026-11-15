@@ -24,6 +24,10 @@ import { Brain } from './Brain';
 import { openCode } from './DevCode';
 import { watchCodeStatus, stopWatching } from './codeStatus';
 import { ProjectCodeJobs } from './CodeJobsPage';
+import pkg from '../package.json';
+
+/** App version shown at the top of the sidebar, as v<major.minor.patch> (read from package.json, so it follows each release). */
+const APP_VERSION = /^\d+\.\d+\.\d+/.test(pkg.version) ? `v${pkg.version.match(/^\d+\.\d+\.\d+/)![0]}` : '';
 
 export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', codejobs: 'Code jobs', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
 const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, codejobs: ProjectCodeJobs, source: Sources, brain: Brain, settings: Settings };
@@ -84,6 +88,7 @@ function Sidebar({ view }: { view: string }) {
   );
   const nav = (
     <nav className="sidebar" aria-label="Project" data-tour="sidebar" onClick={(e) => { if (drawerOpen && (e.target as HTMLElement).closest('a')) closeDrawer(false); }}>
+      <div className="side-version" aria-label={`App version ${APP_VERSION}`} title={`Ticket Forge ${APP_VERSION}`}>{APP_VERSION}</div>
       <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}

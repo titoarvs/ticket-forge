@@ -1,6 +1,6 @@
 {
   "name": "ticketforge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Turn requirement documents into epics, tickets, acceptance criteria and test cases with Claude.",
   "type": "module",
   "main": "server.js",
