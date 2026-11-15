@@ -702,6 +702,18 @@ a.side-item:hover, a.brand:hover, a.navlink:hover { text-decoration: none; }
 .side-menu-btn:focus-visible, .side-drawer-x:focus-visible { outline: 2px solid var(--selected-text); outline-offset: 2px; }
 @keyframes side-in { from { transform: translateX(-100%); } to { transform: none; } }
 @media (max-width: 599px) { .shell { flex-direction: column; } }
+/* App version at the top of the sidebar (TF-84). Stays visible in full, rail and drawer modes. */
+.side-version { padding: 0 10px 8px; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--text-subtlest); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.side-wrap.is-collapsed .side-version { padding: 0 0 8px; text-align: center; font-size: 10px; }
+/* Phone safety net: nothing pushes the page sideways, media and long words stay inside the screen. */
+@media (max-width: 599px) {
+  .main, .page, .page-inner, .view { min-width: 0; max-width: 100%; }
+  .page { overflow-x: hidden; overflow-wrap: anywhere; }
+  .page img, .page video, .page canvas, .page pre { max-width: 100%; }
+  .page pre { overflow-x: auto; }
+  .page-h { flex-wrap: wrap; }
+  .page input, .page select, .page textarea { max-width: 100%; }
+}
 @media (prefers-reduced-motion: reduce) { .side-drawer { animation: none; } }
 
 /* Test automation tabs and failures */

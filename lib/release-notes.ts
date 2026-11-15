@@ -11,6 +11,7 @@ export const RELEASES: Release[] = [
   { version: '0.1.0', date: '2026-11-09' },
   { version: '0.2.0', date: '2026-11-12' },
   { version: '1.0.0', date: '2026-11-15' },
+  { version: '1.0.1', date: '2026-11-16' },
 ];
 
 /** Every release with its feature titles (major and minor), newest release first. */
