@@ -158,6 +158,9 @@ export const TIMELINE: TlEntry[] = [
   // ---- 15 Nov
   { id: 'responsive', date: '2026-11-15', cat: 'platform', title: 'Responsive everywhere',
     text: 'The top bar, workspace menu and project pages adapt from a phone to a wide laptop.', tags: ['Mobile'] },
+  { id: 'ai-flow', date: '2026-11-15', cat: 'ai', title: 'AI flow: connect providers like nodes',
+    text: 'The AI settings as a canvas, in the spirit of n8n. Wire each task to a tier, chain providers by fallback, and click any node to test it or change its models.',
+    details: ['Drag from a task’s dot onto High, Standard, Light or a configuration.', 'Drag a provider’s bottom dot onto another to set the fallback order.', 'Pan, zoom, arrange nodes and go full screen; changes save as you make them.'], tags: ['Canvas', 'Providers'] },
   { id: 'timeline', date: '2026-11-15', cat: 'platform', title: 'This timeline',
     text: 'An animated tour of how the product grew, with filters and search.', tags: ['You are here'] },
 ];

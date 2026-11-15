@@ -404,6 +404,22 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   To try it locally: `stripe listen --forward-to localhost:5173/api/stripe/webhook` with test keys, and the card
   4242 4242 4242 4242.
 
+## AI flow (Administration → AI → AI flow)
+
+The AI settings as a canvas of nodes, like n8n. Left to right: **tasks** (grouped) → **tiers** (High, Standard, Light, and
+your AI configurations) → the **router** → your **providers**, chained in fallback order.
+
+- **Route a task:** drag from the dot beside a task onto a tier or a configuration. Click a wire and press Delete (or the ×)
+  to put the task back on its default tier.
+- **Set the fallback order:** drag a provider's bottom dot onto another provider: that one is tried next, after it. The
+  Claude account and Copilot (on your own computer) always go first; providers set with environment variables come last.
+- **Click a node** for its details: status, Test connection, Edit, Remove, and the model it uses for each tier. The
+  router has the Model routing and fallback switches. Wires are saved as you make them; model edits have a Save bar.
+- **Move around:** drag the background to pan, Ctrl/⌘ + scroll or pinch to zoom, drag nodes to arrange them (kept in your
+  browser), ⤢ fits everything, ⛶ goes full screen. On phones the details open as a bottom sheet.
+
+It reads and writes the same settings as Model routing, Models per tier and Providers, which stay available.
+
 ## Product timeline (`/timeline`)
 
 A public, animated page that tells how TicketForge grew, day by day: a sparkline of features shipped per day, then every
