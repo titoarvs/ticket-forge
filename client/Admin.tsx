@@ -10,6 +10,7 @@ import { AdminSkeleton } from './skeletons';
 import { GenerationTab } from './GenerationTab';
 import { AgentsTab } from './AgentsTab';
 import { FeaturesTab } from './FeatureFlags';
+import { AiFlow } from './AiFlow';
 import { BillingTab } from './Billing';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
@@ -495,7 +496,7 @@ function AiTab() {
   const [busy, setBusy] = useState('');
   const [showEnv, setShowEnv] = useState(false);
   const [envProv, setEnvProv] = useState('openai');
-  const [sec, setSec] = useSection('tf.adminAiSec', ['connection', 'routing', 'models', 'usage', 'savings', 'configs', 'providers', 'local'], 'connection');
+  const [sec, setSec] = useSection('tf.adminAiSec', ['flow', 'connection', 'routing', 'models', 'usage', 'savings', 'configs', 'providers', 'local'], 'flow');
   const refresh = async () => { setBusy('refresh'); try { applyAi(await api('/api/admin/ai?fresh=1')); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
   if (!c) {
     return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await api('/api/admin/ai?fresh=1'))}>
@@ -513,6 +514,7 @@ function AiTab() {
     : 'TicketForge was opened on a web address (not localhost), so it uses the AI providers below.';
   const now = c.mode === 'account' && !c.switched ? 'Your Claude account' : c.label;
   const items = [
+    { key: 'flow', label: 'AI flow', hint: 'Connect providers like nodes', icon: I.grid },
     { key: 'connection', label: 'Connection', hint: 'Status, sign-in and test', icon: I.sparkle },
     { key: 'routing', label: 'Model routing', hint: 'Presets and the tier for each task', icon: I.chart, badge: c.routingOn ? null : <span className="loz">Off</span> },
     { key: 'models', label: 'Models per tier', hint: 'High, Standard and Light on each AI', icon: I.bot },
@@ -526,6 +528,15 @@ function AiTab() {
     <div className="sec-layout">
       <SectionNav label="AI settings" items={items} value={sec} onChange={setSec} />
       <div className="sec-body">
+      {sec === 'flow' && <AiFlow c={c} actions={{
+        onSaved: applyAi,
+        add: () => openModal(<ProviderModal c={c} />),
+        edit: (x: Any) => openModal(<ProviderModal c={c} entry={x} />),
+        remove: (x: Any) => openModal(<Confirm title={`Remove ${x.label}?`} label="Remove"
+          text={<>{x.label}{x.model ? ` (${x.model})` : ''} and its saved API key are deleted.</>}
+          onYes={async () => { try { applyAi(await api(`/api/admin/ai?id=${encodeURIComponent(x.entryId)}`, { method: 'DELETE' })); toast(`${x.label} removed`); } catch (e: Any) { toast(e.message, 'err'); } }} />),
+        goto: setSec,
+      }} />}
       {['routing', 'models', 'usage', 'savings'].includes(sec) && <RoutingSection key={`${sec}${JSON.stringify(c.settings?.routing)}`} c={c} onSaved={applyAi} part={sec as 'routing' | 'models' | 'usage' | 'savings'} go={setSec} />}
       {sec === 'local' && c.copilot && <div className="cards"><LocalAiCard c={c} />
         {c.account?.signedIn && <div className="card wide"><h3>Claude plan limits</h3>
