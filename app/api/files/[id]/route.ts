@@ -38,7 +38,7 @@ export const GET = api(async (req, p) => {
 
 export const DELETE = api(async (_req, p) => {
   const { user, f } = await load(p.id);
-  if (!['issue.create', 'project.settings', 'issue.comment'].some((x) => store.has(user, x))) throw new HttpError(403, "You don't have permission to remove files.");
+  if (!['issue.create', 'project.settings', 'issue.comment', 'issue.edit'].some((x) => store.has(user, x))) throw new HttpError(403, "You don't have permission to remove files.");
   await deleteFile(f.id);
   return { ok: true };
 });
