@@ -1,10 +1,10 @@
 'use client';
 // Project workspace: sidebar, current view and the issue/epic panel.
-import { useEffect } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { loadAgents, hireAgent } from './Agents';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { S, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, can, type Any } from './core';
+import { S, store, emit, useStore, P, openProject, isSub, isDone, feat, activeSprint, hashColor, COLORS, ticket, toggleSidebar, statusColorCss, can, type Any } from './core';
 import { Ico, I, EmptyState, ErrorState } from './ui';
 import { switchWorkspace } from './WorkspaceSwitcher';
 import { WorkspaceSkeleton } from './skeletons';
@@ -24,24 +24,71 @@ import { Brain } from './Brain';
 import { openCode } from './DevCode';
 import { watchCodeStatus, stopWatching } from './codeStatus';
 import { ProjectCodeJobs } from './CodeJobsPage';
+import pkg from '../package.json';
+
+/** App version shown at the top of the sidebar, as v<major.minor.patch> (read from package.json, so it follows each release). */
+const APP_VERSION = /^\d+\.\d+\.\d+/.test(pkg.version) ? `v${pkg.version.match(/^\d+\.\d+\.\d+/)![0]}` : '';
 
 export const VIEWS: Record<string, string> = { summary: 'Summary', issues: 'Issues', backlog: 'Backlog', board: 'Board', epics: 'Epics', releases: 'Releases', timeline: 'Timeline', activity: 'Activity', reports: 'Reports', tests: 'Test cases', testmgmt: 'Test management', automation: 'Test automation', prs: 'Pull requests', codejobs: 'Code jobs', source: 'Source documents', brain: 'Brain', settings: 'Project settings' };
 const COMPONENTS: Record<string, () => React.ReactNode> = { summary: Summary, issues: Issues, backlog: Backlog, board: Board, epics: Epics, releases: Releases, timeline: Timeline, activity: Activity, reports: Reports, tests: Tests, testmgmt: TestManagement, automation: Automation, prs: PullRequests, codejobs: ProjectCodeJobs, source: Sources, brain: Brain, settings: Settings };
 
+/** Sidenav layout for the screen width: phone (< 600px) drawer, tablet (600–1023px) icon rail, desktop (1024px+) full. */
+type SideMode = 'phone' | 'rail' | 'full';
+const PHONE_Q = '(max-width: 599px)', RAIL_Q = '(max-width: 1023px)';
+const subscribeMode = (cb: () => void) => {
+  const qs = [matchMedia(PHONE_Q), matchMedia(RAIL_Q)];
+  qs.forEach((q) => q.addEventListener('change', cb));
+  return () => qs.forEach((q) => q.removeEventListener('change', cb));
+};
+const modeNow = (): SideMode => (matchMedia(PHONE_Q).matches ? 'phone' : matchMedia(RAIL_Q).matches ? 'rail' : 'full');
+const useSideMode = () => useSyncExternalStore(subscribeMode, modeNow, () => 'full' as SideMode);
+
+/** Whether the phone drawer is open is remembered in this browser; a missing or invalid saved value means closed. */
+const DRAWER_KEY = 'tf.sideDrawerOpen';
+const readDrawerOpen = () => store.get(DRAWER_KEY, false) === true;
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 function Sidebar({ view }: { view: string }) {
   const p = P();
+  const mode = useSideMode();
+  const [open, setOpen] = useState(false);
+  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  const drawerEl = useRef<HTMLDivElement>(null);
+  useEffect(() => { setOpen(readDrawerOpen()); }, []);
+  const setDrawer = (v: boolean) => { setOpen(v); store.set(DRAWER_KEY, v); };
+  const drawerOpen = mode === 'phone' && open;
+  // A modal drawer takes focus when it opens (including when it is restored after a reload).
+  useEffect(() => { if (drawerOpen) drawerEl.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus(); }, [drawerOpen]);
+  useEffect(() => { if (mode !== 'rail') setTip(null); }, [mode]);
+  const closeDrawer = (returnFocus = true) => { setDrawer(false); if (returnFocus) setTimeout(() => menuBtn.current?.focus(), 0); };
+  const onDrawerKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.nativeEvent.stopPropagation(); closeDrawer(); return; }
+    if (e.key !== 'Tab') return;
+    const els = [...(drawerEl.current?.querySelectorAll<HTMLElement>(FOCUSABLE) || [])];
+    if (!els.length) { e.preventDefault(); return; }
+    const first = els[0], last = els[els.length - 1], cur = document.activeElement;
+    if (!drawerEl.current?.contains(cur)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && cur === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
+  };
   const tests = p.tickets.reduce((s: number, t: any) => s + t.testCases.length, 0);
-  const mini = S.sideCollapsed;
+  const rail = mode === 'rail';
+  const mini = rail || (mode === 'full' && S.sideCollapsed);
+  const showTip = (text: string) => (e: React.SyntheticEvent<HTMLElement>) => {
+    if (!rail) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ text, top: r.top + r.height / 2, left: r.right + 8 });
+  };
   const item = (v: string, icon: string, label: string, n?: number) => (!feat(VIEW_FEATURE[v] || '') ? null :
-    <Link key={v} className={`side-item ${view === v ? 'active' : ''}`} href={`/p/${p.id}/${v}`} title={mini ? `${label}${n !== undefined ? ` (${n})` : ''}` : undefined}
-      aria-label={mini ? label : undefined} aria-current={view === v ? 'page' : undefined}>
+    <Link key={v} className={`side-item ${view === v ? 'active' : ''}`} href={`/p/${p.id}/${v}`} title={mini && !rail ? `${label}${n !== undefined ? ` (${n})` : ''}` : undefined}
+      aria-label={mini ? label : undefined} aria-current={view === v ? 'page' : undefined}
+      onMouseEnter={showTip(label)} onFocus={showTip(label)} onMouseLeave={() => setTip(null)} onBlur={() => setTip(null)}>
       <Ico svg={icon} /><span className="side-text">{label}</span>{n !== undefined && <span className="n">{n}</span>}</Link>
   );
-  // On small screens the navigation is a scrolling top bar: keep the current page's tab in view.
-  useEffect(() => { document.querySelector('.sidebar .side-item.active')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [view]);
-  return (
-    <div className={`side-wrap ${mini ? 'is-collapsed' : ''}`}>
-    <nav className="sidebar" aria-label="Project" data-tour="sidebar">
+  const nav = (
+    <nav className="sidebar" aria-label="Project" data-tour="sidebar" onClick={(e) => { if (drawerOpen && (e.target as HTMLElement).closest('a')) closeDrawer(false); }}>
+      <div className="side-version" aria-label={`App version ${APP_VERSION}`} title={`Ticket Forge ${APP_VERSION}`}>{APP_VERSION}</div>
       <div className="proj-head" title={mini ? p.name : undefined}><span className="proj-avatar" style={{ background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><div className="side-text" style={{ minWidth: 0 }}><b title={p.name}>{p.name}</b><span>Software project</span></div></div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}
@@ -65,8 +112,31 @@ function Sidebar({ view }: { view: string }) {
       {item('brain', I.brain, 'Brain')}
       <div className="side-foot">{item('settings', I.settings, 'Project settings')}</div>
     </nav>
-    <button type="button" className="side-toggle" onClick={() => toggleSidebar()} aria-expanded={!mini} aria-label={mini ? 'Expand sidebar' : 'Collapse sidebar'}
-      title={mini ? 'Expand sidebar  [' : 'Collapse sidebar  ['}><Ico svg={I.chevron} /></button>
+  );
+  if (mode === 'phone') {
+    return (
+      <div className="side-phone">
+        <div className="side-mbar">
+          <button type="button" ref={menuBtn} className="icon-btn side-menu-btn" onClick={() => setDrawer(!open)} aria-label="Open navigation menu"
+            aria-expanded={drawerOpen} aria-controls={drawerOpen ? 'side-drawer' : undefined} aria-haspopup="dialog"><Ico svg={I.menu} /></button>
+          <span className="side-mbar-name">{p.name}</span>
+        </div>
+        {drawerOpen && <>
+          <div className="side-backdrop" onClick={() => closeDrawer()} aria-hidden="true" />
+          <div id="side-drawer" ref={drawerEl} className="side-drawer" role="dialog" aria-modal="true" aria-label="Project navigation" onKeyDown={onDrawerKey}>
+            <button type="button" className="icon-btn side-drawer-x" onClick={() => closeDrawer()} aria-label="Close navigation menu"><Ico svg={I.close} /></button>
+            {nav}
+          </div>
+        </>}
+      </div>
+    );
+  }
+  return (
+    <div className={`side-wrap ${mini ? 'is-collapsed' : ''} ${rail ? 'is-rail' : ''}`}>
+    {nav}
+    {!rail && <button type="button" className="side-toggle" onClick={() => toggleSidebar()} aria-expanded={!mini} aria-label={mini ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={mini ? 'Expand sidebar  [' : 'Collapse sidebar  ['}><Ico svg={I.chevron} /></button>}
+    {tip && <div className="side-tip" role="tooltip" style={{ top: tip.top, left: tip.left }}>{tip.text}</div>}
     </div>
   );
 }

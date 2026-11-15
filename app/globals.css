@@ -368,12 +368,6 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .drawer:not(.full) { width: min(520px, 50%); }
 }
 @media (max-width: 960px) {
-  .shell { flex-direction: column; }
-  .sidebar { width: auto; flex-direction: row; overflow-x: auto; padding: 6px 8px; border-right: 0; border-bottom: 1px solid var(--border); gap: 2px; }
-  .sidebar .side-label, .sidebar .side-foot, .sidebar .proj-head span { display: none; }
-  .sidebar .proj-head { padding: 0 8px 0 0; }
-  .side-item { width: auto; white-space: nowrap; }
-  .side-item.active::before { display: none; }
   .drawer:not(.full) { position: fixed; inset: 56px 0 0 auto; width: min(560px, 100%); z-index: 50; box-shadow: var(--shadow-overlay); }
   .view { padding: 16px; }
   .cards, .create-grid, .cmp, .grid2 { grid-template-columns: 1fr; }
@@ -694,14 +688,33 @@ a.side-item:hover, a.brand:hover, a.navlink:hover { text-decoration: none; }
 .side-wrap.is-collapsed .side-item { justify-content: center; padding: 0; gap: 0; }
 .side-wrap.is-collapsed .side-foot { padding-top: 10px; }
 @media (prefers-reduced-motion: reduce) { .side-wrap .sidebar, .side-toggle, .side-toggle .ico { transition: none; } }
-/* Small screens already show the sidebar as a top bar */
-@media (max-width: 960px) {
-  .side-wrap { display: block; }
-  .side-toggle { display: none; }
-  .side-wrap.is-collapsed .sidebar { width: auto; }
-  .side-wrap.is-collapsed .side-text { display: inline; }
-  .side-wrap.is-collapsed .side-item { padding: 0 10px; gap: 10px; }
+/* Responsive sidenav (TF-83): phone < 600px = off-canvas drawer, tablet 600–1023px = icon rail, desktop = full. */
+.side-wrap.is-rail .sidebar { width: 56px; }
+.side-tip { position: fixed; transform: translateY(-50%); z-index: 80; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: var(--radius); white-space: nowrap; box-shadow: var(--shadow-overlay); }
+.side-phone { flex: none; }
+.side-mbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--bg); border-bottom: 1px solid var(--border); min-width: 0; }
+.side-menu-btn { width: 40px; height: 40px; flex: none; }
+.side-mbar-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(9, 30, 66, .54); }
+.side-drawer { position: fixed; top: 0; bottom: 0; left: 0; z-index: 71; width: min(300px, 85vw); display: flex; flex-direction: column; background: var(--bg-sunken); box-shadow: var(--shadow-overlay); animation: side-in .18s ease; }
+.side-drawer .sidebar { width: auto; flex: 1; min-height: 0; border-right: 0; padding-top: 48px; }
+.side-drawer-x { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; z-index: 1; }
+.side-menu-btn:focus-visible, .side-drawer-x:focus-visible { outline: 2px solid var(--selected-text); outline-offset: 2px; }
+@keyframes side-in { from { transform: translateX(-100%); } to { transform: none; } }
+@media (max-width: 599px) { .shell { flex-direction: column; } }
+/* App version at the top of the sidebar (TF-84). Stays visible in full, rail and drawer modes. */
+.side-version { padding: 0 10px 8px; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--text-subtlest); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.side-wrap.is-collapsed .side-version { padding: 0 0 8px; text-align: center; font-size: 10px; }
+/* Phone safety net: nothing pushes the page sideways, media and long words stay inside the screen. */
+@media (max-width: 599px) {
+  .main, .page, .page-inner, .view { min-width: 0; max-width: 100%; }
+  .page { overflow-x: hidden; overflow-wrap: anywhere; }
+  .page img, .page video, .page canvas, .page pre { max-width: 100%; }
+  .page pre { overflow-x: auto; }
+  .page-h { flex-wrap: wrap; }
+  .page input, .page select, .page textarea { max-width: 100%; }
 }
+@media (prefers-reduced-motion: reduce) { .side-drawer { animation: none; } }
 
 /* Test automation tabs and failures */
 .auto-tabs { margin-bottom: 16px; }
@@ -1989,10 +2002,6 @@ tr.xr-step-passed td { background: color-mix(in srgb, var(--success-bg) 40%, tra
 
 /* ================================================================ Responsive fixes (phones and tablets) */
 @media (max-width: 960px) {
-  /* Project navigation as a top bar: it scrolls sideways, and Project settings is in it too. */
-  .side-wrap .sidebar { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
-  .side-wrap .sidebar::-webkit-scrollbar { display: none; }
-  .sidebar .side-foot { display: contents; }
   .page { padding: 16px 16px 64px; }
   /* Wide tables scroll inside themselves instead of pushing the whole page sideways. */
   .view table.tbl, .page table.tbl, table.rt-tbl, table.res-tbl, table.xr-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
