@@ -20,7 +20,7 @@ function Reference({ t, r, edit }: { t: Any; r: Any; edit: boolean }) {
   const [open, setOpen] = useState(false);
   const remove = () => openModal(<Confirm title="Remove this reference?" label="Remove" onYes={async () => {
     try { await api(`/api/files/${r.id}`, { method: 'DELETE' }); }
-    catch (e: any) { return toast(e.message || 'Could not remove the file.', 'err'); }
+    catch (e: any) { toast(e.message || 'Could not remove the file.', 'err'); return; }
     mutate(() => { t.references = (t.references || []).filter((x: Any) => x.id !== r.id); logEvent(t, `removed the reference ${r.name}`); });
     toast('Reference removed');
   }} text={<>“{r.name}”, its preview and the text, fields and components read from it will be deleted from this ticket.</>} />);
