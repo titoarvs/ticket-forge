@@ -12,6 +12,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <Link href="/#features">Features</Link>
           <Link href="/#how">How it works</Link>
           <Link href="/pricing">Pricing</Link>
+          <Link href="/timeline">Timeline</Link>
         </nav>
         <span className="mk-spacer" />
         <Link href="/login" className="mk-link">Sign in</Link>

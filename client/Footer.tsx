@@ -5,6 +5,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
   return (
     <footer className={`site-footer ${compact ? 'compact' : ''}`}>
       <nav aria-label="Legal">
+        <Link href="/timeline">Timeline</Link>
         <Link href="/terms">Terms of Use</Link>
         <Link href="/privacy">Privacy Policy</Link>
         <Link href="/cookies">Cookies</Link>

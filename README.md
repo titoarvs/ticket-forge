@@ -404,6 +404,17 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   To try it locally: `stripe listen --forward-to localhost:5173/api/stripe/webhook` with test keys, and the card
   4242 4242 4242 4242.
 
+## Product timeline (`/timeline`)
+
+A public, animated page that tells how TicketForge grew, day by day: a sparkline of features shipped per day, then every
+feature as a card on a line that fills as you scroll. Filter by area, search, switch between newest and oldest first,
+expand details, jump with the day rail (a swipeable bar on phones) or the `j` / `k` keys. It respects "reduce motion"
+and is complete without scripts. It's linked from the public header and footer, and from the account menu
+(*What's new: product timeline*).
+
+The entries are in `lib/timeline.ts` (dates come from when each feature's code first appeared in the repository).
+When something new ships, add an entry to its day, or a new day to `DAYS`.
+
 ## Public site, legal pages, sign-up and the guided tour
 
 - **Home page**: signed-out visitors to `/` see the product page (features, how it works, pricing). Signed-in

@@ -299,6 +299,7 @@ export function TopNav() {
             <Ico svg={runPlace() === 'github' ? I.pr : I.folder} />{runPlace() === 'github' ? 'Code & tests: GitHub Actions' : 'Code & tests: this computer'}</button>}
           <button onClick={() => { S.menu = null; emit(); setTimeout(() => { if (!startTourHere()) toast('There’s no tour for this page.'); }, 150); }}><Ico svg={I.sparkle} />Show me around</button>
           <button onClick={async () => { S.menu = null; emit(); await resetTours(); toast('Tours will show again on each page.'); setTimeout(startTourHere, 150); }}><Ico svg={I.undo} />Restart all tours</button>
+          <button onClick={() => window.open('/timeline', '_blank', 'noopener')}><Ico svg={I.history} />What’s new: product timeline</button>
           <button onClick={() => window.open('/terms', '_blank', 'noopener')}><Ico svg={I.doc} />Terms of Use</button>
           <button onClick={() => window.open('/privacy', '_blank', 'noopener')}><Ico svg={I.doc} />Privacy Policy</button>
           <hr />
