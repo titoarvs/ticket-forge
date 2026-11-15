@@ -6,32 +6,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { S, api, toast, openModal, closeModal, type Any } from './core';
 import { Ico, I, Modal, Spinner, ErrorState } from './ui';
+import { LimitBar } from './Limits';
 
-const LABELS: [string, string, (n: number) => string][] = [
-  ['projects', 'Projects', (n) => n.toLocaleString()],
-  ['members', 'Members', (n) => n.toLocaleString()],
-  ['aiCalls', 'AI actions this month', (n) => n.toLocaleString()],
-  ['codeJobs', 'AI code jobs this month', (n) => n.toLocaleString()],
-  ['storageMb', 'Storage', (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)} GB` : `${n} MB`)],
-];
 const date = (d: string | null) => (d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '');
 const money = (n: number, cur: string) => (n === 0 ? 'Free' : new Intl.NumberFormat([], { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n));
 
 async function go(path: string, body: Any = {}) {
   try { const r = await api(path, { method: 'POST', body }); if (r.url) location.href = r.url; }
   catch (e: Any) { toast(e.message, 'err'); }
-}
-
-function UsageBar({ label, used, limit, fmt, extra }: { label: string; used: number; limit: number | null; fmt: (n: number) => string; extra?: string }) {
-  const pct = limit == null ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
-  const tone = limit != null && pct >= 100 ? 'bad' : pct >= 80 ? 'warn' : 'ok';
-  return (
-    <div className="bill-usage">
-      <div className="bill-usage-h"><span>{label}</span><b>{fmt(used)}{limit == null ? <span className="muted"> · no limit</span> : <span className="muted"> of {fmt(limit)}</span>}</b></div>
-      {limit != null && <div className="bill-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}><i className={tone} style={{ width: `${Math.max(pct, 2)}%` }} /></div>}
-      {extra && <div className="muted small">{extra}</div>}
-    </div>
-  );
 }
 
 export function BillingTab() {
@@ -56,7 +38,7 @@ export function BillingTab() {
   if (error) return <ErrorState title="Couldn’t load billing" error={error} onRetry={load}><p>Your plan and usage couldn’t be loaded.</p></ErrorState>;
   if (!d) return <div className="card" style={{ padding: 24 }}><Spinner /> Loading billing…</div>;
   if (!d.enabled) return <div className="card" style={{ padding: 20 }}><h2 style={{ marginTop: 0 }}>No plans here</h2><p className="muted">This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the hosted service (TICKETFORGE_MODE=saas).</p></div>;
-  const p = d.plan, s = d.subscription, u = d.usage;
+  const p = d.plan, s = d.subscription;
   const status = p.source === 'unlimited' ? 'This workspace has no limits.'
     : p.source === 'trial' ? `Free trial of Pro until ${date(p.trialEndsAt)}. Then the Free plan applies unless you choose a plan.`
       : p.source === 'subscription' ? (s.cancelAtPeriodEnd ? `Cancelled: stays ${p.name} until ${date(s.periodEnd)}, then Free.` : `Renews ${s.interval === 'year' ? 'yearly' : 'monthly'} on ${date(s.periodEnd)}.`)
@@ -69,8 +51,7 @@ export function BillingTab() {
           <div><span className="muted small">Current plan</span><h2>{p.name}</h2><p className="muted" style={{ margin: 0 }}>{status}</p></div>
           {s.hasCustomer && <button className="btn" onClick={() => go('/api/billing/portal')}><Ico svg={I.external} />Manage billing</button>}
         </div>
-        <div className="bill-usages">{LABELS.map(([k, l, fmt]) => (
-          <UsageBar key={k} label={l} used={u[k] || 0} limit={p.limits[k]} fmt={fmt} extra={k === 'members' && u.pendingInvites ? `${u.pendingInvites} pending invite${u.pendingInvites === 1 ? '' : 's'} count too` : k === 'aiCalls' ? 'Only AI paid by the service counts. Your own API keys and people’s own Claude subscriptions don’t.' : undefined} />))}</div>
+        <div className="bill-usages">{d.limits.map((r: Any) => <LimitBar key={r.key} r={r} />)}</div>
       </div>
       {p.source !== 'unlimited' && <>
         <div className="row" style={{ alignItems: 'center', margin: '24px 0 12px', gap: 12 }}>
