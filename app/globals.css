@@ -3117,3 +3117,31 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
   .cjp-bar .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .cjp-bar .seg button { white-space: nowrap; padding: 4px 10px; font-size: 12.5px; }
 }
+
+/* Workspace menu: the name with its role and project count underneath (left aligned), a size that fits any screen. */
+.menu:has(.ws-row) { min-width: 260px; max-width: min(380px, calc(100vw - 16px)); }
+.menu .ws-row { text-align: left; align-items: flex-start; min-width: 0; }
+.menu .ws-row b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .ws-row small { margin-left: 0; }
+.menu button .ws-avatar { flex: none; }
+.menu button[aria-current="true"] { background: var(--selected-bg, var(--hover)); }
+@media (max-width: 640px) {
+  /* On phones the menu spans the screen under the top bar, so it can never run off either side. */
+  .menu:has(.ws-row) { position: fixed; left: 8px; right: 8px; top: 60px; max-width: none; min-width: 0; max-height: calc(100vh - 76px); overflow-y: auto; }
+}
+
+/* Projects list on phones: the epics column goes, and the date is short, so every row fits without side scrolling. */
+.col-upd .d-short { display: none; }
+@media (max-width: 640px) {
+  .tbl .col-epics { display: none; }
+  .col-upd .d-full { display: none; }
+  .col-upd .d-short { display: inline; white-space: nowrap; }
+  .tbl td, .tbl th { padding-left: 8px; padding-right: 8px; }
+}
+@media (max-width: 480px) { .tbl .col-key { display: none; } }
+@media (max-width: 560px) {
+  /* Page headers on phones: the title gets its own row, the actions sit together below it. */
+  .page-h { row-gap: 10px; }
+  .page-h > h1, .page-h > div:first-child:not(.spacer) { flex: 1 1 100%; }
+  .page-h .spacer { display: none; }
+}
