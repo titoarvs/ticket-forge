@@ -23,6 +23,7 @@ import { PrFindingChips, openPrFindings } from './CodeRabbit';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { VersionHistory } from './Versions';
+import { ReferencesSection } from './References';
 import { useAutoTour } from './tour';
 import { CodeChip } from './codeStatus';
 
@@ -164,6 +165,8 @@ function IssuePanel({ t }: { t: Any }) {
             ))}
             {!t.acceptanceCriteria.length && <p className="muted small">No acceptance criteria yet.</p>}
           </div>
+
+          <ReferencesSection t={t} />
 
           {!isSub(t) && <div className="sec"><div className="sec-title"><Ico svg={I.subtask} /><h3>Child issues</h3><span className="count">{kids.length}</span>
             {can('issue.create') && <div className="tools"><button className="btn sm subtle" onClick={() => { S.subForm = true; emit(); }}><Ico svg={I.plus} />Add child issue</button></div>}</div>
