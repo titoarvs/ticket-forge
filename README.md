@@ -627,6 +627,12 @@ for review*, *All recent*), a project filter and search. Each job can be stopped
 issue opens with its code job), or followed to its GitHub Actions run and pull request. You only see projects you
 have access to.
 
+**Done on code completion.** When a code job finishes with code for an issue (ready for review, committed or in a
+pull request) while the project is open, the issue moves to the workflow's *Done* status by itself, from any status
+including custom ones, with no approval step. An issue that is already done stays done, and an issue whose job failed,
+was stopped or is still running keeps its status. If the change can't be saved (for example the server is unreachable)
+the issue keeps its old status and an error is shown. It needs the *Edit issues* permission.
+
 Set up once per project in **Project settings → Code & GitHub**:
 - **Local folder**: a clone of the project's GitHub repository on the computer running TicketForge. **Browse…** opens a
   folder picker (Home, Desktop, Documents…; git repositories are marked) and checks the folder you choose. You can

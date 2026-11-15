@@ -2,8 +2,9 @@
 // Coding indicators: which issues have AI-written code, and in what state (writing now, ready for review, pull
 // request open, merged, committed, failed). Shown on backlog rows, board cards and the issue panel. The state comes
 // from the project's code jobs (this computer and GitHub Actions) and from the issue's linked pull requests, and is
-// refreshed every few seconds while a job is running.
-import { S, emit, api, P, isDone, can, feat, type Any } from './core';
+// refreshed every few seconds while a job is running. When a job finishes and the issue has code, the issue moves to
+// Done by itself (no approval step): see completeOnCode.
+import { S, emit, api, P, isDone, can, feat, ticket, mutate, setField, saveNow, toast, type Any } from './core';
 import { Ico, I, Spinner } from './ui';
 
 type Job = { id: string; ticketId: string; status: string; side?: string; agentName?: string; startedAt?: string; where?: string; pr?: Any };
@@ -43,6 +44,31 @@ export function CodeChip({ t, compact = false }: { t: Any; compact?: boolean }) 
   return <span className={`code-ind c-${c.state} ${c.coded && isDone(t) ? 'is-done' : ''}`} title={c.title}>{icon}{!compact && c.label}</span>;
 }
 
+const MOVING = new Set<string>();
+/** The status code completion moves an issue to: the workflow's "Done", or else its first status in the done category. */
+const doneStatus = (): string => { const w: Any[] = (P()?.workflow || []).filter((x: Any) => x.category === 'done'); return (w.find((x) => /^done$/i.test(x.name)) || w[0])?.name || ''; };
+
+/**
+ * Moves an issue to Done once its code is complete, with no approval step, from any status (custom ones too).
+ * An issue that is already done is left alone. When the change can't be saved (the server is unreachable) the old
+ * status is put back and an error is shown.
+ */
+export async function completeOnCode(t: Any) {
+  const to = doneStatus();
+  if (!t || !to || isDone(t) || MOVING.has(t.id) || !can('issue.edit')) return;
+  MOVING.add(t.id);
+  const from = t.status;
+  try {
+    mutate(() => setField(ticket(t.id), 'status', to, 'Code job'), { tag: 'code-done' });
+    await saveNow();
+    while (S.saving || S.saveTimer) await new Promise((r) => setTimeout(r, 200)); // a save was already running: wait for ours
+    if (S.saveText === 'Save failed') {
+      mutate(() => { const x = ticket(t.id); if (x && x.status === to) setField(x, 'status', from, 'Code job'); }, { tag: 'code-done' });
+      toast(`${t.key} stays “${from}”: its code is complete but its status couldn’t be changed to “${to}”. Check the connection and try again.`, 'err');
+    } else toast(`${t.key} moved to “${to}”: its code is complete.`);
+  } finally { MOVING.delete(t.id); }
+}
+
 async function load(pid: string) {
   if (G.busy) return;
   G.busy = true;
@@ -51,8 +77,14 @@ async function load(pid: string) {
     const by: Record<string, Job[]> = {};
     for (const j of r.jobs || []) (by[j.ticketId] ||= []).push(j);
     const before = JSON.stringify(G.byTicket);
+    const prev = G.pid === pid ? G.byTicket : {};
     G.pid = pid; G.byTicket = by; G.at = Date.now();
     if (JSON.stringify(by) !== before) emit();
+    // Code completed: an issue whose job was running at the last refresh and now has code moves to Done.
+    for (const id of Object.keys(prev)) {
+      const t = ticket(id);
+      if (t && prev[id].some((j) => LIVE.includes(j.status)) && !(by[id] || []).some((j) => LIVE.includes(j.status)) && codeInfo(t).coded) completeOnCode(t).catch(() => {});
+    }
     return (r.jobs || []).some((j: Job) => LIVE.includes(j.status));
   } catch { return false; } finally { G.busy = false; }
 }
