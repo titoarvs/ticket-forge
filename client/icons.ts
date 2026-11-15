@@ -28,6 +28,7 @@ export const I = {
   chevron: s('<path d="M4 6l4 4 4-4"/>', 'class="chev"'),
   plus: s('<path d="M8 3v10M3 8h10"/>'),
   close: s('<path d="M4 4l8 8M12 4l-8 8"/>'),
+  menu: s('<path d="M2.5 4h11M2.5 8h11M2.5 12h11"/>'),
   more: s('<circle cx="3.5" cy="8" r=".6" fill="currentColor"/><circle cx="8" cy="8" r=".6" fill="currentColor"/><circle cx="12.5" cy="8" r=".6" fill="currentColor"/>'),
   expand: s('<path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5L9 7M2.5 13.5L7 9"/>'),
   collapse: s('<path d="M13 7H9V3M3 9h4v4M9 7l4.5-4.5M7 9l-4.5 4.5"/>'),
