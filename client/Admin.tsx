@@ -12,9 +12,10 @@ import { AgentsTab } from './AgentsTab';
 import { FeaturesTab } from './FeatureFlags';
 import { AiFlow } from './AiFlow';
 import { BillingTab } from './Billing';
+import { LimitsTab } from './Limits';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['billing', 'Billing', I.chart], ['email', 'Email & database', I.doc]];
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['billing', 'Billing', I.chart], ['limits', 'Limits', I.flag],['email', 'Email & database', I.doc]];
 /** Tabs only the owner sees: people (users and invites) and feature flags. */
 const OWNER_TABS = ['users', 'invites', 'features', 'billing'];
 const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
@@ -73,6 +74,7 @@ export default function AdminPage({ tab }: { tab: string }) {
       {t === 'agents' && <AgentsTab />}
       {t === 'features' && <FeaturesTab />}
       {t === 'billing' && <BillingTab />}
+      {t === 'limits' && <LimitsTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
   );
