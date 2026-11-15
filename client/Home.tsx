@@ -63,12 +63,12 @@ export function ProjectsPage() {
         : <ProjectsSkeleton />)
       : S.projects.length ? <>
         <div className="toolbar"><TF search sx={{ width: 220 }} placeholder="Search projects" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <table className="tbl"><thead><tr><th>Name</th><th>Key</th><th className="num">Epics</th><th className="num">Issues</th><th>Last updated</th><th /></tr></thead><tbody>
+        <table className="tbl"><thead><tr><th>Name</th><th className="col-key">Key</th><th className="num col-epics">Epics</th><th className="num">Issues</th><th>Last updated</th><th /></tr></thead><tbody>
           {list.map((p: Any) => (
             <tr key={p.id} className="click" onClick={() => S.nav(`/p/${p.id}/summary`)}>
               <td><span className="row" style={{ flexWrap: 'nowrap' }}><span className="proj-avatar" style={{ width: 24, height: 24, fontSize: 10, background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><a>{p.name}</a></span></td>
-              <td>{p.key}</td><td className="num">{p.epics}</td><td className="num">{p.tickets}</td>
-              <td className="muted">{new Date(p.updatedAt).toLocaleString()}</td>
+              <td className="col-key">{p.key}</td><td className="num col-epics">{p.epics}</td><td className="num">{p.tickets}</td>
+              <td className="muted col-upd"><span className="d-full">{new Date(p.updatedAt).toLocaleString()}</span><span className="d-short">{new Date(p.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span></td>
               <td style={{ textAlign: 'right' }}>{can('project.delete') && <button className="icon-btn" title="Delete project" onClick={(e) => { e.stopPropagation(); del(p); }}><Ico svg={I.trash} /></button>}</td>
             </tr>
           ))}
