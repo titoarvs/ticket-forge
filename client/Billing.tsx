@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { S, api, toast, openModal, closeModal, type Any } from './core';
-import { Ico, I, Modal, Spinner, ErrorState } from './ui';
+import { Ico, I, Modal, Spinner, ErrorState, Confirm } from './ui';
 import { LimitBar, num } from './Limits';
 
 const date = (d: string | null) => (d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '');
@@ -14,6 +14,14 @@ const money = (n: number, cur: string) => (n === 0 ? 'Free' : new Intl.NumberFor
 async function go(path: string, body: Any = {}) {
   try { const r = await api(path, { method: 'POST', body }); if (r.url) location.href = r.url; }
   catch (e: Any) { toast(e.message, 'err'); }
+}
+
+async function cancelPlan(name: string, reload: () => void) {
+  try {
+    const r = await api('/api/billing/cancel', { method: 'POST', body: {} });
+    toast(`Subscription cancelled. ${name} access ends on ${date(r.accessEndsAt) || 'the end of the current period'}.`);
+  } catch (e: Any) { toast(e.message, 'err'); }
+  reload();
 }
 
 export function BillingTab() {
@@ -42,7 +50,7 @@ export function BillingTab() {
   const status = p.source === 'unlimited' ? 'This workspace has no limits.'
     : p.pastDue && p.graceEndsAt ? `Past due. ${p.name} stays available until ${date(p.graceEndsAt)}, then the Free plan applies.`
     : p.source === 'trial' ? `Free trial of Pro until ${date(p.trialEndsAt)}. Then the Free plan applies unless you choose a plan.`
-      : p.source === 'subscription' ? (s.cancelAtPeriodEnd ? `Cancelled: stays ${p.name} until ${date(s.periodEnd)}, then Free.` : `Renews ${s.interval === 'year' ? 'yearly' : 'monthly'} on ${date(s.periodEnd)}.`)
+      : p.source === 'subscription' ? (s.cancelAtPeriodEnd ? `Cancelled: stays ${p.name} until ${date(s.accessEndsAt || s.periodEnd)}, then Free.` : `Renews ${s.interval === 'year' ? 'yearly' : 'monthly'} on ${date(s.periodEnd)}.`)
         : 'You’re on the Free plan.';
   return (
     <div className="bill">
@@ -50,7 +58,12 @@ export function BillingTab() {
       <div className="card bill-now">
         <div className="bill-now-h">
           <div><span className="muted small">Current plan</span><h2>{p.name}</h2><p className="muted" style={{ margin: 0 }}>{status}</p></div>
-          {s.hasCustomer && <button className="btn" onClick={() => go('/api/billing/portal')}><Ico svg={I.external} />Manage billing</button>}
+          <div className="row" style={{ gap: 8 }}>
+            {s.cancellable && <button className="btn" onClick={() => openModal(<Confirm title="Cancel subscription?" label="Cancel subscription"
+              text={`You won’t be charged again. ${p.name} stays available until ${date(s.periodEnd) || 'the end of the current period'}, then the workspace moves to the Free plan.`}
+              onYes={() => cancelPlan(p.name, load)} />)}>Cancel subscription</button>}
+            {s.hasCustomer && <button className="btn" onClick={() => go('/api/billing/portal')}><Ico svg={I.external} />Manage billing</button>}
+          </div>
         </div>
         <div className="bill-usages">{d.limits.map((r: Any) => <LimitBar key={r.key} r={r} />)}</div>
       </div>
