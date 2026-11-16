@@ -17,6 +17,7 @@ import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
 import { FbdSection, ArdSection } from './Fbd';
+import { openSpecs } from './Specs';
 import { openSplitIssues } from './Split';
 import { codeReady, openCode, openUpdatePr } from './DevCode';
 import { PrFindingChips, openPrFindings } from './CodeRabbit';
@@ -486,6 +487,7 @@ function EpicPanel({ e }: { e: Any }) {
         {can('issue.create') && <button className="btn" onClick={() => openModal(<CreateIssueModal epicId={e.id} />)}><Ico svg={I.plus} />Create issue</button>}
         {can('issue.create') && can('ai.use') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
         {can('issue.create') && can('ai.use') && feat('split') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
+        <button className="btn" onClick={() => openSpecs(e)} title="One coding prompt per issue, with the files it touches and overlaps between issues"><Ico svg={I.doc} />Coding specs</button>
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>

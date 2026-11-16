@@ -985,6 +985,15 @@ On the Epics page (**AI actions → Split issues**) or in an epic's panel (**Spl
 - **The AI proposes** small tickets for each issue: one testable behaviour each, 1–3 points, following your team's acceptance-criteria rules, and covering exactly the original scope. It shares the issue's test cases out to the part each one tests. Issues that are already small are kept, with the reason.
 - **On apply**, the first part keeps the original issue (key, history, comments, pull requests, links). The other parts become new issues next to it, in the same epic, sprint and status, linked with "relates to". Parts that no test case covers are flagged so you can write tests for them. ⌘Z undoes it.
 
+## Coding specs per epic, with overlap detection
+
+In an epic's panel, **Coding specs** (needs a connected git remote: Project settings → Code & GitHub; any remote works):
+- **Generate coding specs** writes one coding prompt per issue of the epic (`lib/specgen.js`). Each spec lists the issue's acceptance criteria and the files and modules it is expected to touch. When the repository is on this computer the AI sees its file names, otherwise it goes by the Repository Profile. Generating again replaces the spec and sets it back to draft. Nothing here runs an AI agent or writes code.
+- **Overlaps** (`lib/specs.js`): two specs that list the same file or module are flagged, naming the issues and the file. Specs of one epic are always compared; specs of different epics are compared when one of them is ready (being coded in parallel).
+- **Mark ready** follows the project's setting (Coding specs → Settings, needs *Edit project settings*): **block** refuses with a message naming the issues and files, **warn** marks the specs ready and shows the overlap. Specs without an overlap are marked ready with no warning. Blocking is the default.
+- **Reviewer approval:** link AI-produced changes (a branch, pull request or commit) to a ready spec. They can be marked accepted only after one of the project's required reviewers (chosen in the same settings) has approved them; until then the server answers 409.
+- Tables `coding_specs` and `spec_changes` (`lib/db.js`); API under `/api/projects/:id/specs`.
+
 ## GitHub Copilot as the local AI
 
 When TicketForge is opened at localhost, it can use **GitHub Copilot** through the Copilot CLI with your own Copilot subscription, the same way it uses your Claude account through Claude Code.
