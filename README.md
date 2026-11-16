@@ -410,6 +410,11 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
   shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
   in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
+- **Cancel a subscription**: the owner presses **Cancel subscription** on Billing (`POST /api/billing/cancel`). The
+  PayMongo subscription is cancelled (`PAYMONGO_SECRET_KEY`; the id is in `workspaces.paymongo_subscription_id`), so no
+  more charges, but the workspace keeps its paid plan until the current period ends (`current_period_end`) and Billing
+  shows that date. After it, the workspace is on Free (`lib/limits.js`). Without an active subscription the request is
+  rejected (409, "There is no active subscription to cancel."); non-owners get 403. Refunds are not part of this.
 
 ## AI flow (Administration → AI → AI flow)
 
