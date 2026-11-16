@@ -420,6 +420,17 @@ your AI configurations) → the **router** → your **providers**, chained in fa
 
 It reads and writes the same settings as Model routing, Models per tier and Providers, which stay available.
 
+## Help chatbot and release announcement robot
+
+Every signed-in user has a chat button in the bottom-right corner. The chatbot is rule-based (no AI, no provider): it
+answers from the FAQ in `lib/chatbot.js` and from live ticket data. Ticket counts only cover projects the person can
+access; asking about another project is refused, and people counts need the "Manage users and access" permission.
+`GET/POST /api/chatbot` serve it (`client/Chatbot.tsx`).
+
+The robot announces the latest release (or your own message) when `RELEASE_ANNOUNCEMENT=1`; set
+`RELEASE_ANNOUNCEMENT_MESSAGE` to change the text. With the flag off nothing is shown. With "reduce motion" on, the
+message is shown without animation. Dismissing it (or opening the chat) hides that message on this browser.
+
 ## Product timeline (`/timeline`)
 
 A public, animated page that tells how TicketForge grew, day by day: a sparkline of features shipped per day, then every
