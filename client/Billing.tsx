@@ -48,12 +48,13 @@ export function BillingTab() {
   if (!d.enabled) return <div className="card" style={{ padding: 20 }}><h2 style={{ marginTop: 0 }}>No plans here</h2><p className="muted">This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the hosted service (TICKETFORGE_MODE=saas).</p></div>;
   const p = d.plan, s = d.subscription;
   const status = p.source === 'unlimited' ? 'This workspace has no limits.'
+    : p.pastDue && p.graceEndsAt ? `Past due. ${p.name} stays available until ${date(p.graceEndsAt)}, then the Free plan applies.`
     : p.source === 'trial' ? `Free trial of Pro until ${date(p.trialEndsAt)}. Then the Free plan applies unless you choose a plan.`
       : p.source === 'subscription' ? (s.cancelAtPeriodEnd ? `Cancelled: stays ${p.name} until ${date(s.accessEndsAt || s.periodEnd)}, then Free.` : `Renews ${s.interval === 'year' ? 'yearly' : 'monthly'} on ${date(s.periodEnd)}.`)
         : 'You’re on the Free plan.';
   return (
     <div className="bill">
-      {p.pastDue && <div className="banner warn" role="alert"><Ico svg={I.warn} /> Your last payment failed. Stripe will try again; update your card in Manage billing to keep {p.name}.</div>}
+      {p.pastDue && <div className="banner warn" role="alert"><Ico svg={I.warn} /> {p.graceEndsAt ? `Your last payment failed. Pay by ${date(p.graceEndsAt)} to keep ${p.name}; after that the workspace moves to the Free plan.` : `Your last payment failed. Stripe will try again; update your card in Manage billing to keep ${p.name}.`}</div>}
       <div className="card bill-now">
         <div className="bill-now-h">
           <div><span className="muted small">Current plan</span><h2>{p.name}</h2><p className="muted" style={{ margin: 0 }}>{status}</p></div>

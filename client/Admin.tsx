@@ -48,7 +48,8 @@ export default function AdminPage({ tab }: { tab: string }) {
   useEffect(() => { closeProject(); reload(); }, []);
   const tt = tab === 'claude' ? 'ai' : tab;
   const tabs = TABS.filter(([k]) => (S.user?.isOwner || !OWNER_TABS.includes(k)) && (k !== 'billing' || S.auth?.saas));
-  const t = tabs.some(([k]) => k === tt) ? tt : tabs[0][0];
+  // A non-owner who opens Billing stays on it and is told it's for the owner (BillingTab), not sent to another tab.
+  const t = tabs.some(([k]) => k === tt) || (tt === 'billing' && S.auth?.saas) ? tt : tabs[0][0];
   if (!A.loaded) {
     if (!A.error) return <AdminSkeleton />;
     return <div className="page"><div className="page-inner">
