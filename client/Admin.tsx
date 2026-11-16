@@ -14,12 +14,13 @@ import { AgentsTab } from './AgentsTab';
 import { FeaturesTab } from './FeatureFlags';
 import { AiFlow } from './AiFlow';
 import { BillingTab } from './Billing';
+import { PaymentsTab } from './Payments';
 import { LimitsTab } from './Limits';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 
-const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['billing', 'Billing', I.chart], ['limits', 'Limits', I.flag],['email', 'Email & database', I.doc]];
+const TABS: [string, string, string][] = [['users', 'Users', I.people], ['invites', 'Invites', I.comment], ['roles', 'Roles & permissions', I.settings], ['ai', 'AI', I.sparkle], ['generation', 'Generation', I.test], ['agents', 'Agents', I.bot], ['features', 'Features', I.flag], ['billing', 'Billing', I.chart], ['payments', 'Plans & gateways', I.settings], ['limits', 'Limits', I.flag],['email', 'Email & database', I.doc]];
 /** Tabs only the owner sees: people (users and invites) and feature flags. */
-const OWNER_TABS = ['users', 'invites', 'features', 'billing'];
+const OWNER_TABS = ['users', 'invites', 'features', 'billing', 'payments'];
 const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
 
 const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
@@ -47,7 +48,7 @@ export default function AdminPage({ tab }: { tab: string }) {
   const [q, setQ] = useState('');
   useEffect(() => { closeProject(); reload(); }, []);
   const tt = tab === 'claude' ? 'ai' : tab;
-  const tabs = TABS.filter(([k]) => (S.user?.isOwner || !OWNER_TABS.includes(k)) && (k !== 'billing' || S.auth?.saas));
+  const tabs = TABS.filter(([k]) => (S.user?.isOwner || !OWNER_TABS.includes(k)) && (k !== 'billing' || S.auth?.saas) && (k !== 'payments' || (S.auth?.saas && S.auth?.canManageBilling)));
   // A non-owner who opens Billing stays on it and is told it's for the owner (BillingTab), not sent to another tab.
   const t = tabs.some(([k]) => k === tt) || (tt === 'billing' && S.auth?.saas) ? tt : tabs[0][0];
   if (!A.loaded) {
@@ -73,6 +74,7 @@ export default function AdminPage({ tab }: { tab: string }) {
       {t === 'agents' && <AgentsTab />}
       {t === 'features' && <FeaturesTab />}
       {t === 'billing' && <BillingTab />}
+      {t === 'payments' && <PaymentsTab />}
       {t === 'limits' && <LimitsTab />}
       {t === 'email' && <EmailTab />}
     </div></div>
