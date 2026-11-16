@@ -403,6 +403,11 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   4. Turn on the Customer Portal in Stripe's settings.
   To try it locally: `stripe listen --forward-to localhost:5173/api/stripe/webhook` with test keys, and the card
   4242 4242 4242 4242.
+- **Payment method (PayMongo, PHP)**: `/checkout?plan=pro&interval=month` (owner only) lets the customer choose
+  **Card**, **GCash** or **Maya**, shows the total in PHP, and **Pay** continues to `/checkout/<method>` (the payment
+  step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
+  shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
+  in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
 
 ## AI flow (Administration → AI → AI flow)
 

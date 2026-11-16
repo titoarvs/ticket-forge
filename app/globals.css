@@ -2916,6 +2916,17 @@ td.danger-text { color: var(--danger); }
 .bill-price { font-size: 26px; font-weight: 700; margin: 6px 0 10px; } .bill-price .muted { font-size: 14px; font-weight: 400; }
 .bill-plan ul { list-style: none; padding: 0; margin: 0 0 16px; flex: 1; font-size: 13px; }
 .bill-plan li { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+/* Checkout: payment method selector */
+.pay { max-width: 560px; }
+.pay-card { padding: 20px; }
+.pay-total { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
+.pay-total b { font-size: 28px; }
+.pay-methods { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.pay-methods legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
+.pay-method { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.pay-method.on { outline: 2px solid var(--brand); }
+.pay-method > span { display: flex; flex-direction: column; }
+.pay-missing { color: var(--danger); margin: 10px 0 0; }
 .ws-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-sunken); font-size: 13px; }
 
 /* AI usage & suggestions (organized) */
