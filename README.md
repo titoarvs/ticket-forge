@@ -414,6 +414,14 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
   shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
   in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
+- **Paid plan with a trial (PayMongo, PHP)**: the owner starts a plan with **Start trial** on Billing
+  (`POST /api/billing/subscription` with `{ plan, interval, method? }`; owner only, otherwise 403). A PayMongo
+  customer, plan and subscription are created (`lib/paymongo.js`, needs `PAYMONGO_SECRET_KEY`), the subscription id is
+  saved on the workspace (`paymongo_subscription_id`) and its status is `trialing` for `TRIAL_DAYS` (`lib/plans.js`).
+  A workspace that already has a paid plan (`active`, `trialing` or `past_due`) is rejected with 409. When the trial
+  ends, the first recurring charge is attempted in PHP and listed on Billing (`subscription_charges`): paid → `active`,
+  not paid → `past_due`. Ended trials are settled whenever `GET /api/billing` runs, or by calling `settleTrials()`
+  from `lib/subscriptions.js` (for example from a scheduled job); each trial is charged once.
 
 ## AI flow (Administration → AI → AI flow)
 
