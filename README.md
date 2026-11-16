@@ -378,8 +378,10 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
 
 - **Plans** are in `lib/plans.js`: Free, Pro and Team, with limits on projects, members (people plus pending
   invites), platform AI actions per month, AI code jobs per month and storage. The prices and limits there are
-  placeholders. A new company's first workspace gets a 14-day Pro trial (`TRIAL_DAYS`); further workspaces of the
-  same owner start on Free.
+  placeholders. Every limit has a name, a numeric value (`null` = no limit) and a unit (`LIMIT_DEFS`, checked by
+  `validatePlan` when the app loads). Every new workspace starts on Free; paid plans are started from Billing. A plan
+  with `archived: true` is left out of the plans offered for purchase (Billing, Pricing, `GET /api/plans?purchasable=1`)
+  and can't be checked out, but workspaces already on it keep it.
 - **What counts as an AI action**: only calls that use the service's own AI keys (environment variables).
   Providers a workspace adds in Administration → AI, and people's own Claude subscriptions (My AI), don't count.
   Monthly allowances are taken atomically, so many requests at once never go over, and a failed call gives its

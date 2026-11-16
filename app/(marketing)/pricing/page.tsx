@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PLANS, PLAN_ORDER, TRIAL_DAYS, CURRENCY } from '@/lib/plans';
+import { listPlans, TRIAL_DAYS, CURRENCY } from '@/lib/plans';
 
 export const metadata: Metadata = { title: 'Pricing · TicketForge' };
 const money = (n: number) => (n ? new Intl.NumberFormat('en', { style: 'currency', currency: CURRENCY, maximumFractionDigits: 0 }).format(n) : 'Free');
@@ -10,7 +10,7 @@ export default function Pricing() {
     <section className="mk-sec mk-pricing">
       <h1>Simple plans that grow with your team</h1>
       <p className="mk-lead">Start free. Paid plans include a {TRIAL_DAYS}-day trial. Prices per workspace, excluding taxes.</p>
-      <div className="mk-plans">{PLAN_ORDER.map((id) => { const p = (PLANS as any)[id]; return (
+      <div className="mk-plans">{listPlans({ forPurchase: true }).map((p: any) => { const id = p.id; return (
         <article key={id} className={`mk-plan ${id === 'pro' ? 'featured' : ''}`}>
           {id === 'pro' && <span className="mk-badge">Most popular</span>}
           <h2>{p.name}</h2><p className="muted">{p.blurb}</p>
