@@ -90,7 +90,7 @@ export function BillingTab() {
               {!pl.isFree && pl.trialDays > 0 && <p className="muted small" style={{ margin: '0 0 8px' }}>{pl.trialDays}-day free trial, no card needed.</p>}
               <ul>{(pl.features || []).map((f: string) => <li key={f}><Ico svg={I.check} />{f}</li>)}</ul>
               <div className="muted small" style={{ margin: '8px 0 4px' }}>Limits</div>
-              <ul aria-label={`${pl.name} limits`}>{pl.limitList.map((l: Any) => <li key={l.key}><Ico svg={I.check} />{l.name}: {l.value == null ? 'No limit' : num(l.value, l.unit)}</li>)}</ul>
+              <ul aria-label={`${pl.name} limits`}>{pl.limitList.map((l: Any) => <li key={l.key}><Ico svg={I.check} />{l.name}: {l.value == null || l.value <= 0 ? 'No limit' : num(l.value, l.unit)}</li>)}</ul>
               {current ? <button className="btn wide" disabled>Current plan</button>
                 : <button className={`btn wide ${pl.isFree ? '' : 'primary'}`} disabled={(subscribed && !s.cancelAtPeriodEnd && pl.isFree) || (!pl.isFree && !canTrial && d.gateways.length === 0 && !trialing)}
                   title={subscribed && pl.isFree ? 'Cancel your subscription to move to the Free plan' : ''} onClick={() => choosePlan(pl, load)}>{label}</button>}
