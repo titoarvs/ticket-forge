@@ -108,6 +108,8 @@ export async function api(url: string, { method = 'GET', body, raw, signal }: { 
     if (res.status === 401 && S.user && !url.startsWith('/api/auth/')) { S.user = null; emit(); S.nav('/login'); }
     const err: Any = new Error(msg); err.status = res.status; err.body = errBody;
     if (res.status === 402 && errBody?.code === 'limit') onPlanLimit(errBody);
+    // The trial ended without a payment: the app shows the pay prompt (AppShell) instead of the page.
+    if (res.status === 402 && errBody?.code === 'locked' && S.auth) { S.auth.billing = { locked: true, plan: { id: errBody.plan, name: S.auth.billing?.plan?.name }, trialEndedAt: S.auth.billing?.trialEndedAt }; emit(); }
     throw err;
   }
   return raw ? res : res.json();

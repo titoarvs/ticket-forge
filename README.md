@@ -418,6 +418,24 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   (nothing is created, the plan stays as it was) or **failed** (error with a **Retry** button back to the checkout).
   A success is never taken from the address: the plan changes only when PayMongo reports the payment as paid. The
   pending session is kept in `workspaces.paymongo_checkout_id`. `PAYMONGO_API_BASE` points tests at a local mock.
+- **Payment gateways and plans (TF-100)**: Administration → **Plans & gateways** (the owner who runs this TicketForge:
+  the default workspace's owner or a `PLATFORM_ADMIN_EMAILS` account; hosted service only).
+  - *Gateways*: **PayMongo** (PHP), **Xendit** (PHP) and **Stripe** (PHP, USD) can all be active at once. Enabling one
+    needs its secret key, which is checked with the gateway first (a wrong key shows an error and the gateway stays
+    inactive) and then stored encrypted in `payment_gateways`; it is never sent back to the browser.
+    `PAYMONGO_API_BASE`, `XENDIT_API_BASE` and `STRIPE_API_BASE` point tests at a local mock.
+  - *Plans* (`billing_plans`, `lib/billing-plans.js`): name, price, currency (PHP or USD), cycle (monthly or yearly),
+    free-plan option and trial days. The default Free, Pro and Team plans from `lib/plans.js` are copied in the first
+    time. Editing the price, currency, cycle, free option or trial days of a plan that has subscribers adds a **new
+    version**; workspaces keep the version they subscribed to (`workspaces.plan_version`) and new subscriptions use the
+    latest. Other edits change the latest version in place. API: `GET/POST /api/billing/plans`, `PUT /api/billing/plans/<id>`.
+  - *Choosing a plan* (Billing): a plan with trial days starts a **trial with no card** (`POST /api/billing/subscription`)
+    with full access until it ends. A trial that ends without a payment **locks the workspace**: every API route except
+    sign-in and billing answers 402 `locked`, and the app shows a pay prompt until the owner pays at `/checkout` (plan
+    and active gateway picked there; the way back reads the payment from the gateway, then the plan is `active`) or
+    cancels. Switching plan during a trial keeps the trial; switching while paid is a new payment on the new plan (no
+    proration yet) and cancelling keeps access until the paid period ends. Paying through PayMongo or Xendit is one
+    payment per period: renewals are not charged automatically yet.
 
 ## AI flow (Administration → AI → AI flow)
 
