@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { S, api, toast, openModal, closeModal, type Any } from './core';
 import { Ico, I, Modal, Spinner, ErrorState } from './ui';
-import { LimitBar } from './Limits';
+import { LimitBar, num } from './Limits';
 
 const date = (d: string | null) => (d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '');
 const money = (n: number, cur: string) => (n === 0 ? 'Free' : new Intl.NumberFormat([], { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n));
@@ -71,6 +71,8 @@ export function BillingTab() {
               <h3>{pl.name}</h3><p className="muted small" style={{ minHeight: 34 }}>{pl.blurb}</p>
               <div className="bill-price">{money(price, d.currency)}{price > 0 && <span className="muted">/{interval === 'year' ? 'year' : 'month'}</span>}</div>
               <ul>{pl.features.map((f: string) => <li key={f}><Ico svg={I.check} />{f}</li>)}</ul>
+              <div className="muted small" style={{ margin: '8px 0 4px' }}>Limits</div>
+              <ul aria-label={`${pl.name} limits`}>{pl.limitList.map((l: Any) => <li key={l.key}><Ico svg={I.check} />{l.name}: {l.value == null ? 'No limit' : num(l.value, l.unit)}</li>)}</ul>
               {current ? <button className="btn wide" disabled>Current plan</button>
                 : pl.id === 'free' ? (subscribed ? <button className="btn wide" onClick={() => go('/api/billing/portal')}>Downgrade in Manage billing</button> : null)
                   : subscribed ? <button className="btn wide" onClick={() => go('/api/billing/portal')}>Switch in Manage billing</button>

@@ -1,7 +1,7 @@
 import { api, authed, HttpError } from '@/lib/server/http';
 import { effectivePlan, usage, billingOn, limitRows } from '@/lib/limits.js';
 import { stripeConfigured } from '@/lib/stripe.js';
-import { PLANS, PLAN_ORDER, TRIAL_DAYS, CURRENCY, priceIdFor } from '@/lib/plans.js';
+import { listPlans, TRIAL_DAYS, CURRENCY, priceIdFor } from '@/lib/plans.js';
 import { qs } from '@/lib/db.js';
 
 // The workspace's plan, what it uses, and the plans it can choose (Administration → Billing, owner only).
@@ -15,6 +15,7 @@ export const GET = api(async () => {
     enabled: billingOn(), stripe: stripeConfigured(), currency: CURRENCY, trialDays: TRIAL_DAYS,
     plan, usage: used, limits: limitRows(plan, used),
     subscription: { status: w.subscription_status || null, interval: w.billing_interval || null, periodEnd: w.current_period_end || null, cancelAtPeriodEnd: Boolean(w.cancel_at_period_end), trialEndsAt: w.trial_ends_at || null, hasCustomer: Boolean(w.stripe_customer_id) },
-    plans: PLAN_ORDER.map((id) => ({ ...PLANS[id], available: { month: Boolean(priceIdFor(id, 'month')), year: Boolean(priceIdFor(id, 'year')) } })),
+    // Archived plans are left out: they can't be bought any more (a workspace already on one keeps it in `plan`).
+    plans: listPlans({ forPurchase: true }).map((p: any) => ({ ...p, available: { month: Boolean(priceIdFor(p.id, 'month')), year: Boolean(priceIdFor(p.id, 'year')) } })),
   };
 });
