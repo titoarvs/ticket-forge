@@ -501,7 +501,7 @@ export function mutate(fn: (p: Any) => void, { tag = '' }: { tag?: string; rende
   emit();
 }
 function restore(state: Any) {
-  const { version, id, updatedAt } = P();
+  const { version, id, updatedAt, createdBy } = P();
   if (typeof state === 'string') S.project = JSON.parse(state);
   else {
     const p: Any = {};
@@ -509,7 +509,7 @@ function restore(state: Any) {
     p.tickets = JSON.parse(state.order).map((tid: string) => state.tickets.get(tid)).filter(Boolean).map((x: string) => JSON.parse(x));
     S.project = p;
   }
-  Object.assign(S.project, { version, id, updatedAt });
+  Object.assign(S.project, { version, id, updatedAt, createdBy });
   S.mutSeq += 1;
   S.lastSnap = { tag: '', at: 0 };
   S.dataRev += 1;
@@ -524,7 +524,7 @@ export function redo() { if (!S.redo.length) return; S.undo.push(currentState())
 // section it started from (S.revs). If a teammate saved the same issue meanwhile, the server refuses (409) and sends
 // their copy: both people's changes are merged (merge3) and saved again. Teammates' changes arrive as "changes
 // since my version" (a few kB) instead of the whole project, and are merged with unsaved edits the same way.
-const META_SKIP = new Set(['tickets', 'version', 'updatedAt', 'id', '_revs']);
+const META_SKIP = new Set(['tickets', 'version', 'updatedAt', 'id', 'createdBy', '_revs']);
 S.revs = { issues: {}, meta: {} } as { issues: Record<string, number>; meta: Record<string, number> };
 /** Takes the server's per-issue and per-section versions off a project as it arrives. */
 function takeRevs(p: Any) { const r = p?._revs || { issues: {}, meta: {} }; if (p) delete p._revs; return { issues: { ...(r.issues || {}) }, meta: { ...(r.meta || {}) } }; }

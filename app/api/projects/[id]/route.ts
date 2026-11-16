@@ -1,5 +1,6 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
+import * as auth from '@/lib/auth.js';
 
 // The whole project, shared between everyone opening the same version (see store.projectJson).
 // ?gz=1: the same JSON gzipped, as a file the browser unpacks (a big project is ~30× smaller on the wire).
@@ -16,9 +17,12 @@ export const PATCH = api(async (req, p) => {
   store.requireAccess(user, p.id);
   return store.patchProject(p.id, await body(req), user);
 });
-export const DELETE = api(async (_req, p) => {
-  const user = await perm('project.delete');
+// Soft delete (archive): only the creator and owners, and only with their password ({ password } in the body).
+export const DELETE = api(async (req, p) => {
+  const user = await authed();
   store.requireAccess(user, p.id);
-  await store.deleteProject(p.id);
+  auth.throttle(`project-delete:${user.id}`); // the password is checked here, so guessing it is slowed down
+  const b = await body(req);
+  await store.deleteProject(p.id, user, b.password);
   return { ok: true };
 });
