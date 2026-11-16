@@ -822,6 +822,8 @@ client/                    React components (client side)
   Workspace.tsx views.tsx  Project sidebar and views (Summary, Backlog, Board, Epics, Reports, Tests, Automation, Settings)
   Drawer.tsx               Issue and epic panels
   Brain.tsx markdown.tsx   The Brain page (notes, graph, editor) and the Markdown renderer with [[wikilinks]]
+  api/                     API client modules: the only client code that builds requests to /api/*
+  logic/                   Logic modules: pure rules and formatting, with no JSX and no requests
 lib/                       Server modules
   server/http.ts           Route-handler helpers: sessions, permissions, streaming, setup
   db.js auth.js store.js   Database (Supabase/Postgres or local), users & invites, projects & permission checks
@@ -832,6 +834,20 @@ lib/                       Server modules
 scripts/db-push.js         Copies the local database to DATABASE_URL
 legacy/                    The previous Express + vanilla JS version (run with `TICKETFORGE_RLS=off npm run legacy`)
 ```
+
+### Code layers (UI, logic, API)
+
+The client code is split into three layers so each concern lives in one place. A change to one layer should not need edits in the others.
+
+| Layer | Where | Responsibility | May import |
+| --- | --- | --- | --- |
+| UI | `client/*.tsx` (for example `Versions.tsx`, `Admin.tsx`, `AgentsTab.tsx`) | Renders screens, reads input, shows loading, empty, error and success states (`toast`, modals). Calls the logic and API layers; it builds no request URLs and has no `fetch`. | `client/api/*`, `client/logic/*`, `core.ts`, `ui.tsx`, `fields.tsx` |
+| Logic | `client/logic/*.ts` | Rules with no JSX and no requests: which fields are compared, how a value reads as text, what counts as a change. Easy to read and to reuse. | `core.ts` helpers and other logic modules |
+| API client | `client/api/*.ts` | One function per server request: it owns the URL, method, query string and body. It returns what `api()` returns and does not catch errors, so the screen shows the same error state as before. | `api()` from `core.ts` only |
+| Transport and state | `client/core.ts` | `api()` (the one `fetch` call: headers, errors, 401 sign-out, plan-limit prompt), the state store `S`, toasts, modals and undo. | none of the layers above |
+| Server | `app/api/**/route.ts` → `lib/*.js` | Route handlers stay thin (`api()`, `authed()`, permission checks) and call `lib/store.js` and the other server modules for the data and rules. | |
+
+Migrated so far: issue versions (`api/versions.ts`, `logic/versions.ts`), Administration (`api/admin.ts`), the Agents tab (`api/agents.ts`) and project reads (`api/projects.ts`). Other screens in `client/` still call `api()` directly and move to these layers when they are next changed: add a function to `client/api/<feature>.ts` (and rules to `client/logic/<feature>.ts`) instead of building a URL in the component.
 
 ## Notes
 
