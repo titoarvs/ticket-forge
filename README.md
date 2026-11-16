@@ -391,11 +391,7 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   over its limit after a downgrade just can't add more.
 - **Billing page**: Administration → Billing (workspace owner) shows the plan, what renews when, and usage against
   each limit. **Choose a plan** opens Stripe Checkout; **Manage billing** opens the Stripe Customer Portal (card,
-  invoices, plan changes, cancelling). It also shows the status: the next billing date for an active plan, the trial
-  end date for a trialing one, a warning with the grace period end (`GRACE_DAYS` in `lib/plans.js`, counted from the
-  end of the last paid period) for a past-due one, and the Free plan with an **Upgrade** action for a free workspace.
-  Non-owners see a message instead of the details (`GET /api/billing` is owner only). It reads the database on each
-  load, so a refresh shows the latest status.
+  invoices, plan changes, cancelling).
 - **Webhook**: `POST /api/stripe/webhook`. It checks the `Stripe-Signature` (HMAC, 5-minute window) and handles
   each event once (`billing_events`). It reads the subscription back from Stripe before changing the plan. Events:
   `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid` and
@@ -414,14 +410,14 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
   shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
   in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
-- **Paid plan with a trial (PayMongo, PHP)**: the owner starts a plan with **Start trial** on Billing
-  (`POST /api/billing/subscription` with `{ plan, interval, method? }`; owner only, otherwise 403). A PayMongo
-  customer, plan and subscription are created (`lib/paymongo.js`, needs `PAYMONGO_SECRET_KEY`), the subscription id is
-  saved on the workspace (`paymongo_subscription_id`) and its status is `trialing` for `TRIAL_DAYS` (`lib/plans.js`).
-  A workspace that already has a paid plan (`active`, `trialing` or `past_due`) is rejected with 409. When the trial
-  ends, the first recurring charge is attempted in PHP and listed on Billing (`subscription_charges`): paid → `active`,
-  not paid → `past_due`. Ended trials are settled whenever `GET /api/billing` runs, or by calling `settleTrials()`
-  from `lib/subscriptions.js` (for example from a scheduled job); each trial is charged once.
+- **Failed payments (PayMongo, grace period)**: `POST /api/paymongo/webhook` checks the `Paymongo-Signature`
+  (HMAC-SHA256 of `<t>.<body>` with `PAYMONGO_WEBHOOK_SECRET`); a bad signature is rejected with 400 and nothing
+  changes. Each event id is handled once (`billing_events`). `payment.failed` (or `subscription.past_due`) turns an
+  active or trialing subscription **past due** and sets `workspaces.grace_ends_at` (`PAYMENT_GRACE_DAYS`, default 7;
+  length not decided). A further failure doesn't move that date. During the grace period the paid plan and its
+  features stay; when it ends unpaid the workspace goes to **Free**. `payment.paid` makes a past due subscription
+  **active** again. The workspace is found by `metadata.workspace_id` on the payment, or by its
+  `paymongo_subscription_id` / `paymongo_customer_id`. Email reminders are not part of this.
 
 ## AI flow (Administration → AI → AI flow)
 
