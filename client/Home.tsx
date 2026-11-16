@@ -8,6 +8,7 @@ import { ProjectsSkeleton } from './skeletons';
 import { BlankProjectModal, AiSettingsModal } from './actions';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { askFirst } from './Clarify';
+import { canDeleteProject, openDeleteProject } from './DeleteProject';
 import { useAutoTour } from './tour';
 import { switchWorkspace } from './WorkspaceSwitcher';
 
@@ -46,8 +47,7 @@ export function ProjectsPage() {
       S.nav(`/p/${saved.id}/summary`);
     } catch (e: Any) { toast(`Import failed: ${e.message}`, 'err'); }
   };
-  const del = (p: Any) => openModal(<Confirm title="Delete project?" label="Delete" text={`“${p.name}” and all of its issues will be permanently deleted. This can’t be undone.`}
-    onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); toast('Project deleted'); loadProjects(); } catch (e: Any) { toast(e.message, 'err'); } }} />);
+  const del = (p: Any) => openDeleteProject(p, loadProjects);
   return (
     <div className="page"><div className="page-inner">
       <div className="page-h"><div><h1>Projects</h1>{(S.auth?.workspaces || []).length > 1 && <p className="muted small" style={{ margin: '2px 0 0' }}>In <b>{S.user?.workspaceName}</b></p>}</div><div className="spacer" />
@@ -69,7 +69,7 @@ export function ProjectsPage() {
               <td><span className="row" style={{ flexWrap: 'nowrap' }}><span className="proj-avatar" style={{ width: 24, height: 24, fontSize: 10, background: hashColor(p.key, COLORS) }}>{p.key.slice(0, 2)}</span><a>{p.name}</a></span></td>
               <td className="col-key">{p.key}</td><td className="num col-epics">{p.epics}</td><td className="num">{p.tickets}</td>
               <td className="muted col-upd"><span className="d-full">{new Date(p.updatedAt).toLocaleString()}</span><span className="d-short">{new Date(p.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span></td>
-              <td style={{ textAlign: 'right' }}>{can('project.delete') && <button className="icon-btn" title="Delete project" onClick={(e) => { e.stopPropagation(); del(p); }}><Ico svg={I.trash} /></button>}</td>
+              <td style={{ textAlign: 'right' }}>{canDeleteProject(p) && <button className="icon-btn" title="Delete project" onClick={(e) => { e.stopPropagation(); del(p); }}><Ico svg={I.trash} /></button>}</td>
             </tr>
           ))}
         </tbody></table>

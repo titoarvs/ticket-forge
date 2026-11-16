@@ -863,7 +863,7 @@ On Postgres (Supabase), every table has row-level security switched on:
 
 - **Supabase's public roles are locked out.** `anon` and `authenticated` get no privileges on any TicketForge table, so the Supabase REST/GraphQL API (and anyone holding your anon key) can't read or change anything.
 - **The app queries as a restricted role.** Each request runs as `ticketforge_app` (no `BYPASSRLS`) with the signed-in user's id set for that transaction. Policies then decide what that user can touch:
-  - projects and issues: only projects the user has access to; creating needs `project.create`, deleting needs `project.delete`.
+  - projects and issues: only projects the user has access to; creating needs `project.create`. Deleting is a soft delete (the project is archived, `projects.archived_at`, and the app owner can restore it): only the project's creator and the workspace owner can do it, and the app asks them to re-enter their password. A database trigger and the delete policy enforce the same rule.
   - notifications: only the user's own (anyone signed in can send one).
   - users and roles: readable by signed-in users, written only by the sign-in system.
   - sessions, invites, password resets and settings: sign-in system only.
