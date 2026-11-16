@@ -410,6 +410,14 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
   shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
   in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
+- **PayMongo checkout**: with `PAYMONGO_SECRET_KEY` set, Billing shows **Start paid plan** on each paid plan (owner
+  only; non-owners never see it, and the API refuses them with 403). It opens the checkout above; on the payment step,
+  **Continue to PayMongo** creates a PayMongo Checkout Session in PHP (`POST /api/billing/paymongo`) and redirects to
+  its page. PayMongo sends the owner back to `/checkout/return`, which reads the session back from PayMongo
+  (`GET /api/billing/paymongo/return`) and shows one of: **success** (plan activated, new plan shown), **cancelled**
+  (nothing is created, the plan stays as it was) or **failed** (error with a **Retry** button back to the checkout).
+  A success is never taken from the address: the plan changes only when PayMongo reports the payment as paid. The
+  pending session is kept in `workspaces.paymongo_checkout_id`. `PAYMONGO_API_BASE` points tests at a local mock.
 
 ## AI flow (Administration → AI → AI flow)
 

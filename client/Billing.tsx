@@ -61,7 +61,7 @@ export function BillingTab() {
             <button className={interval === 'year' ? 'on' : ''} aria-pressed={interval === 'year'} onClick={() => setInterval_('year')}>Yearly</button>
           </div>
         </div>
-        {!d.stripe && <p className="muted small">Payments aren’t set up on this server yet (STRIPE_SECRET_KEY), so plans can’t be bought here.</p>}
+        {!d.stripe && !d.paymongo && <p className="muted small">Payments aren’t set up on this server yet (STRIPE_SECRET_KEY), so plans can’t be bought here.</p>}
         <div className="bill-plans">{d.plans.map((pl: Any) => {
           const current = p.source === 'subscription' ? pl.id === p.id : pl.id === 'free' && p.source === 'free';
           const price = pl.price[interval];
@@ -76,8 +76,12 @@ export function BillingTab() {
               {current ? <button className="btn wide" disabled>Current plan</button>
                 : pl.id === 'free' ? (subscribed ? <button className="btn wide" onClick={() => go('/api/billing/portal')}>Downgrade in Manage billing</button> : null)
                   : subscribed ? <button className="btn wide" onClick={() => go('/api/billing/portal')}>Switch in Manage billing</button>
-                    : <button className="btn primary wide" disabled={!d.stripe || !pl.available[interval]} title={!pl.available[interval] ? 'Not available for this period yet' : ''}
-                      onClick={() => go('/api/billing/checkout', { plan: pl.id, interval })}>Choose {pl.name}</button>}
+                    : <>
+                      {/* PayMongo (PHP): owners only; the checkout page lets them pick Card, GCash or Maya. */}
+                      {S.user?.isOwner && d.paymongo && <Link className="btn primary wide" href={`/checkout?plan=${pl.id}&interval=${interval}`}>Start paid plan</Link>}
+                      {(d.stripe || !d.paymongo) && <button className={`btn wide ${d.paymongo ? '' : 'primary'}`} disabled={!d.stripe || !pl.available[interval]} title={!pl.available[interval] ? 'Not available for this period yet' : ''}
+                        onClick={() => go('/api/billing/checkout', { plan: pl.id, interval })}>Choose {pl.name}</button>}
+                    </>}
             </div>
           );
         })}</div>
