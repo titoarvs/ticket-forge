@@ -163,7 +163,7 @@ function InvitesTab() {
             <td><span className={`loz ${cls}`}>{st}</span>{st === 'Pending' && <div className="muted small">expires {new Date(i.expires_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</div>}</td>
             <td className="muted small">{i.emailed ? <><Ico svg={I.check} /> Emailed</> : 'Link only'}</td>
             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-              {st !== 'Accepted' && <button className="btn sm subtle" onClick={async () => { const r = await act(() => api(`/api/admin/invites/${i.id}/resend`, { method: 'POST', body: {} })); if (r) openModal(<LinkModal title={`New invite link for ${r.email}`} res={r} />); }}>{A.email?.configured ? 'Resend' : 'New link'}</button>}
+              {st !== 'Accepted' && <ResendButton id={i.id} />}
               {st === 'Pending' && <button className="btn sm danger-subtle" onClick={() => act(() => api(`/api/admin/invites/${i.id}`, { method: 'DELETE' }), 'Invite revoked')}>Revoke</button>}
             </td>
           </tr>
@@ -173,18 +173,39 @@ function InvitesTab() {
       <p>Invite teammates by email and choose their role and which projects they can open.</p></EmptyState>}
   </>;
 }
+/** Resend (or new link) for one invite: disabled with a spinner while it sends; the server enforces the cooldown and maximum. */
+function ResendButton({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const go = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true; setBusy(true);
+    const r = await act(() => api(`/api/admin/invites/${id}/resend`, { method: 'POST', body: {} }), A.email?.configured ? 'Invite resent' : 'New invite link created');
+    inFlight.current = false; setBusy(false);
+    if (r) openModal(<LinkModal title={`New invite link for ${r.email}`} res={r} />);
+  };
+  return <button className="btn sm subtle" disabled={busy} aria-busy={busy || undefined} onClick={go}>{busy && <span className="spinner" />}{A.email?.configured ? 'Resend' : 'New link'}</button>;
+}
 function InviteModal() {
   const def = A.roles.find((r: Any) => r.id === 'member') || A.roles[0];
   const [f, setF] = useState<Any>({ emails: '', roleId: def?.id, access: 'all', message: '' });
+  const [sending, setSending] = useState(false);
+  const inFlight = useRef(false); // set at once, so a second click or Enter before React re-renders can't send again
+  const send = async () => {
+    if (inFlight.current || !f.emails.trim()) return;
+    inFlight.current = true; setSending(true);
+    try {
+      const res = await api('/api/admin/invites', { method: 'POST', body: { emails: f.emails, roleId: f.roleId, projectAccess: f.access, message: f.message } });
+      const sent = res.results.filter((r: Any) => !r.error).length;
+      if (sent) toast(`${sent === 1 ? 'Invite' : `${sent} invites`} sent`);
+      for (const r of res.results) if (r.error) toast(`${r.email}: ${r.error}`, 'err');
+      await load();
+      S.nav('/admin/invites');
+      openModal(<InviteResults results={res.results} />);
+    } catch (e: Any) { toast(e.message, 'err'); } finally { inFlight.current = false; setSending(false); }
+  };
   return (
-    <Modal title="Invite people" actions={[{ label: 'Cancel' }, { label: 'Send invites', kind: 'primary', disabled: !f.emails.trim(), onClick: async () => {
-      try {
-        const res = await api('/api/admin/invites', { method: 'POST', body: { emails: f.emails, roleId: f.roleId, projectAccess: f.access, message: f.message } });
-        await load();
-        S.nav('/admin/invites');
-        openModal(<InviteResults results={res.results} />);
-      } catch (e: Any) { toast(e.message, 'err'); }
-    } }]}>
+    <Modal title="Invite people" persistent={sending} actions={[{ label: 'Cancel', disabled: sending }, { label: sending ? 'Sending…' : 'Send invites', kind: 'primary', disabled: !f.emails.trim(), busy: sending, onClick: send }]}>
       <label className="field"><span>Email addresses <span className="req">*</span></span><TA autoFocus style={{ minHeight: 70 }} value={f.emails} onChange={(e) => setF({ ...f, emails: e.target.value })} placeholder="ana@company.com, ben@company.com" />
         <span className="muted small" style={{ fontWeight: 400 }}>Separate several with commas, spaces or new lines.</span></label>
       <label className="field"><span>Role</span><SF value={f.roleId} onChange={(e) => setF({ ...f, roleId: e.target.value })}>{A.roles.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name} — {r.description}</MenuItem>)}</SF></label>

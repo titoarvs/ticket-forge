@@ -56,7 +56,7 @@ export function Menu({ id, button, children, left = false, style }: { id: string
   );
 }
 
-export type Action = { label: string; onClick?: () => void; kind?: 'primary' | 'danger' | 'ai' | 'subtle'; disabled?: boolean; hidden?: boolean };
+export type Action = { label: string; onClick?: () => void; kind?: 'primary' | 'danger' | 'ai' | 'subtle'; disabled?: boolean; busy?: boolean; hidden?: boolean };
 /** Dialog frame. Render it from a component passed to openModal(). */
 /** persistent: clicking outside or pressing Escape doesn't close it (work in progress). */
 export function Modal({ title, children, actions = [], wide = false, left, persistent = false }: { title: string; children: ReactNode; actions?: Action[]; wide?: boolean; left?: ReactNode; persistent?: boolean }) {
@@ -74,7 +74,7 @@ export function Modal({ title, children, actions = [], wide = false, left, persi
           {left && <div className="left">{left}</div>}
           {!left && actions.some((a) => a.kind === 'ai' && !a.hidden) && <div className="left"><AiRunPicker /></div>}
           {actions.filter((a) => !a.hidden).map((a) => (
-            <button key={a.label} className={`btn ${a.kind || 'subtle'}`} disabled={a.disabled} onClick={a.onClick || closeModal}>{a.label}</button>
+            <button key={a.label} className={`btn ${a.kind || 'subtle'}`} disabled={a.disabled || a.busy} aria-busy={a.busy || undefined} onClick={a.onClick || closeModal}>{a.busy && <span className="spinner" />}{a.label}</button>
           ))}
         </footer>
       </div>
