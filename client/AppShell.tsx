@@ -15,7 +15,7 @@ import { MyAiModal } from './MyAi';
 import { useThemeMode } from './theme';
 import { TourHost, startTourHere, resetTours } from './tour';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
-import { showUpgrade } from './Billing';
+import { showUpgrade, LockedScreen } from './Billing';
 import { Chatbot } from './Chatbot';
 import { planLimitHandler } from './core';
 
@@ -423,7 +423,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <TourHost>
       <TopNav />
-      <main id="app">{children}</main>
+      {/* A trial that ended without a payment: the pay prompt replaces the app (checkout stays reachable so it can be paid). */}
+      <main id="app">{S.auth?.billing?.locked && !pathname.startsWith('/checkout') ? <LockedScreen /> : children}</main>
       {S.modal as Any}
       <LegalPrompt />
       <Toasts />

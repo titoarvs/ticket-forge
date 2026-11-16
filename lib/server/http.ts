@@ -2,10 +2,11 @@
 import { lockedFeatureFor, lockedMessage } from '../features.js';
 import { cookies, headers } from 'next/headers';
 import * as auth from '@/lib/auth.js';
-import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION } from '@/lib/db.js';
+import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION, DEFAULT_WS } from '@/lib/db.js';
 import * as store from '@/lib/store.js';
 import { isLocalHost } from '@/lib/claude.js';
-import { isSaas, scrubSharedTokens } from '@/lib/platform.js';
+import { isSaas, scrubSharedTokens, platformAdminEmails } from '@/lib/platform.js';
+import { lockStatus } from '@/lib/limits.js';
 
 const G = globalThis as any;
 
@@ -42,6 +43,14 @@ export async function ownerOnly() {
   if (!u.is_owner) throw new HttpError(403, 'Only the owner can manage users and invites.');
   return u;
 }
+/** Whether this user may set up payment gateways and plans: the owner of the default workspace, or a platform admin (PLATFORM_ADMIN_EMAILS). */
+export const runsThePlatform = (u: any) => Boolean(u?.is_owner && (u.workspace_id === DEFAULT_WS || platformAdminEmails().includes(String(u.email).toLowerCase())));
+/** Only the owner who runs this TicketForge: payment gateways and plans (Administration → Billing). */
+export async function platformOwner() {
+  const u: any = await authed();
+  if (!runsThePlatform(u)) throw new HttpError(403, 'Only the owner who runs this TicketForge can set up payment gateways and plans.');
+  return u;
+}
 export async function perm(...perms: string[]) {
   const u = await authed();
   for (const p of perms) store.requirePerm(u, p);
@@ -73,6 +82,9 @@ export const aiOpts = (b: any) => {
 };
 const aiOptsOf = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined, run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined, fresh: b?.fresh === true || b?.regenerate === true || undefined });
 
+/** API routes that still work while the workspace is locked, so the owner can sign in, see the plans and pay. */
+const LOCK_EXEMPT = /^\/api\/(auth|billing|plans|features|status)(\/|$)/;
+
 type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
 const resolve = async (fn: Handler, req: Request, p: Promise<Record<string, string>>) => fn(req, (await p) || {});
@@ -99,6 +111,11 @@ export function api(fn: Handler) {
         if (w && w !== user.workspace_id) throw new HttpError(404, 'Project not found');
       }
       const out = await asUser(user?.id, async () => {
+        // A trial that ended without a payment locks the workspace: everything but sign-in and billing refuses until it is paid.
+        if (user && !LOCK_EXEMPT.test(new URL(req.url).pathname)) {
+          const lock = await lockStatus(user.workspace_id);
+          if (lock.locked) throw Object.assign(new HttpError(402, `Your ${lock.plan.name} trial has ended. Pay to keep using this workspace.`), { extra: { code: 'locked', plan: lock.plan.id } });
+        }
         // Feature flags: a feature the workspace owner locked refuses its API routes for everyone in that workspace.
         const locked = await lockedFeatureFor(new URL(req.url).pathname);
         if (locked) throw new HttpError(423, lockedMessage(locked));

@@ -418,6 +418,24 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   (nothing is created, the plan stays as it was) or **failed** (error with a **Retry** button back to the checkout).
   A success is never taken from the address: the plan changes only when PayMongo reports the payment as paid. The
   pending session is kept in `workspaces.paymongo_checkout_id`. `PAYMONGO_API_BASE` points tests at a local mock.
+- **Payment gateways and plans (TF-100)**: Administration → **Plans & gateways** (the owner who runs this TicketForge:
+  the default workspace's owner or a `PLATFORM_ADMIN_EMAILS` account; hosted service only).
+  - *Gateways*: **PayMongo** (PHP), **Xendit** (PHP) and **Stripe** (PHP, USD) can all be active at once. Enabling one
+    needs its secret key, which is checked with the gateway first (a wrong key shows an error and the gateway stays
+    inactive) and then stored encrypted in `payment_gateways`; it is never sent back to the browser.
+    `PAYMONGO_API_BASE`, `XENDIT_API_BASE` and `STRIPE_API_BASE` point tests at a local mock.
+  - *Plans* (`billing_plans`, `lib/billing-plans.js`): name, price, currency (PHP or USD), cycle (monthly or yearly),
+    free-plan option and trial days. The default Free, Pro and Team plans from `lib/plans.js` are copied in the first
+    time. Editing the price, currency, cycle, free option or trial days of a plan that has subscribers adds a **new
+    version**; workspaces keep the version they subscribed to (`workspaces.plan_version`) and new subscriptions use the
+    latest. Other edits change the latest version in place. API: `GET/POST /api/billing/plans`, `PUT /api/billing/plans/<id>`.
+  - *Choosing a plan* (Billing): a plan with trial days starts a **trial with no card** (`POST /api/billing/subscription`)
+    with full access until it ends. A trial that ends without a payment **locks the workspace**: every API route except
+    sign-in and billing answers 402 `locked`, and the app shows a pay prompt until the owner pays at `/checkout` (plan
+    and active gateway picked there; the way back reads the payment from the gateway, then the plan is `active`) or
+    cancels. Switching plan during a trial keeps the trial; switching while paid is a new payment on the new plan (no
+    proration yet) and cancelling keeps access until the paid period ends. Paying through PayMongo or Xendit is one
+    payment per period: renewals are not charged automatically yet.
 
 ## AI flow (Administration → AI → AI flow)
 
@@ -984,6 +1002,15 @@ On the Epics page (**AI actions → Split issues**) or in an epic's panel (**Spl
 - **Pick the issues.** Big ones are ticked for you: over 3 points, or unestimated with many acceptance criteria, many test cases or a long description.
 - **The AI proposes** small tickets for each issue: one testable behaviour each, 1–3 points, following your team's acceptance-criteria rules, and covering exactly the original scope. It shares the issue's test cases out to the part each one tests. Issues that are already small are kept, with the reason.
 - **On apply**, the first part keeps the original issue (key, history, comments, pull requests, links). The other parts become new issues next to it, in the same epic, sprint and status, linked with "relates to". Parts that no test case covers are flagged so you can write tests for them. ⌘Z undoes it.
+
+## Coding specs per epic, with overlap detection
+
+In an epic's panel, **Coding specs** (needs a connected git remote: Project settings → Code & GitHub; any remote works):
+- **Generate coding specs** writes one coding prompt per issue of the epic (`lib/specgen.js`). Each spec lists the issue's acceptance criteria and the files and modules it is expected to touch. When the repository is on this computer the AI sees its file names, otherwise it goes by the Repository Profile. Generating again replaces the spec and sets it back to draft. Nothing here runs an AI agent or writes code.
+- **Overlaps** (`lib/specs.js`): two specs that list the same file or module are flagged, naming the issues and the file. Specs of one epic are always compared; specs of different epics are compared when one of them is ready (being coded in parallel).
+- **Mark ready** follows the project's setting (Coding specs → Settings, needs *Edit project settings*): **block** refuses with a message naming the issues and files, **warn** marks the specs ready and shows the overlap. Specs without an overlap are marked ready with no warning. Blocking is the default.
+- **Reviewer approval:** link AI-produced changes (a branch, pull request or commit) to a ready spec. They can be marked accepted only after one of the project's required reviewers (chosen in the same settings) has approved them; until then the server answers 409.
+- Tables `coding_specs` and `spec_changes` (`lib/db.js`); API under `/api/projects/:id/specs`.
 
 ## GitHub Copilot as the local AI
 
