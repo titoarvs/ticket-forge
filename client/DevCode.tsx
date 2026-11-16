@@ -239,7 +239,7 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
           <button className="btn sm subtle" disabled={!!busy} onClick={() => { setErr(''); setMode(isGh ? 'github' : isClone ? (d.source?.url && /github/i.test(d.source.url) ? 'github' : 'url') : 'folder'); }}>Change</button></>}
       </div>
       <div className="rc-meta small muted">
-        {isGh ? <span>Used through GitHub: code jobs run on GitHub Actions{d.baseBranch ? <> · base branch <code>{d.baseBranch}</code></> : null}</span> : <code title={d.localPath}>{d.localPath}</code>}
+        {isGh ? <span>Used through GitHub: code jobs use your AI provider and GitHub{d.baseBranch ? <> · base branch <code>{d.baseBranch}</code></> : null}</span> : <code title={d.localPath}>{d.localPath}</code>}
         {status?.ok && <span>default branch <code>{status.defaultBranch}</code> · on <code>{status.currentBranch}</code>{status.uncommitted ? ` · ${status.uncommitted} uncommitted change${status.uncommitted === 1 ? '' : 's'} (never touched)` : ''}</span>}
         {isClone && d.source?.clonedAt && <span>updated {ago(d.source.clonedAt)}</span>}
       </div>
@@ -274,68 +274,24 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
 }
 
 /**
- * Project settings → Code & GitHub → Where code jobs run: on this computer (Claude Code next to the checkout) or on
- * GitHub Actions (works from the deployed TicketForge). GitHub Actions is set up with a pull request (the workflow)
- * and repository secrets (the run key and a Claude key).
+ * Project settings → Code & GitHub → Where code jobs run: on this computer (Claude Code next to the checkout) or through
+ * your AI provider and the GitHub API (works from the deployed TicketForge; nothing to set up beyond GitHub access).
  */
 function CodeRunnerCard({ ed, env }: { ed: boolean; env: Any }) {
   const d = dev();
   const local = env?.local !== false;
   const onGh = !local || runPlace() === 'github';
-  const [status, setStatus] = useState<Any>(null);
-  const [busy, setBusy] = useState('');
-  const [err, setErr] = useState('');
-  const [claudeKey, setClaudeKey] = useState('');
-  const base = `/api/projects/${P().id}/dev`;
-  const check = async () => {
-    if (!d.repo) return;
-    setBusy('check'); setErr('');
-    try { setStatus(await api(base, { method: 'POST', body: { action: 'codeRunnerStatus' } })); } catch (e: Any) { setErr(e.message); } finally { setBusy(''); }
-  };
-  useEffect(() => { if (onGh && d.repo) check(); }, [onGh, d.repo]); // eslint-disable-line react-hooks/exhaustive-deps
-  const setup = async () => {
-    setBusy('setup'); setErr('');
-    try {
-      const r = await api(base, { method: 'POST', body: { action: 'codeRunnerSetup', claudeToken: claudeKey.trim() } });
-      setClaudeKey('');
-      toast(`${r.created ? 'Opened' : 'Updated'} pull request #${r.pr.number}. Merge it, then press Check.`, 'ok', { title: 'Code runner ready to merge', action: { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') } });
-      await check();
-    } catch (e: Any) { setErr(e.message); } finally { setBusy(''); }
-  };
-  const needsClaude = status?.checks?.some((c: Any) => c.label === 'Claude' && !c.ok);
-  return <SetCard id="code-runner" title="Where code jobs run" desc="Write code with AI runs a Claude Code agent on the repository. On this computer it works next to the checkout; on GitHub Actions it runs on GitHub’s machines, so it also works from the deployed TicketForge.">
-    <p className="muted small" style={{ margin: '0 0 8px' }}>{local ? <>Your choice on this computer, for code jobs <b>and</b> test runs (it’s remembered in this browser, not saved in the project). The deployed TicketForge always uses GitHub Actions.</> : <>This TicketForge is deployed, so code jobs and test runs always use GitHub Actions.</>}</p>
+  return <SetCard id="code-runner" title="Where code jobs run" desc="Write code with AI either runs a Claude Code agent next to the checkout on this computer, or asks your AI provider for the change and commits it to the issue’s branch through GitHub. The second works from the deployed TicketForge.">
+    <p className="muted small" style={{ margin: '0 0 8px' }}>{local ? <>Your choice on this computer, for code jobs <b>and</b> test runs (it’s remembered in this browser, not saved in the project). The deployed TicketForge always uses the AI API and GitHub.</> : <>This TicketForge is deployed, so code jobs use your AI provider and GitHub.</>}</p>
     <div className="rc-sources" role="radiogroup" aria-label="Where code jobs run">
       <button role="radio" aria-checked={!onGh} className={!onGh ? 'on' : ''} disabled={!local} onClick={() => { setRunPlace('local'); toast('Code jobs and test runs now run on this computer'); }}>
         <Ico svg={I.folder} /><b>This computer</b><span className="muted small">{local ? 'Claude Code next to the repository; live progress; reviews and CodeRabbit.' : 'Only when TicketForge runs on your computer (localhost).'}</span></button>
-      <button role="radio" aria-checked={onGh} className={onGh ? 'on' : ''} disabled={!local} onClick={() => { setRunPlace('github'); toast('Code jobs and test runs now run on GitHub Actions'); }}>
-        <Ico svg={I.pr} /><b>GitHub Actions</b><span className="muted small">{local ? 'On GitHub’s machines; works from the deployed app. Commits go to the issue’s branch.' : 'Used here: this TicketForge is deployed.'}</span></button>
+      <button role="radio" aria-checked={onGh} className={onGh ? 'on' : ''} disabled={!local} onClick={() => { setRunPlace('github'); toast('Code jobs now use the AI API and GitHub; test runs use GitHub Actions'); }}>
+        <Ico svg={I.pr} /><b>AI API + GitHub</b><span className="muted small">{local ? 'Your AI provider writes the change and TicketForge commits it to the issue’s branch. Works from the deployed app.' : 'Used here: this TicketForge is deployed.'}</span></button>
     </div>
     {onGh && <div className="crun">
-      {!d.repo ? <p className="small muted" style={{ margin: 0 }}>Choose the GitHub repository above first.</p> : <>
-        {status && <ul className="ghr-checks">{status.checks.map((c: Any) => <li key={c.label} className={c.ok ? 'ok' : 'bad'}><span className={`dot ${c.ok ? 'ok' : 'bad'}`} /><b>{c.label}</b><span className="muted">{c.detail}</span></li>)}</ul>}
-        {status?.setupPr && !status.ready && <div className="warn-banner" style={{ marginTop: 8 }}><Ico svg={I.pr} /><span>Merge <a href={status.setupPr.url} target="_blank" rel="noopener noreferrer">pull request #{status.setupPr.number}</a> into {status.defaultBranch}, then press Check. GitHub only starts workflows that are on the default branch.</span></div>}
-        {status?.ready && <div className="ok-banner" style={{ marginTop: 8 }}><Ico svg={I.check} /><span>Ready: Write code with AI runs on GitHub Actions in <b>{d.repo}</b>.</span></div>}
-        {ed && (!status?.ready || needsClaude) && <div className="crun-setup">
-          <div className="field" style={{ margin: 0 }}><span>Shared Claude subscription token (optional)</span>
-            <p className="muted small" style={{ margin: '0 0 6px', fontWeight: 400 }}>Each person’s code jobs use <b>their own</b> Claude subscription from <b>My AI</b> (avatar menu). A shared token here is only for people who haven’t set up their own; leave it empty so everyone uses their own.</p>
-            <ol className="small ck-steps">
-              <li>On your computer, in a terminal: <code className="ck-cmd">claude setup-token</code> <button className="btn sm subtle" onClick={() => { try { navigator.clipboard.writeText('claude setup-token'); toast('Command copied'); } catch { /* clipboard off */ } }}>Copy</button></li>
-              <li>Sign in with your Claude account (Pro or Max) in the browser window it opens.</li>
-              <li>Copy the token it prints (it starts with <code>sk-ant-oat01-</code>, valid for a year) and paste it here.</li>
-            </ol>
-            <TF type="password" autoComplete="off" value={claudeKey} placeholder={status?.checks?.some((c: Any) => c.label === 'Claude' && c.ok) ? 'Replace the saved token (optional)' : 'sk-ant-oat01-…'} onChange={(e) => setClaudeKey(e.target.value)} />
-            {claudeKey.trim() && !/^sk-ant-oat/.test(claudeKey.trim()) && <small className="bad-text">That doesn’t look like a subscription token (they start with sk-ant-oat01-).</small>}
-            <small className="muted">Saved on the repository as the <code>CLAUDE_CODE_OAUTH_TOKEN</code> GitHub Actions secret; code jobs use only your Claude subscription (never billed API usage) and count toward your plan’s limits. TicketForge doesn’t keep it. Anyone who can change the repository’s workflows could use it, so use a repository only your team controls.</small>
-          </div>
-        </div>}
-        <div className="row" style={{ gap: 8, marginTop: 10 }}>
-          <button className="btn" disabled={!!busy} onClick={check}>{busy === 'check' ? <><Spinner />Checking…</> : 'Check'}</button>
-          {ed && <button className="btn primary" disabled={!!busy} onClick={setup}>{busy === 'setup' ? <><Spinner />Setting up…</> : status?.ready ? 'Update the runner' : 'Set up'}</button>}
-        </div>
-        <p className="muted small" style={{ margin: '8px 0 0' }}>Set up adds the <code>TICKETFORGE_RUN_KEY</code> secret, your Claude key, and opens a pull request with <code>.github/workflows/ticketforge-code.yml</code>. Each job pushes its commits to the issue’s branch; you review the diff in TicketForge and open the pull request from here. The GitHub token needs Actions, Contents, Pull requests, Secrets and Workflows access.</p>
-      </>}
-      {err && <div className="warn-banner danger" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>{err}</span></div>}
+      {!d.repo ? <p className="small muted" style={{ margin: 0 }}>Choose the GitHub repository above first.</p> : <div className="ok-banner"><Ico svg={I.check} /><span>Write code with AI works on <b>{d.repo}</b>. It needs an AI provider (Administration → AI) and a GitHub connection with write access to the repository; there is nothing to install or set up there.</span></div>}
+      <p className="muted small" style={{ margin: '8px 0 0' }}>The AI reads the files that matter for the issue and returns exact edits; TicketForge checks each one against the file, then commits to the issue’s branch. It can’t run your tests or build, so review the diff before opening the pull request (use the checks on the pull request for the rest). It never changes workflow files, <code>.env</code> files or lock files.</p>
     </div>}
   </SetCard>;
 }
@@ -346,7 +302,7 @@ export function DevSettings({ ed }: { ed: boolean }) {
   const [env, setEnv] = useState<Any>(null);
   useEffect(() => { api(`/api/projects/${P().id}/dev`).then(setEnv).catch(() => setEnv({})); }, []);
   return <>
-    {env && !env.local && <div className="ok-banner"><Ico svg={I.check} /><span>This TicketForge is deployed: choose a GitHub repository and code jobs run on GitHub Actions (set up under <b>Where code jobs run</b>). Folders on a computer and cloning work when TicketForge runs on your computer.</span></div>}
+    {env && !env.local && <div className="ok-banner"><Ico svg={I.check} /><span>This TicketForge is deployed: choose a GitHub repository and code jobs use your AI provider and GitHub (see <b>Where code jobs run</b>). Folders on a computer and cloning work when TicketForge runs on your computer.</span></div>}
     <GitHubAccountCard ed={ed} env={env} setEnv={setEnv} />
     <SetCard id="repo" title="Repository" desc="Where the code agents work: one of your GitHub repositories, any Git URL, or a folder on this computer. Each issue gets its own branch and git worktree, so the checkout and any uncommitted work are never touched.">
       <RepoChooser side="frontend" ed={ed} env={env} setEnv={setEnv} />
@@ -736,7 +692,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             <span className="cj-branch" title={`${job.branch} → ${job.base}`}><Ico svg={I.pr} /><code>{job.branch}</code><span className="muted">→</span><code>{job.base}</code></span>
             <span><Ico svg={I.folder} />{job.repo || 'local repository'}</span>
             <span><Ico svg={I.clock} />Started {ago(job.startedAt)}</span>
-            {job.remote && <span><Ico svg={I.external} />{job.runUrl ? <a href={job.runUrl} target="_blank" rel="noopener noreferrer">GitHub Actions run</a> : 'GitHub Actions'}</span>}
+            {job.remote && <span><Ico svg={I.external} />{job.runUrl ? <a href={job.runUrl} target="_blank" rel="noopener noreferrer">GitHub Actions run</a> : 'AI API + GitHub'}</span>}
             {job.costUsd ? <span>${job.costUsd.toFixed(2)}</span> : null}
           </div>
         </div>
@@ -824,7 +780,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             {!job.remote && <button className="btn subtle" disabled={!!busy || !title.trim()} onClick={commitLocal} title="Commit on the local branch without pushing">{busy === 'commit' ? <Spinner /> : 'Commit locally only'}</button>}
             <button className="btn primary" disabled={!!busy || !title.trim()} onClick={openPr}>{busy === 'pr' ? <><Spinner />Opening…</> : <><Ico svg={I.pr} />{job.remote ? 'Open pull request' : <>Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}</>}</button>
           </div>
-          <div className="muted small">{job.remote ? 'Opens the pull request for the branch the job pushed on GitHub Actions.' : <>Commits with your git name and email, pushes <code>{job.branch}</code> to the repository’s <code>origin</code> with your own git setup (SSH key or credential helper; the project’s token only if that’s refused), then opens the {job.provider === 'GitLab' ? 'merge request' : 'pull request'}.</>}
+          <div className="muted small">{job.remote ? 'Opens the pull request for the branch the job pushed to GitHub.' : <>Commits with your git name and email, pushes <code>{job.branch}</code> to the repository’s <code>origin</code> with your own git setup (SSH key or credential helper; the project’s token only if that’s refused), then opens the {job.provider === 'GitLab' ? 'merge request' : 'pull request'}.</>}
           </div>
         </div>}
         {job.pr?.compare && <div className="ok-banner"><Ico svg={I.check} /><span>Committed and pushed <code>{job.branch}</code> with your git setup. <a href={job.pr.url} target="_blank" rel="noopener noreferrer">Open the {job.provider === 'GitLab' ? 'merge request' : 'pull request'} on {job.provider || 'GitHub'}</a> to finish; link it to this issue in Development once it’s open.</span></div>}
@@ -958,7 +914,7 @@ export function CodeJobs() {
       <span><b>{n(['running', 'starting'])}</b> running</span><span><b>{n(['queued'])}</b> waiting</span>
       <span><b>{n(['review', 'report'])}</b> ready for review</span><span><b>{n(['pr', 'committed'])}</b> shipped</span>
       {n(['failed', 'cancelled', 'empty']) > 0 && <span className="bad"><b>{n(['failed', 'cancelled', 'empty'])}</b> need attention</span>}
-      <span className="spacer" /><span className="muted small">{data.queue.max === 'GitHub' ? 'Runs on GitHub Actions' : `${data.queue.running} of ${data.queue.max} agent slots busy`}</span>
+      <span className="spacer" /><span className="muted small">{data.queue.max === 'GitHub' ? 'Runs through the AI API and GitHub' : `${data.queue.running} of ${data.queue.max} agent slots busy`}</span>
     </div>
     <div className="jobs-list">{jobs.map((j: Any) => {
       const t = P().tickets.find((x: Any) => x.id === j.ticketId);

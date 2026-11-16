@@ -362,7 +362,7 @@ and can belong to several workspaces; their role, project access and owner statu
 - **Hosted service (SaaS) safety**:
   - AI never uses the server's own Claude sign-in. Each workspace sets up its own AI providers, or people use My AI.
   - Code jobs and repository folders never run on the server itself. Repositories connect through GitHub, and code
-    jobs run on GitHub Actions.
+    jobs go through the AI API and the GitHub API.
   - Server-wide `GITHUB_TOKEN`, `GH_TOKEN` and `GITLAB_TOKEN` are ignored, and so is the server's `gh` sign-in.
   - Test runs refuse apps on private or internal addresses. This checks the address you enter, not pages a test
     script opens later, so for full protection run tests on GitHub Actions or a remote browser.
@@ -382,6 +382,9 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   `validatePlan` when the app loads). Every new workspace starts on Free; paid plans are started from Billing. A plan
   with `archived: true` is left out of the plans offered for purchase (Billing, Pricing, `GET /api/plans?purchasable=1`)
   and can't be checked out, but workspaces already on it keep it.
+- **Every feature is on every plan** (TF-101): a plan limits how much you use, never which features you can use.
+  Only a positive limit stops anything; a value of `0` (for example AI code jobs on Free) no longer means "not
+  included" and is treated as no limit (`enforced()` in `lib/limits.js`).
 - **What counts as an AI action**: only calls that use the service's own AI keys (environment variables).
   Providers a workspace adds in Administration → AI, and people's own Claude subscriptions (My AI), don't count.
   Monthly allowances are taken atomically, so many requests at once never go over, and a failed call gives its
@@ -586,11 +589,10 @@ the browser (only its last 4 characters), and never used for anyone else's reque
 - **Your AI requests** run on your subscription first (Claude Code with your token). If it isn't available (usage
   limit, expired token), they use the team's AI from Administration → AI, unless you turn that off, in which case they
   stop with the reason.
-- **Your code jobs on GitHub Actions** run with your token too: it travels inside the encrypted job, is masked in the
-  run's log, and replaces any shared `CLAUDE_CODE_OAUTH_TOKEN` on the repository. A shared repository token is now
-  optional (for people without their own).
+- **Your code jobs** on the deployed TicketForge use the workspace's AI provider (Administration → AI), not your Claude
+  subscription: a subscription token only works inside Claude Code, which runs on your computer.
 - Using it for TicketForge's AI features needs Claude Code installed where TicketForge runs (your computer or a VPS);
-  on serverless hosting it's used for your code jobs only.
+  on serverless hosting it can't be used.
 - The admin-level **Claude subscription, shared with everyone** provider still exists for one plan used by all.
 
 ### Claude subscription as an AI provider
@@ -603,34 +605,32 @@ Claude Code installed where TicketForge runs (your computer or a VPS); serverles
 it. A subscription token is refused as an Anthropic API key, and an API key as a subscription token. The plan is
 meant for your own use: for a whole team, use a team plan or an API.
 
-### Code jobs on the deployed TicketForge (GitHub Actions)
+### Code jobs on the deployed TicketForge (AI API + GitHub)
 
-**Where code jobs and test runs go.** The deployed TicketForge always uses GitHub Actions. On your computer
-(localhost) they run on this computer by default: Claude Code next to your checkout, and Playwright in a local
-browser. To send them to GitHub Actions instead, use Project settings → Code & GitHub → *Where code jobs run*,
-Test automation → *Run on GitHub Actions*, or the account menu (*Code & tests: …*). The choice covers code jobs and
-test runs together, belongs to you, and is remembered in your browser rather than saved in the project, so it never
-changes what the deployed app or your teammates do.
+**Where code jobs and test runs go.** On your computer (localhost) code jobs run on this computer by default: Claude
+Code next to your checkout, and Playwright in a local browser. The deployed TicketForge (Vercel, or opened from another
+computer) has no checkout and no Claude Code, so **Write code with AI** asks your AI provider for the change and commits
+it through the GitHub API. **No GitHub Actions workflow and no Claude Code on a server are needed for code jobs.** (Test
+runs on the deployed app still use GitHub Actions.) A project on your computer can choose the API too: Project settings
+→ Code & GitHub → **Where code jobs run**. The choice is yours, remembered in your browser, not saved in the project.
 
-On a deployed TicketForge (Vercel, or opened from another computer) there is no checkout and no Claude Code, so
-**Write code with AI** runs on **GitHub Actions** instead (and a project on your computer can choose that too:
-Project settings → Code & GitHub → **Where code jobs run**).
+1. **Repository**: choose one of your GitHub repositories (or paste its URL / `owner/name`) and connect GitHub with
+   write access (Contents and Pull requests). Nothing is cloned on the server.
+2. **An AI provider** in Administration → AI (an API key; routing uses the *Coding agents* task, High tier by default).
+3. **Write code with AI** (also bulk coding and Build both at once): TicketForge reads the repository's file list on
+   GitHub, the AI picks the files that matter for the issue, then returns the change as exact edits (`find` / `replace`),
+   new files and deletions, in the chosen agent's own instructions and with the issue, brain and repository profile as
+   context. Every edit is checked against the file (the text to replace must appear exactly once; a failed edit is sent
+   back to the AI once to correct) and the result is committed to the issue's branch with the Git Data API. The diff
+   and summary appear in the code window like a local job. **Ask for changes** adds another commit to the same branch;
+   **Open pull request** opens it as you; **Discard** deletes the branch; **Stop** commits nothing more.
 
-1. **Repository**: choose one of your GitHub repositories (or paste its URL / `owner/name`). Nothing is cloned on the
-   server; it's used through GitHub.
-2. **Where code jobs run → Set up**: TicketForge stores the `TICKETFORGE_RUN_KEY` secret and your Claude key as
-   repository secrets: your **Claude subscription token** (Pro/Max: run `claude setup-token` in a terminal on your
-   computer, sign in, paste the `sk-ant-oat01-…` token; saved as `CLAUDE_CODE_OAUTH_TOKEN`). Code jobs use **only** your
-   Claude subscription: the workflow never passes an API key to Claude Code and stops if the token is missing, and opens a pull request adding `.github/workflows/ticketforge-code.yml` and
-   `.github/ticketforge/code.mjs`. Merge it and press **Check**.
-3. **Write code with AI** (also bulk coding and Build both at once): the job, with the same agent instructions, issue
-   context and repository profile as a local job, is sent encrypted to the workflow. GitHub's machine checks out the
-   repository, installs the dependencies, runs Claude Code on the issue's branch, then commits and pushes it. The
-   result (summary, changed files, diff) comes back encrypted. **Ask for changes** runs another round on the same
-   branch; **Open pull request** opens it as you through the GitHub API; **Discard** deletes the branch.
-
-Jobs are kept in the database (`code_jobs`), so they survive serverless restarts. Reviews, CodeRabbit and committing
-locally need TicketForge on your computer.
+Limits to know: the AI cannot run your tests, build or linter (review the diff and use the pull request's checks), and
+it sees up to about 16 files and 220 KB of code per round, so large cross-cutting changes work better on your computer.
+It never changes `.github/workflows`, `.env` files or lock files. A round runs after the response is sent and can take up
+to 5 minutes (Vercel's limit); a round that goes quiet for 8 minutes is marked failed. Jobs are kept in the database
+(`code_jobs`), so they survive serverless restarts. Jobs started on GitHub Actions in an earlier version can't continue:
+start a new job. Reviews, CodeRabbit and committing locally need TicketForge on your computer.
 
 ### Code that follows your repository
 
@@ -665,10 +665,10 @@ locally need TicketForge on your computer.
 ## Code with AI and pull requests
 
 **Code jobs page** (top bar → *Code jobs*, `/code-jobs`; inside a project it is *Development → Code jobs*, with that project's jobs only, and the *Code jobs* button on the Pull requests page goes there): every code generation in your workspace's projects, on
-this computer and on GitHub Actions, in one list that updates live (every few seconds while something runs). It shows
+this computer and through the AI API, in one list that updates live (every few seconds while something runs). It shows
 counts of what's working, waiting, ready for review, shipped and needing attention, filters (*Running now*, *Ready
 for review*, *All recent*), a project filter and search. Each job can be stopped, opened to review its changes (the
-issue opens with its code job), or followed to its GitHub Actions run and pull request. You only see projects you
+issue opens with its code job), or followed to its branch and pull request on GitHub. You only see projects you
 have access to.
 
 **Done on code completion.** When a code job finishes with code for an issue (ready for review, committed or in a

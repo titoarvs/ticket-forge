@@ -14,8 +14,8 @@ export const store = {
   set(k: string, v: Any) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
 /**
- * Where code jobs and test runs go. The deployed TicketForge can only use GitHub Actions; on your computer they run
- * here by default, and you can switch to GitHub Actions (your choice, remembered in this browser).
+ * Where code jobs and test runs go. The deployed TicketForge uses the AI API and GitHub for code (and GitHub Actions for tests); on your computer they run
+ * here by default, and you can switch to them (your choice, remembered in this browser).
  */
 export const isDeployed = () => S.status?.local === false || Boolean(S.status?.serverless);
 export const runPlace = (): 'local' | 'github' => (isDeployed() ? 'github' : store.get('tf.runOn', 'local') === 'github' ? 'github' : 'local');

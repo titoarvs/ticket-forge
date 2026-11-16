@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http';
 import * as store from '@/lib/store.js';
 import { SERVERLESS, currentContext } from '@/lib/db.js';
@@ -8,23 +9,23 @@ import { ardContext } from '@/lib/ard.js';
 import { markdownToDocx } from '@/lib/md-docx.js';
 import { codeTask, branchFor, writePrText } from '@/lib/devagent.js';
 import { gh as ghApi } from '@/lib/gh-actions.js';
-import { myAi } from '@/lib/user-ai.js';
 import { brainForCode } from '@/lib/brain.js';
 import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs.js';
 
-// ---------------------------------------------------------------- code jobs on GitHub Actions
+// ---------------------------------------------------------------- code jobs through the AI API and GitHub
 // Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code next to a checkout, so
-// code jobs run on GitHub Actions (lib/gh-code.js). On your computer they run here, unless you switched to GitHub
-// Actions (the X-TF-Run-On header from the browser; see runPlace in client/core.ts).
+// code jobs ask your AI provider for the change and commit it through the GitHub API (lib/api-code.js). On your
+// computer they run here with Claude Code, unless you switched to the API (the X-TF-Run-On header from the browser; see
+// runPlace in client/core.ts). A round runs after the response (after()), so it needs the longest time Vercel allows.
+export const maxDuration = 300;
 const localHere = () => !SERVERLESS && Boolean((currentContext() as any).local);
 const remoteMode = (_project?: any) => !localHere() || (currentContext() as any).runOn === 'github';
 async function ghFor(project: any, dev: any) {
-  const [token, key] = await Promise.all([getProjectSecret(project.id, 'githubToken'), getProjectSecret(project.id, 'ghRunnerKey')]);
-  if (!key) throw new HttpError(400, 'Set up code jobs on GitHub Actions first: Project settings → Code & GitHub → Where code jobs run.');
+  const token = (await getProjectSecret(project.id, 'githubToken')) || process.env.GITHUB_TOKEN || '';
   if (!dev?.repo) throw new HttpError(400, 'Choose the GitHub repository first: Project settings → Code & GitHub → Repository.');
-  const tok = token || process.env.GITHUB_TOKEN || '';
-  const info: any = await ghApi('GET', `repos/${dev.repo}`, { token: tok }).catch((e: any) => { throw new HttpError(400, e.message); });
-  return { token: tok, key, ref: info.default_branch, defaultBranch: info.default_branch };
+  if (!token) throw new HttpError(400, 'Connect GitHub first (Project settings → Code & GitHub) so TicketForge can read the repository and push the branch.');
+  const info: any = await ghApi('GET', `repos/${dev.repo}`, { token }).catch((e: any) => { throw new HttpError(400, e.message); });
+  return { token, ref: info.default_branch, defaultBranch: info.default_branch };
 }
 /**
  * The project brain for a code job (lib/brain.js): the notes linked to the issue as a block for the prompt, and for jobs
@@ -42,10 +43,8 @@ async function userOk(p: any, perms: string[]) {
   if (missing.length) throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
   return user;
 }
-/** The requester's own Claude subscription token (My AI), when they set one and allow it for code jobs. */
-const ownToken = async () => { const m: any = await myAi().catch(() => null); return m?.token && m.enabled && m.codeJobs ? m.token : ''; };
 const remoteDev = (project: any, side: string) => (side === 'backend' ? (project.devBackend?.enabled && project.devBackend?.repo ? { draft: project.dev?.draft, ...project.devBackend } : null) : project.dev || {});
-async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '' }: any) {
+async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '', ai }: any) {
   const dev = remoteDev(project, side);
   if (!dev?.repo) throw new HttpError(400, side === 'backend' ? 'Set the backend repository first.' : 'Choose the GitHub repository first (Project settings → Code & GitHub).');
   const gh = await ghFor(project, dev);
@@ -54,8 +53,7 @@ async function startRemoteFor(project: any, ticket: any, { side, user, instructi
   const ctx = [context || [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n'), brain.text].filter(Boolean).join('\n\n');
   const task: any = await codeTask({ ticket, agentId: id, instructions, round: 1, context: ctx, dev });
   task.agentId = id; task.commitTitle = ticket.title;
-  task.oauthToken = await ownToken();
-  return publicRemote(await startRemoteJob({ projectId: project.id, ticket, side, dev, gh, task, branch: branchFor(ticket, dev), user, base: dev.baseBranch || gh.defaultBranch }));
+  return publicRemote(await startRemoteJob({ projectId: project.id, ticket, side, dev, gh, task, branch: branchFor(ticket, dev), user, base: dev.baseBranch || gh.defaultBranch, ai, defer: (fn: any) => after(fn) }));
 }
 /** GET for remote jobs (job, diff, list, an issue's jobs). Returns null when the request isn't for them. */
 async function remoteGet(p: any, sp: URLSearchParams) {
@@ -68,7 +66,7 @@ async function remoteGet(p: any, sp: URLSearchParams) {
     let j = await loadJob(id);
     if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
     if (sp.get('diff')) return new Response(remoteDiff(j, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-    if (['starting', 'queued', 'running'].includes(j.status)) j = await refreshJob(j, await ghFor(project, remoteDev(project, j.side))).catch(() => j);
+    if (['starting', 'queued', 'running'].includes(j.status)) j = await refreshJob(j).catch(() => j);
     return publicRemote(j, Number(sp.get('since') || 0));
   }
   if (sp.get('list')) {
@@ -101,7 +99,7 @@ async function remotePost(req: Request, p: any, b: any) {
       const both = remoteDev(project, 'backend') && (b.action === 'start-both' || ticket.layer === 'both');
       const sides = both ? ['backend', 'frontend'] : [b.side === 'backend' || (b.action === 'start-many' && ticket.layer === 'backend' && remoteDev(project, 'backend')) ? 'backend' : 'frontend'];
       for (const side of sides) {
-        try { started.push(await startRemoteFor(project, ticket, { side, user, instructions: String(b.instructions || '').slice(0, 4000), agentId: b.agentId ? String(b.agentId) : '' })); }
+        try { started.push(await startRemoteFor(project, ticket, { side, user, instructions: String(b.instructions || '').slice(0, 4000), agentId: b.agentId ? String(b.agentId) : '', ai: aiOpts(b) })); }
         catch (e: any) { if (b.action === 'start') throw e; skipped.push({ key: ticket.key, reason: e.message }); }
       }
     }
@@ -113,16 +111,15 @@ async function remotePost(req: Request, p: any, b: any) {
   const j = await loadJob(String(b.jobId));
   if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
   const dev = remoteDev(project, j.side);
-  // Stop must work even when GitHub or the runner setup isn't reachable right now.
-  if (b.action === 'cancel') return publicRemote(await cancelRemote(j, await ghFor(project, dev).catch(() => null)));
+  // Stop must work even when GitHub isn't reachable right now.
+  if (b.action === 'cancel') return publicRemote(await cancelRemote(j));
   const gh = await ghFor(project, dev);
   if (b.action === 'follow') {
     if (!store.has(user, 'ai.use')) throw new HttpError(403, 'You don’t have permission to do this (ai.use).');
     const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { id: j.ticketId, key: j.ticketKey, title: j.ticketKey };
     const task: any = await codeTask({ ticket, agentId: j.agentId, instructions: String(b.text || '').slice(0, 4000), round: (j.rounds || 1) + 1, dev, previousSummary: j.summary });
     task.agentId = j.agentId; task.commitTitle = String(b.text || '').split('\n')[0].slice(0, 80);
-    task.oauthToken = await ownToken();
-    return publicRemote(await followRemote(j, { gh, task, user, text: String(b.text || '').slice(0, 4000) }));
+    return publicRemote(await followRemote(j, { gh, task, user, text: String(b.text || '').slice(0, 4000), ai: aiOpts(b), defer: (fn: any) => after(fn) }));
   }
   if (b.action === 'discard') return publicRemote(await discardRemote(j, gh));
   if (b.action === 'prDraft') {
@@ -132,11 +129,11 @@ async function remotePost(req: Request, p: any, b: any) {
   if (b.action === 'pr') {
     const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { key: j.ticketKey, title: j.ticketKey };
     const link = `${appUrl(req)}/p/${p.id}/backlog?issue=${encodeURIComponent(j.ticketId)}`;
-    const body = String(b.body || '').trim() || [`Implements **${ticket.key}: ${ticket.title}** (${link}).`, ticket.userStory, ticket.acceptanceCriteria?.length ? `### Acceptance criteria\n${ticket.acceptanceCriteria.map((a: string) => `- ${a}`).join('\n')}` : '', j.summary ? `### What the agent did\n${String(j.summary).slice(0, 20000)}` : '', '_Written by the TicketForge agent on GitHub Actions; reviewed in TicketForge._'].filter(Boolean).join('\n\n');
+    const body = String(b.body || '').trim() || [`Implements **${ticket.key}: ${ticket.title}** (${link}).`, ticket.userStory, ticket.acceptanceCriteria?.length ? `### Acceptance criteria\n${ticket.acceptanceCriteria.map((a: string) => `- ${a}`).join('\n')}` : '', j.summary ? `### What the agent did\n${String(j.summary).slice(0, 20000)}` : '', '_Written by the TicketForge agent; reviewed in TicketForge._'].filter(Boolean).join('\n\n');
     const r = await prRemote(j, gh, { title: String(b.title || `${ticket.key}: ${ticket.title}`).slice(0, 250), body, draft: b.draft !== false });
     return { job: publicRemote(await loadJob(j.id)), ...r };
   }
-  throw new HttpError(400, 'Not available for code jobs on GitHub Actions yet (reviews, CodeRabbit and local commits need TicketForge on your computer).');
+  throw new HttpError(400, 'Not available for code jobs on the deployed TicketForge yet (reviews, CodeRabbit and local commits need TicketForge on your computer).');
 }
 
 

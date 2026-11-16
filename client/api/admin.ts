@@ -38,6 +38,10 @@ export const patchAiSettings = (body: Any): Promise<Any> => api('/api/admin/ai',
 export const aiAction = (body: Any): Promise<Any> => api('/api/admin/ai', { method: 'POST', body });
 export const removeAiEntry = (entryId: string): Promise<Any> => api(`/api/admin/ai?id=${encodeURIComponent(entryId)}`, { method: 'DELETE' });
 
+// ---------------------------------------------------------------- local folders (per user and repository)
+export const listLocalFolders = (): Promise<Any> => api('/api/admin/folders');
+export const purgeLocalFolder = (id: string): Promise<Any> => api(`/api/admin/folders?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+
 // ---------------------------------------------------------------- email and account
 export const sendTestEmail = (): Promise<Any> => api('/api/admin/email/test', { method: 'POST', body: {} });
 export const changePassword = (current: string, next: string): Promise<Any> => api('/api/auth/password', { method: 'POST', body: { current, next } });

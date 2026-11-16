@@ -1,7 +1,7 @@
 'use client';
 // Coding indicators: which issues have AI-written code, and in what state (writing now, ready for review, pull
 // request open, merged, committed, failed). Shown on backlog rows, board cards and the issue panel. The state comes
-// from the project's code jobs (this computer and GitHub Actions) and from the issue's linked pull requests, and is
+// from the project's code jobs (this computer and the AI API) and from the issue's linked pull requests, and is
 // refreshed every few seconds while a job is running. When a job finishes and the issue has code, the issue moves to
 // Done by itself (no approval step): see completeOnCode.
 import { S, emit, api, P, isDone, can, feat, ticket, mutate, setField, saveNow, toast, type Any } from './core';

@@ -33,7 +33,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
       const url = `/api/code-jobs${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`;
       const r = await api(url);
       setD(r); setError(null);
-      // Jobs on GitHub Actions update when someone asks about them: ask for the running ones, then show the news.
+      // Jobs through the AI API update when someone asks about them: ask for the running ones, then show the news.
       const gh = r.jobs.filter((j: Any) => j.live && j.where === 'github').slice(0, 8);
       if (gh.length) {
         await Promise.all(gh.map((j: Any) => api(`/api/projects/${j.projectId}/code?jobId=${encodeURIComponent(j.id)}&since=999999`).catch(() => null)));
@@ -103,7 +103,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                     {!scoped && <span className="cjp-proj" title={j.projectName}>{j.projectName}</span>}
                     {j.side === 'backend' && <span className="layer-chip l-backend">Backend</span>}</div>
                   <div className="job-l2 muted small">
-                    <span>{j.where === 'github' ? 'GitHub Actions' : 'This computer'}</span>
+                    <span>{j.where === 'github' ? 'AI API + GitHub' : 'This computer'}</span>
                     {j.agentName && <span>{j.agentName}</span>}
                     {j.todosTotal > 0 && <span>Plan {j.todosDone}/{j.todosTotal}</span>}
                     {j.live && j.last ? <span className="job-last">{j.last}</span> : j.error ? <span className="job-last bad">{j.error}</span> : null}
