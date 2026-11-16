@@ -391,7 +391,11 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   over its limit after a downgrade just can't add more.
 - **Billing page**: Administration → Billing (workspace owner) shows the plan, what renews when, and usage against
   each limit. **Choose a plan** opens Stripe Checkout; **Manage billing** opens the Stripe Customer Portal (card,
-  invoices, plan changes, cancelling).
+  invoices, plan changes, cancelling). It also shows the status: the next billing date for an active plan, the trial
+  end date for a trialing one, a warning with the grace period end (`GRACE_DAYS` in `lib/plans.js`, counted from the
+  end of the last paid period) for a past-due one, and the Free plan with an **Upgrade** action for a free workspace.
+  Non-owners see a message instead of the details (`GET /api/billing` is owner only). It reads the database on each
+  load, so a refresh shows the latest status.
 - **Webhook**: `POST /api/stripe/webhook`. It checks the `Stripe-Signature` (HMAC, 5-minute window) and handles
   each event once (`billing_events`). It reads the subscription back from Stripe before changing the plan. Events:
   `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid` and

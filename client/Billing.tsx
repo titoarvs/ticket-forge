@@ -1,11 +1,12 @@
 'use client';
 // Administration → Billing (hosted service, workspace owner): the plan in force, what the workspace uses against its
 // limits, and upgrading (Stripe Checkout) or managing billing (Stripe Customer Portal). Also the "Upgrade" prompt
-// shown anywhere in the app when something would go over the plan (a 402 with code 'limit').
+// shown anywhere in the app when something would go over the plan (a 402 with code 'limit'). It shows the plan name,
+// status and next billing date, the trial end, and the grace period end of a past-due plan; non-owners see a message.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { S, api, toast, openModal, closeModal, type Any } from './core';
-import { Ico, I, Modal, Spinner, ErrorState } from './ui';
+import { Ico, I, Modal, Spinner, ErrorState, EmptyState } from './ui';
 import { LimitBar, num } from './Limits';
 
 const date = (d: string | null) => (d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '');
@@ -20,8 +21,10 @@ export function BillingTab() {
   const [d, setD] = useState<Any>(null);
   const [error, setError] = useState<Any>(null);
   const [interval, setInterval_] = useState<'month' | 'year'>('month');
+  const owner = Boolean(S.user?.isOwner);
   const load = () => api('/api/billing').then((x) => { setD(x); setError(null); if (x.subscription?.interval) setInterval_(x.subscription.interval); }).catch(setError);
   useEffect(() => {
+    if (!owner) return undefined;
     load();
     // Back from Stripe Checkout: the webhook updates the plan within a few seconds.
     const q = new URLSearchParams(location.search).get('checkout');
@@ -34,28 +37,32 @@ export function BillingTab() {
     }
     if (q === 'cancelled') { toast('Checkout cancelled. Nothing changed.'); history.replaceState(null, '', location.pathname); }
     return undefined;
-  }, []);
+  }, [owner]);
+  if (!owner) return <div className="card"><EmptyState icon={I.warn} tone="neutral" title="Billing is for the workspace owner"><p>Only the workspace owner can see the plan and billing details. Ask your owner if you need to know.</p></EmptyState></div>;
   if (error) return <ErrorState title="Couldn’t load billing" error={error} onRetry={load}><p>Your plan and usage couldn’t be loaded.</p></ErrorState>;
   if (!d) return <div className="card" style={{ padding: 24 }}><Spinner /> Loading billing…</div>;
   if (!d.enabled) return <div className="card" style={{ padding: 20 }}><h2 style={{ marginTop: 0 }}>No plans here</h2><p className="muted">This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the hosted service (TICKETFORGE_MODE=saas).</p></div>;
   const p = d.plan, s = d.subscription;
   const status = p.source === 'unlimited' ? 'This workspace has no limits.'
     : p.source === 'trial' ? `Free trial of Pro until ${date(p.trialEndsAt)}. Then the Free plan applies unless you choose a plan.`
-      : p.source === 'subscription' ? (s.cancelAtPeriodEnd ? `Cancelled: stays ${p.name} until ${date(s.periodEnd)}, then Free.` : `Renews ${s.interval === 'year' ? 'yearly' : 'monthly'} on ${date(s.periodEnd)}.`)
+      : p.source === 'subscription' ? (s.status === 'trialing' ? `Trial ends on ${date(s.trialEndsAt)}. Your first payment is due then.`
+        : s.status === 'past_due' ? `Payment past due. ${p.name} stays until ${date(s.graceEndsAt)}.`
+          : s.cancelAtPeriodEnd ? `Cancelled: stays ${p.name} until ${date(s.periodEnd)}, then Free.` : `Renews ${s.interval === 'year' ? 'yearly' : 'monthly'}. Next billing date: ${date(s.nextBillingDate || s.periodEnd)}.`)
         : 'You’re on the Free plan.';
   return (
     <div className="bill">
-      {p.pastDue && <div className="banner warn" role="alert"><Ico svg={I.warn} /> Your last payment failed. Stripe will try again; update your card in Manage billing to keep {p.name}.</div>}
+      {p.pastDue && <div className="banner warn" role="alert"><Ico svg={I.warn} /> Your last payment failed. Stripe will try again; update your card in Manage billing to keep {p.name}{s.graceEndsAt ? <> past the grace period, which ends on <b>{date(s.graceEndsAt)}</b></> : ''}.</div>}
       <div className="card bill-now">
         <div className="bill-now-h">
-          <div><span className="muted small">Current plan</span><h2>{p.name}</h2><p className="muted" style={{ margin: 0 }}>{status}</p></div>
+          <div><span className="muted small">Current plan</span><h2>{p.name}{p.source === 'subscription' && s.status && <span className="muted small" style={{ marginLeft: 8, textTransform: 'capitalize' }}>{String(s.status).replace('_', ' ')}</span>}</h2><p className="muted" style={{ margin: 0 }}>{status}</p></div>
+          {p.source === 'free' && <a className="btn primary" href="#plans">Upgrade</a>}
           {s.hasCustomer && <button className="btn" onClick={() => go('/api/billing/portal')}><Ico svg={I.external} />Manage billing</button>}
         </div>
         <div className="bill-usages">{d.limits.map((r: Any) => <LimitBar key={r.key} r={r} />)}</div>
       </div>
       {p.source !== 'unlimited' && <>
         <div className="row" style={{ alignItems: 'center', margin: '24px 0 12px', gap: 12 }}>
-          <h2 style={{ margin: 0 }}>Plans</h2><div className="spacer" />
+          <h2 id="plans" style={{ margin: 0 }}>Plans</h2><div className="spacer" />
           <div className="seg" role="group" aria-label="Billing period">
             <button className={interval === 'month' ? 'on' : ''} aria-pressed={interval === 'month'} onClick={() => setInterval_('month')}>Monthly</button>
             <button className={interval === 'year' ? 'on' : ''} aria-pressed={interval === 'year'} onClick={() => setInterval_('year')}>Yearly</button>
