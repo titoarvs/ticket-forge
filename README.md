@@ -378,8 +378,10 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
 
 - **Plans** are in `lib/plans.js`: Free, Pro and Team, with limits on projects, members (people plus pending
   invites), platform AI actions per month, AI code jobs per month and storage. The prices and limits there are
-  placeholders. A new company's first workspace gets a 14-day Pro trial (`TRIAL_DAYS`); further workspaces of the
-  same owner start on Free.
+  placeholders. Every limit has a name, a numeric value (`null` = no limit) and a unit (`LIMIT_DEFS`, checked by
+  `validatePlan` when the app loads). Every new workspace starts on Free; paid plans are started from Billing. A plan
+  with `archived: true` is left out of the plans offered for purchase (Billing, Pricing, `GET /api/plans?purchasable=1`)
+  and can't be checked out, but workspaces already on it keep it.
 - **What counts as an AI action**: only calls that use the service's own AI keys (environment variables).
   Providers a workspace adds in Administration → AI, and people's own Claude subscriptions (My AI), don't count.
   Monthly allowances are taken atomically, so many requests at once never go over, and a failed call gives its
@@ -403,6 +405,19 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   4. Turn on the Customer Portal in Stripe's settings.
   To try it locally: `stripe listen --forward-to localhost:5173/api/stripe/webhook` with test keys, and the card
   4242 4242 4242 4242.
+- **Payment method (PayMongo, PHP)**: `/checkout?plan=pro&interval=month` (owner only) lets the customer choose
+  **Card**, **GCash** or **Maya**, shows the total in PHP, and **Pay** continues to `/checkout/<method>` (the payment
+  step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
+  shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
+  in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
+- **PayMongo checkout**: with `PAYMONGO_SECRET_KEY` set, Billing shows **Start paid plan** on each paid plan (owner
+  only; non-owners never see it, and the API refuses them with 403). It opens the checkout above; on the payment step,
+  **Continue to PayMongo** creates a PayMongo Checkout Session in PHP (`POST /api/billing/paymongo`) and redirects to
+  its page. PayMongo sends the owner back to `/checkout/return`, which reads the session back from PayMongo
+  (`GET /api/billing/paymongo/return`) and shows one of: **success** (plan activated, new plan shown), **cancelled**
+  (nothing is created, the plan stays as it was) or **failed** (error with a **Retry** button back to the checkout).
+  A success is never taken from the address: the plan changes only when PayMongo reports the payment as paid. The
+  pending session is kept in `workspaces.paymongo_checkout_id`. `PAYMONGO_API_BASE` points tests at a local mock.
 
 ## AI flow (Administration → AI → AI flow)
 
@@ -419,6 +434,17 @@ your AI configurations) → the **router** → your **providers**, chained in fa
   browser), ⤢ fits everything, ⛶ goes full screen. On phones the details open as a bottom sheet.
 
 It reads and writes the same settings as Model routing, Models per tier and Providers, which stay available.
+
+## Help chatbot and release announcement robot
+
+Every signed-in user has a chat button in the bottom-right corner. The chatbot is rule-based (no AI, no provider): it
+answers from the FAQ in `lib/chatbot.js` and from live ticket data. Ticket counts only cover projects the person can
+access; asking about another project is refused, and people counts need the "Manage users and access" permission.
+`GET/POST /api/chatbot` serve it (`client/Chatbot.tsx`).
+
+The robot announces the latest release (or your own message) when `RELEASE_ANNOUNCEMENT=1`; set
+`RELEASE_ANNOUNCEMENT_MESSAGE` to change the text. With the flag off nothing is shown. With "reduce motion" on, the
+message is shown without animation. Dismissing it (or opening the chat) hides that message on this browser.
 
 ## Product timeline (`/timeline`)
 
@@ -811,6 +837,8 @@ client/                    React components (client side)
   Workspace.tsx views.tsx  Project sidebar and views (Summary, Backlog, Board, Epics, Reports, Tests, Automation, Settings)
   Drawer.tsx               Issue and epic panels
   Brain.tsx markdown.tsx   The Brain page (notes, graph, editor) and the Markdown renderer with [[wikilinks]]
+  api/                     API client modules: the only client code that builds requests to /api/*
+  logic/                   Logic modules: pure rules and formatting, with no JSX and no requests
 lib/                       Server modules
   server/http.ts           Route-handler helpers: sessions, permissions, streaming, setup
   db.js auth.js store.js   Database (Supabase/Postgres or local), users & invites, projects & permission checks
@@ -821,6 +849,20 @@ lib/                       Server modules
 scripts/db-push.js         Copies the local database to DATABASE_URL
 legacy/                    The previous Express + vanilla JS version (run with `TICKETFORGE_RLS=off npm run legacy`)
 ```
+
+### Code layers (UI, logic, API)
+
+The client code is split into three layers so each concern lives in one place. A change to one layer should not need edits in the others.
+
+| Layer | Where | Responsibility | May import |
+| --- | --- | --- | --- |
+| UI | `client/*.tsx` (for example `Versions.tsx`, `Admin.tsx`, `AgentsTab.tsx`) | Renders screens, reads input, shows loading, empty, error and success states (`toast`, modals). Calls the logic and API layers; it builds no request URLs and has no `fetch`. | `client/api/*`, `client/logic/*`, `core.ts`, `ui.tsx`, `fields.tsx` |
+| Logic | `client/logic/*.ts` | Rules with no JSX and no requests: which fields are compared, how a value reads as text, what counts as a change. Easy to read and to reuse. | `core.ts` helpers and other logic modules |
+| API client | `client/api/*.ts` | One function per server request: it owns the URL, method, query string and body. It returns what `api()` returns and does not catch errors, so the screen shows the same error state as before. | `api()` from `core.ts` only |
+| Transport and state | `client/core.ts` | `api()` (the one `fetch` call: headers, errors, 401 sign-out, plan-limit prompt), the state store `S`, toasts, modals and undo. | none of the layers above |
+| Server | `app/api/**/route.ts` → `lib/*.js` | Route handlers stay thin (`api()`, `authed()`, permission checks) and call `lib/store.js` and the other server modules for the data and rules. | |
+
+Migrated so far: issue versions (`api/versions.ts`, `logic/versions.ts`), Administration (`api/admin.ts`), the Agents tab (`api/agents.ts`) and project reads (`api/projects.ts`). Other screens in `client/` still call `api()` directly and move to these layers when they are next changed: add a function to `client/api/<feature>.ts` (and rules to `client/logic/<feature>.ts`) instead of building a URL in the component.
 
 ## Notes
 
@@ -836,7 +878,7 @@ On Postgres (Supabase), every table has row-level security switched on:
 
 - **Supabase's public roles are locked out.** `anon` and `authenticated` get no privileges on any TicketForge table, so the Supabase REST/GraphQL API (and anyone holding your anon key) can't read or change anything.
 - **The app queries as a restricted role.** Each request runs as `ticketforge_app` (no `BYPASSRLS`) with the signed-in user's id set for that transaction. Policies then decide what that user can touch:
-  - projects and issues: only projects the user has access to; creating needs `project.create`, deleting needs `project.delete`.
+  - projects and issues: only projects the user has access to; creating needs `project.create`. Deleting is a soft delete (the project is archived, `projects.archived_at`, and the app owner can restore it): only the project's creator and the workspace owner can do it, and the app asks them to re-enter their password. A database trigger and the delete policy enforce the same rule.
   - notifications: only the user's own (anyone signed in can send one).
   - users and roles: readable by signed-in users, written only by the sign-in system.
   - sessions, invites, password resets and settings: sign-in system only.

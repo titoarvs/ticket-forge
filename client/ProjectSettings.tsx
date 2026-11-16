@@ -2,8 +2,9 @@
 // Project settings, organised like Jira's: a section menu on the left (Details, People, Workflow, Danger zone),
 // one section at a time, each made of labelled cards with a short explanation. Changes save automatically.
 import Link from 'next/link';
-import { S, emit, P, api, can, mutate, setField, openModal, toast, uid, ago, hashColor, COLORS, saveUi, type Any } from './core';
-import { Ico, I, Avatar, Confirm, SetCard } from './ui';
+import { S, emit, P, can, mutate, setField, uid, ago, hashColor, COLORS, saveUi, type Any } from './core';
+import { Ico, I, Avatar, SetCard } from './ui';
+import { canDeleteProject, openDeleteProject, ONLY_OWNERS } from './DeleteProject';
 import { TF, TA } from './fields';
 import { Header, CommitInput } from './views';
 import { ListEditor } from './ListEditor';
@@ -129,11 +130,12 @@ function People({ ed }: { ed: boolean }) {
 
 function Danger() {
   const p = P();
-  const del = () => openModal(<Confirm title="Delete project?" label="Delete project" text={`“${p.name}” and all of its ${p.tickets.length} issues, ${p.epics.length} epics, sprints and test cases will be permanently deleted. This can’t be undone.`}
-    onYes={async () => { try { await api(`/api/projects/${p.id}`, { method: 'DELETE' }); S.project = null; S.base = null; emit(); toast('Project deleted'); S.nav('/projects'); } catch (e: Any) { toast(e.message, 'err'); } }} />);
+  const allowed = canDeleteProject(p);
+  const del = () => openDeleteProject(p, () => { S.project = null; S.base = null; emit(); S.nav('/projects'); });
   return (
-    <SetCard id="delete" tone="danger" title="Delete this project" desc="Permanently removes the project with all of its epics, issues, sprints, test cases, source documents and failure screenshots."
-      right={<button className="btn danger" onClick={del}><Ico svg={I.trash} />Delete project</button>}>
+    <SetCard id="delete" tone="danger" title="Delete this project" desc="Removes the project with all of its epics, issues, sprints, test cases, source documents and failure screenshots from everyone’s project list. Only the creator and owners can delete it."
+      right={<span title={allowed ? undefined : ONLY_OWNERS}><button className="btn danger" onClick={del} disabled={!allowed} aria-describedby={allowed ? undefined : 'delete-owner-only'}><Ico svg={I.trash} />Delete project</button></span>}>
+      {!allowed && <p id="delete-owner-only" className="muted small set-note">{ONLY_OWNERS}</p>}
       <p className="muted small set-note">Want a copy first? Use <b>Export → Project backup (.json)</b>. You can import it again from the projects page.</p>
     </SetCard>
   );
@@ -141,7 +143,7 @@ function Danger() {
 
 export function Settings() {
   const ed = can('project.settings');
-  const sections = SECTIONS.filter(([k]) => k !== 'danger' || can('project.delete'));
+  const sections = SECTIONS;
   const cur = sections.find(([k]) => k === S.setTab)?.[0] || 'details';
   const go = (k: string) => { S.setTab = k; saveUi(); emit(); document.querySelector('.view')?.scrollTo({ top: 0 }); };
   const [, label, , desc] = sections.find(([k]) => k === cur)!;

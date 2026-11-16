@@ -2,8 +2,10 @@
 // Administration: users, invites, roles & permissions, email. Also the "Your account" dialog.
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { S, emit, useStore, api, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
+import { S, emit, useStore, toast, openModal, closeModal, copyText, ago, closeProject, readNdjson, type Any } from './core';
 import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection, PlanLimits } from './ui';
+import { loadAdminData, updateUser, resetUserPassword, deleteUser, revokeInvite, resendInvite, createInvites, updateRole, createRole, deleteRole,
+  getAiSettings, saveAiSettings, patchAiSettings, aiAction, removeAiEntry, sendTestEmail, changePassword } from './api/admin';
 import { RoutingSection } from './AiRouting';
 import { ConfigsSection } from './AiConfigs';
 import { AdminSkeleton } from './skeletons';
@@ -30,11 +32,7 @@ function inviteState(i: Any): [string, string] {
 }
 async function load() {
   // Users and invites are the owner's alone (the server refuses them to other administrators).
-  const owner = Boolean(S.user?.isOwner);
-  const [users, roles, invites, projects, email, ai] = await Promise.all([
-    owner ? api('/api/admin/users') : [], api('/api/admin/roles'), owner ? api('/api/admin/invites') : [], api('/api/admin/projects'), api('/api/admin/email'),
-    api('/api/admin/ai').catch(() => null),
-  ]);
+  const { users, roles, invites, projects, email, ai } = await loadAdminData(Boolean(S.user?.isOwner));
   Object.assign(A, { users, roles, invites, projects, email, loaded: true, error: null });
   if (ai) applyAi(ai); else emit();
 }
@@ -50,7 +48,8 @@ export default function AdminPage({ tab }: { tab: string }) {
   useEffect(() => { closeProject(); reload(); }, []);
   const tt = tab === 'claude' ? 'ai' : tab;
   const tabs = TABS.filter(([k]) => (S.user?.isOwner || !OWNER_TABS.includes(k)) && (k !== 'billing' || S.auth?.saas));
-  const t = tabs.some(([k]) => k === tt) ? tt : tabs[0][0];
+  // A non-owner who opens Billing stays on it and is told it's for the owner (BillingTab), not sent to another tab.
+  const t = tabs.some(([k]) => k === tt) || (tt === 'billing' && S.auth?.saas) ? tt : tabs[0][0];
   if (!A.loaded) {
     if (!A.error) return <AdminSkeleton />;
     return <div className="page"><div className="page-inner">
@@ -92,17 +91,17 @@ function UsersTab({ q, setQ }: { q: string; setQ: (v: string) => void }) {
         <tr key={u.id}>
           <td><div className="row" style={{ flexWrap: 'nowrap' }}><Avatar name={u.name} size={32} /><div><b style={{ fontWeight: 500 }}>{u.name}</b>{u.isOwner && <> <span className="loz s-inprogress">Owner</span></>}{u.id === S.user.id && <span className="muted small"> (you)</span>}<div className="muted small">{u.email}</div></div></div></td>
           <td><span title={u.isOwner ? 'The owner is always an Administrator' : undefined} style={{ display: 'inline-block' }}><SF filter value={u.roleId} disabled={u.isOwner} aria-label="Role"
-            onChange={(e) => act(() => api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: { roleId: e.target.value } }), `${u.name} is now ${A.roles.find((r: Any) => r.id === e.target.value)?.name}`)}>
+            onChange={(e) => act(() => updateUser(u.id, { roleId: e.target.value }), `${u.name} is now ${A.roles.find((r: Any) => r.id === e.target.value)?.name}`)}>
             {A.roles.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}</SF></span></td>
           <td><button className="btn sm" disabled={u.isOwner} title={accessTitle(u.projectAccess)} onClick={() => openModal(<AccessModal u={u} />)}><Ico svg={I.folder} />{accessText(u.projectAccess)}</button></td>
           <td><span className={`loz ${u.status === 'active' ? 's-done' : 's-todo'}`}>{u.status === 'active' ? 'Active' : 'Disabled'}</span></td>
           <td className="muted">{u.lastLoginAt ? ago(u.lastLoginAt) : 'Never'}</td>
           <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-            <button className="btn sm subtle" title="Send a password reset link" onClick={async () => { const r = await act(() => api(`/api/admin/users/${u.id}/reset`, { method: 'POST', body: {} })); if (r) openModal(<LinkModal title={`Password reset for ${u.name}`} res={r} />); }}>Reset password</button>
+            <button className="btn sm subtle" title="Send a password reset link" onClick={async () => { const r = await act(() => resetUserPassword(u.id)); if (r) openModal(<LinkModal title={`Password reset for ${u.name}`} res={r} />); }}>Reset password</button>
             {!u.isOwner && u.id !== S.user.id && <>
-              <button className="btn sm subtle" onClick={() => act(() => api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: { status: u.status === 'active' ? 'disabled' : 'active' } }), `${u.name} ${u.status === 'active' ? 'disabled — signed out everywhere' : 'enabled'}`)}>{u.status === 'active' ? 'Disable' : 'Enable'}</button>
+              <button className="btn sm subtle" onClick={() => act(() => updateUser(u.id, { status: u.status === 'active' ? 'disabled' : 'active' }), `${u.name} ${u.status === 'active' ? 'disabled — signed out everywhere' : 'enabled'}`)}>{u.status === 'active' ? 'Disable' : 'Enable'}</button>
               <button className="icon-btn" title="Remove user" onClick={() => openModal(<Confirm title={`Remove ${u.name}?`} label="Remove user" text={`${u.email} loses access immediately. Their past comments and history stay.`}
-                onYes={() => act(() => api(`/api/admin/users/${u.id}`, { method: 'DELETE' }), `Removed ${u.name}`)} />)}><Ico svg={I.trash} /></button>
+                onYes={() => act(() => deleteUser(u.id), `Removed ${u.name}`)} />)}><Ico svg={I.trash} /></button>
             </>}
           </td>
         </tr>
@@ -132,7 +131,7 @@ function AccessModal({ u }: { u: Any }) {
   const [access, setAccess] = useState(u.projectAccess);
   return (
     <Modal title={`Project access for ${u.name}`} actions={[{ label: 'Cancel' }, { label: 'Save', kind: 'primary', onClick: async () => {
-      closeModal(); await act(() => api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: { projectAccess: access } }), `Updated access for ${u.name}`);
+      closeModal(); await act(() => updateUser(u.id, { projectAccess: access }), `Updated access for ${u.name}`);
     } }]}>
       <p className="muted" style={{ marginTop: 0 }}>{u.email} · {u.roleName}. Their role decides what they can do; this decides which projects they can see.</p>
       <AccessPicker value={access} onChange={setAccess} />
@@ -163,8 +162,8 @@ function InvitesTab() {
             <td><span className={`loz ${cls}`}>{st}</span>{st === 'Pending' && <div className="muted small">expires {new Date(i.expires_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</div>}</td>
             <td className="muted small">{i.emailed ? <><Ico svg={I.check} /> Emailed</> : 'Link only'}</td>
             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-              {st !== 'Accepted' && <button className="btn sm subtle" onClick={async () => { const r = await act(() => api(`/api/admin/invites/${i.id}/resend`, { method: 'POST', body: {} })); if (r) openModal(<LinkModal title={`New invite link for ${r.email}`} res={r} />); }}>{A.email?.configured ? 'Resend' : 'New link'}</button>}
-              {st === 'Pending' && <button className="btn sm danger-subtle" onClick={() => act(() => api(`/api/admin/invites/${i.id}`, { method: 'DELETE' }), 'Invite revoked')}>Revoke</button>}
+              {st !== 'Accepted' && <ResendButton id={i.id} />}
+              {st === 'Pending' && <button className="btn sm danger-subtle" onClick={() => act(() => revokeInvite(i.id), 'Invite revoked')}>Revoke</button>}
             </td>
           </tr>
         );
@@ -173,18 +172,39 @@ function InvitesTab() {
       <p>Invite teammates by email and choose their role and which projects they can open.</p></EmptyState>}
   </>;
 }
+/** Resend (or new link) for one invite: disabled with a spinner while it sends; the server enforces the cooldown and maximum. */
+function ResendButton({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const go = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true; setBusy(true);
+    const r = await act(() => resendInvite(id), A.email?.configured ? 'Invite resent' : 'New invite link created');
+    inFlight.current = false; setBusy(false);
+    if (r) openModal(<LinkModal title={`New invite link for ${r.email}`} res={r} />);
+  };
+  return <button className="btn sm subtle" disabled={busy} aria-busy={busy || undefined} onClick={go}>{busy && <span className="spinner" />}{A.email?.configured ? 'Resend' : 'New link'}</button>;
+}
 function InviteModal() {
   const def = A.roles.find((r: Any) => r.id === 'member') || A.roles[0];
   const [f, setF] = useState<Any>({ emails: '', roleId: def?.id, access: 'all', message: '' });
+  const [sending, setSending] = useState(false);
+  const inFlight = useRef(false); // set at once, so a second click or Enter before React re-renders can't send again
+  const send = async () => {
+    if (inFlight.current || !f.emails.trim()) return;
+    inFlight.current = true; setSending(true);
+    try {
+      const res = await createInvites({ emails: f.emails, roleId: f.roleId, projectAccess: f.access, message: f.message });
+      const sent = res.results.filter((r: Any) => !r.error).length;
+      if (sent) toast(`${sent === 1 ? 'Invite' : `${sent} invites`} sent`);
+      for (const r of res.results) if (r.error) toast(`${r.email}: ${r.error}`, 'err');
+      await load();
+      S.nav('/admin/invites');
+      openModal(<InviteResults results={res.results} />);
+    } catch (e: Any) { toast(e.message, 'err'); } finally { inFlight.current = false; setSending(false); }
+  };
   return (
-    <Modal title="Invite people" actions={[{ label: 'Cancel' }, { label: 'Send invites', kind: 'primary', disabled: !f.emails.trim(), onClick: async () => {
-      try {
-        const res = await api('/api/admin/invites', { method: 'POST', body: { emails: f.emails, roleId: f.roleId, projectAccess: f.access, message: f.message } });
-        await load();
-        S.nav('/admin/invites');
-        openModal(<InviteResults results={res.results} />);
-      } catch (e: Any) { toast(e.message, 'err'); }
-    } }]}>
+    <Modal title="Invite people" persistent={sending} actions={[{ label: 'Cancel', disabled: sending }, { label: sending ? 'Sending…' : 'Send invites', kind: 'primary', disabled: !f.emails.trim(), busy: sending, onClick: send }]}>
       <label className="field"><span>Email addresses <span className="req">*</span></span><TA autoFocus style={{ minHeight: 70 }} value={f.emails} onChange={(e) => setF({ ...f, emails: e.target.value })} placeholder="ana@company.com, ben@company.com" />
         <span className="muted small" style={{ fontWeight: 400 }}>Separate several with commas, spaces or new lines.</span></label>
       <label className="field"><span>Role</span><SF value={f.roleId} onChange={(e) => setF({ ...f, roleId: e.target.value })}>{A.roles.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name} — {r.description}</MenuItem>)}</SF></label>
@@ -217,7 +237,7 @@ function RolesTab() {
   const toggle = async (r: Any, key: string, on: boolean) => {
     const permissions = on ? [...new Set([...r.permissions, key])] : r.permissions.filter((k: string) => k !== key);
     r.permissions = permissions; emit();
-    await act(() => api(`/api/admin/roles/${r.id}`, { method: 'PUT', body: { name: r.name, description: r.description, permissions } }),
+    await act(() => updateRole(r.id, { name: r.name, description: r.description, permissions }),
       `${r.name}: ${on ? 'can now' : 'can no longer'} ${perms.find((p: Any) => p.key === key).label.toLowerCase()}`);
   };
   return <>
@@ -246,8 +266,8 @@ function RoleModal({ role }: { role?: Any }) {
     <Modal title={role ? `Edit ${role.name}` : 'Create role'} actions={[{ label: 'Cancel' }, { label: role ? 'Save' : 'Create', kind: 'primary', disabled: !f.name.trim(), onClick: async () => {
       closeModal();
       await act(() => (role
-        ? api(`/api/admin/roles/${role.id}`, { method: 'PUT', body: { name: f.name.trim(), description: f.description.trim(), permissions: role.permissions } })
-        : api('/api/admin/roles', { method: 'POST', body: { name: f.name.trim(), description: f.description.trim(), permissions: A.roles.find((r: Any) => r.id === f.copy)?.permissions || [] } })), role ? 'Role updated' : `Created ${f.name.trim()}`);
+        ? updateRole(role.id, { name: f.name.trim(), description: f.description.trim(), permissions: role.permissions })
+        : createRole({ name: f.name.trim(), description: f.description.trim(), permissions: A.roles.find((r: Any) => r.id === f.copy)?.permissions || [] })), role ? 'Role updated' : `Created ${f.name.trim()}`);
     } }]}>
       <label className="field"><span>Name <span className="req">*</span></span><TF autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Business analyst" /></label>
       <label className="field"><span>Description</span><TF value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="What this role is for" /></label>
@@ -261,7 +281,7 @@ function DeleteRoleModal({ role }: { role: Any }) {
   return (
     <Modal title={`Delete ${role.name}?`} actions={[{ label: 'Cancel' }, { label: 'Delete role', kind: 'danger', onClick: async () => {
       closeModal();
-      await act(() => api(`/api/admin/roles/${role.id}${role.users ? `?replacement=${encodeURIComponent(to)}` : ''}`, { method: 'DELETE' }), `Deleted ${role.name}`);
+      await act(() => deleteRole(role.id, role.users ? to : undefined), `Deleted ${role.name}`);
     } }]}>
       {role.users ? <><p style={{ marginTop: 0 }}>{role.users} user{role.users === 1 ? ' has' : 's have'} this role. Move them to:</p>
         <SF value={to} onChange={(e) => setTo(e.target.value)}>{others.map((r: Any) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}</SF></>
@@ -330,13 +350,13 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
   const draft = { id: saved?.id, provider: f.provider, model: f.model.trim(), baseUrl: f.baseUrl.trim(), apiKey: f.apiKey.trim() };
   const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); try { await fn(); } catch (e: Any) { setResult({ ok: false, error: e.message }); } finally { setBusy(''); } };
   const loadModels = () => run('models', async () => {
-    const r = await api('/api/admin/ai', { method: 'POST', body: { action: 'models', draft } });
+    const r = await aiAction({ action: 'models', draft });
     setModels(r.models || []);
     if (!r.models?.length) setResult({ ok: false, error: 'The provider didn’t list any models. Type the model name instead.' });
   });
-  const test = () => run('test', async () => setResult(await api('/api/admin/ai', { method: 'POST', body: { action: 'test', draft } })));
+  const test = () => run('test', async () => setResult(await aiAction({ action: 'test', draft })));
   const save = () => run('save', async () => {
-    applyAi(await api('/api/admin/ai', { method: 'PUT', body: draft }));
+    applyAi(await saveAiSettings(draft));
     closeModal();
     toast(saved ? `${p.label} updated` : `${p.label} added`);
   });
@@ -383,21 +403,21 @@ function ProvidersCard({ c }: { c: Any }) {
   const list: Any[] = c.apis || [];
   const panel = list.filter((x) => x.source === 'panel');
   const run = async (key: string, fn: () => Promise<void>) => { setBusy(key); try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
-  const patch = (b: Any) => api('/api/admin/ai', { method: 'PATCH', body: b }).then(applyAi);
+  const patch = (b: Any) => patchAiSettings(b).then(applyAi);
   const move = (id: string, to: number) => run(`move:${id}`, async () => {
     const ids = panel.map((x) => x.entryId).filter((x) => x !== id);
     ids.splice(Math.max(0, Math.min(to, ids.length)), 0, id);
     await patch({ order: ids });
   });
   const test = (x: Any) => run(`test:${x.entryId}`, async () => {
-    const r = await api('/api/admin/ai', { method: 'POST', body: { action: 'test', id: x.entryId } });
+    const r = await aiAction({ action: 'test', id: x.entryId });
     setTests((t) => ({ ...t, [x.entryId]: r }));
-    applyAi(await api('/api/admin/ai'));
+    applyAi(await getAiSettings());
   });
-  const reset = (id?: string) => run(`reset:${id || 'all'}`, async () => applyAi(await api('/api/admin/ai', { method: 'POST', body: { action: 'reset', id } })));
+  const reset = (id?: string) => run(`reset:${id || 'all'}`, async () => applyAi(await aiAction({ action: 'reset', id })));
   const remove = (x: Any) => openModal(<Confirm title={`Remove ${x.label}?`} label="Remove"
     text={<>{x.label}{x.model ? ` (${x.model})` : ''} and its saved API key are deleted. {list.length > 1 ? 'TicketForge keeps using the other providers.' : ''}</>}
-    onYes={() => run(`remove:${x.entryId}`, async () => { applyAi(await api(`/api/admin/ai?id=${encodeURIComponent(x.entryId)}`, { method: 'DELETE' })); toast(`${x.label} removed`); })} />);
+    onYes={() => run(`remove:${x.entryId}`, async () => { applyAi(await removeAiEntry(x.entryId)); toast(`${x.label} removed`); })} />);
   const chip = (x: Any) => {
     if (!x.enabled) return <span className="loz">Off</span>;
     if (!x.configured) return <span className="loz t-fail" title={x.error || ''}>Incomplete</span>;
@@ -464,7 +484,7 @@ function ProvidersCard({ c }: { c: Any }) {
 function LocalAiCard({ c }: { c: Any }) {
   const [busy, setBusy] = useState('');
   const run = async (key: string, fn: () => Promise<void>) => { setBusy(key); try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
-  const patch = (b: Any) => api('/api/admin/ai', { method: 'PATCH', body: b }).then(applyAi);
+  const patch = (b: Any) => patchAiSettings(b).then(applyAi);
   return (
     <div className="card wide"><h3>Local AI</h3>
       <p className="sub">Used when TicketForge is opened on this computer (localhost), with your own subscription. Model routing picks the model per task.</p>
@@ -499,16 +519,16 @@ function AiTab() {
   const [showEnv, setShowEnv] = useState(false);
   const [envProv, setEnvProv] = useState('openai');
   const [sec, setSec] = useSection('tf.adminAiSec', ['flow', 'connection', 'routing', 'models', 'usage', 'savings', 'configs', 'providers', 'local'], 'flow');
-  const refresh = async () => { setBusy('refresh'); try { applyAi(await api('/api/admin/ai?fresh=1')); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
+  const refresh = async () => { setBusy('refresh'); try { applyAi(await getAiSettings(true)); setTest(null); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
   if (!c) {
-    return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await api('/api/admin/ai?fresh=1'))}>
+    return <div className="card"><ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await getAiSettings(true))}>
       <p>The server didn’t report how TicketForge connects to AI.</p></ErrorState></div>;
   }
   const row = (k: string, v: React.ReactNode) => <tr><td className="muted" style={{ width: 200 }}>{k}</td><td>{v}</td></tr>;
   const acct = c.account;
   const runTest = async () => {
     setBusy('test'); setTest(null);
-    try { setTest(await api('/api/admin/ai', { method: 'POST', body: { action: 'test' } })); applyAi(await api('/api/admin/ai')); } catch (e: Any) { setTest({ ok: false, error: e.message }); } finally { setBusy(''); }
+    try { setTest(await aiAction({ action: 'test' })); applyAi(await getAiSettings()); } catch (e: Any) { setTest({ ok: false, error: e.message }); } finally { setBusy(''); }
   };
   const why = c.forced ? `Chosen with AI_MODE=${c.mode} on the server.`
     : c.mode === 'account' ? 'You opened TicketForge on this computer (localhost), so it uses your personal Claude account through Claude Code.'
@@ -536,7 +556,7 @@ function AiTab() {
         edit: (x: Any) => openModal(<ProviderModal c={c} entry={x} />),
         remove: (x: Any) => openModal(<Confirm title={`Remove ${x.label}?`} label="Remove"
           text={<>{x.label}{x.model ? ` (${x.model})` : ''} and its saved API key are deleted.</>}
-          onYes={async () => { try { applyAi(await api(`/api/admin/ai?id=${encodeURIComponent(x.entryId)}`, { method: 'DELETE' })); toast(`${x.label} removed`); } catch (e: Any) { toast(e.message, 'err'); } }} />),
+          onYes={async () => { try { applyAi(await removeAiEntry(x.entryId)); toast(`${x.label} removed`); } catch (e: Any) { toast(e.message, 'err'); } }} />),
         goto: setSec,
       }} />}
       {['routing', 'models', 'usage', 'savings'].includes(sec) && <RoutingSection key={`${sec}${JSON.stringify(c.settings?.routing)}`} c={c} onSaved={applyAi} part={sec as 'routing' | 'models' | 'usage' | 'savings'} go={setSec} />}
@@ -615,7 +635,7 @@ function EmailTab() {
           {row('Links point to', <>{e.appUrl}{!e.appUrlSet && <span className="muted small"> (detected — set APP_URL for a public address)</span>}</>)}
         </tbody></table>
         <div className="row" style={{ marginTop: 12 }}><button className="btn" disabled={!e.configured} onClick={async () => {
-          try { const r = await api('/api/admin/email/test', { method: 'POST', body: {} }); toast(`Test email sent to ${r.to}`); } catch (err: Any) { toast(err.message, 'err'); }
+          try { const r = await sendTestEmail(); toast(`Test email sent to ${r.to}`); } catch (err: Any) { toast(err.message, 'err'); }
         }}>Send a test email to me</button></div></div>
       <div className="card"><h3>Database</h3><p className="sub">Where projects, users and invites are stored.</p>
         <table className="tbl"><tbody>{row('Connected to', e.database || '—')}
@@ -647,7 +667,7 @@ export function AccountModal() {
   const [next, setNext] = useState('');
   return (
     <Modal title="Your account" actions={[{ label: 'Close' }, { label: 'Change password', kind: 'primary', disabled: !cur || next.length < 8, onClick: async () => {
-      try { await api('/api/auth/password', { method: 'POST', body: { current: cur, next } }); closeModal(); toast('Password changed'); }
+      try { await changePassword(cur, next); closeModal(); toast('Password changed'); }
       catch (e: Any) { toast(e.message, 'err'); }
     } }]}>
       <div className="row" style={{ flexWrap: 'nowrap', marginBottom: 16 }}><Avatar name={S.user.name} size={40} /><div><b>{S.user.name}</b><div className="muted small">{S.user.email} · {S.user.roleName}</div></div></div>

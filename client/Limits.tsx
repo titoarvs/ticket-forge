@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { api, type Any } from './core';
 import { Ico, I, Spinner, ErrorState } from './ui';
 
-const num = (n: number, unit: string) => (unit === 'mb' ? (n >= 1000 ? `${(n / 1000).toFixed(1)} GB` : `${n} MB`) : n.toLocaleString());
+export const num = (n: number, unit: string) => (unit === 'mb' ? (n >= 1000 ? `${(n / 1000).toFixed(1)} GB` : `${n} MB`) : n.toLocaleString());
 
 /** One plan limit: name and value, used and remaining, a bar, and "Limit reached" when nothing is left. */
 export function LimitBar({ r }: { r: Any }) {

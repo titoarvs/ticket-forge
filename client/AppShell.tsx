@@ -16,6 +16,7 @@ import { useThemeMode } from './theme';
 import { TourHost, startTourHere, resetTours } from './tour';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { showUpgrade } from './Billing';
+import { Chatbot } from './Chatbot';
 import { planLimitHandler } from './core';
 
 const EXPORTS: (string[] | null)[] = [
@@ -428,6 +429,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <Toasts />
       <TaskTray />
       <RunPill />
+      <Chatbot />
     </TourHost>
   );
 }

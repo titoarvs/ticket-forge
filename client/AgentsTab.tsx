@@ -4,7 +4,9 @@
 // off or change its model, effort and extra instructions. Hire picks a project and epic, opens the epic and puts the
 // agent to work there.
 import { useEffect, useState } from 'react';
-import { S, api, toast, openModal, closeModal, ago, aiBody, can, type Any } from './core';
+import { S, toast, openModal, closeModal, ago, aiBody, can, type Any } from './core';
+import { getAgents, saveAgents, agentsAction, deleteAgent } from './api/agents';
+import { listProjects, getProject } from './api/projects';
 import { Ico, I, Modal, Spinner, ErrorState, Loading, Sk, EmptyState } from './ui';
 import { TA, TF, SF, CB, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
@@ -87,11 +89,11 @@ function CustomAgentModal({ a, onSaved, builtIns = [], start = '' }: { a?: Any; 
   const [busy, setBusy] = useState('');
   const [check, setCheck] = useState<Any>(null);
   const run = async (k: string, fn: () => Promise<void>) => { setBusy(k); try { await fn(); } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); } };
-  const generate = () => run('gen', async () => { const r = await api('/api/admin/agents', { method: 'POST', body: aiBody({ action: 'generate', description: desc, kind }) }); setMd(r.md); setMode('md'); setCheck(null); });
-  const verify = () => run('check', async () => { setCheck((await api('/api/admin/agents', { method: 'POST', body: { action: 'check', md } })).agent); });
-  const save = () => run('save', async () => { const d = await api('/api/admin/agents', { method: 'POST', body: { action: 'save', id: a?.id, md } }); onSaved(d); closeModal(); toast(a ? `${a.name} updated` : 'Agent created'); });
+  const generate = () => run('gen', async () => { const r = await agentsAction(aiBody({ action: 'generate', description: desc, kind })); setMd(r.md); setMode('md'); setCheck(null); });
+  const verify = () => run('check', async () => { setCheck((await agentsAction({ action: 'check', md })).agent); });
+  const save = () => run('save', async () => { const d = await agentsAction({ action: 'save', id: a?.id, md }); onSaved(d); closeModal(); toast(a ? `${a.name} updated` : 'Agent created'); });
   const copyFrom = (id: string) => { if (!id) return; if (id === '__example') { setMd(SAMPLE); setMode('md'); setCheck(null); return; }
-    const tpl = TEMPLATES.find((x) => x.id === id); if (tpl) { setMd(tpl.md); setMode('md'); setCheck(null); return; } run('copy', async () => { setMd((await api('/api/admin/agents', { method: 'POST', body: { action: 'copy', id } })).md); setMode('md'); setCheck(null); }); };
+    const tpl = TEMPLATES.find((x) => x.id === id); if (tpl) { setMd(tpl.md); setMode('md'); setCheck(null); return; } run('copy', async () => { setMd((await agentsAction({ action: 'copy', id })).md); setMode('md'); setCheck(null); }); };
   useEffect(() => { if (start) copyFrom(start); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const file = (f?: File) => { if (f) f.text().then((t) => { setMd(t); setMode('md'); setCheck(null); }); };
   return (
@@ -127,10 +129,10 @@ function AgentDetails({ a, data, onSave, onHire, onData }: { a: Any; data: Any; 
   return (
     <Modal title={a.name} wide left={!a.custom ? <div className="row" style={{ gap: 6 }}>
         {a.runner === 'code' && <button className="btn" onClick={() => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} start={a.id} />)} title="A custom agent with this agent’s rules, for you to change">Copy as custom agent</button>}
-        <button className="btn danger-subtle" onClick={async () => { try { onData(await api('/api/admin/agents', { method: 'POST', body: { action: 'remove', ids: [a.id] } })); closeModal(); toast(`${a.name} removed. Restore it from Built-in agents.`); } catch (e: Any) { toast(e.message, 'err'); } }}>Remove</button>
+        <button className="btn danger-subtle" onClick={async () => { try { onData(await agentsAction({ action: 'remove', ids: [a.id] })); closeModal(); toast(`${a.name} removed. Restore it from Built-in agents.`); } catch (e: Any) { toast(e.message, 'err'); } }}>Remove</button>
       </div> : a.custom ? <div className="row" style={{ gap: 6 }}>
         <button className="btn" onClick={() => openModal(<CustomAgentModal a={a} onSaved={onData} />)}>Edit rules</button>
-        <button className="btn danger-subtle" onClick={async () => { try { onData(await api(`/api/admin/agents?id=${encodeURIComponent(a.id)}`, { method: 'DELETE' })); closeModal(); toast(`${a.name} removed`); } catch (e: Any) { toast(e.message, 'err'); } }}>Remove</button></div> : undefined}
+        <button className="btn danger-subtle" onClick={async () => { try { onData(await deleteAgent(a.id)); closeModal(); toast(`${a.name} removed`); } catch (e: Any) { toast(e.message, 'err'); } }}>Remove</button></div> : undefined}
       actions={[{ label: 'Close' }, { label: 'Hire', onClick: onHire, disabled: !a.enabled, hidden: a.runner === 'testing' }, { label: 'Save', kind: 'primary', disabled: !dirty, onClick: async () => { await onSave(a.id, v); closeModal(); } }]}>
       <div className={`ad-hero ${phaseClass(a.phase)}`}>
         <span className="agent-icon lg" aria-hidden>{a.icon}</span>
@@ -169,8 +171,8 @@ function HireModal({ a }: { a: Any }) {
   const [pid, setPid] = useState('');
   const [project, setProject] = useState<Any>(null);
   const [eid, setEid] = useState('');
-  useEffect(() => { api('/api/projects').then((l) => { setProjects(l); if (l[0]) setPid(l[0].id); }).catch((e) => toast(e.message, 'err')); }, []);
-  useEffect(() => { if (!pid) return; setProject(null); setEid(''); api(`/api/projects/${pid}`).then((p) => { setProject(p); if (p.epics?.[0]) setEid(p.epics[0].id); }).catch((e) => toast(e.message, 'err')); }, [pid]);
+  useEffect(() => { listProjects().then((l) => { setProjects(l); if (l[0]) setPid(l[0].id); }).catch((e) => toast(e.message, 'err')); }, []);
+  useEffect(() => { if (!pid) return; setProject(null); setEid(''); getProject(pid).then((p) => { setProject(p); if (p.epics?.[0]) setEid(p.epics[0].id); }).catch((e) => toast(e.message, 'err')); }, [pid]);
   const go = () => { closeModal(); S.nav(`/p/${pid}/backlog?epic=${encodeURIComponent(eid)}&hire=${encodeURIComponent(a.id)}`); };
   return (
     <Modal title={`Hire ${a.name}`} actions={[{ label: 'Cancel' }, { label: 'Hire', kind: 'primary', disabled: !pid || !eid, onClick: go }]}>
@@ -228,7 +230,7 @@ function BuiltInsModal({ data: first, onData }: { data: Any; onData: (d: Any) =>
   const act = async (action: 'remove' | 'restore', ids: string[]) => {
     if (!ids.length) return;
     setBusy(action);
-    try { const d = await api('/api/admin/agents', { method: 'POST', body: { action, ids } }); onData(d); setData(d); setSel(new Set()); toast(`${ids.length} built-in agent${ids.length === 1 ? '' : 's'} ${action === 'remove' ? 'removed' : 'restored'}`); }
+    try { const d = await agentsAction({ action, ids }); onData(d); setData(d); setSel(new Set()); toast(`${ids.length} built-in agent${ids.length === 1 ? '' : 's'} ${action === 'remove' ? 'removed' : 'restored'}`); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(''); }
   };
   const toggle = (id: string) => setSel((x) => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -260,7 +262,7 @@ function DefaultAgents({ data, onData }: { data: Any; onData: (d: Any) => void }
     setBusy(true);
     const next: Any = Object.fromEntries(Object.entries(roles).map(([k, r]: Any) => [k, r.chosen || '']));
     next[key] = id;
-    try { onData(await api('/api/admin/agents', { method: 'POST', body: { action: 'roles', roles: Object.fromEntries(Object.entries(next).filter(([, v]) => v)) } })); toast('Default agents saved'); }
+    try { onData(await agentsAction({ action: 'roles', roles: Object.fromEntries(Object.entries(next).filter(([, v]) => v)) })); toast('Default agents saved'); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
   const nameOf = (id: string) => data.agents.find((a: Any) => a.id === id)?.name || id;
@@ -285,7 +287,7 @@ export function AgentsTab() {
   const [q, setQ] = useState('');
   const [view, setView] = useState<string>(() => { try { return localStorage.getItem('tf.agents.view') || 'cards'; } catch { return 'cards'; } });
   const [busy, setBusy] = useState('');
-  const load = async () => { setErr(null); try { const d = await api('/api/admin/agents'); setData(d); setAgentsCache(d); } catch (e: Any) { setErr(e); } };
+  const load = async () => { setErr(null); try { const d = await getAgents(); setData(d); setAgentsCache(d); } catch (e: Any) { setErr(e); } };
   useEffect(() => { load(); }, []);
   if (err) return <div className="card"><ErrorState compact title="Couldn’t load the agents" error={err} onRetry={load} /></div>;
   if (!data) return <Loading><div className="agent-grid">{[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <div key={i} className="agent-card"><div className="agent-head"><Sk w={44} h={44} r={12} /><div><Sk w={140} h={14} /><Sk w={60} h={10} style={{ marginTop: 6 }} /></div></div><Sk w="90%" h={10} /><Sk w="60%" h={10} /></div>)}</div></Loading>;
@@ -294,7 +296,7 @@ export function AgentsTab() {
     const agents: Any = {};
     for (const a of data.agents) agents[a.id] = { enabled: a.enabled, model: a.model, effort: a.effort, instructions: a.instructions };
     agents[id] = v;
-    try { const d = await api('/api/admin/agents', { method: 'PUT', body: { agents } }); setData(d); setAgentsCache(d); if (!quiet) toast('Agent saved'); } catch (e: Any) { toast(e.message, 'err'); }
+    try { const d = await saveAgents(agents); setData(d); setAgentsCache(d); if (!quiet) toast('Agent saved'); } catch (e: Any) { toast(e.message, 'err'); }
   };
   const toggle = async (a: Any, on: boolean) => {
     setBusy(a.id);
