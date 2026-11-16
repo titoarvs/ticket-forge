@@ -382,6 +382,9 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   `validatePlan` when the app loads). Every new workspace starts on Free; paid plans are started from Billing. A plan
   with `archived: true` is left out of the plans offered for purchase (Billing, Pricing, `GET /api/plans?purchasable=1`)
   and can't be checked out, but workspaces already on it keep it.
+- **Every feature is on every plan** (TF-101): a plan limits how much you use, never which features you can use.
+  Only a positive limit stops anything; a value of `0` (for example AI code jobs on Free) no longer means "not
+  included" and is treated as no limit (`enforced()` in `lib/limits.js`).
 - **What counts as an AI action**: only calls that use the service's own AI keys (environment variables).
   Providers a workspace adds in Administration → AI, and people's own Claude subscriptions (My AI), don't count.
   Monthly allowances are taken atomically, so many requests at once never go over, and a failed call gives its

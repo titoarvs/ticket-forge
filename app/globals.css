@@ -2903,13 +2903,13 @@ td.danger-text { color: var(--danger); }
 .bill-now { padding: 20px; }
 .bill-now-h { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
 .bill-now-h h2 { margin: 2px 0 4px; font-size: 22px; }
-.bill-usages { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 24px; }
+.bill-usages { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 16px 24px; }
 .bill-usage-h { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 6px; }
 .bill-bar { height: 6px; border-radius: 99px; background: var(--bg-neutral, rgba(127,127,127,.18)); overflow: hidden; }
 .bill-bar i { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
 .bill-bar i.warn { background: #e2a400; } .bill-bar i.bad { background: #e2483d; }
 .bill-usage .small { margin-top: 4px; }
-.bill-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 12px; }
+.bill-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 16px; margin-bottom: 12px; }
 .bill-plan { padding: 18px; display: flex; flex-direction: column; }
 .bill-plan.current { outline: 2px solid var(--brand); }
 .bill-plan h3 { margin: 0 0 4px; }
@@ -2927,6 +2927,11 @@ td.danger-text { color: var(--danger); }
 .pay-method.on { outline: 2px solid var(--brand); }
 .pay-method > span { display: flex; flex-direction: column; }
 .pay-missing { color: var(--danger); margin: 10px 0 0; }
+/* Plan pages and the Upgrade/pay prompts stay inside the screen at any width: grid items may shrink, long text wraps. */
+.bill, .pay { width: 100%; min-width: 0; }
+.bill > *, .bill-usage, .bill-plan, .pay-card { min-width: 0; }
+.bill-usage-h > *, .bill-plan li, .pay-method > span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .bill-now, .bill-plan, .pay-card { padding: 14px; } .bill-now-h h2 { font-size: 19px; } .bill-price { font-size: 22px; } .pay-total b { font-size: 24px; } }
 .ws-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-sunken); font-size: 13px; }
 
 /* AI usage & suggestions (organized) */
