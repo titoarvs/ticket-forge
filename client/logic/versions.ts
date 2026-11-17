@@ -10,7 +10,9 @@ const ORDER = ['status', 'assignee', 'priority', 'title', 'type', 'reporter', 's
   'layer', 'flagged', 'description', 'userStory', 'acceptanceCriteria', 'testCases', 'dependencies', 'links', 'prs'];
 const EXTRA_LABEL: Record<string, string> = { key: 'Key', layer: 'Implementation', links: 'Linked issues', prs: 'Pull requests' };
 export const labelOf = (k: string) => FIELD_LABEL[k] || EXTRA_LABEL[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
-export const same = (a: Any, b: Any) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/** Same value regardless of object key order (jsonb stores object keys in its own order). */
+const canon = (x: Any): Any => (Array.isArray(x) ? x.map(canon) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, canon(x[k])])) : x);
+export const same = (a: Any, b: Any) => JSON.stringify(canon(a ?? null)) === JSON.stringify(canon(b ?? null));
 export const fullTime = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 export function fieldKeys(...datas: Any[]) {
