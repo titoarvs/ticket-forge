@@ -8,11 +8,11 @@
     "dev": "next dev -p 5173",
     "build": "next build",
     "start": "next start -p 5173",
-    "db:push": "node --env-file-if-exists=.env scripts/db-push.js",
+    "db:push": "node --env-file-if-exists=.env --import tsx scripts/db-push.ts",
     "db:schema": "node scripts/drizzle-schema.mjs",
     "db:check": "node scripts/drizzle-schema.mjs --check",
     "db:studio": "drizzle-kit studio",
-    "legacy": "node --env-file-if-exists=.env legacy/server.js"
+    "legacy": "node --env-file-if-exists=.env --import tsx legacy/server.js"
   },
   "license": "UNLICENSED",
   "private": true,
@@ -55,6 +55,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },
   "overrides": {

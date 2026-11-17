@@ -1,12 +1,12 @@
 // Helpers shared by the Next.js route handlers.
-import { lockedFeatureFor, lockedMessage } from '../features.js';
+import { lockedFeatureFor, lockedMessage } from '../features';
 import { cookies, headers } from 'next/headers';
-import * as auth from '@/lib/auth.js';
-import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION, DEFAULT_WS } from '@/lib/db.js';
-import * as store from '@/lib/store.js';
-import { isLocalHost } from '@/lib/claude.js';
-import { isSaas, scrubSharedTokens, platformAdminEmails } from '@/lib/platform.js';
-import { lockStatus } from '@/lib/limits.js';
+import * as auth from '@/lib/auth';
+import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION, DEFAULT_WS } from '@/lib/db';
+import * as store from '@/lib/store';
+import { isLocalHost } from '@/lib/claude';
+import { isSaas, scrubSharedTokens, platformAdminEmails } from '@/lib/platform';
+import { lockStatus } from '@/lib/limits';
 
 const G = globalThis as any;
 
@@ -122,7 +122,7 @@ export function api(fn: Handler) {
         return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
       }, user, { local, projectId, runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local' });
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
-    } catch (e: any) {
+    } catch (e) {
       if (!e.status || e.status >= 500) console.error(e);
       return Response.json({ error: e.message || String(e), ...(e.extra || {}) }, { status: e.status || 500 });
     }
@@ -140,7 +140,7 @@ export function ndjson(req: Request, run: (send: (o: any) => void, signal: Abort
       const send = (o: any) => { if (open) { try { controller.enqueue(enc.encode(`${JSON.stringify(o)}\n`)); } catch { open = false; } } };
       const ping = setInterval(() => send({ type: 'ping' }), 15000);
       try { await run(send, ctrl.signal); }
-      catch (e: any) { if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) }); }
+      catch (e) { if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) }); }
       finally { clearInterval(ping); open = false; try { controller.close(); } catch { /* closed */ } }
     },
     cancel() { ctrl.abort(); },

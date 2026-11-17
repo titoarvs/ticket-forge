@@ -1,5 +1,5 @@
 import { api, perm, HttpError } from '@/lib/server/http';
-import { savePsdTemplate, publicPsdTemplate, clearPsdTemplate, getPsdTemplate } from '@/lib/psd-template.js';
+import { savePsdTemplate, publicPsdTemplate, clearPsdTemplate, getPsdTemplate } from '@/lib/psd-template';
 
 // Administration → Generation → Problem Statement template: the .docx every generated PSD is built from.
 

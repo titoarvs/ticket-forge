@@ -1,5 +1,5 @@
 'use client';
-// Questions before the AI writes (lib/clarify.js). The AI reads what it was given and asks the few questions whose
+// Questions before the AI writes (lib/clarify.ts). The AI reads what it was given and asks the few questions whose
 // answers would most change the result; the person answers (picks a suggested answer or types one) or skips.
 // - askFirst(): a dialog. Resolves with the answers as instructions, '' when skipped (or nothing to ask), null when cancelled.
 // - useQuestions() + <QuestionsView>: the same inside a dialog that is already open (Add feature).

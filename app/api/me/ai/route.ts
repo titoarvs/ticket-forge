@@ -1,7 +1,7 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import { publicMyAi, saveMyAi, myAi } from '@/lib/user-ai.js';
-import { askViaSubscription, cliInfo } from '@/lib/claude.js';
-import { SERVERLESS } from '@/lib/db.js';
+import { publicMyAi, saveMyAi, myAi } from '@/lib/user-ai';
+import { askViaSubscription, cliInfo } from '@/lib/claude';
+import { SERVERLESS } from '@/lib/db';
 
 // My AI (everyone, for themselves): their own Claude subscription token, stored encrypted and readable only by them.
 export const GET = api(async () => {

@@ -1,6 +1,6 @@
 import { api, platformOwner, body, HttpError } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { listBillingPlans, createPlan, CURRENCIES, INTERVALS } from '@/lib/billing-plans.js';
+import { billingOn } from '@/lib/limits';
+import { listBillingPlans, createPlan, CURRENCIES, INTERVALS } from '@/lib/billing-plans';
 
 function hosted() {
   if (!billingOn()) throw new HttpError(400, 'Plans are only used on the hosted service.');

@@ -1,7 +1,7 @@
 import { api, authed } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { q } from '@/lib/db.js';
-import { listJobs } from '@/lib/devagent.js';
+import * as store from '@/lib/store';
+import { q } from '@/lib/db';
+import { listJobs } from '@/lib/devagent';
 
 // Every code job in your workspace's projects (the ones you can open): on this computer (in memory) and on GitHub
 // Actions (code_jobs), newest first, with the project and issue they belong to. For the Code jobs page.

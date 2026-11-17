@@ -1,10 +1,10 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { isSaas } from '@/lib/platform.js';
-import * as brain from '@/lib/brain.js';
+import * as store from '@/lib/store';
+import { SERVERLESS, currentContext } from '@/lib/db';
+import { isSaas } from '@/lib/platform';
+import * as brain from '@/lib/brain';
 
-// The project brain (lib/brain.js): its notes for the Brain page, one note, search, the zip of the vault, a preview of
+// The project brain (lib/brain.ts): its notes for the Brain page, one note, search, the zip of the vault, a preview of
 // what the AI gets for an issue or epic; refresh, the team's own notes, import, and (on this computer only) folder sync.
 // Reading needs access to the project. Writing your own notes needs Edit issues or Project settings; exporting needs
 // Export; folder sync and the brain's settings need Project settings.

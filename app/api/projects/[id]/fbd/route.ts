@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { generateFbd } from '@/lib/fbd.js';
+import * as store from '@/lib/store';
+import { generateFbd } from '@/lib/fbd';
 
 export const maxDuration = 300;
 

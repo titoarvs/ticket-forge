@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { startPlan } from '@/lib/subscriptions.js';
+import { billingOn } from '@/lib/limits';
+import { startPlan } from '@/lib/subscriptions';
 
 // Choose a plan: starts the trial (no card) when the plan has trial days, switches plan during a trial or to a free plan,
 // and otherwise answers `requiresPayment: true` so the app sends the owner to checkout.

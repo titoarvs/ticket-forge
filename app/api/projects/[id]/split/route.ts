@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { splitIssues } from '@/lib/split.js';
+import * as store from '@/lib/store';
+import { splitIssues } from '@/lib/split';
 
 export const maxDuration = 300;
 

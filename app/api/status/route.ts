@@ -1,9 +1,9 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import { providerStatus, accountStatus, aiMode } from '@/lib/claude.js';
-import { getAiSettings } from '@/lib/settings.js';
-import { SUPPORTED } from '@/lib/parse.js';
-import { dbInfo } from '@/lib/db.js';
-import { getRules } from '@/lib/genrules.js';
+import { providerStatus, accountStatus, aiMode } from '@/lib/claude';
+import { getAiSettings } from '@/lib/settings';
+import { SUPPORTED } from '@/lib/parse';
+import { dbInfo } from '@/lib/db';
+import { getRules } from '@/lib/genrules';
 
 // ?fresh=1 (the Refresh button): skip the caches, so the Claude sign-in and the AI settings are checked again now.
 export const GET = api(async (req: Request) => {

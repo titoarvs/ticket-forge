@@ -6,7 +6,7 @@ import { S, P, api, downloadFrom, can, mutate, toast, openModal, closeModal, rea
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA, TF, SF, MenuItem } from './fields';
 import { askFirst } from './Clarify';
-import { Running } from './Fbd';
+import { Running, setDocStatus } from './Fbd';
 
 const STATUSES = ['Draft', 'For Review', 'Approved'];
 const busy = new Map<string, number>(); // epic id → started at
@@ -108,7 +108,7 @@ export function PsdSection({ epic }: { epic: Any }) {
   const psd = epic.psd;
   const canWrite = can('ai.use') && can('epic.manage');
   const running = busy.has(epic.id);
-  const set = (k: string, v: string) => mutate(() => { epic.psd = { ...epic.psd, [k]: v }; }, { tag: `psd.${k}${epic.id}` });
+  const set = (k: string, v: string) => (k === 'status' ? setDocStatus(epic, 'psd', v) : mutate(() => { epic.psd = { ...epic.psd, [k]: v }; }, { tag: `psd.${k}${epic.id}` }));
   return (
     <div className="sec psd-sec"><div className="sec-title"><h3>Problem Statement</h3>
       {psd && <span className="muted small" style={{ marginLeft: 'auto' }}>Written {ago(psd.generatedAt)}{psd.generatedBy ? ` by ${psd.generatedBy}` : ''}</span>}</div>
@@ -171,7 +171,7 @@ export function PsdTemplateCard({ project = false, ed = true }: { project?: bool
     setBusyUp('upload');
     try {
       // Drop embedded bold font files the template doesn't use as such, so it fits serverless upload limits.
-      const [{ default: JSZip }, { trimEmbeddedFonts }] = await Promise.all([import('jszip'), import('../lib/docx-fonts.js')]);
+      const [{ default: JSZip }, { trimEmbeddedFonts }] = await Promise.all([import('jszip'), import('../lib/docx-fonts')]);
       const zip = await JSZip.loadAsync(await file.arrayBuffer());
       await trimEmbeddedFonts(zip);
       const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });

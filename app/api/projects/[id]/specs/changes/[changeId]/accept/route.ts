@@ -1,5 +1,5 @@
 import { api, authed } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
+import * as store from '@/lib/store';
 
 // Mark AI-produced changes accepted. Refused (409) until a required reviewer has approved them.
 export const POST = api(async (_req, p) => {

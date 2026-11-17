@@ -1,5 +1,5 @@
 import { api, perm, body, HttpError, aiOpts } from '@/lib/server/http';
-import { publicAgents, saveAgentSettings, saveCustomAgent, removeCustomAgent, generateAgentMd, parseAgentMd, getAgentSettings, builtInAsMd, AGENTS } from '@/lib/agents.js';
+import { publicAgents, saveAgentSettings, saveCustomAgent, removeCustomAgent, generateAgentMd, parseAgentMd, getAgentSettings, builtInAsMd, AGENTS } from '@/lib/agents';
 
 // Administration → Agents: what each TicketForge agent does, the administrator's settings for it (on/off, Claude model,
 // effort, extra instructions), and custom agents defined as Markdown (written by AI from a description, or pasted).

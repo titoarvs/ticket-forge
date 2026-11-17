@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
 // Switch this sign-in to another of your workspaces, or rename the current one (its owner).
 export const PUT = api(async (req) => {

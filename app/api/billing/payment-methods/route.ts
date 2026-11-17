@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { supportedMethods, checkoutQuote, paymentStep } from '@/lib/payment-methods.js';
+import { billingOn } from '@/lib/limits';
+import { supportedMethods, checkoutQuote, paymentStep } from '@/lib/payment-methods';
 
 function ownerCheckout(u: any) {
   if (!u.is_owner) throw new HttpError(403, 'Only the workspace owner can change the plan.');

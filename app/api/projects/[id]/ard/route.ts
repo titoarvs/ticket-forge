@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { generateArd } from '@/lib/ard.js';
+import * as store from '@/lib/store';
+import { generateArd } from '@/lib/ard';
 
 export const maxDuration = 300;
 

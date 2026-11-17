@@ -1,6 +1,6 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { checkoutResult } from '@/lib/subscriptions.js';
+import { billingOn } from '@/lib/limits';
+import { checkoutResult } from '@/lib/subscriptions';
 
 // The way back from a payment gateway: success (read back from the gateway and activated), cancelled or failed.
 export const GET = api(async (req) => {

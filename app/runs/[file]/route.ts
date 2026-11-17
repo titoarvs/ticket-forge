@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { api, authed, HttpError } from '@/lib/server/http';
-import { RUN_DIR, runPrefix } from '@/lib/automation.js';
+import { RUN_DIR, runPrefix } from '@/lib/automation';
 
 // Screenshots from automated test runs: signed-in people, and only their own workspace's (see runPrefix).
 export const GET = api(async (_req, p) => {

@@ -1,8 +1,8 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import { effectivePlan, usage, billingOn, limitRows } from '@/lib/limits.js';
-import { listBillingPlans } from '@/lib/billing-plans.js';
-import { activeGateways } from '@/lib/gateways.js';
-import { qs } from '@/lib/db.js';
+import { effectivePlan, usage, billingOn, limitRows } from '@/lib/limits';
+import { listBillingPlans } from '@/lib/billing-plans';
+import { activeGateways } from '@/lib/gateways';
+import { qs } from '@/lib/db';
 
 // The workspace's plan, what it uses, and the plans it can choose (Administration → Billing, owner only).
 export const GET = api(async () => {

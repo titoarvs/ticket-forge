@@ -1,4 +1,4 @@
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 import { appUrl } from '@/lib/server/http';
 
 export async function sendInviteEmail(req: Request, actor: any, inv: any, message = '') {

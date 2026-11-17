@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { api, body, startSession, clientIp } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
 export const POST = api(async (req) => {
   const h = await headers();

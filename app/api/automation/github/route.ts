@@ -1,9 +1,9 @@
 import { api, authed, perm, body, HttpError, ndjson, appUrl } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { getProjectSecret, setProjectSecret } from '@/lib/secrets.js';
-import { runnerStatus, setupRunner, newRunKey } from '@/lib/gh-actions.js';
-import { followGitHubRuns } from '@/lib/automation.js';
-import { reportRun } from '@/lib/notify.js';
+import * as store from '@/lib/store';
+import { getProjectSecret, setProjectSecret } from '@/lib/secrets';
+import { runnerStatus, setupRunner, newRunKey } from '@/lib/gh-actions';
+import { followGitHubRuns } from '@/lib/automation';
+import { reportRun } from '@/lib/notify';
 import { githubRunner } from '@/lib/server/gh-runner';
 
 // Test automation → Settings → GitHub Actions: status of the runner in a repository, setting it up (repository

@@ -1,7 +1,7 @@
 import { api, perm, body } from '@/lib/server/http';
-import { getRules, getGuide, saveRules, resetRules, rulesMeta, rulesText, normalizeRules, DEFAULT_RULES } from '@/lib/genrules.js';
-import { SYSTEM_BA, systemWith } from '@/lib/prompts.js';
-import { automationSystem, SCRIPT_BASE } from '@/lib/automation.js';
+import { getRules, getGuide, saveRules, resetRules, rulesMeta, rulesText, normalizeRules, DEFAULT_RULES } from '@/lib/genrules';
+import { SYSTEM_BA, systemWith } from '@/lib/prompts';
+import { automationSystem, SCRIPT_BASE } from '@/lib/automation';
 
 // Administration → Generation: the team's standard for generated tickets, test cases and scripts.
 

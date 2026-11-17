@@ -1,4 +1,4 @@
-// Drizzle ORM client. It sends every statement through lib/db.js, so it behaves exactly like q() and qs():
+// Drizzle ORM client. It sends every statement through lib/db.ts, so it behaves exactly like q() and qs():
 //   • the same database (Supabase / PostgreSQL, or the built-in local one), the same connection pool,
 //   • the same row-level security: queries run as the signed-in user's role and workspace (see asUser, asSystem),
 //   • no second connection to configure.
@@ -7,12 +7,12 @@
 //     const rows = await orm.select().from(projects).where(eq(projects.workspaceId, ws));
 // For work outside a signed-in request (startup, webhooks, background jobs) wrap it like qs():
 //     const rows = await asSystem(() => orm.select().from(workspaces));
-// Transactions: Drizzle's own `orm.transaction` isn't available through a proxy driver; use `tx()` from lib/db.js.
-// Tables are defined in lib/db.js. After changing them, run `npm run db:schema` to refresh lib/schema.ts.
+// Transactions: Drizzle's own `orm.transaction` isn't available through a proxy driver; use `tx()` from lib/db.ts.
+// Tables are defined in lib/db.ts. After changing them, run `npm run db:schema` to refresh lib/schema.ts.
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import * as schema from './schema';
 import * as relations from './relations';
-import { qrows } from './db.js';
+import { qrows } from './db';
 
 export const orm = drizzle(async (sql, params) => {
   const r: any = await qrows(sql, params as any[]);

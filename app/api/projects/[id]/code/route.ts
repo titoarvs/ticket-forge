@@ -1,20 +1,20 @@
 import { after } from 'next/server';
 import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { codeRabbitJob, issueContext, apiContract, listJobs, queueInfo, startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent.js';
-import { publicAgents, agentForRole, requireRole } from '@/lib/agents.js';
-import { getProjectSecret } from '@/lib/secrets.js';
-import { ardContext } from '@/lib/ard.js';
-import { markdownToDocx } from '@/lib/md-docx.js';
-import { codeTask, branchFor, writePrText } from '@/lib/devagent.js';
-import { gh as ghApi } from '@/lib/gh-actions.js';
-import { brainForCode } from '@/lib/brain.js';
-import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs.js';
+import * as store from '@/lib/store';
+import { SERVERLESS, currentContext } from '@/lib/db';
+import { codeRabbitJob, issueContext, apiContract, listJobs, queueInfo, startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent';
+import { publicAgents, agentForRole, requireRole } from '@/lib/agents';
+import { getProjectSecret } from '@/lib/secrets';
+import { ardContext } from '@/lib/ard';
+import { markdownToDocx } from '@/lib/md-docx';
+import { codeTask, branchFor, writePrText } from '@/lib/devagent';
+import { gh as ghApi } from '@/lib/gh-actions';
+import { brainForCode } from '@/lib/brain';
+import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs';
 
 // ---------------------------------------------------------------- code jobs through the AI API and GitHub
 // Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code next to a checkout, so
-// code jobs ask your AI provider for the change and commit it through the GitHub API (lib/api-code.js). On your
+// code jobs ask your AI provider for the change and commit it through the GitHub API (lib/api-code.ts). On your
 // computer they run here with Claude Code, unless you switched to the API (the X-TF-Run-On header from the browser; see
 // runPlace in client/core.ts). A round runs after the response (after()), so it needs the longest time Vercel allows.
 export const maxDuration = 300;
@@ -28,7 +28,7 @@ async function ghFor(project: any, dev: any) {
   return { token, ref: info.default_branch, defaultBranch: info.default_branch };
 }
 /**
- * The project brain for a code job (lib/brain.js): the notes linked to the issue as a block for the prompt, and for jobs
+ * The project brain for a code job (lib/brain.ts): the notes linked to the issue as a block for the prompt, and for jobs
  * on this computer the notes themselves as files in the worktree's .ticketforge/brain/ folder (never committed).
  */
 async function brainFor(project: any, ticket: any, local: boolean) {
@@ -138,7 +138,7 @@ async function remotePost(req: Request, p: any, b: any) {
 
 
 
-// Code generation and pull requests for an issue (local only): TicketForge agents (lib/agents.js) run as Claude Code
+// Code generation and pull requests for an issue (local only): TicketForge agents (lib/agents.ts) run as Claude Code
 // agents in a git worktree of the project's repo.
 async function guard(p: any, perms: string[]) {
   const user = await authed();
@@ -259,13 +259,13 @@ export const POST = api(async (req, p) => {
     if (!ids.length) throw new HttpError(400, 'Choose at least one issue.');
     const instructions = String(b.instructions || '').slice(0, 4000);
     const started: any[] = [], skipped: { key: string; reason: string }[] = [];
-    // All at once: API contracts are written in parallel; git setup takes turns per repository (lib/devagent.js).
+    // All at once: API contracts are written in parallel; git setup takes turns per repository (lib/devagent.ts).
     await Promise.all(ids.map(async (id) => {
       const ticket = project.tickets.find((t: any) => t.id === id);
       if (!ticket) { skipped.push({ key: id, reason: 'not saved yet' }); return; }
       try {
         const r = await startForIssue(project, ticket, { instructions, user, ai: aiOpts(b), agentId: b.agentId ? String(b.agentId) : '' });
-        started.push(...Object.values(r.jobs).filter(Boolean));
+        started.push(...Object.values<any>(r.jobs).filter(Boolean));
       } catch (e: any) { skipped.push({ key: ticket.key, reason: e.message }); }
     }));
     return { started, skipped, queue: queueInfo() };

@@ -1,10 +1,10 @@
 import { api, authed, body, HttpError, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { inspectRepo, githubToken, listFolders, learnRepo, cloneRepo } from '@/lib/devagent.js';
-import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets.js';
-import { codeRabbitStatus } from '@/lib/coderabbit.js';
-import { getClientId, saveClientId, startDeviceLogin, pollDeviceLogin, listRepos } from '@/lib/github-connect.js';
+import * as store from '@/lib/store';
+import { SERVERLESS, currentContext } from '@/lib/db';
+import { inspectRepo, githubToken, listFolders, learnRepo, cloneRepo } from '@/lib/devagent';
+import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets';
+import { codeRabbitStatus } from '@/lib/coderabbit';
+import { getClientId, saveClientId, startDeviceLogin, pollDeviceLogin, listRepos } from '@/lib/github-connect';
 
 // Project settings → Code & GitHub: checks the local repository folder and keeps the project's GitHub token.
 const localOnly = () => !SERVERLESS && Boolean((currentContext() as any).local);
@@ -67,7 +67,7 @@ export const POST = api(async (req, p) => {
     return ndjson(req, async (send, signal) => {
       try {
         const r = await learnRepo({ localPath: dev.localPath, signal, onStep: (text: string) => send({ type: 'step', text }) });
-        send({ type: 'profile', ...r, learnedAt: new Date().toISOString() });
+        send({ type: 'profile', ...(r as any), learnedAt: new Date().toISOString() });
       } catch (e: any) { send({ type: 'error', message: e.message }); }
     });
   }

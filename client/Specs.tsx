@@ -11,7 +11,7 @@ import { TF, SF, CB, MenuItem } from './fields';
 /** Opens the Coding specs dialog of an epic. */
 export const openSpecs = (epic: Any) => openModal(<SpecsModal epic={epic} />);
 
-/** "PR-2 and PR-3 both touch lib/store.js": the tickets and the file or module they share. */
+/** "PR-2 and PR-3 both touch lib/store.ts": the tickets and the file or module they share. */
 function OverlapLine({ o }: { o: Any }) {
   const keys: string[] = o.specs.map((s: Any) => s.key || s.ticketId);
   const who = keys.length === 2 ? `${keys[0]} and ${keys[1]} both` : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]} all`;

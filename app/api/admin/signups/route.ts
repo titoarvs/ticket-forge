@@ -1,7 +1,7 @@
 import { api, ownerOnly, body, HttpError } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
-import { DEFAULT_WS } from '@/lib/db.js';
-import { platformAdminEmails } from '@/lib/platform.js';
+import * as auth from '@/lib/auth';
+import { DEFAULT_WS } from '@/lib/db';
+import { platformAdminEmails } from '@/lib/platform';
 
 // People who asked for an account while sign-up is a waitlist. Only whoever runs this TicketForge sees them: the owner
 // of the default workspace, or a platform admin (PLATFORM_ADMIN_EMAILS). Owners of other workspaces don't.

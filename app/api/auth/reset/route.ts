@@ -1,5 +1,5 @@
 import { api, body, HttpError, startSession } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
 export const POST = api(async (req) => {
   const b = await body(req);

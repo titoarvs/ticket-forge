@@ -1,8 +1,8 @@
 // The App setup (pages, roles, login) used by test runs, page discovery and login tests. It always comes from the
 // SAVED project, and role passwords are only filled in for the project's saved application URL, so nobody can
 // point a run at another site to capture them.
-import * as store from '@/lib/store.js';
-import { appWithSecrets } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { appWithSecrets } from '@/lib/secrets';
 
 const originOf = (u: string) => { try { return new URL(u).origin; } catch { return ''; } };
 

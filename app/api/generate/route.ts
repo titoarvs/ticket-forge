@@ -1,6 +1,6 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import { generateProject } from '@/lib/generate.js';
-import * as store from '@/lib/store.js';
+import { generateProject } from '@/lib/generate';
+import * as store from '@/lib/store';
 
 export const POST = api(async (req) => {
   const user = await perm('project.create', 'ai.use');

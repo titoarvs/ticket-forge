@@ -1,7 +1,7 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
-import { providerStatus, accountStatus, testConnection, listModels, clearCooldown, clearAiUsage, PROVIDERS } from '@/lib/claude.js';
-import { cacheClear } from '@/lib/aicache.js';
-import { saveAiProvider, removeAiProvider, reorderAiProviders, setAiOptions, setAiRouting, setAiConfigs } from '@/lib/settings.js';
+import { providerStatus, accountStatus, testConnection, listModels, clearCooldown, clearAiUsage, PROVIDERS } from '@/lib/claude';
+import { cacheClear } from '@/lib/aicache';
+import { saveAiProvider, removeAiProvider, reorderAiProviders, setAiOptions, setAiRouting, setAiConfigs } from '@/lib/settings';
 
 // AI for administrators: status, the list of AI APIs (in priority order), tests, model lists and cooldowns.
 

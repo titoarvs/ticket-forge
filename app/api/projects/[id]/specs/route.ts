@@ -1,6 +1,6 @@
 import { api, authed, perm, body, HttpError, aiOpts } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { generateSpecs } from '@/lib/specgen.js';
+import * as store from '@/lib/store';
+import { generateSpecs } from '@/lib/specgen';
 
 export const maxDuration = 300;
 

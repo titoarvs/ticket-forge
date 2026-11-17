@@ -1,7 +1,7 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { testLogin, engineStatus, noBrowser } from '@/lib/automation.js';
-import { appWithSecrets } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { testLogin, engineStatus, noBrowser } from '@/lib/automation';
+import { appWithSecrets } from '@/lib/secrets';
 import { savedSetup } from '@/lib/server/app-setup';
 
 // Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).

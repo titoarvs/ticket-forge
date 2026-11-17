@@ -1,7 +1,7 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { saveFile } from '@/lib/files.js';
-import { referenceType, typeMessage, sizeMessage, maxBytes, maxLabel, allowedExtensions, extractReference } from '@/lib/references.js';
+import * as store from '@/lib/store';
+import { saveFile } from '@/lib/files';
+import { referenceType, typeMessage, sizeMessage, maxBytes, maxLabel, allowedExtensions, extractReference } from '@/lib/references';
 
 // What can be attached to a ticket as a UI reference: the allowed types and the size limit (both configurable).
 export const GET = api(async (_req, p) => {

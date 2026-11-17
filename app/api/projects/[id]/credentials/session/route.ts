@@ -1,7 +1,7 @@
 import { api, perm, body, HttpError, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { setRoleSecret, credentialStatus } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { SERVERLESS, currentContext } from '@/lib/db';
+import { setRoleSecret, credentialStatus } from '@/lib/secrets';
 import { onLoginish } from '@/lib/app-helpers.mjs';
 import { systemBrowser } from '@/lib/browser.mjs';
 
