@@ -1,6 +1,6 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import { ticketAction } from '@/lib/generate.js';
-import * as store from '@/lib/store.js';
+import { ticketAction } from '@/lib/generate';
+import * as store from '@/lib/store';
 
 export const POST = api(async (req) => {
   const u = await perm('ai.use');

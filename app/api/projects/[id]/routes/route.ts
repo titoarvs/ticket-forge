@@ -1,9 +1,9 @@
 import { api, authed, perm, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { currentContext, SERVERLESS } from '@/lib/db.js';
-import { scanCodebase } from '@/lib/routes.js';
-import { localReader, githubReader } from '@/lib/codebase.js';
-import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { currentContext, SERVERLESS } from '@/lib/db';
+import { scanCodebase } from '@/lib/routes';
+import { localReader, githubReader } from '@/lib/codebase';
+import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets';
 
 // Page routes from the web app's source code (Test automation → App setup → Source code).
 

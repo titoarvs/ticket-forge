@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { api, authed, body, clientIp } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
 // Accept the current Terms of Use and Privacy Policy (after a change, or for accounts created before consent existed).
 export const GET = api(async () => auth.legalStatus(await authed()));

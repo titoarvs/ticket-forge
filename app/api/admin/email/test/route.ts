@@ -1,5 +1,5 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
 export const POST = api(async (req) => {
   const u = await perm('users.manage');

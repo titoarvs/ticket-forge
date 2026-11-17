@@ -1,5 +1,5 @@
 import { api, authed } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
+import * as store from '@/lib/store';
 
 // Restore an issue to one of its versions. Admins and managers only (issue.restore): anyone else gets 403 and
 // the issue is left as it is.

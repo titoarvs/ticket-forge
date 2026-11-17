@@ -1,6 +1,6 @@
 import { api, perm, body, aiOpts } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { classifyLayers } from '@/lib/layers.js';
+import * as store from '@/lib/store';
+import { classifyLayers } from '@/lib/layers';
 
 export const maxDuration = 300;
 

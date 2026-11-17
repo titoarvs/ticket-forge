@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError, startSession } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
-import { isSaas } from '@/lib/platform.js';
+import * as auth from '@/lib/auth';
+import { isSaas } from '@/lib/platform';
 
 // The workspaces you belong to, and creating a new one (you own it, then switch to it).
 export const GET = api(async () => {

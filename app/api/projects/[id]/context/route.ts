@@ -1,7 +1,7 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { buildAppContext } from '@/lib/appcontext.js';
+import * as store from '@/lib/store';
+import { SERVERLESS, currentContext } from '@/lib/db';
+import { buildAppContext } from '@/lib/appcontext';
 import { execFile } from 'node:child_process';
 
 // Project settings → App context: build the project's app-knowledge brief (from the code when a local repository is

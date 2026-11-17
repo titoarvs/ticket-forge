@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { runDocAgent } from '@/lib/agentdocs.js';
+import * as store from '@/lib/store';
+import { runDocAgent } from '@/lib/agentdocs';
 
 // A document agent (Kick Off, Demo, Deploy…) writes its document for one epic. Nothing is saved here: the app
 // stores it on the epic, like the Problem Statement and Feature Brief.

@@ -1,8 +1,8 @@
 import { headers } from 'next/headers';
 import { api, body, startSession, clientIp } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
-// Public sign-up. What it does depends on SIGNUP_MODE (see lib/auth.js signup).
+// Public sign-up. What it does depends on SIGNUP_MODE (see lib/auth.ts signup).
 export const POST = api(async (req) => {
   const b = await body(req);
   const ip = await clientIp();

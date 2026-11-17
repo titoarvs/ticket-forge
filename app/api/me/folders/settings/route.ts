@@ -1,5 +1,5 @@
 import { api, authed, body } from '@/lib/server/http';
-import { readFolderSettings, saveFolderSettings } from '@/lib/userfolders.js';
+import { readFolderSettings, saveFolderSettings } from '@/lib/userfolders';
 
 // Your AI, browser, email and template settings for one repository, kept in your own folder.
 export const GET = api(async (req) => {

@@ -1,6 +1,6 @@
 import { api, platformOwner, body, HttpError } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { listGateways, saveGateway } from '@/lib/gateways.js';
+import { billingOn } from '@/lib/limits';
+import { listGateways, saveGateway } from '@/lib/gateways';
 
 function hosted() {
   if (!billingOn()) throw new HttpError(400, 'Payment gateways are only used on the hosted service.');

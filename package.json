@@ -8,8 +8,11 @@
     "dev": "next dev -p 5173",
     "build": "next build",
     "start": "next start -p 5173",
-    "db:push": "node --env-file-if-exists=.env scripts/db-push.js",
-    "legacy": "node --env-file-if-exists=.env legacy/server.js"
+    "db:push": "node --env-file-if-exists=.env --import tsx scripts/db-push.ts",
+    "db:schema": "node scripts/drizzle-schema.mjs",
+    "db:check": "node scripts/drizzle-schema.mjs --check",
+    "db:studio": "drizzle-kit studio",
+    "legacy": "node --env-file-if-exists=.env --import tsx legacy/server.js"
   },
   "license": "UNLICENSED",
   "private": true,
@@ -33,6 +36,7 @@
     "@tiptap/starter-kit": "3.32.0",
     "dayjs": "^1.11.23",
     "docx": "^9.15.2",
+    "drizzle-orm": "^0.45.4",
     "exceljs": "^4.4.0",
     "express": "^5.3.0",
     "fflate": "0.8.3",
@@ -50,6 +54,8 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },
   "overrides": {

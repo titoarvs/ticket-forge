@@ -1,8 +1,8 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { publicPsdTemplate, savePsdTemplate, clearPsdTemplate, getPsdTemplate } from '@/lib/psd-template.js';
-import { publicFbdTemplate, saveFbdTemplate, resetFbdTemplate } from '@/lib/fbd.js';
-import { publicArdTemplate, saveArdTemplate, resetArdTemplate } from '@/lib/ard.js';
+import * as store from '@/lib/store';
+import { publicPsdTemplate, savePsdTemplate, clearPsdTemplate, getPsdTemplate } from '@/lib/psd-template';
+import { publicFbdTemplate, saveFbdTemplate, resetFbdTemplate } from '@/lib/fbd';
+import { publicArdTemplate, saveArdTemplate, resetArdTemplate } from '@/lib/ard';
 
 // Project settings → Templates: a project's own Problem Statement (.docx), Feature Brief (.md) and Architecture Record
 // Design (.md) templates. Without one, the project uses the team's (Administration → Generation).

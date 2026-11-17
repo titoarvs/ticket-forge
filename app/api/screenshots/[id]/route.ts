@@ -1,6 +1,6 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { getShot } from '@/lib/shots.js';
+import * as store from '@/lib/store';
+import { getShot } from '@/lib/shots';
 
 // A failed test's screenshot, stored in the database. Only people with access to its project can open it.
 export const GET = api(async (_req, p) => {

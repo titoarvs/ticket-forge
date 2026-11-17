@@ -1,5 +1,5 @@
 import { api, authed } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
+import * as store from '@/lib/store';
 
 // An issue's versions (saved on every status change and every restore), newest first. Everyone with access to
 // the project can see them; `canRestore` tells the browser whether to offer Restore.

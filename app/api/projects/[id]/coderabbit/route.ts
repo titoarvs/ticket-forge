@@ -1,7 +1,7 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { getProjectSecret } from '@/lib/secrets.js';
-import { codeRabbitPrFindings } from '@/lib/coderabbit-pr.js';
+import * as store from '@/lib/store';
+import { getProjectSecret } from '@/lib/secrets';
+import { codeRabbitPrFindings } from '@/lib/coderabbit-pr';
 
 // CodeRabbit's review comments on a pull/merge request linked to an issue, as findings. The browser merges them into
 // the issue's saved code reviews (keeping each finding's status), so they show in the issue and in Reports.

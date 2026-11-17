@@ -1,5 +1,5 @@
 import { api, authed, HttpError, appUrl } from '@/lib/server/http';
-import { portalUrl } from '@/lib/stripe.js';
+import { portalUrl } from '@/lib/stripe';
 
 // Manage billing: returns the Stripe Customer Portal address (card, plan changes, invoices, cancel).
 export const POST = api(async (req) => {

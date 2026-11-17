@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { generatePsd } from '@/lib/psd.js';
+import * as store from '@/lib/store';
+import { generatePsd } from '@/lib/psd';
 
 // Writing a PSD takes a minute or two.
 export const maxDuration = 300;

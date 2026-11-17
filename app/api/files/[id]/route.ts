@@ -1,6 +1,6 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { getFile, deleteFile, docxPage, showsInline } from '@/lib/files.js';
+import * as store from '@/lib/store';
+import { getFile, deleteFile, docxPage, showsInline } from '@/lib/files';
 
 const ID = /^[a-f0-9]{8,32}$/;
 async function load(id: string) {

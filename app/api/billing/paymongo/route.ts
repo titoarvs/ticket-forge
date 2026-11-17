@@ -1,6 +1,6 @@
 import { api, authed, body, HttpError, appUrl } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { startCheckout } from '@/lib/paymongo-checkout.js';
+import { billingOn } from '@/lib/limits';
+import { startCheckout } from '@/lib/paymongo-checkout';
 
 // Start a paid plan: returns the PayMongo checkout address to send the owner to (nothing is subscribed until it is paid).
 export const POST = api(async (req) => {

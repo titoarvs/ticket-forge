@@ -1,6 +1,6 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import * as auth from '@/lib/auth.js';
+import * as store from '@/lib/store';
+import * as auth from '@/lib/auth';
 
 // The whole project, shared between everyone opening the same version (see store.projectJson).
 // ?gz=1: the same JSON gzipped, as a file the browser unpacks (a big project is ~30× smaller on the wire).

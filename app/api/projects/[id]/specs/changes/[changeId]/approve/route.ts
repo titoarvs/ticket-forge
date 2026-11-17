@@ -1,5 +1,5 @@
 import { api, authed } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
+import * as store from '@/lib/store';
 
 // A required reviewer (coding spec settings) approves AI-produced changes. Anyone else gets 403.
 export const POST = api(async (_req, p) => {

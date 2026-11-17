@@ -1,8 +1,8 @@
 import { api, perm, body, HttpError, aiOpts } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { clarifyQuestions } from '@/lib/clarify.js';
+import * as store from '@/lib/store';
+import { clarifyQuestions } from '@/lib/clarify';
 
-// The questions the AI asks before a generation or enhancement (lib/clarify.js). Nothing is saved.
+// The questions the AI asks before a generation or enhancement (lib/clarify.ts). Nothing is saved.
 export const POST = api(async (req) => {
   const user = await perm('ai.use');
   const b = await body(req);

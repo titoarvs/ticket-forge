@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import { testsForIssues } from '@/lib/generate.js';
-import * as store from '@/lib/store.js';
+import { testsForIssues } from '@/lib/generate';
+import * as store from '@/lib/store';
 
 // Test cases for many issues: up to 5 per AI request. Streams { type: 'batch', results, missing, done, total } and
 // { type: 'done' }. The issues are read from the saved project.

@@ -1,5 +1,5 @@
 import { api, authed, body } from '@/lib/server/http';
-import { listMyFolders, ensureFolder } from '@/lib/userfolders.js';
+import { listMyFolders, ensureFolder } from '@/lib/userfolders';
 
 // Your own local folders (one per repository). Nobody else's folders are ever returned here.
 export const GET = api(async () => listMyFolders(await authed()));

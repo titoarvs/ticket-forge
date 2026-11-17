@@ -1,8 +1,8 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { discoverPages, engineStatus, noBrowser } from '@/lib/automation.js';
+import * as store from '@/lib/store';
+import { discoverPages, engineStatus, noBrowser } from '@/lib/automation';
 import { maskSecrets } from '@/lib/app-helpers.mjs';
-import { appWithSecrets } from '@/lib/secrets.js';
+import { appWithSecrets } from '@/lib/secrets';
 import { savedSetup } from '@/lib/server/app-setup';
 
 // Driving a browser takes a while: let this run up to 5 minutes on serverless hosting (Vercel).

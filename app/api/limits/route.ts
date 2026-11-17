@@ -1,6 +1,6 @@
 import { api, perm } from '@/lib/server/http';
-import { effectivePlan, usage, billingOn, limitRows } from '@/lib/limits.js';
-import { copilotLimits } from '@/lib/claude.js';
+import { effectivePlan, usage, billingOn, limitRows } from '@/lib/limits';
+import { copilotLimits } from '@/lib/claude';
 
 // Administration → Limits: the workspace's plan limits (hosted service only) and GitHub Copilot's limits (this computer only).
 export const GET = api(async () => {

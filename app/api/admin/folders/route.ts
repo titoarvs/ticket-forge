@@ -1,5 +1,5 @@
 import { api, perm, HttpError } from '@/lib/server/http';
-import { listAllFolders, purgeFolder } from '@/lib/userfolders.js';
+import { listAllFolders, purgeFolder } from '@/lib/userfolders';
 
 // Every person's local repository folders, for administrators. Folders stay until purged here.
 export const GET = api(async () => listAllFolders(await perm('users.manage')));

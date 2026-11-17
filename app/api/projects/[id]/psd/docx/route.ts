@@ -1,8 +1,8 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { getPsdTemplate } from '@/lib/psd-template.js';
-import { buildPsdDocx, buildPlainPsdDocx } from '@/lib/psd-docx.js';
-import { normalizePsd } from '@/lib/psd.js';
+import * as store from '@/lib/store';
+import { getPsdTemplate } from '@/lib/psd-template';
+import { buildPsdDocx, buildPlainPsdDocx } from '@/lib/psd-docx';
+import { normalizePsd } from '@/lib/psd';
 
 export const maxDuration = 60;
 

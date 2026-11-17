@@ -1,11 +1,11 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { SERVERLESS, currentContext } from '@/lib/db.js';
-import { readRepo, testCaseUpdates, builtFeatures, pageTestCases, builtFeatureMap } from '@/lib/reposync.js';
+import * as store from '@/lib/store';
+import { SERVERLESS, currentContext } from '@/lib/db';
+import { readRepo, testCaseUpdates, builtFeatures, pageTestCases, builtFeatureMap } from '@/lib/reposync';
 
 export const maxDuration = 300;
 
-// Test automation → Sync with the repository (lib/reposync.js). Streams progress; returns pages, test-case updates and
+// Test automation → Sync with the repository (lib/reposync.ts). Streams progress; returns pages, test-case updates and
 // already-built features for review. Nothing is saved here.
 export const POST = api(async (req, p) => {
   const user = await authed();

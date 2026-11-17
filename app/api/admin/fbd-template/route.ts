@@ -1,5 +1,5 @@
 import { api, perm, authed, body, HttpError } from '@/lib/server/http';
-import { publicFbdTemplate, saveFbdTemplate, resetFbdTemplate } from '@/lib/fbd.js';
+import { publicFbdTemplate, saveFbdTemplate, resetFbdTemplate } from '@/lib/fbd';
 
 // Administration → Generation → Feature Brief template (Markdown). The team's file is the default.
 export const GET = api(async () => { await authed(); return { template: await publicFbdTemplate() }; });

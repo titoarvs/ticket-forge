@@ -8,6 +8,7 @@ import { Ico, I, Modal, Spinner, Confirm, Elapsed } from './ui';
 import { TA, TF, SF, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
 import { askFirst } from './Clarify';
+import { approvalStamp } from '../lib/approval';
 
 type Kind = 'fbd' | 'ard';
 type Doc = { key: Kind; name: string; short: string; heading: string; running: (e: Any) => string; about: (e: Any) => string; write: (e: Any) => string; placeholder: string; stat: (md: string) => string };
@@ -32,12 +33,20 @@ const DOCS: Record<Kind, Doc> = {
   },
 };
 const STATUSES = ['Draft', 'For Review', 'Approved'];
+/** Sets a document's status (Problem Statement, Feature Brief or Architecture Record) and records who approved which version. */
+export function setDocStatus(epic: Any, k: 'psd' | 'fbd' | 'ard', status: string) {
+  mutate(() => {
+    let next = { ...epic[k], status };
+    if (k !== 'psd') next = { ...next, markdown: syncDocControl(k, next.markdown, next.version || 'v1.0', status) };
+    epic[k] = { ...next, ...approvalStamp(next, me()) };
+  }, { tag: `${k}.status${epic.id}` });
+}
 const busy = new Map<string, number>(); // running key → started at
 const bk = (k: Kind, id: string) => `${k}:${id}`;
 const fileName = (k: Kind, epic: Any, ext: string) => `${DOCS[k].name} - ${epic.title} - ${epic[k]?.version || 'v1.0'}.${ext}`.replace(/[\\/:*?"<>|]+/g, ' ');
 
 /** Updates the version and status in the document's Document Control table, so the document and the panel agree. */
-function syncDocControl(k: Kind, md: string, version: string, status: string) {
+export function syncDocControl(k: Kind, md: string, version: string, status: string) {
   const re = new RegExp(`(\\|\\s*${DOCS[k].heading}[^|]*\\|\\s*)([^|]*)(\\|\\s*[^|]*\\|\\s*)([^|]*)(\\|)`, 'i');
   return md.replace(re, (_m, a, _v, c, _s, e) => `${a}${version} ${c}${status} ${e}`);
 }
@@ -129,10 +138,13 @@ export function DocSection({ k, epic }: { k: Kind; epic: Any }) {
   const f = epic[k];
   const canWrite = can('ai.use') && can('epic.manage');
   const ed = can('epic.manage');
-  const set = (key: string, v: string) => mutate(() => {
-    const next = { ...epic[k], [key]: v };
-    epic[k] = { ...next, markdown: syncDocControl(k, next.markdown, next.version || 'v1.0', next.status || 'Draft') };
-  }, { tag: `${k}.${key}${epic.id}` });
+  const set = (key: string, v: string) => {
+    if (key === 'status') return setDocStatus(epic, k, v);
+    mutate(() => {
+      const next = { ...epic[k], [key]: v };
+      epic[k] = { ...next, markdown: syncDocControl(k, next.markdown, next.version || 'v1.0', next.status || 'Draft') };
+    }, { tag: `${k}.${key}${epic.id}` });
+  };
   const glance = f ? (f.markdown.split(/^##\s+/m)[1] || '').split('\n').slice(1).find((l: string) => l.trim() && !l.startsWith('|') && !l.startsWith('<!--')) : '';
   return (
     <div className="sec psd-sec"><div className="sec-title"><h3>{d.name}</h3>

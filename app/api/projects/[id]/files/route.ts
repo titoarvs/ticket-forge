@@ -1,7 +1,7 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { saveFile, fileType, attachmentType } from '@/lib/files.js';
-import { q } from '@/lib/db.js';
+import * as store from '@/lib/store';
+import { saveFile, fileType, attachmentType } from '@/lib/files';
+import { q } from '@/lib/db';
 
 // Keep the original PDF or Word file of a source document, so it can be shown as it was written.
 // form: file, and optionally target=original to link it as the project's initial document right away

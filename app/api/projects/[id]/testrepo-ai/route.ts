@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { writeRepoTests, improveRepoTest } from '@/lib/testwriter.js';
+import * as store from '@/lib/store';
+import { writeRepoTests, improveRepoTest } from '@/lib/testwriter';
 
 export const maxDuration = 300;
 

@@ -1,6 +1,6 @@
 import { api, perm, body, aiOpts } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { buildTestPlan } from '@/lib/testplan.js';
+import * as store from '@/lib/store';
+import { buildTestPlan } from '@/lib/testplan';
 
 export const maxDuration = 300;
 

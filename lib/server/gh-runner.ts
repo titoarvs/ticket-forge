@@ -1,8 +1,8 @@
 // The project's GitHub Actions test runner (Test automation → Settings → GitHub Actions): the repository and branch
 // saved on the project, the project's GitHub token (or GITHUB_TOKEN / the `gh` sign-in on this computer) and the
 // run key TicketForge shares with that repository's TICKETFORGE_RUN_KEY secret.
-import * as store from '@/lib/store.js';
-import { getProjectSecret } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { getProjectSecret } from '@/lib/secrets';
 import { HttpError } from '@/lib/server/http';
 
 export async function githubRunner(projectId: string | undefined, { deadlineMs = 0 } = {}) {

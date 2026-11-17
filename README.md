@@ -376,7 +376,7 @@ and can belong to several workspaces; their role, project access and owner statu
 On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-hosted, and the service's own
 `default` workspace, have no limits.
 
-- **Plans** are in `lib/plans.js`: Free, Pro and Team, with limits on projects, members (people plus pending
+- **Plans** are in `lib/plans.ts`: Free, Pro and Team, with limits on projects, members (people plus pending
   invites), platform AI actions per month, AI code jobs per month and storage. The prices and limits there are
   placeholders. Every limit has a name, a numeric value (`null` = no limit) and a unit (`LIMIT_DEFS`, checked by
   `validatePlan` when the app loads). Every new workspace starts on Free; paid plans are started from Billing. A plan
@@ -384,7 +384,7 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   and can't be checked out, but workspaces already on it keep it.
 - **Every feature is on every plan** (TF-101): a plan limits how much you use, never which features you can use.
   Only a positive limit stops anything; a value of `0` (for example AI code jobs on Free) no longer means "not
-  included" and is treated as no limit (`enforced()` in `lib/limits.js`).
+  included" and is treated as no limit (`enforced()` in `lib/limits.ts`).
 - **What counts as an AI action**: only calls that use the service's own AI keys (environment variables).
   Providers a workspace adds in Administration → AI, and people's own Claude subscriptions (My AI), don't count.
   Monthly allowances are taken atomically, so many requests at once never go over, and a failed call gives its
@@ -412,7 +412,7 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
   **Card**, **GCash** or **Maya**, shows the total in PHP, and **Pay** continues to `/checkout/<method>` (the payment
   step). Pressing Pay with no method asks the customer to choose one. Methods the gateway doesn't support are not
   shown: set `PAYMONGO_PAYMENT_METHODS` (comma list of `card`, `gcash`, `paymaya`; default all three). PHP prices are
-  in `lib/payment-methods.js`. API: `GET/POST /api/billing/payment-methods`.
+  in `lib/payment-methods.ts`. API: `GET/POST /api/billing/payment-methods`.
 - **PayMongo checkout**: with `PAYMONGO_SECRET_KEY` set, Billing shows **Start paid plan** on each paid plan (owner
   only; non-owners never see it, and the API refuses them with 403). It opens the checkout above; on the payment step,
   **Continue to PayMongo** creates a PayMongo Checkout Session in PHP (`POST /api/billing/paymongo`) and redirects to
@@ -427,8 +427,8 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
     needs its secret key, which is checked with the gateway first (a wrong key shows an error and the gateway stays
     inactive) and then stored encrypted in `payment_gateways`; it is never sent back to the browser.
     `PAYMONGO_API_BASE`, `XENDIT_API_BASE` and `STRIPE_API_BASE` point tests at a local mock.
-  - *Plans* (`billing_plans`, `lib/billing-plans.js`): name, price, currency (PHP or USD), cycle (monthly or yearly),
-    free-plan option and trial days. The default Free, Pro and Team plans from `lib/plans.js` are copied in the first
+  - *Plans* (`billing_plans`, `lib/billing-plans.ts`): name, price, currency (PHP or USD), cycle (monthly or yearly),
+    free-plan option and trial days. The default Free, Pro and Team plans from `lib/plans.ts` are copied in the first
     time. Editing the price, currency, cycle, free option or trial days of a plan that has subscribers adds a **new
     version**; workspaces keep the version they subscribed to (`workspaces.plan_version`) and new subscriptions use the
     latest. Other edits change the latest version in place. API: `GET/POST /api/billing/plans`, `PUT /api/billing/plans/<id>`.
@@ -439,6 +439,70 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
     cancels. Switching plan during a trial keeps the trial; switching while paid is a new payment on the new plan (no
     proration yet) and cancelling keeps access until the paid period ends. Paying through PayMongo or Xendit is one
     payment per period: renewals are not charged automatically yet.
+
+## Issues from approved documents
+
+An epic's issues are written from its three documents, and only once all three are **approved**: the **Problem
+Statement (PSD)**, the **Feature Brief (FBD)** and the **Architecture Record Design (ARD)**.
+
+- **Approving**: each document has a status (*Draft*, *For Review*, *Approved*). Setting it to *Approved* records who
+  approved it, when, and a fingerprint of that version (`approvedBy`, `approvedAt`, `approvedFp`). Changing the status
+  or an edit that changes the content, such as a new version, shows **Changed after approval** and needs approving
+  again. Documents approved before this existed count as approved. Needs the *Manage epics* permission.
+- **Epic panel → Issues from approved documents** (when the *Epic documents* feature is on): shows the three documents
+  with their state and **Approve** / **Open** buttons. **Write issues from the documents** is enabled when all three are
+  approved. `POST /api/projects/<id>/epic-issues` refuses with **409** (`code: docs-not-approved`) otherwise.
+- **What the AI writes**: the Feature Brief's acceptance scenarios (AS-01…) become issues and their acceptance
+  criteria, the Architecture Record's components and decisions (AD-01…) set the technical scope, and the Problem
+  Statement keeps the work on the problem. Each issue says what it covers ("Covers: AS-01. Decisions: AD-02."). Things
+  the documents leave open become *open questions*, not guesses. Issues the epic already has are not repeated.
+- **Review before adding**: you see every issue (story, description, criteria, test cases), which scenarios have no
+  issue yet (shown as a warning), and add the ones you choose.
+- **Write issue with Claude** (one issue in an epic, `POST /api/ai/new-ticket`) follows the same rule when the epic
+  documents feature is on.
+
+## Decisions with Jev (optional)
+
+[Jev](https://docs.typesafe.ai) (TypeSafe AI, early access) is a fast model for decisions: you give it the state of something
+and questions (pick one of up to 255 options, rate 0-9, yes/no) and it returns typed answers with calibrated probabilities
+in a few hundred milliseconds, at a fraction of a general AI's price. It can't write text, so TicketForge uses it only for
+small classification calls, **when an owner turns it on** in Administration → AI → **Decisions**:
+
+- **Frontend, backend or both** for each issue (`lib/layers.ts`): one call per 25 issues.
+- **Which automated tests are worth running** (`lib/testselect.ts`): a yes/no per test, ranked, up to the budget.
+
+Anything Jev isn't sure about (below the confidence you choose, 60% by default), and every call when it is off,
+unreachable, or answers an error, goes to your AI as before, so turning it on never makes these features fail. Setup: paste
+the API key from console.typesafe.ai → Keys (stored encrypted per workspace and never sent back; `TYPESAFE_API_KEY` works
+too), turn it on, and use **Test the connection**. `TICKETFORGE_JEV_URL` points tests at a stand-in server. The titles,
+descriptions and test names being decided are sent to TypeSafe, so check their terms first. Client: `lib/jev.ts`
+(`POST https://api.typesafe.ai/v1/systemone`, `jev-latest`, retries 429/529 twice).
+
+## Drizzle ORM
+
+[Drizzle ORM](https://orm.drizzle.team) is set up next to the existing database code, so new code can use typed queries
+instead of hand-written SQL. Existing `q()` / `qs()` queries keep working unchanged.
+
+- **`lib/orm.ts`**: the `orm` client (and the tables and the usual operators: `eq`, `and`, `inArray`, `desc`, `sql`…).
+  It sends every statement through `lib/db.ts`, so it uses the same database (Supabase/PostgreSQL or the built-in local
+  one), the same pool and the same **row-level security**: queries run as the signed-in user's role and workspace, and
+  `asSystem(() => orm…)` is the system context, exactly like `qs()`.
+  ```ts
+  import { orm, projects, eq, desc } from '@/lib/orm';
+  const mine = await orm.select().from(projects).where(eq(projects.workspaceId, ws)).orderBy(desc(projects.updatedAt));
+  ```
+  Relational queries work too (`orm.query.workspaces.findMany({ with: { workspaceMembers: true } })`). Drizzle's own
+  `orm.transaction` isn't available through this driver: use `tx()` from `lib/db.ts` for transactions.
+- **`lib/schema.ts`** and **`lib/relations.ts`**: every table, typed. They are generated, not written by hand: tables,
+  policies, triggers and migrations are still defined in `lib/db.ts` (Drizzle Kit doesn't know about row-level security),
+  so there is deliberately no `drizzle-kit push` or `migrate`.
+- **`npm run db:schema`** rebuilds the two files: it creates a throwaway local database with `lib/db.ts`, reads it back
+  with Drizzle Kit and writes the schema. It never touches your own database. Run it after changing a table in
+  `lib/db.ts` and commit the result. **`npm run db:check`** fails when they are out of date (for CI).
+- **`npm run db:studio`** opens Drizzle Studio on your database (`DATABASE_URL`, or `data/db` when there is none).
+
+Notes: timestamps are `Date` objects; `bytea` columns (`files.data`, `screenshots.data`) are a `Buffer` on PostgreSQL
+and a `Uint8Array` on the built-in local database; `jsonb` columns are untyped (`unknown`) until you add `.$type<…>()`.
 
 ## AI flow (Administration → AI → AI flow)
 
@@ -459,7 +523,7 @@ It reads and writes the same settings as Model routing, Models per tier and Prov
 ## Help chatbot and release announcement robot
 
 Every signed-in user has a chat button in the bottom-right corner. The chatbot is rule-based (no AI, no provider): it
-answers from the FAQ in `lib/chatbot.js` and from live ticket data. Ticket counts only cover projects the person can
+answers from the FAQ in `lib/chatbot.ts` and from live ticket data. Ticket counts only cover projects the person can
 access; asking about another project is refused, and people counts need the "Manage users and access" permission.
 `GET/POST /api/chatbot` serve it (`client/Chatbot.tsx`).
 
@@ -489,7 +553,7 @@ When something new ships, add an entry to its day, or a new day to `DAYS`.
   so no cookie banner is needed.
 - **Consent**: setup, accepting an invite and sign-up have an unticked box to accept the Terms of Use and Privacy
   Policy; the server refuses without it. Each acceptance is stored in `legal_acceptances` (document, version,
-  time, IP address, browser). When you change a document, bump its version in `lib/legal/versions.js`
+  time, IP address, browser). When you change a document, bump its version in `lib/legal/versions.ts`
   (`material: true`): everyone is asked to accept the new version the next time they open the app. Accounts made
   before consent existed are asked once too. On the hosted service (`TICKETFORGE_MODE=saas`) the prompt can't be
   put off; self-hosted, people can choose "Remind me later".
@@ -506,7 +570,7 @@ When something new ships, add an entry to its day, or a new day to `DAYS`.
   starts the tour for the page you are on; **Restart all tours** shows them all again. Accounts created before the
   tours were added don't see them automatically.
 - **Settings**: `TICKETFORGE_MODE` (`selfhost` | `saas`), `SIGNUP_MODE` (`closed` | `waitlist` | `open`),
-  `PLATFORM_NAME`, `PLATFORM_ADMIN_EMAILS`. Plans and prices for the pricing page are in `lib/plans.js`.
+  `PLATFORM_NAME`, `PLATFORM_ADMIN_EMAILS`. Plans and prices for the pricing page are in `lib/plans.ts`.
 
 ## Email (SMTP)
 
@@ -520,7 +584,7 @@ uses so links in emails work outside your machine.
 
 ## Agents
 
-TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), shown in **Administration → Agents**:
+TicketForge has one agent per job in the feature lifecycle (`lib/agents.ts`), shown in **Administration → Agents**:
 
 | Phase | Agent | What it does | Works in |
 | --- | --- | --- | --- |
@@ -547,7 +611,7 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.js`), sh
 and epic. (Epic and issue panels don't list agents.) Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
 run TicketForge's existing writers with the agent's instructions. Epic, Kick Off, Demo, Sign-Off and Manual, Deploy,
 Release Certification and Review a Submission write a Markdown document from the epic, its documents, issues, test
-results and pull requests, saved on the epic (`lib/agentdocs.js`). Code agents ask which issue to work on. In the code
+results and pull requests, saved on the epic (`lib/agentdocs.ts`). Code agents ask which issue to work on. In the code
 window, **Review panel** runs three Review agents in parallel (correctness, security, tests & acceptance).
 
 The agents in bold (and Architecture Record) run as real Claude Code agents: TicketForge passes them to
@@ -631,6 +695,28 @@ It never changes `.github/workflows`, `.env` files or lock files. A round runs a
 to 5 minutes (Vercel's limit); a round that goes quiet for 8 minutes is marked failed. Jobs are kept in the database
 (`code_jobs`), so they survive serverless restarts. Jobs started on GitHub Actions in an earlier version can't continue:
 start a new job. Reviews, CodeRabbit and committing locally need TicketForge on your computer.
+
+**GitHub access: only the deployed app needs it.** On your computer, cloning a repository, pushing branches and opening
+pull requests use your own git setup (an SSH key, your credential helper or `gh auth login`), so Project settings →
+Code & GitHub works without connecting GitHub or saving a token. The *GitHub account* card there is optional on your
+computer: connect it only to pick from your list of GitHub repositories, or if git can't sign in. The deployed
+TicketForge has no git sign-in, so it needs the connection (or a token) to read the repository and push the branch.
+
+**Trying hosted mode on your own computer.** With `TICKETFORGE_MODE=saas` in `.env`, TicketForge treats every request as
+deployed, even at `localhost`, so the repository source *Folder on this computer*, cloning and Claude Code agents are
+off (a visitor can send any `Host` header to a public server, so hosted mode never trusts it). To use them while
+testing billing on your own computer, add `TICKETFORGE_ALLOW_LOCAL=1` to `.env` and restart: it is honoured only for
+requests whose address is `localhost` and that came through no proxy (no `X-Forwarded-*` header). Never set it on a
+server. Project settings → Code & GitHub says so when this is why folders are unavailable.
+
+**Everyone sets up their own local copy.** The project shares *which* repository it is (name, provider, base branch,
+branch prefix, conventions: the project settings permission), but the folder on disk belongs to each person: a
+teammate's path doesn't exist on your computer. In Project settings → Code & GitHub anyone with access to the project
+can choose a **Git URL** (cloned for them) or a **Folder on this computer**, and it is saved just for them (in their
+preferences, `user_prefs`), per project and per side (frontend or backend). Code jobs, learning the repository, test
+selection and the other features that read the code use your folder. If you haven't set one, the project's older shared
+folder is used only when it exists on your computer; otherwise you are asked to set up your own. It works only when
+TicketForge runs on your computer (opened at localhost).
 
 ### Code that follows your repository
 
@@ -864,7 +950,7 @@ lib/                       Server modules
   brain.js                 The project brain: notes built from the project, retrieval for prompts, Obsidian import/export, folder sync
   automation.js runner.mjs Playwright test automation
   exporters.js parse.js github.js    Exports, document parsing, PR lookup
-scripts/db-push.js         Copies the local database to DATABASE_URL
+scripts/db-push.ts         Copies the local database to DATABASE_URL
 legacy/                    The previous Express + vanilla JS version (run with `TICKETFORGE_RLS=off npm run legacy`)
 ```
 
@@ -878,7 +964,7 @@ The client code is split into three layers so each concern lives in one place. A
 | Logic | `client/logic/*.ts` | Rules with no JSX and no requests: which fields are compared, how a value reads as text, what counts as a change. Easy to read and to reuse. | `core.ts` helpers and other logic modules |
 | API client | `client/api/*.ts` | One function per server request: it owns the URL, method, query string and body. It returns what `api()` returns and does not catch errors, so the screen shows the same error state as before. | `api()` from `core.ts` only |
 | Transport and state | `client/core.ts` | `api()` (the one `fetch` call: headers, errors, 401 sign-out, plan-limit prompt), the state store `S`, toasts, modals and undo. | none of the layers above |
-| Server | `app/api/**/route.ts` → `lib/*.js` | Route handlers stay thin (`api()`, `authed()`, permission checks) and call `lib/store.js` and the other server modules for the data and rules. | |
+| Server | `app/api/**/route.ts` → `lib/*.js` | Route handlers stay thin (`api()`, `authed()`, permission checks) and call `lib/store.ts` and the other server modules for the data and rules. | |
 
 Migrated so far: issue versions (`api/versions.ts`, `logic/versions.ts`), Administration (`api/admin.ts`), the Agents tab (`api/agents.ts`) and project reads (`api/projects.ts`). Other screens in `client/` still call `api()` directly and move to these layers when they are next changed: add a function to `client/api/<feature>.ts` (and rules to `client/logic/<feature>.ts`) instead of building a URL in the component.
 
@@ -1006,11 +1092,11 @@ On the Epics page (**AI actions → Split issues**) or in an epic's panel (**Spl
 ## Coding specs per epic, with overlap detection
 
 In an epic's panel, **Coding specs** (needs a connected git remote: Project settings → Code & GitHub; any remote works):
-- **Generate coding specs** writes one coding prompt per issue of the epic (`lib/specgen.js`). Each spec lists the issue's acceptance criteria and the files and modules it is expected to touch. When the repository is on this computer the AI sees its file names, otherwise it goes by the Repository Profile. Generating again replaces the spec and sets it back to draft. Nothing here runs an AI agent or writes code.
-- **Overlaps** (`lib/specs.js`): two specs that list the same file or module are flagged, naming the issues and the file. Specs of one epic are always compared; specs of different epics are compared when one of them is ready (being coded in parallel).
+- **Generate coding specs** writes one coding prompt per issue of the epic (`lib/specgen.ts`). Each spec lists the issue's acceptance criteria and the files and modules it is expected to touch. When the repository is on this computer the AI sees its file names, otherwise it goes by the Repository Profile. Generating again replaces the spec and sets it back to draft. Nothing here runs an AI agent or writes code.
+- **Overlaps** (`lib/specs.ts`): two specs that list the same file or module are flagged, naming the issues and the file. Specs of one epic are always compared; specs of different epics are compared when one of them is ready (being coded in parallel).
 - **Mark ready** follows the project's setting (Coding specs → Settings, needs *Edit project settings*): **block** refuses with a message naming the issues and files, **warn** marks the specs ready and shows the overlap. Specs without an overlap are marked ready with no warning. Blocking is the default.
 - **Reviewer approval:** link AI-produced changes (a branch, pull request or commit) to a ready spec. They can be marked accepted only after one of the project's required reviewers (chosen in the same settings) has approved them; until then the server answers 409.
-- Tables `coding_specs` and `spec_changes` (`lib/db.js`); API under `/api/projects/:id/specs`.
+- Tables `coding_specs` and `spec_changes` (`lib/db.ts`); API under `/api/projects/:id/specs`.
 
 ## GitHub Copilot as the local AI
 
@@ -1079,7 +1165,7 @@ Claude Code agents are routed too:
 
 A model picked on an agent in Administration → Agents still wins over routing. Usage for agent runs shows the cost Claude Code reports.
 
-Presets: **Best quality**, **Balanced** (the default) and **Economy**. The page also shows the calls, the volume of text and the model that answered for each task since the server started. When routing is on, it overrides each person's own model choice in the AI connection dialog. The code is in `lib/aitasks.js`.
+Presets: **Best quality**, **Balanced** (the default) and **Economy**. The page also shows the calls, the volume of text and the model that answered for each task since the server started. When routing is on, it overrides each person's own model choice in the AI connection dialog. The code is in `lib/aitasks.ts`.
 
 ### AI failure analysis on automated tests
 
@@ -1090,7 +1176,7 @@ When automated tests fail, the test-run comment on the issue includes an AI anal
 
 The analysis works from the error, the script, the test case, the issue's acceptance criteria, the page the test ended on and the browser logs.
 
-The same analysis goes into the assignee's notification and email. From the comment you can copy it as a bug report, or rewrite the script and re-run. Turn it off in Test automation → Settings → "When a test fails". The code is in `lib/failures.js`.
+The same analysis goes into the assignee's notification and email. From the comment you can copy it as a bug report, or rewrite the script and re-run. Turn it off in Test automation → Settings → "When a test fails". The code is in `lib/failures.ts`.
 
 ### Pull requests page
 
@@ -1128,7 +1214,7 @@ Test automation → **Find built features** works from the **code**. Without AI,
 
 The AI groups that into epics and features, and writes each feature's tickets from its pages' code: real labels, fields, rules and endpoints.
 
-Git history and `.md` documents (release notes, feature notes) are hints for naming only. Every feature must cite code that exists in the repository. Anything only the documents mention is listed separately as **not found in the code** and is never added, and existing issues are only marked Done when the code proves it. The code is in `lib/codeinventory.js`.
+Git history and `.md` documents (release notes, feature notes) are hints for naming only. Every feature must cite code that exists in the repository. Anything only the documents mention is listed separately as **not found in the code** and is never added, and existing issues are only marked Done when the code proves it. The code is in `lib/codeinventory.ts`.
 
 ### Feature flags (Administration → Features, owner only)
 
@@ -1147,7 +1233,7 @@ A locked feature:
 
 Locking **AI features** hides every AI control, because the `ai.use` permission counts only while AI is on. Test automation does the same for `test.run`, and Export for `export`.
 
-Data is never deleted: unlocking brings everything back as it was. Flags are stored in `app_meta` (`feature_flags`), and the catalog is in `lib/features.js`.
+Data is never deleted: unlocking brings everything back as it was. Flags are stored in `app_meta` (`feature_flags`), and the catalog is in `lib/features.ts`.
 
 ### AI testing agents (Administration → Agents → Test)
 

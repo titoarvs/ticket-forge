@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
-import { engineStatus } from '@/lib/automation.js';
-import { publicRemoteBrowser, saveRemoteBrowser, clearRemoteBrowser, checkBrowserUrl } from '@/lib/settings.js';
+import { engineStatus } from '@/lib/automation';
+import { publicRemoteBrowser, saveRemoteBrowser, clearRemoteBrowser, checkBrowserUrl } from '@/lib/settings';
 import { launch, hideEndpoint, describeBrowser, normalizeRemote, explainConnectError } from '@/lib/browser.mjs';
 
 // Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).
@@ -36,7 +36,7 @@ export const POST = api(async (req) => {
   await perm('users.manage');
   const b = await body(req);
   if (b.url) { const spec = remoteSpec(b); return { ...(await tryBrowser(spec)), corrected: spec.corrected }; }
-  const { browserSpec } = await import('@/lib/automation.js');
+  const { browserSpec } = await import('@/lib/automation');
   return tryBrowser(await browserSpec());
 });
 

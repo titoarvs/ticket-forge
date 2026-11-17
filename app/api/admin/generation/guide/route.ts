@@ -1,5 +1,5 @@
 import { api, perm, body } from '@/lib/server/http';
-import { getGuide, saveGuide, clearGuide, GUIDE_MAX } from '@/lib/genrules.js';
+import { getGuide, saveGuide, clearGuide, GUIDE_MAX } from '@/lib/genrules';
 
 // Administration → Generation → Generation guide: a Markdown document the AI uses as reference context.
 export const GET = api(async () => { await perm('users.manage'); return { guide: await getGuide({ fresh: true }), max: GUIDE_MAX }; });

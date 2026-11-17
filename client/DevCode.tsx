@@ -13,7 +13,9 @@ const dev = () => P().dev || {};
 const be = () => P().devBackend || {};
 const setBe = (k: string, v: Any) => mutate((pp) => { pp.devBackend = { ...(pp.devBackend || {}), [k]: v }; }, { tag: `devBackend.${k}` });
 /** The project has a separate backend repository set up. */
-export const hasBackend = () => Boolean(be().enabled && be().localPath);
+/** This person's own folder for a repository (set up on their computer), else the project's shared one. */
+export const myPath = (side: 'frontend' | 'backend'): string => S.auth?.prefs?.local?.[P().id]?.[side]?.path || (side === 'backend' ? be().localPath : dev().localPath) || '';
+export const hasBackend = () => Boolean(be().enabled && myPath('backend'));
 const setDev = (k: string, v: Any) => mutate((pp) => { pp.dev = { ...(pp.dev || {}), [k]: v }; }, { tag: `dev.${k}` });
 
 /** Pick a folder on this computer: click through folders (git repositories are marked), then choose one. */
@@ -135,6 +137,7 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
   const acct = dev().githubAccount;
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
+  const local = env?.local !== false; // on this computer git uses your own sign-in; the token is for the deployed app
   const connected = Boolean(acct && env?.hasToken);
   const how = connected ? null : env?.hasToken ? 'A personal access token is saved for this project (encrypted).' : env?.envToken ? 'Using GITHUB_TOKEN from the server.' : env?.ghSignedIn ? 'Using the GitHub CLI sign-in (gh) on this computer.' : null;
   const connect = () => openModal(<GitHubConnectModal env={env} onDone={(a) => { setDev('githubAccount', { ...a, connectedAt: new Date().toISOString() }); setEnv({ ...env, hasToken: true }); }} />);
@@ -145,17 +148,20 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
     try { const r = await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: { action: 'saveToken', token } }); setDev('githubAccount', null); setEnv({ ...env, hasToken: r.hasToken }); setToken(''); toast('GitHub token saved (encrypted)'); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
-  return <SetCard id="gh-account" title="GitHub account" desc="How TicketForge signs in to GitHub to list and clone your repositories, push branches and open pull requests.">
+  return <SetCard id="gh-account" title={local ? 'GitHub account (optional here)' : 'GitHub account'} desc={local
+    ? 'On this computer, cloning, pushing and pull requests use your own git setup (SSH key or credential helper), so you don’t need to connect GitHub. Connect it only to pick from your list of repositories, or if git can’t sign in.'
+    : 'How the deployed TicketForge signs in to GitHub to read your repositories, push branches and open pull requests. Required here: there is no git sign-in on a server.'}>
     <div className={`gha-row ${connected || how ? 'ok' : ''}`}>
       {connected && acct.avatar ? <img src={acct.avatar} alt="" width={36} height={36} /> : <span className="gha-icon"><Ico svg={I.pr} /></span>}
       <div className="gha-text">
         {connected ? <><b>Connected as @{acct.login}</b><span className="muted small">{acct.name ? `${acct.name} · ` : ''}connected {ago(acct.connectedAt)} · repo, read:org and workflow access</span></>
           : how ? <><b>Signed in</b><span className="muted small">{how}</span></>
+          : local ? <><b>Not needed on this computer</b><span className="muted small">Git uses your own sign-in. Connect only to choose from your GitHub repositories in a list.</span></>
           : <><b>Not connected</b><span className="muted small">Connect your GitHub account to choose from all your repositories and open pull requests.</span></>}
       </div>
       <span className="spacer" />
       {ed && (connected ? <button className="btn subtle" onClick={forget}>Disconnect</button>
-        : <><button className="btn primary" onClick={connect}><Ico svg={I.pr} />{how ? 'Connect your account' : 'Connect GitHub'}</button>{env?.hasToken && <button className="btn subtle" onClick={forget}>Remove token</button>}</>)}
+        : <><button className={local ? 'btn' : 'btn primary'} onClick={connect}><Ico svg={I.pr} />{how ? 'Connect your account' : local ? 'Connect GitHub (optional)' : 'Connect GitHub'}</button>{env?.hasToken && <button className="btn subtle" onClick={forget}>Remove token</button>}</>)}
     </div>
     {ed && !connected && <details className="gha-pat"><summary className="small">Use a personal access token instead</summary>
       <p className="muted small" style={{ margin: '6px 0' }}>A fine-grained token with Contents and Pull requests (read and write) on the repositories, plus Workflows for GitHub Actions. Stored encrypted.</p>
@@ -169,7 +175,7 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
 const DEPLOYED_HINT: Record<string, string> = { github: 'Pick one from your account; used through GitHub, nothing to clone.', url: 'A GitHub URL or owner/name; used through GitHub.', folder: 'Only when TicketForge runs on that computer.' };
 const SOURCES: [string, string, string][] = [
   ['github', 'Your GitHub repositories', 'Pick one from your account; TicketForge clones it for you.'],
-  ['url', 'Git URL', 'Any https or SSH URL (GitHub, GitLab, others); TicketForge clones it.'],
+  ['url', 'Git URL', 'Any https or SSH URL (GitHub, GitLab, others); cloned with your own git sign-in, no token needed.'],
   ['folder', 'Folder on this computer', 'A clone you already have.'],
 ];
 /**
@@ -180,52 +186,72 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
   const d = side === 'backend' ? be() : dev();
   const key = side === 'backend' ? 'devBackend' : 'dev';
   const local = env?.local !== false;
-  const isClone = d.source?.type === 'clone';
+  // The folder on disk is each person's own (Project settings are shared, the copy on your computer is yours).
+  const mineE = S.auth?.prefs?.local?.[P().id]?.[side];
+  const sharedOk = env ? Boolean(env.sharedUsable?.[side]) : true;
+  const lpath: string = mineE?.path || (sharedOk ? d.localPath : '') || '';
+  const src = mineE?.source || (sharedOk ? d.source : null);
+  const isClone = src?.type === 'clone';
+  const mineOk = local; // on this computer everyone sets up their own copy; the project's shared choices need the settings permission
   // On the deployed app a GitHub repository is used through GitHub, even when it was cloned on someone's computer.
   const isGh = d.source?.type === 'github' || (!local && Boolean(d.repo) && (d.provider || 'GitHub') === 'GitHub');
-  const has = Boolean(d.localPath || (isGh && d.repo));
-  const [mode, setMode] = useState<string>(d.localPath || (d.source?.type === 'github' && d.repo) ? '' : (side === 'backend' ? 'url' : 'github'));
+  const has = Boolean(lpath || (isGh && d.repo));
+  const [mode, setMode] = useState<string>(lpath || (d.source?.type === 'github' && d.repo) ? '' : (side === 'backend' ? 'url' : 'github'));
+  // Once the environment is known: on this computer start with a Git URL (it needs no GitHub sign-in) unless GitHub is already usable.
+  const picked = useRef(false);
+  useEffect(() => {
+    if (!env || has || picked.current || side === 'backend') return;
+    setMode(env.local !== false && !(env.hasToken || env.ghSignedIn || env.envToken) ? 'url' : 'github');
+  }, [env]); // eslint-disable-line react-hooks/exhaustive-deps
   const [status, setStatus] = useState<Any>(null);
   const [busy, setBusy] = useState('');
   const [step, setStep] = useState('');
   const [err, setErr] = useState('');
   const [url, setUrl] = useState('');
   const [branch, setBranch] = useState('');
-  const [folder, setFolder] = useState(d.localPath && !isClone ? d.localPath : '');
+  const [folder, setFolder] = useState(lpath && !isClone ? lpath : '');
   const base = `/api/projects/${P().id}/dev`;
   const canList = Boolean(env?.hasToken || env?.ghSignedIn || env?.envToken);
-  // A new repository replaces the old one's name and base branch (unless it's the same repository).
-  const apply = (r: Any, source: Any) => mutate((pp: Any) => {
-    const cur = pp[key] || {};
-    const same = Boolean(cur.repo && r.repo && cur.repo === r.repo);
-    pp[key] = { ...cur, ...(side === 'backend' ? { enabled: true } : {}), localPath: r.path, repo: r.repo || (same ? cur.repo : ''), provider: r.provider || '',
-      baseBranch: source?.branch || (same && cur.baseBranch) || r.defaultBranch, source };
-  });
+  // A new repository: the folder is saved as this person's own, and (with the settings permission) the repository's name,
+  // provider and base branch become the project's, unless it's the same repository.
+  const apply = async (rr: Any, source: Any) => {
+    if (rr.path && source?.type !== 'github') {
+      const out = await api(base, { method: 'POST', body: { action: 'setMyLocal', side, path: rr.path, source } });
+      S.auth.prefs = { ...(S.auth.prefs || {}), local: { ...(S.auth.prefs?.local || {}), [P().id]: out.local } };
+      emit();
+    }
+    if (ed) mutate((pp: Any) => {
+      const cur = pp[key] || {};
+      const same = Boolean(cur.repo && rr.repo && cur.repo === rr.repo);
+      pp[key] = { ...cur, ...(side === 'backend' ? { enabled: true } : {}), ...(rr.path && source?.type !== 'github' ? {} : { localPath: '' }), repo: rr.repo || (same ? cur.repo : ''), provider: rr.provider || '',
+        baseBranch: source?.branch || (same && cur.baseBranch) || rr.defaultBranch, ...(source?.type === 'github' ? { source } : {}) };
+    });
+  };
   const inspect = async (p: string, quiet = false) => {
     if (!quiet) setBusy('check');
     try { const r = await api(base, { method: 'POST', body: { action: 'inspect', localPath: p } }); setStatus({ ok: true, ...r }); return r; }
     catch (e: Any) { setStatus({ ok: false, error: e.message }); if (!quiet) setErr(e.message); return null; } finally { if (!quiet) setBusy(''); }
   };
-  useEffect(() => { if (d.localPath && local && d.source?.type !== 'github') inspect(d.localPath, true); }, [d.localPath, local]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (lpath && local && src?.type !== 'github') inspect(lpath, true); }, [lpath, local]); // eslint-disable-line react-hooks/exhaustive-deps
   const useFolder = async (p: string) => {
     setErr('');
     const r = await inspect(p);
-    if (r) { apply(r, { type: 'local' }); setMode(''); toast(`Using ${r.repo || r.path}`); }
+    if (r) { await apply(r, { type: 'local' }); setMode(''); toast(`Using ${r.repo || r.path}`); }
   };
-  const clone = async (src: string, br: string) => {
+  const clone = async (source: string, br: string) => {
     setBusy('clone'); setErr(''); setStep('Starting…');
     try {
-      const res = await api(base, { method: 'POST', raw: true, body: { action: 'clone', side, source: src, branch: br } });
+      const res = await api(base, { method: 'POST', raw: true, body: { action: 'clone', side, source, branch: br } });
       let got: Any = null;
       await readNdjson(res, (ev) => { if (ev.type === 'step') setStep(ev.text); else if (ev.type === 'repo') got = ev; else if (ev.type === 'error') throw new Error(ev.message); });
-      if (got) { apply(got, { type: 'clone', url: src, branch: br, clonedAt: new Date().toISOString() }); setStatus({ ok: true, ...got }); setMode(''); setUrl(''); toast(`${isClone && d.source?.url === src ? 'Updated' : 'Cloned'} ${got.repo || 'the repository'}`); }
+      if (got) { await apply(got, { type: 'clone', url: source, branch: br, clonedAt: new Date().toISOString() }); setStatus({ ok: true, ...got }); setMode(''); setUrl(''); toast(`${isClone && src?.url === source ? 'Updated' : 'Cloned'} ${got.repo || 'the repository'}`); }
     } catch (e: Any) { setErr(e.message); } finally { setBusy(''); setStep(''); }
   };
   // Deployed: a GitHub repository is used through GitHub (Actions and the API), with no copy on this server.
   const pickRemote = (fullName: string, defaultBranch = '') => { apply({ path: '', repo: fullName, provider: 'GitHub', defaultBranch: defaultBranch || 'main' }, { type: 'github' }); setStatus(null); setMode(''); setUrl(''); toast(`Using ${fullName} on GitHub`); };
   const ghName = (u: string) => (u.trim().match(/^(?:https?:\/\/github\.com\/|git@github\.com:)?([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i) || [])[1] || '';
   const working = busy === 'clone';
-  const name = d.repo || String(d.localPath || '').split('/').pop();
+  const name = d.repo || String(lpath || '').split('/').pop();
   void has;
   return <div className="rc">
     {has && !mode && <div className="rc-current">
@@ -234,37 +260,38 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
         <div className="rc-name"><b>{name}</b>
           <span className="rc-badges"><span className="ag-chip tiny">{isGh ? 'On GitHub' : isClone ? 'Cloned by TicketForge' : 'Local folder'}</span>{d.provider && <span className="ag-chip tiny">{d.provider}</span>}</span></div>
         <span className="spacer" />
-        {ed && <>{isGh ? null : isClone ? <button className="btn sm" disabled={!local || !!busy} onClick={() => clone(d.source.url, d.source.branch || '')}>{working ? <Spinner /> : <Ico svg={I.refresh} />}Update</button>
-          : <button className="btn sm" disabled={!local || !!busy} onClick={() => inspect(d.localPath)}>{busy === 'check' ? <Spinner /> : null}Check</button>}
-          <button className="btn sm subtle" disabled={!!busy} onClick={() => { setErr(''); setMode(isGh ? 'github' : isClone ? (d.source?.url && /github/i.test(d.source.url) ? 'github' : 'url') : 'folder'); }}>Change</button></>}
+        {(ed || mineOk) && <>{isGh ? null : isClone ? <button className="btn sm" disabled={!local || !!busy} onClick={() => clone(src.url, src.branch || '')}>{working ? <Spinner /> : <Ico svg={I.refresh} />}Update</button>
+          : <button className="btn sm" disabled={!local || !!busy} onClick={() => inspect(lpath)}>{busy === 'check' ? <Spinner /> : null}Check</button>}
+          <button className="btn sm subtle" disabled={!!busy} onClick={() => { setErr(''); setMode(isGh ? 'github' : isClone ? (src?.url && /github/i.test(src.url) ? 'github' : 'url') : 'folder'); }}>Change</button></>}
       </div>
       <div className="rc-meta small muted">
-        {isGh ? <span>Used through GitHub: code jobs use your AI provider and GitHub{d.baseBranch ? <> · base branch <code>{d.baseBranch}</code></> : null}</span> : <code title={d.localPath}>{d.localPath}</code>}
+        {isGh ? <span>Used through GitHub: code jobs use your AI provider and GitHub{d.baseBranch ? <> · base branch <code>{d.baseBranch}</code></> : null}</span> : <code title={lpath}>{lpath}</code>}
         {status?.ok && <span>default branch <code>{status.defaultBranch}</code> · on <code>{status.currentBranch}</code>{status.uncommitted ? ` · ${status.uncommitted} uncommitted change${status.uncommitted === 1 ? '' : 's'} (never touched)` : ''}</span>}
-        {isClone && d.source?.clonedAt && <span>updated {ago(d.source.clonedAt)}</span>}
+        {isClone && src?.clonedAt && <span>updated {ago(src.clonedAt)}</span>}
       </div>
       {status && !status.ok && <div className="warn-banner danger" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>{status.error}</span></div>}
     </div>}
     {(mode || !has) && <div className="rc-pick">
       <div className="rc-sources" role="radiogroup" aria-label="Where the repository comes from">{SOURCES.map(([k, l, h]) => (
-        <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} disabled={!ed || (k === 'folder' && !local)} onClick={() => { setMode(k); setErr(''); }}>
+        <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} disabled={!(ed || mineOk) || (k === 'folder' && !local)} onClick={() => { picked.current = true; setMode(k); setErr(''); }}>
           <Ico svg={k === 'folder' ? I.folder : I.pr} /><b>{l}</b><span className="muted small">{local ? h : DEPLOYED_HINT[k]}</span></button>))}</div>
       {mode === 'github' && <div className="rc-form">
         {canList ? <><p className="small muted" style={{ margin: 0 }}>Personal and organisation repositories your GitHub sign-in can see.</p>
-          <button className="btn primary" disabled={!ed || working} onClick={() => openModal(<RepoPickerModal onPick={(r) => (local && runPlace() !== 'github' ? clone(r.cloneUrl, '') : pickRemote(r.fullName, r.defaultBranch))} />)}><Ico svg={I.search} />Choose a repository</button></>
-          : <><p className="small muted" style={{ margin: 0 }}>Connect GitHub first (GitHub account, above), or use a Git URL.</p>
-            <button className="btn primary" disabled={!ed} onClick={() => openModal(<GitHubConnectModal env={env} onDone={(a) => { setDev('githubAccount', { ...a, connectedAt: new Date().toISOString() }); setEnv({ ...env, hasToken: true }); }} />)}><Ico svg={I.pr} />Connect GitHub</button></>}
+          <button className="btn primary" disabled={!(ed || mineOk) || working} onClick={() => openModal(<RepoPickerModal onPick={(r) => (local && runPlace() !== 'github' ? clone(r.cloneUrl, '') : pickRemote(r.fullName, r.defaultBranch))} />)}><Ico svg={I.search} />Choose a repository</button></>
+          : <><p className="small muted" style={{ margin: 0 }}>{local ? 'Listing your repositories needs a GitHub sign-in (optional on this computer). Or use a Git URL: it is cloned with your own git sign-in, no token needed.' : 'Connect GitHub first (GitHub account, above), or use a GitHub URL.'}</p>
+            <button className={local ? 'btn' : 'btn primary'} disabled={!ed} onClick={() => openModal(<GitHubConnectModal env={env} onDone={(a) => { setDev('githubAccount', { ...a, connectedAt: new Date().toISOString() }); setEnv({ ...env, hasToken: true }); }} />)}><Ico svg={I.pr} />{local ? 'Connect GitHub (optional)' : 'Connect GitHub'}</button></>}
       </div>}
       {mode === 'url' && <div className="rc-form dev-path">
-        <label className="field" style={{ flex: 2, margin: 0 }}><span>Repository URL</span><TF disabled={!ed || working} value={url} spellCheck={false} placeholder="https://github.com/owner/repo, git@gitlab.com:group/repo.git or owner/repo" onChange={(e) => setUrl(e.target.value)} /></label>
-        <label className="field" style={{ flex: 1, margin: 0 }}><span>Branch (optional)</span><TF disabled={!ed || working} value={branch} spellCheck={false} placeholder="default branch" onChange={(e) => setBranch(e.target.value)} /></label>
-        <button className="btn primary" disabled={!ed || working || !url.trim()} onClick={() => { if (local) clone(url.trim(), branch.trim()); else if (ghName(url)) pickRemote(ghName(url), branch.trim()); else setErr('From the deployed TicketForge, use a GitHub repository (owner/name or its GitHub URL).'); }}>{local ? 'Clone' : 'Use'}</button>
+        <label className="field" style={{ flex: 2, margin: 0 }}><span>Repository URL</span><TF disabled={!(ed || mineOk) || working} value={url} spellCheck={false} placeholder="https://github.com/owner/repo, git@gitlab.com:group/repo.git or owner/repo" onChange={(e) => setUrl(e.target.value)} /></label>
+        <label className="field" style={{ flex: 1, margin: 0 }}><span>Branch (optional)</span><TF disabled={!(ed || mineOk) || working} value={branch} spellCheck={false} placeholder="default branch" onChange={(e) => setBranch(e.target.value)} /></label>
+        <button className="btn primary" disabled={!(ed || mineOk) || working || !url.trim()} onClick={() => { if (local) clone(url.trim(), branch.trim()); else if (ghName(url)) pickRemote(ghName(url), branch.trim()); else setErr('From the deployed TicketForge, use a GitHub repository (owner/name or its GitHub URL).'); }}>{local ? 'Clone' : 'Use'}</button>
       </div>}
       {mode === 'folder' && <div className="rc-form dev-path">
-        <label className="field" style={{ flex: 1, margin: 0 }}><span>Folder</span><TF disabled={!ed} value={folder} spellCheck={false} placeholder="/Users/you/code/my-app" onChange={(e) => setFolder(e.target.value)} /></label>
-        <button className="btn" disabled={!ed || !local} onClick={() => openModal(<FolderPicker start={folder || d.localPath || ''} onPick={(p) => { setFolder(p); useFolder(p); }} />)}><Ico svg={I.folder} />Browse…</button>
-        <button className="btn primary" disabled={!ed || !local || !folder.trim() || !!busy} onClick={() => useFolder(folder.trim())}>{busy === 'check' ? <><Spinner />Checking…</> : 'Use this folder'}</button>
+        <label className="field" style={{ flex: 1, margin: 0 }}><span>Folder</span><TF disabled={!(ed || mineOk)} value={folder} spellCheck={false} placeholder="/Users/you/code/my-app" onChange={(e) => setFolder(e.target.value)} /></label>
+        <button className="btn" disabled={!(ed || mineOk) || !local} onClick={() => openModal(<FolderPicker start={folder || lpath || ''} onPick={(p) => { setFolder(p); useFolder(p); }} />)}><Ico svg={I.folder} />Browse…</button>
+        <button className="btn primary" disabled={!(ed || mineOk) || !local || !folder.trim() || !!busy} onClick={() => useFolder(folder.trim())}>{busy === 'check' ? <><Spinner />Checking…</> : 'Use this folder'}</button>
       </div>}
+      {!local && env?.saasBlocksLocal && <div className="warn-banner" style={{ marginTop: 8 }}><Ico svg={I.warn} /><span>You opened TicketForge on this computer, but it is running in hosted mode (<code>TICKETFORGE_MODE=saas</code> in <code>.env</code>), which keeps this computer’s folders off. To use a folder here, add <code>TICKETFORGE_ALLOW_LOCAL=1</code> to <code>.env</code> (or remove <code>TICKETFORGE_MODE=saas</code>) and restart TicketForge.</span></div>}
       {!local && <p className="small muted" style={{ margin: '8px 0 0' }}>Deployed: your GitHub repositories and GitHub URLs are used through GitHub (no copy here); folders on a computer work when TicketForge runs on that computer.</p>}
       {has && mode && <button className="btn sm subtle" style={{ marginTop: 8 }} disabled={working} onClick={() => { setMode(''); setErr(''); }}>Keep {name}</button>}
     </div>}
@@ -302,7 +329,8 @@ export function DevSettings({ ed }: { ed: boolean }) {
   const [env, setEnv] = useState<Any>(null);
   useEffect(() => { api(`/api/projects/${P().id}/dev`).then(setEnv).catch(() => setEnv({})); }, []);
   return <>
-    {env && !env.local && <div className="ok-banner"><Ico svg={I.check} /><span>This TicketForge is deployed: choose a GitHub repository and code jobs use your AI provider and GitHub (see <b>Where code jobs run</b>). Folders on a computer and cloning work when TicketForge runs on your computer.</span></div>}
+    {env && !env.local && env.saasBlocksLocal && <div className="warn-banner"><Ico svg={I.warn} /><span>This TicketForge runs in hosted mode (<code>TICKETFORGE_MODE=saas</code>), so it treats you as deployed even at localhost. Add <code>TICKETFORGE_ALLOW_LOCAL=1</code> to <code>.env</code> and restart to use folders, git and Claude Code on this computer.</span></div>}
+    {env && !env.local && !env.saasBlocksLocal && <div className="ok-banner"><Ico svg={I.check} /><span>This TicketForge is deployed: choose a GitHub repository and code jobs use your AI provider and GitHub (see <b>Where code jobs run</b>). Folders on a computer and cloning work when TicketForge runs on your computer.</span></div>}
     <GitHubAccountCard ed={ed} env={env} setEnv={setEnv} />
     <SetCard id="repo" title="Repository" desc="Where the code agents work: one of your GitHub repositories, any Git URL, or a folder on this computer. Each issue gets its own branch and git worktree, so the checkout and any uncommitted work are never touched.">
       <RepoChooser side="frontend" ed={ed} env={env} setEnv={setEnv} />
@@ -363,7 +391,7 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
     <div className="rp-h"><b>Repository profile</b>
       <span className="muted small">{prof ? <>Learned {ago(prof.learnedAt)}{prof.commit ? <> at <code>{prof.commit}</code></> : null}{prof.editedAt ? ' · edited' : ''} · {Math.round(prof.markdown.length / 100) / 10}k characters</> : 'Not learned yet: agents only see the conventions above.'}</span>
       <span className="spacer" />
-      {ed && <button className="btn sm ai" disabled={busy || !d.localPath} onClick={learn} title="A read-only Claude Code agent reads the repository and writes how it’s built">{busy ? <><Spinner />Learning…</> : <><Ico svg={I.sparkle} />{prof ? 'Learn again' : 'Learn from repository'}</>}</button>}
+      {ed && <button className="btn sm ai" disabled={busy || !myPath(side)} onClick={learn} title="A read-only Claude Code agent reads the repository and writes how it’s built">{busy ? <><Spinner />Learning…</> : <><Ico svg={I.sparkle} />{prof ? 'Learn again' : 'Learn from repository'}</>}</button>}
     </div>
     {busy && <div className="rp-step small muted"><Spinner /> {step}{steps ? ` · ${steps} files and searches` : ''}</div>}
     {!busy && <p className="muted small" style={{ margin: '4px 0 0' }}>A read-only agent reads the code (never changes it) and writes its stack, structure, how a feature is built end to end, conventions, tests and commands. Every code job gets it, so new code is built the way this repository already works. Learn again after big changes.</p>}
@@ -482,7 +510,7 @@ function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boole
 }
 
 /** Whether "Write code with AI" can be offered for issues in this project. */
-export const codeReady = () => feat('code') && Boolean(dev().localPath || dev().repo);
+export const codeReady = () => feat('code') && Boolean(myPath('frontend') || dev().repo);
 
 const STATUS: Record<string, string> = { committed: 'Committed locally', report: 'Report ready', starting: 'Starting…', queued: 'Waiting for a free agent slot', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
 
@@ -651,7 +679,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
         {(['backend', 'frontend'] as const).map((k) => { const jj = jobs[k]; const busyK = jj && ['starting', 'queued', 'running'].includes(jj.status); return (
           <button key={k} role="tab" aria-selected={side === k} className={side === k ? 'on' : ''} onClick={() => setSide(k)}>
             <span className={`layer-chip l-${k}`}>{k === 'backend' ? 'Backend' : 'Frontend'}</span>
-            <span className="muted small">{k === 'backend' ? (be().repo || be().localPath) : (d.repo || d.localPath)}</span>
+            <span className="muted small">{k === 'backend' ? (be().repo || myPath('backend')) : (d.repo || myPath('frontend'))}</span>
             <span className="side-state small">{busyK ? <><Spinner /> {jj.status === 'queued' ? 'waiting' : 'working'}</> : jj && jj.status !== 'discarded' ? STATUS[jj.status] || jj.status : 'Not started'}</span>
           </button>); })}
         <span className="side-hint small muted">{t.layer ? <>This issue is marked <b>{LAYER_LABEL[t.layer]}</b>.{t.layer === 'both' ? ' Build both at once, or the backend first so the frontend gets its API summary.' : ''}</> : 'Mark the issue frontend, backend or both in its details.'}</span>
@@ -676,7 +704,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
         </div>}
         {backend && side === 'frontend' && t.layer === 'both' && !canBoth && !['committed', 'review', 'starting', 'running'].includes(jobs.backend?.status) && <div className="warn-banner" style={{ marginBottom: 8 }}><Ico svg={I.warn} /><span>The backend part isn’t done yet. You can start the frontend now, but it won’t know the final API.</span>
           <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('backend')}>Go to Backend</button></div>}
-        {backend && side === 'backend' && <p className="small muted" style={{ marginTop: 0 }}>Runs in <code>{be().localPath}</code>{be().repo ? <> · {be().provider === 'GitLab' ? 'merge request on GitLab' : 'pull request on GitHub'} <code>{be().repo}</code></> : ''}.</p>}
+        {backend && side === 'backend' && <p className="small muted" style={{ marginTop: 0 }}>Runs in <code>{myPath('backend')}</code>{be().repo ? <> · {be().provider === 'GitLab' ? 'merge request on GitLab' : 'pull request on GitHub'} <code>{be().repo}</code></> : ''}.</p>}
         <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId, side })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{agentId === 'architecture-record' ? 'Write the record' : agentId === 'feature-tests' ? 'Write the tests' : 'Start the agent'}</>}</button>
       </> : <>
         <div className="cj-head">

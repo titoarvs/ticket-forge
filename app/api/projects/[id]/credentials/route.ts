@@ -1,6 +1,6 @@
 import { api, authed, perm, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { credentialStatus, setRoleSecret, clearRoleSecrets } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { credentialStatus, setRoleSecret, clearRoleSecrets } from '@/lib/secrets';
 import { checkTotp } from '@/lib/totp.mjs';
 
 // Secrets for the roles in this project's App setup: passwords, authenticator (MFA) secrets and saved sessions.

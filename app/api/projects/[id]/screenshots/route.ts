@@ -1,6 +1,6 @@
 import { api, authed } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { listShots } from '@/lib/shots.js';
+import * as store from '@/lib/store';
+import { listShots } from '@/lib/shots';
 
 // Earlier failure screenshots for a project (optionally one test case: ?tc=<id>), newest first.
 export const GET = api(async (req, p) => {

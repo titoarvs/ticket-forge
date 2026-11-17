@@ -1,7 +1,7 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { toCsvTickets, toCsvTestCases, toCsvJira, toXlsx, toDocx, toPdf, toHtml, slug } from '@/lib/exporters.js';
-import { assignKeys } from '@/lib/model.js';
+import * as store from '@/lib/store';
+import { toCsvTickets, toCsvTestCases, toCsvJira, toXlsx, toDocx, toPdf, toHtml, slug } from '@/lib/exporters';
+import { assignKeys } from '@/lib/model';
 
 const EXPORTS: Record<string, { ext: string; type: string; fn: (p: any) => any }> = {
   csv: { ext: 'tickets.csv', type: 'text/csv; charset=utf-8', fn: toCsvTickets },

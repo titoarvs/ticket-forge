@@ -1,6 +1,6 @@
 import { api, perm, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { detectLogin, engineStatus, noBrowser } from '@/lib/automation.js';
+import * as store from '@/lib/store';
+import { detectLogin, engineStatus, noBrowser } from '@/lib/automation';
 import { savedSetup } from '@/lib/server/app-setup';
 
 // Driving a browser takes a while: let this run up to 2 minutes on serverless hosting (Vercel).

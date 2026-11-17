@@ -1,8 +1,8 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
-import { answer, announcement } from '@/lib/chatbot.js';
+import { answer, announcement } from '@/lib/chatbot';
 import { releaseNotes } from '@/lib/release-notes';
 
-// The help chatbot (rule-based, no AI). Every signed-in user can use it; ticket data is limited by their role in lib/chatbot.js.
+// The help chatbot (rule-based, no AI). Every signed-in user can use it; ticket data is limited by their role in lib/chatbot.ts.
 // GET: the release announcement for the robot ({ announcement: null } while the flag RELEASE_ANNOUNCEMENT is off).
 export const GET = api(async () => {
   await authed();

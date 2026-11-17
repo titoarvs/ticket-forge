@@ -1,5 +1,5 @@
 import { api, authed, ownerOnly, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
+import * as auth from '@/lib/auth';
 
 export const POST = api(async (req, p) => {
   const actor = await ownerOnly();

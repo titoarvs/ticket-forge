@@ -1,6 +1,6 @@
 import { api, authed, HttpError } from '@/lib/server/http';
-import { billingOn } from '@/lib/limits.js';
-import { cancelSubscription } from '@/lib/subscription.js';
+import { billingOn } from '@/lib/limits';
+import { cancelSubscription } from '@/lib/subscription';
 
 // Cancel the paid subscription (owner only). Paid access stays until the current period ends, then the workspace is on Free.
 export const POST = api(async () => {

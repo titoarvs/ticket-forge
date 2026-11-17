@@ -1,8 +1,8 @@
 import { api, authed, body, HttpError, aiOpts } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { currentContext } from '@/lib/db.js';
-import { selectTests } from '@/lib/testselect.js';
-import { ensureAgent } from '@/lib/agents.js';
+import * as store from '@/lib/store';
+import { currentContext } from '@/lib/db';
+import { selectTests } from '@/lib/testselect';
+import { ensureAgent } from '@/lib/agents';
 
 // Test automation → Smart selection (Test Selection Agent): which tests to run for the current change. Nothing runs here.
 export const POST = api(async (req, p) => {

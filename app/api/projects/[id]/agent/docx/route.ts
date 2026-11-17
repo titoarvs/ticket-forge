@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { markdownToDocx } from '@/lib/md-docx.js';
+import * as store from '@/lib/store';
+import { markdownToDocx } from '@/lib/md-docx';
 
 export const maxDuration = 60;
 

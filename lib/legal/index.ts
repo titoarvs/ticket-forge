@@ -4,7 +4,7 @@
 import { TERMS } from './terms';
 import { PRIVACY } from './privacy';
 import { COOKIES } from './cookies';
-import { LEGAL_VERSIONS, ACCEPTED_DOCS as DOCS } from './versions.js';
+import { LEGAL_VERSIONS, ACCEPTED_DOCS as DOCS } from './versions';
 
 export type LegalDoc = 'terms' | 'privacy' | 'cookies';
 export const LEGAL: Record<LegalDoc, { version: string; material: boolean; title: string; path: string; body: string }> = {

@@ -1,10 +1,10 @@
 import { api, perm, body, HttpError, aiOpts, ndjson, appUrl } from '@/lib/server/http';
-import { engineStatus, runAutomation, noBrowser } from '@/lib/automation.js';
-import { reportRun } from '@/lib/notify.js';
-import { analyzeFailures } from '@/lib/failures.js';
-import { isLocked } from '@/lib/features.js';
-import { resolveAgent } from '@/lib/agents.js';
-import * as store from '@/lib/store.js';
+import { engineStatus, runAutomation, noBrowser } from '@/lib/automation';
+import { reportRun } from '@/lib/notify';
+import { analyzeFailures } from '@/lib/failures';
+import { isLocked } from '@/lib/features';
+import { resolveAgent } from '@/lib/agents';
+import * as store from '@/lib/store';
 import { runAppSetup } from '@/lib/server/app-setup';
 import { githubRunner } from '@/lib/server/gh-runner';
 

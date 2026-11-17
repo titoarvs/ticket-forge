@@ -1,5 +1,5 @@
 import { api, perm, authed, body, HttpError } from '@/lib/server/http';
-import { publicArdTemplate, saveArdTemplate, resetArdTemplate } from '@/lib/ard.js';
+import { publicArdTemplate, saveArdTemplate, resetArdTemplate } from '@/lib/ard';
 
 // Administration → Generation → Architecture Record Design template (Markdown). The team's file is the default.
 export const GET = api(async () => { await authed(); return { template: await publicArdTemplate() }; });

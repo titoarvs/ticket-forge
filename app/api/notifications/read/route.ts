@@ -1,5 +1,5 @@
 import { api, authed, body } from '@/lib/server/http';
-import { markRead } from '@/lib/notify.js';
+import { markRead } from '@/lib/notify';
 
 export const POST = api(async (req) => {
   const u = await authed();

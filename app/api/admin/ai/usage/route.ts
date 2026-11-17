@@ -1,5 +1,5 @@
 import { api, perm, authed } from '@/lib/server/http';
-import { usageReport, usageCsv, taskAverage } from '@/lib/aiusage.js';
+import { usageReport, usageCsv, taskAverage } from '@/lib/aiusage';
 
 // GET ?days=30 → the usage report · ?format=csv → every call as CSV · ?estimate=<task> (any signed-in user) → the
 // average tokens and cost of one call of that task, for estimates before big jobs.

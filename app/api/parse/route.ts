@@ -1,5 +1,5 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import { extractText } from '@/lib/parse.js';
+import { extractText } from '@/lib/parse';
 
 export const POST = api(async (req) => {
   await perm('project.create');

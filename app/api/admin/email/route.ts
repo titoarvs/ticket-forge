@@ -1,6 +1,6 @@
 import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
-import * as auth from '@/lib/auth.js';
-import { dbInfo } from '@/lib/db.js';
+import * as auth from '@/lib/auth';
+import { dbInfo } from '@/lib/db';
 
 export const GET = api(async (req) => {
   await perm('users.manage');

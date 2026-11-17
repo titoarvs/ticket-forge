@@ -1,10 +1,10 @@
 import { api, currentUser, runsThePlatform } from '@/lib/server/http';
-import { lockStatus } from '@/lib/limits.js';
-import * as auth from '@/lib/auth.js';
-import { dbInfo } from '@/lib/db.js';
-import { PERMISSIONS } from '@/lib/permissions.js';
-import { getPrefs } from '@/lib/prefs.js';
-import { signupMode, isSaas } from '@/lib/platform.js';
+import { lockStatus } from '@/lib/limits';
+import * as auth from '@/lib/auth';
+import { dbInfo } from '@/lib/db';
+import { PERMISSIONS } from '@/lib/permissions';
+import { getPrefs } from '@/lib/prefs';
+import { signupMode, isSaas } from '@/lib/platform';
 
 export const GET = api(async () => {
   const u = await currentUser();

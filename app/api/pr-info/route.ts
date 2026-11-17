@@ -1,7 +1,7 @@
 import { api, perm, HttpError } from '@/lib/server/http';
-import * as store from '@/lib/store.js';
-import { prInfo } from '@/lib/github.js';
-import { getProjectSecret } from '@/lib/secrets.js';
+import * as store from '@/lib/store';
+import { prInfo } from '@/lib/github';
+import { getProjectSecret } from '@/lib/secrets';
 
 // Looks up a pull/merge request for the Development panel. With ?projectId, the project's GitLab token reads private merge requests.
 export const GET = api(async (req) => {
