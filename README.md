@@ -440,6 +440,32 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
     proration yet) and cancelling keeps access until the paid period ends. Paying through PayMongo or Xendit is one
     payment per period: renewals are not charged automatically yet.
 
+## Drizzle ORM
+
+[Drizzle ORM](https://orm.drizzle.team) is set up next to the existing database code, so new code can use typed queries
+instead of hand-written SQL. Existing `q()` / `qs()` queries keep working unchanged.
+
+- **`lib/orm.ts`**: the `orm` client (and the tables and the usual operators: `eq`, `and`, `inArray`, `desc`, `sql`…).
+  It sends every statement through `lib/db.js`, so it uses the same database (Supabase/PostgreSQL or the built-in local
+  one), the same pool and the same **row-level security**: queries run as the signed-in user's role and workspace, and
+  `asSystem(() => orm…)` is the system context, exactly like `qs()`.
+  ```ts
+  import { orm, projects, eq, desc } from '@/lib/orm';
+  const mine = await orm.select().from(projects).where(eq(projects.workspaceId, ws)).orderBy(desc(projects.updatedAt));
+  ```
+  Relational queries work too (`orm.query.workspaces.findMany({ with: { workspaceMembers: true } })`). Drizzle's own
+  `orm.transaction` isn't available through this driver: use `tx()` from `lib/db.js` for transactions.
+- **`lib/schema.ts`** and **`lib/relations.ts`**: every table, typed. They are generated, not written by hand: tables,
+  policies, triggers and migrations are still defined in `lib/db.js` (Drizzle Kit doesn't know about row-level security),
+  so there is deliberately no `drizzle-kit push` or `migrate`.
+- **`npm run db:schema`** rebuilds the two files: it creates a throwaway local database with `lib/db.js`, reads it back
+  with Drizzle Kit and writes the schema. It never touches your own database. Run it after changing a table in
+  `lib/db.js` and commit the result. **`npm run db:check`** fails when they are out of date (for CI).
+- **`npm run db:studio`** opens Drizzle Studio on your database (`DATABASE_URL`, or `data/db` when there is none).
+
+Notes: timestamps are `Date` objects; `bytea` columns (`files.data`, `screenshots.data`) are a `Buffer` on PostgreSQL
+and a `Uint8Array` on the built-in local database; `jsonb` columns are untyped (`unknown`) until you add `.$type<…>()`.
+
 ## AI flow (Administration → AI → AI flow)
 
 The AI settings as a canvas of nodes, like n8n. Left to right: **tasks** (grouped) → **tiers** (High, Standard, Light, and
