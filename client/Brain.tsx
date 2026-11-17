@@ -61,7 +61,7 @@ export function Brain() {
     if (!sel) { setNote(null); return; }
     let live = true;
     setNoteErr('');
-    api(`/api/projects/${p.id}/brain?note=${encodeURIComponent(sel)}`).then((n) => { if (live) setNote(n); }).catch((e) => { if (live) { setNote(null); setNoteErr(e.message); } });
+    api(`/api/projects/${p.id}/brain?note=${encodeURIComponent(sel)}`).then((n) => { if (!live) return; if (n) setNote(n); else { setNote(null); setNoteErr('That note couldn’t be opened.'); } }).catch((e) => { if (live) { setNote(null); setNoteErr(e.message); } });
     return () => { live = false; };
   }, [sel, list?.rev, p.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Full-text search on the server (bodies aren't in the list); titles, keys and tags match at once here.
