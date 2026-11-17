@@ -11,6 +11,7 @@ import { ListEditor } from './ListEditor';
 import { WorkflowSettings } from './WorkflowEditor';
 import { DevSettings } from './DevCode';
 import { AppContextSettings } from './AppContext';
+import { RepoSetupCard } from './RepoSetup';
 import { allSources } from './Sources';
 import { PsdTemplateCard } from './Psd';
 import { ProjectFbdTemplateCard, ProjectArdTemplateCard } from './Fbd';
@@ -143,7 +144,7 @@ function Danger() {
 
 export function Settings() {
   const ed = can('project.settings');
-  const sections = SECTIONS;
+  const sections = SECTIONS.filter(([k]) => k !== 'code' || can('project.repo'));
   const cur = sections.find(([k]) => k === S.setTab)?.[0] || 'details';
   const go = (k: string) => { S.setTab = k; saveUi(); emit(); document.querySelector('.view')?.scrollTo({ top: 0 }); };
   const [, label, , desc] = sections.find(([k]) => k === cur)!;
@@ -166,7 +167,7 @@ export function Settings() {
           <p className="muted small" style={{ margin: '0 0 12px' }}>The templates this project’s documents follow. Without its own, a project uses the team’s templates from Administration → Generation. Documents already written don’t change.</p>
           <PsdTemplateCard project ed={ed} /><ProjectFbdTemplateCard ed={ed} /><ProjectArdTemplateCard ed={ed} /></div>}
         {cur === 'context' && <AppContextSettings ed={ed} />}
-        {cur === 'code' && <DevSettings ed={ed} />}
+        {cur === 'code' && <><RepoSetupCard key={P().id} /><DevSettings ed={ed} /></>}
         {cur === 'danger' && <Danger />}
       </div>
     </div>
