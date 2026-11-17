@@ -478,6 +478,26 @@ too), turn it on, and use **Test the connection**. `TICKETFORGE_JEV_URL` points 
 descriptions and test names being decided are sent to TypeSafe, so check their terms first. Client: `lib/jev.ts`
 (`POST https://api.typesafe.ai/v1/systemone`, `jev-latest`, retries 429/529 twice).
 
+## Add feature: brainstorm first, documents approved, then issues
+
+**Add feature with AI** no longer plans issues straight from a description. A new feature is worked through in steps, and
+nothing is created until the end:
+
+1. **Brainstorm** (`POST /api/projects/<id>/brainstorm`, `lib/brainstorm.ts`): after the usual clarifying questions the
+   AI works the feature through like a product lead and a tech lead: the problem, goals and what is out of scope, who it is
+   for, options with pros and cons (one recommended), risks, assumptions, open questions, and the **epics** it needs (an
+   epic that already exists is recognised by its title). You can change the epic titles, drop an epic, and add your own
+   decisions, which override the brainstorm in every document.
+2. **Documents** (`POST /api/projects/<id>/feature-docs`, `lib/feature-docs.ts`): for each epic the AI writes the
+   **Problem Statement**, then the **Feature Brief**, then the **Architecture Record Design**, each from the brainstorm and
+   the one before it, in your templates. You read them, edit the Markdown ones, rewrite any, and **approve** each (the
+   approval records who and which version, like on the epic panel). Editing an approved document means approving it again.
+3. **Issues**: `POST /api/projects/<id>/epic-issues` with the epic still being planned (`draftEpic`) writes the issues
+   from the approved documents only, covering every acceptance scenario of the brief (see *Issues from approved
+   documents*). Refused (409) while any of the three isn't approved.
+4. **Review**: the usual review step, then the epics are added **with their approved documents** (an existing epic gets
+   the documents approved here), and the issues with their test cases.
+
 ## Drizzle ORM
 
 [Drizzle ORM](https://orm.drizzle.team) is set up next to the existing database code, so new code can use typed queries

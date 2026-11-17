@@ -19,8 +19,8 @@ export const FEATURES = [
   { id: 'source', group: 'Planning', label: 'Source documents', desc: 'Requirement documents attached to the project.', views: ['source'] },
   // AI
   { id: 'ai', group: 'AI', label: 'AI features', desc: 'Every AI action: writing and enhancing tickets, test cases, scripts, documents, splits and plans. Locking it hides every AI button.',
-    perms: ['ai.use'], api: [/^\/api\/(generate|ai\/)/, /^\/api\/projects\/[^/]+\/(feature|split|layers|testrepo-ai|testplan|testselect)(\/|$)/, /^\/api\/projects\/[^/]+\/(psd|fbd|ard|agent)$/] },
-  { id: 'docs', group: 'AI', label: 'Epic documents', desc: 'Problem Statement, Feature Brief and Architecture Record per epic.', api: [/^\/api\/projects\/[^/]+\/(psd|fbd|ard|epic-issues)(\/|$)/] },
+    perms: ['ai.use'], api: [/^\/api\/(generate|ai\/)/, /^\/api\/projects\/[^/]+\/(feature|brainstorm|split|layers|testrepo-ai|testplan|testselect)(\/|$)/, /^\/api\/projects\/[^/]+\/(psd|fbd|ard|agent)$/] },
+  { id: 'docs', group: 'AI', label: 'Epic documents', desc: 'Problem Statement, Feature Brief and Architecture Record per epic.', api: [/^\/api\/projects\/[^/]+\/(psd|fbd|ard|epic-issues|feature-docs)(\/|$)/] },
   { id: 'agents', group: 'AI', label: 'Agents', desc: 'The agent catalog and document agents (Epic, Kick Off, Demo, Sign-Off…).', api: [/^\/api\/agents(\/|$)/, /^\/api\/projects\/[^/]+\/agent(\/|$)/] },
   { id: 'brain', group: 'AI', label: 'Project brain', desc: 'The Brain page: linked Markdown notes about each project (Obsidian-compatible) that AI actions and code agents read first. Locking it also stops adding them to prompts.',
     views: ['brain'], api: [/^\/api\/projects\/[^/]+\/brain(\/|$)/] },
