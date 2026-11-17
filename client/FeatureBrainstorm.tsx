@@ -46,22 +46,43 @@ export function FeatureBrainstorm({ source, opts, answers, onBack, onDone }: { s
   const [pick, setPick] = useState<Record<string, boolean>>({});
   const ctrl = useRef<AbortController>(new AbortController());
   const started = useRef(false);
+  const closed = useRef(false);
 
+  // The brainstorm to work from, and the epics to plan. A brainstorm that has no epics (or none came back at all) still
+  // plans one epic from the source, with no documents, so the person can carry on by hand.
+  const begin = (result: Any) => {
+    setB(result);
+    const name = String(source.filename || '');
+    const eps = result.epics?.length ? result.epics : [{ title: !name || name === 'Feature description' ? 'New feature' : name.replace(/\.[^.]+$/, ''), description: result.summary || '', existing: false }];
+    setPlan(eps.map((e: Any) => ({ id: e.id || uid(), title: e.title, description: e.description, existing: Boolean(e.existing), reason: e.reason || '', include: true })));
+    // An existing epic that already has its documents starts with them.
+    const pre: Record<string, Any> = {};
+    for (const e of eps) { const x = e.id && p.epics.find((q: Any) => q.id === e.id); if (x) pre[x.id] = { psd: x.psd, fbd: x.fbd, ard: x.ard }; }
+    setDocs(pre);
+    setPhase('brainstorm');
+  };
   const run = async () => {
+    const signal = ctrl.current.signal;
     setErr(''); setPhase('thinking'); setMsg('Brainstorming the feature…');
     try {
-      const out = await stream(`/api/projects/${p.id}/brainstorm`, { text: source.text, sourceName: source.filename, answers, instructions: opts.instructions }, ctrl.current.signal, setMsg);
-      setB(out.result);
-      const eps = out.result.epics?.length ? out.result.epics : [{ title: source.filename === 'Feature description' ? 'New feature' : source.filename.replace(/\.[^.]+$/, ''), description: out.result.summary || '', existing: false }];
-      setPlan(eps.map((e: Any) => ({ id: e.id || uid(), title: e.title, description: e.description, existing: Boolean(e.existing), reason: e.reason || '', include: true })));
-      // An existing epic that already has its documents starts with them.
-      const pre: Record<string, Any> = {};
-      for (const e of eps) { const x = e.id && p.epics.find((q: Any) => q.id === e.id); if (x) pre[x.id] = { psd: x.psd, fbd: x.fbd, ard: x.ard }; }
-      setDocs(pre);
-      setPhase('brainstorm');
-    } catch (e: Any) { if (e.name !== 'AbortError') setErr(e.message); }
+      const out = await stream(`/api/projects/${p.id}/brainstorm`, { text: source.text, sourceName: source.filename, answers, instructions: opts.instructions }, signal, setMsg);
+      begin(out.result || {});
+    } catch (e: Any) {
+      // A run that was replaced or closed (a new controller took over) is ignored; every other ending, an abort included, ends the spinner.
+      if (e.name === 'AbortError') { if (ctrl.current.signal === signal && !closed.current) setErr('The brainstorm was stopped before it finished.'); }
+      else setErr(e.message || 'The brainstorm didn’t finish.');
+    }
   };
-  useEffect(() => { if (!started.current) { started.current = true; run(); } return () => ctrl.current.abort(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Without the AI's brainstorm (it failed, or you don't want to wait): an empty brainstorm and the source as one epic, to work through by hand.
+  const manual = () => begin({ summary: '', epics: [] });
+  useEffect(() => {
+    closed.current = false;
+    // Strict mode runs the cleanup below and then this effect again: the second run gets a fresh controller, so it isn't left aborted.
+    if (started.current) ctrl.current = new AbortController();
+    started.current = true;
+    run();
+    return () => { closed.current = true; ctrl.current.abort(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = plan.filter((e) => e.include);
   const epicObj = (e: Any) => ({ id: e.id, title: e.title, description: e.description, ...(docs[e.id] || {}) });
@@ -118,7 +139,7 @@ export function FeatureBrainstorm({ source, opts, answers, onBack, onDone }: { s
   if (phase === 'thinking') {
     return (
       <Modal title="Add feature with AI" wide persistent left={<button className="btn subtle" onClick={() => { ctrl.current.abort(); onBack(); }}>Back</button>} actions={[{ label: 'Cancel', onClick: () => ctrl.current.abort() }]}>
-        {err ? <><div className="warn-banner danger"><Ico svg={I.warn} /><span>{err}</span></div><button className="btn" style={{ marginTop: 10 }} onClick={() => { ctrl.current = new AbortController(); run(); }}>Try again</button></>
+        {err ? <><div className="warn-banner danger"><Ico svg={I.warn} /><span>{err}</span></div><div className="row" style={{ marginTop: 10, gap: 8 }}><button className="btn" onClick={() => { ctrl.current = new AbortController(); run(); }}>Try again</button><button className="btn subtle" onClick={manual}>Continue manually</button></div></>
           : <div className="progress-box"><div className="pbar"><i /></div><ul className="log"><li><Spinner /><span>{msg}</span></li></ul>
             <p className="muted small" style={{ margin: '6px 0 0' }}>Before anything is created the feature is brainstormed: the problem, options, risks and the epics it needs. Then each epic gets a Problem Statement, a Feature Brief and an Architecture Record that you approve.</p></div>}
       </Modal>
