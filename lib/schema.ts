@@ -542,3 +542,78 @@ export const brainNotes = pgTable("brain_notes", {
     }).onDelete("cascade"),
   primaryKey({ columns: [table.id, table.projectId], name: "brain_notes_pkey"}),
 ]);
+
+export const epicDocVersions = pgTable("epic_doc_versions", {
+  projectId: text("project_id").notNull(),
+  epicId: text("epic_id").notNull(),
+  kind: text().notNull(),
+  number: integer().notNull(),
+  fileId: text("file_id").default('').notNull(),
+  name: text().default('').notNull(),
+  mime: text().default('').notNull(),
+  bytes: integer().default(0).notNull(),
+  text: text().default('').notNull(),
+  author: text().default('').notNull(),
+  authorId: text("author_id"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+      name: "epic_doc_versions_project_id_fkey"
+    }).onDelete("cascade"),
+  primaryKey({ columns: [table.projectId, table.epicId, table.kind, table.number], name: "epic_doc_versions_pkey"}),
+]);
+
+export const epicDocReviews = pgTable("epic_doc_reviews", {
+  projectId: text("project_id").notNull(),
+  epicId: text("epic_id").notNull(),
+  kind: text().notNull(),
+  number: integer().notNull(),
+  userId: text("user_id").notNull(),
+  name: text().default('').notNull(),
+  decision: text().notNull(),
+  at: timestamp({ withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+      name: "epic_doc_reviews_project_id_fkey"
+    }).onDelete("cascade"),
+  primaryKey({ columns: [table.projectId, table.epicId, table.kind, table.number, table.userId], name: "epic_doc_reviews_pkey"}),
+]);
+
+export const epicDocComments = pgTable("epic_doc_comments", {
+  id: text().notNull(),
+  projectId: text("project_id").notNull(),
+  epicId: text("epic_id").notNull(),
+  kind: text().notNull(),
+  number: integer().notNull(),
+  userId: text("user_id"),
+  author: text().default('').notNull(),
+  body: text().default('').notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => [
+  index("epic_doc_comments_doc").using("btree", table.projectId.asc().nullsLast().op("text_ops"), table.epicId.asc().nullsLast().op("text_ops"), table.kind.asc().nullsLast().op("text_ops"), table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+  foreignKey({
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+      name: "epic_doc_comments_project_id_fkey"
+    }).onDelete("cascade"),
+  primaryKey({ columns: [table.id, table.projectId], name: "epic_doc_comments_pkey"}),
+]);
+
+export const epicSignoffs = pgTable("epic_signoffs", {
+  projectId: text("project_id").notNull(),
+  epicId: text("epic_id").notNull(),
+  userId: text("user_id"),
+  signedBy: text("signed_by").default('').notNull(),
+  signedAt: timestamp("signed_at", { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+      name: "epic_signoffs_project_id_fkey"
+    }).onDelete("cascade"),
+  primaryKey({ columns: [table.projectId, table.epicId], name: "epic_signoffs_pkey"}),
+]);

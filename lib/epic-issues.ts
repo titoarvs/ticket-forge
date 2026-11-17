@@ -32,21 +32,29 @@ function psdText(psd: any) {
   ].filter(Boolean).join('\n');
 }
 
-function prompt({ project, epic, instructions, granularity, existing }: any) {
-  const g = { coarse: 'Prefer fewer, larger issues (still sprint-sized).', balanced: 'Use a balanced granularity.', fine: 'Prefer many small, very focused issues.' }[granularity as string] || 'Use a balanced granularity.';
-  return `Write the issues for ONE epic, from its three APPROVED documents. They are the source of truth: don't add scope that isn't in them and don't leave any of their scope out.
-
-Project: ${project.name || ''}
-Epic: ${epic.key || ''} ${epic.title}${epic.description ? `\nEpic description: ${clip(epic.description, 800)}` : ''}
-
-=== PROBLEM STATEMENT (approved ${epic.psd.version || ''}) ===
+/** The documents of the prompt: the epic's own approved PSD, FBD and ARD, or the uploaded documents that passed review (lib/epic-review.ts). */
+function docsBlock(epic: any, reviewed: any[] | null) {
+  if (reviewed) {
+    return reviewed.map((d) => `=== ${d.label.toUpperCase()} (approved ${d.version}) ===\n${d.text ? clip(d.text, 14000) : '(this file is kept, but no text could be read from it)'}`).join('\n\n');
+  }
+  return `=== PROBLEM STATEMENT (approved ${epic.psd.version || ''}) ===
 ${psdText(epic.psd)}
 
 === FEATURE BRIEF (approved ${epic.fbd.version || ''}) ===
 ${clip(epic.fbd.markdown, 14000)}
 
 === ARCHITECTURE RECORD DESIGN (approved ${epic.ard.version || ''}) ===
-${clip(epic.ard.markdown, 14000)}
+${clip(epic.ard.markdown, 14000)}`;
+}
+
+function prompt({ project, epic, instructions, granularity, existing, reviewed }: any) {
+  const g = { coarse: 'Prefer fewer, larger issues (still sprint-sized).', balanced: 'Use a balanced granularity.', fine: 'Prefer many small, very focused issues.' }[granularity as string] || 'Use a balanced granularity.';
+  return `Write the issues for ONE epic, from its three APPROVED documents. They are the source of truth: don't add scope that isn't in them and don't leave any of their scope out.
+
+Project: ${project.name || ''}
+Epic: ${epic.key || ''} ${epic.title}${epic.description ? `\nEpic description: ${clip(epic.description, 800)}` : ''}
+
+${docsBlock(epic, reviewed)}
 
 Issues this epic already has (don't repeat or rewrite them; only add what's missing):
 ${existing || '- (none yet)'}
@@ -71,24 +79,27 @@ Do not include test cases yet.`;
 /**
  * Writes issues for an epic from its approved documents. Nothing is saved: the person reviews the result and adds what
  * they choose. Returns { summary, openQuestions, coverage, uncovered, tickets, docs }.
+ * `reviewedDocs` ([{ kind, label, version, text }]) are the uploaded documents of a signed-off epic (lib/epic-review.ts):
+ * the issues are written from them instead of the epic's generated PSD, FBD and ARD.
  */
-export async function generateEpicIssues({ project, epicId, instructions = '', options = {}, ai: aiIn = {}, emit = (_e: any) => {}, signal }: any) {
+export async function generateEpicIssues({ project, epicId, instructions = '', options = {}, ai: aiIn = {}, emit = (_e: any) => {}, signal, reviewedDocs = null }: any) {
   const epic = (project.epics || []).find((e: any) => e.id === epicId);
   if (!epic) throw err('That epic isn’t in this project (save first if you just created it).', 404);
-  const check = requireApproved(epic);
+  const check = reviewedDocs ? null : requireApproved(epic);
   const base = await getRules();
   const perTicket = Number(options.testsPerTicket) || base.tests.perTicket;
   const rules = { ...base, tests: { ...base.tests, perTicket } };
   const guide = await getGuide();
   const ai = { ...aiIn, signal, reasoning: rules.reasoning, onSwitch: (message: string) => emit({ stage: 'info', level: 'warn', message }) };
   const existing = (project.tickets || []).filter((t: any) => t.epicId === epic.id && t.type !== 'Sub-task').slice(0, 150).map((t: any) => `- ${t.key || ''} ${t.title}`).join('\n');
+  const briefText = String((reviewedDocs ? reviewedDocs.find((d: any) => d.kind === 'fbd')?.text : epic.fbd?.markdown) || '');
   emit({ stage: 'epic-issues', message: `Reading the approved Problem Statement, Feature Brief and Architecture Record for “${epic.title}”…` });
   let tick = 0;
   const raw = await askJson({
     task: 'tickets', ...ai,
     system: systemWith(rules, ['tickets'], guide) + await agentInstructions('working-tickets') + contextBlock(project) + `\n${SYSTEM_BA}`,
-    prompt: prompt({ project, epic, instructions: String(instructions || '').slice(0, 3000), granularity: options.granularity, existing }),
-    brain: { projectId: project.id, epics: [epic], query: `${epic.title} ${epic.fbd?.markdown?.slice(0, 600) || ''}`, max: 5000 },
+    prompt: prompt({ project, epic, instructions: String(instructions || '').slice(0, 3000), granularity: options.granularity, existing, reviewed: reviewedDocs }),
+    brain: { projectId: project.id, epics: [epic], query: `${epic.title} ${briefText.slice(0, 600)}`, max: 5000 },
     onText: (_n: number, total: number) => { if (total - tick > 400) { tick = total; emit({ stage: 'epic-issues', progressChars: total }); } },
   });
   const tickets = (raw.tickets || []).map((t: any) => {
@@ -96,13 +107,13 @@ export async function generateEpicIssues({ project, epicId, instructions = '', o
     return n;
   });
   // Which of the brief's scenarios have an issue: the AI's own account, checked against the scenario ids in the brief.
-  const scenarios = [...new Set(String(epic.fbd.markdown).match(/\bAS-\d{2,3}\b/g) || [])];
+  const scenarios = [...new Set(briefText.match(/\bAS-\d{2,3}\b/g) || [])];
   const coverage = scenarios.map((s) => ({ scenario: s, issues: tickets.filter((t: any) => new RegExp(`\\b${s}\\b`).test(`${t.description || ''} ${t.userStory || ''} ${(t.acceptanceCriteria || []).join(' ')} ${(t.labels || []).join(' ')}`)).map((t: any) => t.title) }));
   const uncovered = coverage.filter((c) => !c.issues.length).map((c) => c.scenario);
   emit({ stage: 'epic-issues-done', message: `Planned ${tickets.length} issue${tickets.length === 1 ? '' : 's'}${scenarios.length ? `, covering ${scenarios.length - uncovered.length} of ${scenarios.length} acceptance scenarios` : ''}.` });
   if (options.includeTests !== false && tickets.length) await writeTestCases({ epics: [{ id: epic.id, title: epic.title }], tickets, summary: project.summary, rules, guide, ai, emit, signal });
   return {
     summary: String(raw.summary || ''), openQuestions: (raw.openQuestions || []).map(String), coverage, uncovered, tickets,
-    docs: check.docs.map((d: any) => ({ kind: d.kind, label: d.label, version: d.version, approvedBy: d.approvedBy, approvedAt: d.approvedAt })),
+    docs: reviewedDocs ? reviewedDocs.map((d: any) => ({ kind: d.kind, label: d.label, version: d.version })) : check!.docs.map((d: any) => ({ kind: d.kind, label: d.label, version: d.version, approvedBy: d.approvedBy, approvedAt: d.approvedAt })),
   };
 }

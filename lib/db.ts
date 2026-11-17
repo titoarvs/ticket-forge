@@ -580,6 +580,56 @@ create table if not exists spec_changes (
   primary key (project_id, id)
 );
 create index if not exists spec_changes_ticket on spec_changes(project_id, ticket_id);
+-- Epic document review (lib/epic-review.ts): the PSD, FBD and ARD an epic's reviewers read before issues are written.
+-- Each upload of a kind is a new version (nothing is overwritten, so a restore or diff is possible); the file itself is in
+-- files. A reviewer's decision and the comments belong to one version; the epic's final sign-off is one row per epic.
+create table if not exists epic_doc_versions (
+  project_id text not null references projects(id) on delete cascade,
+  epic_id text not null,
+  kind text not null,
+  number integer not null,
+  file_id text not null default '',
+  name text not null default '',
+  mime text not null default '',
+  bytes integer not null default 0,
+  text text not null default '',
+  author text not null default '',
+  author_id text,
+  created_at timestamptz not null default now(),
+  primary key (project_id, epic_id, kind, number)
+);
+create table if not exists epic_doc_reviews (
+  project_id text not null references projects(id) on delete cascade,
+  epic_id text not null,
+  kind text not null,
+  number integer not null,
+  user_id text not null,
+  name text not null default '',
+  decision text not null,
+  at timestamptz not null default now(),
+  primary key (project_id, epic_id, kind, number, user_id)
+);
+create table if not exists epic_doc_comments (
+  id text not null,
+  project_id text not null references projects(id) on delete cascade,
+  epic_id text not null,
+  kind text not null,
+  number integer not null,
+  user_id text,
+  author text not null default '',
+  body text not null default '',
+  created_at timestamptz not null default now(),
+  primary key (project_id, id)
+);
+create index if not exists epic_doc_comments_doc on epic_doc_comments(project_id, epic_id, kind, created_at);
+create table if not exists epic_signoffs (
+  project_id text not null references projects(id) on delete cascade,
+  epic_id text not null,
+  user_id text,
+  signed_by text not null default '',
+  signed_at timestamptz not null default now(),
+  primary key (project_id, epic_id)
+);
 `;
 
 // Older TicketForge versions sharing the database (another server not updated yet) don't record issue and section
@@ -696,7 +746,7 @@ async function checkPrivileges(d) {
 }
 
 // ---------------------------------------------------------------- RLS setup (PostgreSQL / Supabase)
-const TABLES = ['roles', 'users', 'sessions', 'invites', 'password_resets', 'projects', 'issues', 'issue_tombstones', 'activity', 'issue_versions', 'app_meta', 'ai_cache', 'ai_usage', 'notifications', 'screenshots', 'files', 'doc_templates', 'code_jobs', 'user_ai', 'legal_acceptances', 'signup_requests', 'user_prefs', 'workspaces', 'workspace_members', 'schema_migrations', 'billing_events', 'payment_gateways', 'billing_plans', 'usage_counters', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes'];
+const TABLES = ['roles', 'users', 'sessions', 'invites', 'password_resets', 'projects', 'issues', 'issue_tombstones', 'activity', 'issue_versions', 'app_meta', 'ai_cache', 'ai_usage', 'notifications', 'screenshots', 'files', 'doc_templates', 'code_jobs', 'user_ai', 'legal_acceptances', 'signup_requests', 'user_prefs', 'workspaces', 'workspace_members', 'schema_migrations', 'billing_events', 'payment_gateways', 'billing_plans', 'usage_counters', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments', 'epic_signoffs'];
 const FUNCS = ['tf_uid()', 'tf_system()', 'tf_ws()', 'tf_can(text)', 'tf_can_delete_project(text)', 'tf_access(text)', 'tf_all_access()', 'tf_access_list()', 'tf_ws_projects()', 'tf_coworkers()', 'tf_my_workspaces()'];
 
 const LOCKDOWN_SQL = `
@@ -822,12 +872,16 @@ create policy tf_system_only on usage_counters for all to ${APP_ROLE} using (tf_
 -- Workspace isolation, added on top of every rule above (restrictive): rows of another workspace never show, even to
 -- someone with access to "all projects". System work stays inside the request's workspace in the app code.
 ${['projects', 'roles', 'invites'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using (tf_system() or workspace_id = tf_ws()) with check (tf_system() or workspace_id = tf_ws())`).join(';\n')};
-${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
+${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments', 'epic_signoffs'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
 create policy tf_all on code_jobs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_notes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_state for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on coding_specs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on spec_changes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_all on epic_doc_versions for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_all on epic_doc_reviews for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_all on epic_doc_comments for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_all on epic_signoffs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_select on notifications for select to ${APP_ROLE} using (tf_system() or user_id = tf_uid());
 create policy tf_insert on notifications for insert to ${APP_ROLE} with check (tf_system() or tf_uid() is not null);
 create policy tf_update on notifications for update to ${APP_ROLE} using (tf_system() or user_id = tf_uid()) with check (tf_system() or user_id = tf_uid());
