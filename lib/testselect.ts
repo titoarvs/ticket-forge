@@ -2,6 +2,7 @@
 // changed in the code since the last run, issues changed recently, and recent failures / flaky / never-run tests,
 // within a budget. Returns the selection with a reason per test, for review before running. Nothing runs here.
 import { askJson } from './claude';
+import { jevEnabled, jevStatus, jevDecide } from './jev';
 import { agentInstructions } from './agents';
 import { readRepo } from './reposync';
 import { contextBlock } from './appcontext';
@@ -27,11 +28,36 @@ export async function selectTests({ project, budget = 25, goal = '', useCode = t
     } catch (e) { changeNote = `Code changes: couldn’t read the repository (${e.message}).`; }
   }
   const recent = project.tickets.filter((t) => now - new Date(t.updatedAt || 0).getTime() < 7 * day).map((t) => `${t.key} ${clip(t.title, 80)} [${t.status}]`);
-  const catalog = items.map(({ t, tc, i }: any) => {
+  const lines = items.map(({ t, tc, i }: any) => {
     const r = tc.lastRun;
     const age = r?.at ? Math.round((now - new Date(r.at).getTime()) / day) : null;
     return `${tc.id} | ${t.key}#${i + 1} | ${clip(tc.title, 90)} | ${t.priority || 'Medium'} | ${tc.status || 'Not run'}${r?.flaky ? ' flaky' : ''}${tc.healed ? ' healed' : ''}${age != null ? ` ${age}d ago` : ' never run'}${tc.script ? '' : ' | no script'}`;
-  }).join('\n');
+  });
+  const catalog = lines.join('\n');
+  // Jev (Administration → AI → Decisions): a yes/no for every test in a few quick calls. When it isn't set up, fails, or
+  // finds nothing worth running, the AI chooses below.
+  if (await jevEnabled().catch(() => false)) {
+    try {
+      emit(`Jev is scoring ${items.length} tests…`);
+      const min = (await jevStatus()).minConfidence;
+      const scored: { x: any; p: number }[] = [];
+      for (let i = 0; i < items.length; i += 40) {
+        const chunk = items.slice(i, i + 40);
+        const r = await jevDecide({
+          state: { project: project.name, goalOfThisRun: goal ? clip(goal, 400) : '', codeChanges: changeNote, pagesChanged: clip(changes, 9000), issuesChangedThisWeek: recent.slice(0, 40), tests: Object.fromEntries(chunk.map((x: any) => [x.tc.id, lines[items.indexOf(x)]])) },
+          questions: Object.fromEntries(chunk.map((x: any) => [x.tc.id, { type: 'noul' as const, instructions: `Is test ${x.tc.id} worth running now? Tests are listed as: id | issue#n | title | priority | last result | when.`,
+            criteria: { true: 'it covers a page or file that changed, an issue changed this week, or it failed or was flaky last time, or it covers a core flow (sign-in, payments, saving data), or it has not run in a long time', false: 'it is unrelated to every change and recently passed' } }])),
+        });
+        for (const x of chunk) scored.push({ x, p: Number((r.answers[x.tc.id] as any)?.noul ?? 0) });
+      }
+      const picked = scored.filter((s) => s.p >= Math.max(0.5, min - 0.1)).sort((a, b) => b.p - a.p).slice(0, budget);
+      if (picked.length) {
+        const selected = picked.map(({ x, p }) => ({ tcId: x.tc.id, ticketId: x.t.id, key: `${x.t.key}#${x.i + 1}`, title: x.tc.title, risk: p >= 0.8 ? 'high' : p >= 0.6 ? 'medium' : 'low',
+          reason: `Jev: ${Math.round(p * 100)}% likely worth running${x.tc.lastRun?.flaky ? ' (flaky)' : x.tc.status === 'Failed' ? ' (failed last time)' : !x.tc.lastRun ? ' (never run)' : ''}` }));
+        return { selected, summary: `Jev chose ${selected.length} of ${items.length} tests from the code changes, recent issue changes and past results.`, gaps: [], considered: items.length, changeNote, head, engine: 'jev' };
+      }
+    } catch { /* the AI chooses */ }
+  }
   emit(`AI is choosing up to ${budget} of ${items.length} tests…`);
   const res = await askJson({ ...ai, task: 'selection', reasoning: 'fast', system: `You are a test selection agent for a CI pipeline. Pick the tests most likely to catch a regression from the
 current change, within the budget. Rank by: tests covering pages/files that changed (highest), tests on issues changed this week,

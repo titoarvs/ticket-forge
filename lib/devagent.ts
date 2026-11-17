@@ -1010,7 +1010,7 @@ export async function cloneRepo({ projectId, side = 'frontend', source, branch =
   } catch (e) {
     const msg = cleanGitError(e);
     const authHint = /authentication|could not read username|403|not found|repository .* not found|permission denied/i.test(msg)
-      ? (src.provider === 'GitLab' ? ' Save a GitLab token (read_repository) in the backend repository settings.' : src.provider === 'GitHub' ? ' Save a GitHub token with Contents access below, or sign in with `gh auth login` on this computer.' : ' Use an SSH URL with a key on this computer.') : '';
+      ? (src.provider === 'GitLab' ? ' Save a GitLab token (read_repository) in the backend repository settings.' : src.provider === 'GitHub' ? ' Cloning here uses your own git sign-in: check that git can reach it on this computer (an SSH key or a credential helper, or `gh auth login`). A GitHub token is optional: you can also save one below.' : ' Use an SSH URL with a key on this computer.') : '';
     throw Object.assign(new Error(`Couldn’t ${has ? 'update' : 'clone'} ${src.path}: ${msg}.${authHint}`), { status: 400 });
   }
   onStep('Ready.');

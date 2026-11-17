@@ -200,7 +200,7 @@ ${contract}` : 'The backend and frontend are being built AT THE SAME TIME in sep
   }
   const side = be && (ticket.layer === 'backend' || !fe) ? 'backend' : 'frontend';
   const dev = side === 'backend' ? be : fe;
-  if (!dev?.localPath) throw new HttpError(400, 'Set the local repository folder in Project settings → Code & GitHub first.');
+  if (!dev?.localPath) throw new HttpError(400, 'Set up your own local copy of the repository first (Project settings → Code & GitHub; each person has their own folder).');
   const job = await startJob({ projectId: project.id, ticket, dev, instructions, user, agentId: await pick(side), context: [sideNote(project, ticket, side), ctx].filter(Boolean).join('\n\n'), side, brainFiles: brain.files });
   return { jobs: { [side]: job } };
 }
@@ -232,7 +232,7 @@ export const POST = api(async (req, p) => {
     const project = await store.getProject(p.id);
     const side = b.side === 'backend' ? 'backend' : 'frontend';
     const dev = side === 'backend' ? backendDev(project) : project.dev || {};
-    if (!dev?.localPath) throw new HttpError(400, side === 'backend' ? 'Set the backend repository in Project settings → Code & GitHub first.' : 'Set the local repository folder in Project settings → Code & GitHub first.');
+    if (!dev?.localPath) throw new HttpError(400, side === 'backend' ? 'Set up your own local copy of the backend repository first (Project settings → Code & GitHub).' : 'Set up your own local copy of the repository first (Project settings → Code & GitHub; each person has their own folder).');
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
     const agentId = String(b.agentId || await requireRole(side === 'backend' && backendDev(project) ? 'backend' : 'build'));
@@ -254,7 +254,7 @@ export const POST = api(async (req, p) => {
   if (b.action === 'start-many') {
     const user = await guard(p, ['ai.use', 'issue.edit']);
     const project = await store.getProject(p.id);
-    if (!project.dev?.localPath && !backendDev(project)) throw new HttpError(400, 'Set the local repository folder in Project settings → Code & GitHub first.');
+    if (!project.dev?.localPath && !backendDev(project)) throw new HttpError(400, 'Set up your own local copy of the repository first (Project settings → Code & GitHub; each person has their own folder).');
     const ids: string[] = (Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String).slice(0, 50);
     if (!ids.length) throw new HttpError(400, 'Choose at least one issue.');
     const instructions = String(b.instructions || '').slice(0, 4000);

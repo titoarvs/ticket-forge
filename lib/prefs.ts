@@ -8,7 +8,16 @@ const TOUR_ID = /^[a-z][\w-]{0,39}$/;
 function clean(d) {
   const tours: any = {};
   for (const [k, v] of Object.entries<any>(d?.tours || {})) if (TOUR_ID.test(k) && typeof v === 'string') tours[k] = v.slice(0, 40);
-  return { tours, toursOff: d?.toursOff === true };
+  // Each person's own local copy of a project's repositories: { [projectId]: { frontend: { path, source }, backend: {…} } }.
+  const local: any = {};
+  for (const [pid, sides] of Object.entries<any>(d?.local || {})) {
+    if (!/^[\w-]{1,64}$/.test(pid)) continue;
+    for (const side of ['frontend', 'backend']) {
+      const e = sides?.[side];
+      if (e && typeof e.path === 'string' && e.path) (local[pid] ??= {})[side] = { path: e.path.slice(0, 500), source: e.source && typeof e.source === 'object' ? { type: String(e.source.type || '').slice(0, 20), url: String(e.source.url || '').slice(0, 500), branch: String(e.source.branch || '').slice(0, 200), clonedAt: String(e.source.clonedAt || '').slice(0, 40) } : null };
+    }
+  }
+  return { tours, toursOff: d?.toursOff === true, local };
 }
 export async function getPrefs(userId = uid()) {
   if (!userId) return clean({});
@@ -25,6 +34,13 @@ export async function savePrefs(change: any = {}) {
   if (typeof change.tourDone === 'string' && TOUR_ID.test(change.tourDone)) p.tours[change.tourDone] = new Date().toISOString();
   if (change.tourReset === true) { p.tours = {}; p.toursOff = false; }
   if (typeof change.toursOff === 'boolean') p.toursOff = change.toursOff;
+  // { myLocal: { projectId, side, path, source } }: set (or, with no path, forget) this person's local copy of a repository.
+  if (change.myLocal && /^[\w-]{1,64}$/.test(String(change.myLocal.projectId)) && ['frontend', 'backend'].includes(change.myLocal.side)) {
+    const m = change.myLocal;
+    p.local ??= {};
+    if (m.path) (p.local[m.projectId] ??= {})[m.side] = { path: String(m.path), source: m.source || null };
+    else if (p.local[m.projectId]) { delete p.local[m.projectId][m.side]; if (!Object.keys(p.local[m.projectId]).length) delete p.local[m.projectId]; }
+  }
   if (Object.keys(p.tours).length > 60) p.tours = Object.fromEntries(Object.entries<any>(p.tours).slice(-60));
   await q(`insert into user_prefs (user_id, data, updated_at) values ($1, $2, now())
     on conflict (user_id) do update set data = excluded.data, updated_at = now()`, [userId, JSON.stringify(p)]);

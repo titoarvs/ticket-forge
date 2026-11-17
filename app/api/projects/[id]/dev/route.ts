@@ -4,16 +4,23 @@ import { SERVERLESS, currentContext } from '@/lib/db';
 import { inspectRepo, githubToken, listFolders, learnRepo, cloneRepo } from '@/lib/devagent';
 import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secrets';
 import { codeRabbitStatus } from '@/lib/coderabbit';
+import { isSaas } from '@/lib/platform';
+import { savePrefs } from '@/lib/prefs';
+import { myLocal, sharedUsable } from '@/lib/mylocal';
+import { isLocalHost } from '@/lib/claude';
 import { getClientId, saveClientId, startDeviceLogin, pollDeviceLogin, listRepos } from '@/lib/github-connect';
 
 // Project settings → Code & GitHub: checks the local repository folder and keeps the project's GitHub token.
 const localOnly = () => !SERVERLESS && Boolean((currentContext() as any).local);
 
 export const GET = api(async (_req, p) => {
+  // Opened at localhost but the hosted mode (TICKETFORGE_MODE=saas) keeps this computer's folders off: tell the app why.
+  const saasBlocksLocal = isSaas() && !localOnly() && isLocalHost(_req.headers.get('host'));
   const user = await authed();
   store.requireAccess(user, p.id);
   const saved = await getProjectSecret(p.id, 'githubToken');
-  return { local: localOnly(), hasGitlabToken: await hasProjectSecret(p.id, 'gitlabToken'), envGitlabToken: Boolean(process.env.GITLAB_TOKEN), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN),
+  const project: any = await store.getProject(p.id, { revs: true }); // the project's own (shared) values
+  return { local: localOnly(), saasBlocksLocal, mine: await myLocal(p.id), sharedUsable: { frontend: sharedUsable(project.dev), backend: sharedUsable(project.devBackend) }, hasGitlabToken: await hasProjectSecret(p.id, 'gitlabToken'), envGitlabToken: Boolean(process.env.GITLAB_TOKEN), hasToken: await hasProjectSecret(p.id, 'githubToken'), ghSignedIn: !saved && !process.env.GITHUB_TOKEN ? Boolean(await githubToken('')) : false, envToken: Boolean(process.env.GITHUB_TOKEN),
     githubConnect: { configured: Boolean((await getClientId()).clientId), source: (await getClientId()).source },
     coderabbit: localOnly() ? { ...(await codeRabbitStatus({ fresh: new URL(_req.url).searchParams.has('fresh') })), bin: undefined, hasKey: await hasProjectSecret(p.id, 'coderabbitKey') } : null };
 });
@@ -21,8 +28,19 @@ export const GET = api(async (_req, p) => {
 export const POST = api(async (req, p) => {
   const user = await authed();
   store.requireAccess(user, p.id);
-  if (!store.has(user, 'project.settings')) throw new HttpError(403, 'Changing Code & GitHub needs the project settings permission.');
   const b = await body(req);
+  // Everyone with access to the project sets up their own local copy (a folder or a clone on their computer); the rest
+  // of Code & GitHub (repository, branches, tokens, conventions) is the project's and needs the settings permission.
+  const personal = ['inspect', 'browse', 'clone', 'setMyLocal'];
+  if (!personal.includes(b.action) && !store.has(user, 'project.settings')) throw new HttpError(403, 'Changing Code & GitHub needs the project settings permission.');
+  if (b.action === 'setMyLocal') {
+    if (!localOnly()) throw new HttpError(400, 'Your own local copy can be set up only when TicketForge runs on your computer (opened at localhost).');
+    const side = b.side === 'backend' ? 'backend' : 'frontend';
+    const path = String(b.path || '').trim();
+    const info: any = path ? await inspectRepo(path) : null; // it must be a git repository on this computer
+    const prefs = await savePrefs({ myLocal: { projectId: p.id, side, path: info?.path || '', source: b.source || null } });
+    return { local: prefs.local?.[p.id] || {} };
+  }
   if (b.action === 'inspect') {
     if (!localOnly()) throw new HttpError(400, 'Local repositories work only when TicketForge runs on your computer (opened at localhost).');
     return inspectRepo(String(b.localPath || ''));

@@ -5,7 +5,7 @@ import * as auth from '@/lib/auth';
 import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION, DEFAULT_WS } from '@/lib/db';
 import * as store from '@/lib/store';
 import { isLocalHost } from '@/lib/claude';
-import { isSaas, scrubSharedTokens, platformAdminEmails } from '@/lib/platform';
+import { isSaas, scrubSharedTokens, platformAdminEmails, requestIsLocal } from '@/lib/platform';
 import { lockStatus } from '@/lib/limits';
 
 const G = globalThis as any;
@@ -102,7 +102,7 @@ export function api(fn: Handler) {
       const user = await currentUser();
       // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
       // On the hosted service (SaaS) never: the server's own Claude sign-in must not answer for other companies.
-      const local = !isSaas() && isLocalHost(req.headers.get('x-forwarded-host') || req.headers.get('host'));
+      const local = requestIsLocal(isLocalHost, req.headers);
       // The project this request is about (for AI usage per project): from the address, or set by aiOpts from the body.
       const projectId = decodeURIComponent(new URL(req.url).pathname.match(/^\/api\/projects\/([^/]+)/)?.[1] || '') || null;
       // Workspaces: a project of another workspace doesn't exist as far as this request is concerned.

@@ -461,6 +461,23 @@ Statement (PSD)**, the **Feature Brief (FBD)** and the **Architecture Record Des
 - **Write issue with Claude** (one issue in an epic, `POST /api/ai/new-ticket`) follows the same rule when the epic
   documents feature is on.
 
+## Decisions with Jev (optional)
+
+[Jev](https://docs.typesafe.ai) (TypeSafe AI, early access) is a fast model for decisions: you give it the state of something
+and questions (pick one of up to 255 options, rate 0-9, yes/no) and it returns typed answers with calibrated probabilities
+in a few hundred milliseconds, at a fraction of a general AI's price. It can't write text, so TicketForge uses it only for
+small classification calls, **when an owner turns it on** in Administration → AI → **Decisions**:
+
+- **Frontend, backend or both** for each issue (`lib/layers.ts`): one call per 25 issues.
+- **Which automated tests are worth running** (`lib/testselect.ts`): a yes/no per test, ranked, up to the budget.
+
+Anything Jev isn't sure about (below the confidence you choose, 60% by default), and every call when it is off,
+unreachable, or answers an error, goes to your AI as before, so turning it on never makes these features fail. Setup: paste
+the API key from console.typesafe.ai → Keys (stored encrypted per workspace and never sent back; `TYPESAFE_API_KEY` works
+too), turn it on, and use **Test the connection**. `TICKETFORGE_JEV_URL` points tests at a stand-in server. The titles,
+descriptions and test names being decided are sent to TypeSafe, so check their terms first. Client: `lib/jev.ts`
+(`POST https://api.typesafe.ai/v1/systemone`, `jev-latest`, retries 429/529 twice).
+
 ## Drizzle ORM
 
 [Drizzle ORM](https://orm.drizzle.team) is set up next to the existing database code, so new code can use typed queries
@@ -678,6 +695,28 @@ It never changes `.github/workflows`, `.env` files or lock files. A round runs a
 to 5 minutes (Vercel's limit); a round that goes quiet for 8 minutes is marked failed. Jobs are kept in the database
 (`code_jobs`), so they survive serverless restarts. Jobs started on GitHub Actions in an earlier version can't continue:
 start a new job. Reviews, CodeRabbit and committing locally need TicketForge on your computer.
+
+**GitHub access: only the deployed app needs it.** On your computer, cloning a repository, pushing branches and opening
+pull requests use your own git setup (an SSH key, your credential helper or `gh auth login`), so Project settings →
+Code & GitHub works without connecting GitHub or saving a token. The *GitHub account* card there is optional on your
+computer: connect it only to pick from your list of GitHub repositories, or if git can't sign in. The deployed
+TicketForge has no git sign-in, so it needs the connection (or a token) to read the repository and push the branch.
+
+**Trying hosted mode on your own computer.** With `TICKETFORGE_MODE=saas` in `.env`, TicketForge treats every request as
+deployed, even at `localhost`, so the repository source *Folder on this computer*, cloning and Claude Code agents are
+off (a visitor can send any `Host` header to a public server, so hosted mode never trusts it). To use them while
+testing billing on your own computer, add `TICKETFORGE_ALLOW_LOCAL=1` to `.env` and restart: it is honoured only for
+requests whose address is `localhost` and that came through no proxy (no `X-Forwarded-*` header). Never set it on a
+server. Project settings → Code & GitHub says so when this is why folders are unavailable.
+
+**Everyone sets up their own local copy.** The project shares *which* repository it is (name, provider, base branch,
+branch prefix, conventions: the project settings permission), but the folder on disk belongs to each person: a
+teammate's path doesn't exist on your computer. In Project settings → Code & GitHub anyone with access to the project
+can choose a **Git URL** (cloned for them) or a **Folder on this computer**, and it is saved just for them (in their
+preferences, `user_prefs`), per project and per side (frontend or backend). Code jobs, learning the repository, test
+selection and the other features that read the code use your folder. If you haven't set one, the project's older shared
+folder is used only when it exists on your computer; otherwise you are asked to set up your own. It works only when
+TicketForge runs on your computer (opened at localhost).
 
 ### Code that follows your repository
 

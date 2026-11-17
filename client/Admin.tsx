@@ -14,6 +14,7 @@ import { AgentsTab } from './AgentsTab';
 import { FeaturesTab } from './FeatureFlags';
 import { AiFlow } from './AiFlow';
 import { BillingTab } from './Billing';
+import { DecisionsSection } from './Jev';
 import { PaymentsTab } from './Payments';
 import { LimitsTab } from './Limits';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -546,6 +547,7 @@ function AiTab() {
     { key: 'savings', label: 'Savings & limits', hint: 'Reused answers, budget and prices', icon: I.check, badge: c.budget?.over ? <span className="loz t-fail">Budget</span> : c.budget?.near ? <span className="loz t-blocked">{Math.round(c.budget.pct * 100)}%</span> : null },
     { key: 'configs', label: 'Configurations', hint: 'Named AI setups for AI buttons', icon: I.settings, badge: (c.settings?.configs || []).length ? <span className="count">{c.settings.configs.length}</span> : null },
     { key: 'providers', label: 'Providers', hint: 'AI APIs, in priority order', icon: I.grid, badge: (c.apis || []).some((x: Any) => x.cooldown) ? <span className="loz t-blocked">Limited</span> : null },
+    { key: 'decisions', label: 'Decisions', hint: 'Fast choices with Jev (optional)', icon: I.flag },
     ...(c.copilot ? [{ key: 'local', label: 'Local AI', hint: 'Claude Code or GitHub Copilot', icon: I.user }] : []),
   ];
   return (
@@ -568,6 +570,7 @@ function AiTab() {
           {c.planUsage ? <PlanLimits u={c.planUsage} /> : <p className="muted small">Not available: sign in to Claude Code with a Pro or Max plan to see these.</p>}
           {c.planUsage?.checkedAt && <p className="muted small" style={{ marginBottom: 0 }}>Checked {new Date(c.planUsage.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · updates every minute.</p>}
         </div>}</div>}
+      {sec === 'decisions' && <DecisionsSection />}
       {sec === 'configs' && <ConfigsSection c={c} onSaved={applyAi} />}
       {sec === 'providers' && <div className="cards"><ProvidersCard c={c} />
       <div className="card wide">

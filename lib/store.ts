@@ -100,8 +100,10 @@ export async function getProject(id, { revs = false }: any = {}) {
     const ir: any = {};
     for (const r of issues.rows) ir[r.data.id] = r.rev;
     p._revs = { issues: ir, meta: rows[0].revs || {} };
+    return p;
   }
-  return p;
+  // For the server's own use (AI, code jobs, exports): the repositories as this person's computer has them.
+  return (await import('./mylocal')).withMyLocal(p);
 }
 
 /**
