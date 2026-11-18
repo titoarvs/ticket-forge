@@ -15,6 +15,7 @@ const TICKETS = 'tickets';
 const SETTINGS_KEYS = ['name', 'key', 'summary', 'assumptions', 'openQuestions', 'workflow', 'members', 'automation', 'sourceName', 'sourceText'];
 // testRepo: the Xray-style test repository, plans and executions (Test management). Testers and editors may change it.
 const META_PERM = { epics: ['epic.manage'], sprints: ['sprint.manage'], releases: ['sprint.manage', 'project.settings'], sources: ['issue.create', 'project.settings'], testRepo: ['test.run', 'issue.edit'], dbSchema: ['project.database'] };
+const PRIORITIES = ['Highest', 'High', 'Medium', 'Low']; // the existing priority values (the same as the client's and lib/model.ts)
 const SYSTEM_AUTHORS = new Set(['Automation', 'Development', 'Claude']);
 /** A draft epic (saved AI output) can't be published without a title. */
 export const NO_DRAFT_TITLE = 'Give the draft a title before you publish it.';
@@ -324,7 +325,9 @@ export async function patchProject(id, patch, user) {
   const metaKeys = Object.keys(meta).filter((k) => !NOT_META.has(k));
   const baseRevs = patch.baseRevs && typeof patch.baseRevs === 'object' ? patch.baseRevs : null;
   const metaRevs = patch.metaRevs && typeof patch.metaRevs === 'object' ? patch.metaRevs : null;
+  let notes: any[] = []; // assignee / priority changes to notify about once the save is in
   const out = await tx(async (t) => {
+    notes = [];
     // The new version first: this takes the project's row lock, so saves of one project queue here and each one
     // reads what the previous one wrote (no lost updates). Only the sections being saved are read.
     const pr = (await t.query(`update projects set version = version + 1, updated_at = now() where id = $1 and archived_at is null
@@ -350,6 +353,19 @@ export async function patchProject(id, patch, user) {
     }
     const upserts = (patch.upsert || []).filter((tk) => tk && typeof tk.id === 'string').map((tk) => keepSystemEntries(current.get(tk.id)?.data, tk));
     for (const tk of upserts) ticketNeeds(current.get(tk.id)?.data, tk, user).forEach(need);
+    // Changed story points must be a number and a changed priority one of the existing values.
+    for (const tk of upserts) {
+      const prev = current.get(tk.id)?.data;
+      if (!prev) continue;
+      const sp = tk.storyPoints;
+      if (!same(prev.storyPoints, sp) && sp != null && !(typeof sp === 'number' && Number.isFinite(sp) && sp >= 0)) throw new HttpError(400, `Story points must be a number (${tk.key || 'issue'}).`);
+      if (!same(prev.priority, tk.priority) && !PRIORITIES.includes(tk.priority)) throw new HttpError(400, `Priority must be one of ${PRIORITIES.join(', ')} (${tk.key || 'issue'}).`);
+      // Who to tell: the new assignee, or the current one when only the priority changed (see notifyIssueChanges).
+      const assigneeChanged = !same(prev.assignee || '', tk.assignee || '');
+      if (tk.assignee && (assigneeChanged || !same(prev.priority, tk.priority))) {
+        notes.push({ issueId: tk.id, key: tk.key, title: tk.title, assignee: tk.assignee, assigneeChanged, priority: tk.priority });
+      }
+    }
     const removes = (patch.remove || []).filter((rid) => current.has(rid));
     if (removes.length) need(['issue.delete']);
     if (ordered) {
@@ -446,6 +462,10 @@ export async function patchProject(id, patch, user) {
     return { version, revs: outRevs };
   });
   noteVersion(id, out.version);
+  if (notes.length) {
+    // The save is done: a failed notification must not undo or fail it.
+    try { await (await import('./notify')).notifyIssueChanges({ projectId: id, actor: user, changes: notes }); } catch (e) { console.error('Could not send issue notifications', e); }
+  }
   return out;
 }
 

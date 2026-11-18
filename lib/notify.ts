@@ -32,6 +32,27 @@ export async function markRead(userId, ids) {
 }
 
 /**
+ * After a save: an in-app notification for the person an issue was assigned to, or whose assigned issue changed
+ * priority. Nobody else is told, and nobody is told about what they did themselves.
+ * changes: [{ issueId, key, title, assignee, assigneeChanged, priority }] (assignee is the person's name).
+ */
+export async function notifyIssueChanges({ projectId, actor, changes }: { projectId: string; actor: any; changes: any[] }) {
+  if (!changes.length) return;
+  const users = (await listUsers()).filter((u) => u.status === 'active');
+  for (const c of changes) {
+    const name = String(c.assignee || '').trim().toLowerCase();
+    const user = name && users.find((u) => u.name.trim().toLowerCase() === name && canAccess({ is_owner: u.isOwner, project_access: u.projectAccess }, projectId));
+    if (!user || user.id === actor?.id) continue;
+    const by = actor?.name || 'Someone';
+    await notify({
+      userId: user.id, projectId, issueId: c.issueId, kind: c.assigneeChanged ? 'issue-assigned' : 'issue-priority',
+      title: c.assigneeChanged ? `${by} assigned ${c.key} to you` : `${by} changed the priority of ${c.key} to ${c.priority}`,
+      body: c.title, link: `/p/${projectId}/backlog?issue=${encodeURIComponent(c.issueId)}`,
+    });
+  }
+}
+
+/**
  * After a test run: one automated comment per issue with its results (passed and failed), and for failures a
  * notification (in-app + email) to the issue's assignee. results: Map(issueId -> [{ tcId, result }]).
  * Settings: automation.onFail { comment, notify } and automation.onPass { comment } (all on by default).

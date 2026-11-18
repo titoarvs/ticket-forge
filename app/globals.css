@@ -901,11 +901,21 @@ a.side-item:hover, a.brand:hover, a.navlink:hover { text-decoration: none; }
 .bcreate:hover { background: var(--hover); color: var(--text); }
 .bcreate-input { width: 100%; resize: none; border: 2px solid var(--border-focus); border-radius: var(--radius); padding: 8px; font: inherit; background: var(--bg); color: var(--text); box-shadow: var(--shadow-raised); }
 @media (hover: none) { .bcreate, .bcol-collapse { opacity: 1; } }
-@media (max-width: 720px) {
-  .board { grid-template-columns: var(--cols-sm); }
-  .board-wrap { scroll-snap-type: x mandatory; max-height: calc(100dvh - 230px); }
-  .bcol-h, .bcol { scroll-snap-align: start; }
-}
+/* Tablets and phones (Board.tsx): one column at a time, chosen with the tabs, so the board never scrolls sideways. */
+.board-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.board-tab { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 36px; padding: 0 12px; border: 1px solid var(--border-input); border-radius: 18px; background: var(--bg); color: var(--text-subtle); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.board-tab:hover { background: var(--hover); color: var(--text); }
+.board-tab.on { background: var(--selected-bg); color: var(--selected-text); border-color: var(--selected-border); }
+.board-tab:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.board-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.board-tab-n { font-variant-numeric: tabular-nums; font-weight: 500; opacity: .8; }
+.board-wrap.narrow { overflow-x: hidden; max-height: none; }
+.board.narrow { min-width: 0; }
+.board.narrow .bcol-h { position: static; }
+.bcard { min-width: 0; }
+.bcard .foot { flex-wrap: wrap; }
+.bcard .foot .right { flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+@media (max-width: 599px) { .board-goal { overflow-wrap: anywhere; } }
 
 /* ---------- workflow editor ---------- */
 .wf-h { font-size: 14px; margin: 24px 0 4px; }
