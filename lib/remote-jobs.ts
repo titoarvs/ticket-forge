@@ -3,7 +3,7 @@
 // jobs, plus { remote: true }. A round runs after the response is sent (`defer`) and records its progress in the job,
 // which the browser polls.
 import crypto from 'node:crypto';
-import { q } from './db';
+import { orm, codeJobs, eq, and, desc, sql } from './orm';
 import { consume } from './limits';
 import { runApiCode, openCodePr, deleteBranch } from './api-code';
 import { err } from './errors';
@@ -15,12 +15,12 @@ const say = (j, text, kind = 'info') => { j.log = [...(j.log || []), { at: now()
 const STALE_MS = 8 * 60000; // a round that has been quiet this long died with its server (serverless time limit)
 async function save(j) {
   j.touched = now();
-  await q(`insert into code_jobs (id, project_id, ticket_id, data, updated_at) values ($1,$2,$3,$4,now())
-    on conflict (id) do update set data = excluded.data, updated_at = now()`, [j.id, j.projectId, j.ticketId, JSON.stringify(j)]);
+  await orm.insert(codeJobs).values({ id: j.id, projectId: j.projectId, ticketId: j.ticketId, data: j, updatedAt: sql`now()` })
+    .onConflictDoUpdate({ target: codeJobs.id, set: { data: j, updatedAt: sql`now()` } });
   return j;
 }
 export async function loadJob(id) {
-  const r = (await q('select data from code_jobs where id = $1', [id])).rows[0];
+  const [r] = await orm.select({ data: codeJobs.data }).from(codeJobs).where(eq(codeJobs.id, id));
   return r ? (typeof r.data === 'string' ? JSON.parse(r.data) : r.data) : null;
 }
 export const isRemoteId = (id) => /^gh-[a-z0-9]+$/.test(String(id || ''));
@@ -118,11 +118,12 @@ export async function prRemote(j, gh, { title, body, draft }: any) {
   return { pr: { url: pr.url, number: pr.number, title: pr.title, draft: pr.draft, repo: j.repo, provider: 'GitHub', status: pr.draft ? 'Draft' : 'Open', branch: j.branch, base: j.base } };
 }
 export async function remoteJobsFor(projectId, ticketId) {
-  const rows = (await q('select data from code_jobs where project_id = $1 and ticket_id = $2 order by updated_at desc limit 20', [projectId, ticketId])).rows;
+  const rows = await orm.select({ data: codeJobs.data }).from(codeJobs)
+    .where(and(eq(codeJobs.projectId, projectId), eq(codeJobs.ticketId, ticketId))).orderBy(desc(codeJobs.updatedAt)).limit(20);
   return rows.map((r) => (typeof r.data === 'string' ? JSON.parse(r.data) : r.data)).filter((j) => j.status !== 'discarded');
 }
 export async function remoteJobsForProject(projectId) {
-  const rows = (await q('select data from code_jobs where project_id = $1 order by updated_at desc limit 200', [projectId])).rows;
+  const rows = await orm.select({ data: codeJobs.data }).from(codeJobs).where(eq(codeJobs.projectId, projectId)).orderBy(desc(codeJobs.updatedAt)).limit(200);
   return rows.map((r) => (typeof r.data === 'string' ? JSON.parse(r.data) : r.data)).filter((j) => j.status !== 'discarded');
 }
 export function remoteDiff(j, file) {

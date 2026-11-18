@@ -2,7 +2,8 @@
 // whose row-level security lets only that person (and the server's own system work) read it, so nobody else's AI
 // requests or code jobs ever use it. When it's set and on, that person's AI requests run on their own subscription
 // first (Claude Code with their token), and their code jobs on GitHub Actions run with it too.
-import { q, currentContext } from './db';
+import { currentContext } from './db';
+import { orm, userAi, eq, sql } from './orm';
 import { encrypt, decrypt } from './settings';
 import { err } from './errors';
 
@@ -13,12 +14,12 @@ const uid = () => currentContext().user?.id || null;
 export async function myAi(userId = uid()) {
   if (!userId) return null;
   let row;
-  try { row = (await q('select data, updated_at from user_ai where user_id = $1', [userId])).rows[0]; } catch { return null; }
+  try { [row] = await orm.select({ data: userAi.data, updatedAt: userAi.updatedAt }).from(userAi).where(eq(userAi.userId, userId)); } catch { return null; }
   if (!row) return null;
-  const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+  const d: any = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
   let token = '';
   try { token = d.tokenEnc ? decrypt(d.tokenEnc) : ''; } catch { token = ''; }
-  return { enabled: d.enabled !== false, model: MODELS.includes(d.model) ? d.model : 'sonnet', teamFallback: d.teamFallback !== false, codeJobs: d.codeJobs !== false, token, hint: d.hint || '', updatedAt: row.updated_at };
+  return { enabled: d.enabled !== false, model: MODELS.includes(d.model) ? d.model : 'sonnet', teamFallback: d.teamFallback !== false, codeJobs: d.codeJobs !== false, token, hint: d.hint || '', updatedAt: row.updatedAt };
 }
 /** What the browser sees: never the token. */
 export async function publicMyAi() {
@@ -40,8 +41,8 @@ export async function saveMyAi({ token, model, enabled, teamFallback, codeJobs, 
     teamFallback: teamFallback ?? cur?.teamFallback ?? true,
     codeJobs: codeJobs ?? cur?.codeJobs ?? true,
   };
-  await q(`insert into user_ai (user_id, data, updated_at) values ($1, $2, now())
-    on conflict (user_id) do update set data = excluded.data, updated_at = now()`, [userId, JSON.stringify(data)]);
+  await orm.insert(userAi).values({ userId, data, updatedAt: sql`now()` })
+    .onConflictDoUpdate({ target: userAi.userId, set: { data, updatedAt: sql`now()` } });
   return publicMyAi();
 }
 /** The token to use for this person's AI requests now, or null (none, or turned off). */

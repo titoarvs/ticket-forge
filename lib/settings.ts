@@ -3,7 +3,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { qs, DATA_DIR } from './db';
+import { DATA_DIR } from './db';
+import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { normalizeRouting, normalizeConfigs } from './aitasks';
 import { wsKey, wsCache } from './wsmeta';
 
@@ -68,14 +69,13 @@ function normalize(v) {
 /** Saved AI settings (keys still encrypted). */
 export async function getAiSettings({ fresh = false }: any = {}) {
   if (!fresh && C.ai !== undefined && Date.now() - C.at < TTL) return C.ai;
-  const row = (await qs('select value from app_meta where key = $1', [wsKey(AI)])).rows[0];
-  C.ai = normalize(row?.value || null);
+  C.ai = normalize((await getMeta(wsKey(AI))) || null);
   C.at = Date.now();
   return C.ai;
 }
 async function write(actor, next) {
   const v = { ...next, updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(AI), JSON.stringify(v)]);
+  await setMeta(wsKey(AI), v);
   C.ai = v; C.at = Date.now();
   return v;
 }
@@ -173,8 +173,8 @@ const hostHint = (url) => { try { const u = new URL(url); return `${u.protocol}/
 export async function getRemoteBrowser() {
   const env = String(process.env.TICKETFORGE_BROWSER_WS || '').trim();
   if (env) return { url: env, protocol: process.env.TICKETFORGE_BROWSER_PROTOCOL === 'cdp' ? 'cdp' : 'playwright', source: 'env' };
-  const row = (await qs('select value from app_meta where key = $1', [wsKey(BROWSER)]).catch(() => ({ rows: [] }))).rows[0];
-  const v = row ? (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) : null;
+  const saved = await getMeta(wsKey(BROWSER)).catch(() => undefined);
+  const v = saved ? (typeof saved === 'string' ? JSON.parse(saved) : saved) : null;
   if (!v?.urlEnc) return null;
   try { return { url: decrypt(v.urlEnc), protocol: v.protocol === 'cdp' ? 'cdp' : 'playwright', source: 'settings' }; } catch { return null; }
 }
@@ -182,8 +182,8 @@ export async function getRemoteBrowser() {
 export async function publicRemoteBrowser() {
   const r = await getRemoteBrowser();
   if (!r) return null;
-  const row = r.source === 'settings' ? (await qs('select value from app_meta where key = $1', [wsKey(BROWSER)])).rows[0] : null;
-  const v = row ? (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) : {};
+  const saved = r.source === 'settings' ? await getMeta(wsKey(BROWSER)) : null;
+  const v = saved ? (typeof saved === 'string' ? JSON.parse(saved) : saved) : {};
   return { set: true, source: r.source, protocol: r.protocol, hint: hostHint(r.url), updatedBy: v.updatedBy || null, updatedAt: v.updatedAt || null };
 }
 export function checkBrowserUrl(url) {
@@ -195,6 +195,6 @@ export function checkBrowserUrl(url) {
 export async function saveRemoteBrowser(actor, { url, protocol }: any) {
   const clean = checkBrowserUrl(url);
   const v = { urlEnc: encrypt(clean), protocol: protocol === 'cdp' ? 'cdp' : 'playwright', updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(BROWSER), JSON.stringify(v)]);
+  await setMeta(wsKey(BROWSER), v);
 }
-export async function clearRemoteBrowser() { await qs('delete from app_meta where key = $1', [wsKey(BROWSER)]); }
+export async function clearRemoteBrowser() { await deleteMeta(wsKey(BROWSER)); }

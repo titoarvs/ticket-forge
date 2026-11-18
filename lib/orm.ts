@@ -6,11 +6,13 @@
 //     import { orm, projects, eq } from '@/lib/orm';
 //     const rows = await orm.select().from(projects).where(eq(projects.workspaceId, ws));
 // For work outside a signed-in request (startup, webhooks, background jobs) wrap it like qs():
-//     const rows = await asSystem(() => orm.select().from(workspaces));
+//     const rows = await asSystem(async () => await orm.select().from(workspaces));
+// (Write `async () => await …`: a Drizzle query only runs when it is awaited, and that must happen inside asSystem.)
 // Transactions: Drizzle's own `orm.transaction` isn't available through a proxy driver; use `tx()` from lib/db.ts.
-// Tables are defined in lib/db.ts. After changing them, run `npm run db:schema` to refresh lib/schema.ts.
+// Tables are created by lib/db.ts; each one has its own typed file in lib/schema/. After changing a table in lib/db.ts,
+// run `npm run db:schema` to refresh those files.
 import { drizzle } from 'drizzle-orm/pg-proxy';
-import * as schema from './schema';
+import * as schema from './schema/index';
 import * as relations from './relations';
 import { qrows } from './db';
 
@@ -19,5 +21,5 @@ export const orm = drizzle(async (sql, params) => {
   return { rows: r.rows };
 }, { schema: { ...schema, ...relations } });
 
-export * from './schema';
+export * from './schema/index';
 export { sql, eq, ne, and, or, not, inArray, notInArray, isNull, isNotNull, gt, gte, lt, lte, like, ilike, desc, asc } from 'drizzle-orm';

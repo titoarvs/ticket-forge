@@ -11,6 +11,7 @@
     "db:push": "node --env-file-if-exists=.env --import tsx scripts/db-push.ts",
     "db:schema": "node scripts/drizzle-schema.mjs",
     "db:check": "node scripts/drizzle-schema.mjs --check",
+    "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "docs:overview": "node --import tsx scripts/overview-docx.ts",
     "docs:pain-points": "node --import tsx scripts/pain-points-docx.ts",

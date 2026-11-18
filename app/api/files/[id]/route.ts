@@ -8,7 +8,7 @@ async function load(id: string) {
   if (!ID.test(id)) throw new HttpError(404, 'Not found');
   const f = await getFile(id);
   if (!f) throw new HttpError(404, 'File not found');
-  await store.requireProject(user, f.project_id);
+  await store.requireProject(user, f.projectId);
   return { user, f };
 }
 const disposition = (kind: string, name: string) => `${kind}; filename*=UTF-8''${encodeURIComponent(name)}`;

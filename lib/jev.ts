@@ -5,7 +5,7 @@
 // / both for an issue, and which tests are worth running. When it is off, unreachable, or unsure, the AI answers as before.
 //   TYPESAFE_API_KEY          the API key, when you'd rather not save one in the app
 //   TICKETFORGE_JEV_URL       the API address (default https://api.typesafe.ai), for tests against a stand-in
-import { qs } from './db';
+import { getMeta, setMeta } from './appmeta';
 import { wsKey } from './wsmeta';
 import { encrypt, decrypt } from './settings';
 import { err } from './errors';
@@ -20,13 +20,13 @@ export type Question =
 export type Answer = { type: string; choice?: string; score?: number; noul?: number; confidence?: number; probabilities?: Record<string, number> };
 
 async function load() {
-  const v = (await qs('select value from app_meta where key = $1', [wsKey(KEY)])).rows[0]?.value;
+  const v = await getMeta(wsKey(KEY));
   return (typeof v === 'string' ? JSON.parse(v) : v) || {};
 }
 async function save(patch: any) {
   const next = { ...(await load()), ...patch };
   for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(KEY), JSON.stringify(next)]);
+  await setMeta(wsKey(KEY), next);
 }
 async function apiKey(c?: any) {
   const s = c || await load();

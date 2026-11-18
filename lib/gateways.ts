@@ -5,7 +5,8 @@
 //   PAYMONGO_API_BASE   default https://api.paymongo.com
 //   XENDIT_API_BASE     default https://api.xendit.co
 //   STRIPE_API_BASE     default https://api.stripe.com
-import { qs } from './db';
+import { asSystem } from './db';
+import { orm, paymentGateways, eq, sql } from './orm';
 import { encrypt } from './settings';
 import { PROVIDERS, gatewayRow, secretFor } from './gateway-keys';
 import { stripe } from './stripe';
@@ -58,11 +59,12 @@ const hint = (key) => (key ? `…${key.slice(-4)}` : '');
 
 /** Every gateway with whether it is active and has a key saved (never the key itself): [{ provider, name, active, configured, keyHint, … }]. */
 export async function listGateways() {
-  const rows = Object.fromEntries((await qs('select * from payment_gateways')).rows.map((r) => [r.provider, r]));
+  const saved: any[] = await asSystem(async () => await orm.select().from(paymentGateways));
+  const rows = Object.fromEntries(saved.map((r) => [r.provider, r]));
   return PROVIDERS.map((p) => ({
     provider: p, name: GATEWAYS[p].name, currencies: GATEWAYS[p].currencies, keyFormat: GATEWAYS[p].keyHint,
     active: Boolean(rows[p]?.active), configured: Boolean(rows[p]?.credentials?.secretKey), keyEnd: rows[p]?.credentials?.hint || '',
-    updatedAt: rows[p]?.updated_at || null, updatedBy: rows[p]?.updated_by || null,
+    updatedAt: rows[p]?.updatedAt || null, updatedBy: rows[p]?.updatedBy || null,
   }));
 }
 
@@ -81,7 +83,9 @@ export async function saveGateway(p, { active, secretKey }: any = {}, actor) {
   const row = await gatewayRow(p);
   if (!active) {
     if (!row) return (await listGateways()).find((g) => g.provider === p);
-    await qs('update payment_gateways set active = false, updated_by = $2, updated_at = now() where provider = $1', [p, actor?.name || null]);
+    await asSystem(async () => {
+      await orm.update(paymentGateways).set({ active: false, updatedBy: actor?.name || null, updatedAt: sql`now()` }).where(eq(paymentGateways.provider, p));
+    });
     return (await listGateways()).find((g) => g.provider === p);
   }
   const key = typed || (row?.credentials?.secretKey ? await secretFor(p) : '');
@@ -89,9 +93,11 @@ export async function saveGateway(p, { active, secretKey }: any = {}, actor) {
   if (!GATEWAYS[p].keyPattern.test(key)) throw err(`That doesn’t look like a ${GATEWAYS[p].name} secret key. It should start like ${GATEWAYS[p].keyHint}.`);
   await verify(p, key); // throws when the gateway rejects it: nothing is saved and the gateway stays as it was
   const credentials = typed ? { secretKey: encrypt(typed), hint: hint(typed) } : row.credentials;
-  await qs(`insert into payment_gateways (provider, active, credentials, updated_by, updated_at) values ($1, true, $2, $3, now())
-    on conflict (provider) do update set active = true, credentials = excluded.credentials, updated_by = excluded.updated_by, updated_at = now()`,
-  [p, JSON.stringify(credentials), actor?.name || null]);
+  const by = actor?.name || null;
+  await asSystem(async () => {
+    await orm.insert(paymentGateways).values({ provider: p, active: true, credentials, updatedBy: by, updatedAt: sql`now()` })
+      .onConflictDoUpdate({ target: paymentGateways.provider, set: { active: true, credentials, updatedBy: by, updatedAt: sql`now()` } });
+  });
   return (await listGateways()).find((g) => g.provider === p);
 }
 

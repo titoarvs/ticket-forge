@@ -3,7 +3,7 @@
 // per test case are kept; passing runs store nothing.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { q } from './db';
+import { orm, screenshots, eq, and, notInArray, desc } from './orm';
 import { checkLimit } from './limits';
 
 const KEEP_PER_TEST = 5;
@@ -18,11 +18,14 @@ export async function saveFailureShot({ file, projectId, issueId, tcId, error, u
     if (await checkLimit('storageMb', data.length).then(() => false, () => true)) return null; // storage full: keep the result, skip the picture
     const id = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
     const mime = /\.png$/i.test(file) ? 'image/png' : 'image/jpeg';
-    await q('insert into screenshots (id, project_id, issue_id, tc_id, status, error, mime, bytes, data, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-      [id, projectId, issueId || null, tcId, 'Fail', String(error || '').slice(0, 2000), mime, data.length, data, user?.name || null]);
+    await orm.insert(screenshots).values({
+      id, projectId, issueId: issueId || null, tcId, status: 'Fail', error: String(error || '').slice(0, 2000),
+      mime, bytes: data.length, data, createdBy: user?.name || null,
+    });
     // Keep only the latest few per test case.
-    await q(`delete from screenshots where project_id = $1 and tc_id = $2 and id not in (
-      select id from screenshots where project_id = $1 and tc_id = $2 order by created_at desc limit ${KEEP_PER_TEST})`, [projectId, tcId]);
+    const ofTest = and(eq(screenshots.projectId, projectId), eq(screenshots.tcId, tcId));
+    const latest = orm.select({ id: screenshots.id }).from(screenshots).where(ofTest).orderBy(desc(screenshots.createdAt)).limit(KEEP_PER_TEST);
+    await orm.delete(screenshots).where(and(ofTest, notInArray(screenshots.id, latest)));
     return `/api/screenshots/${id}`;
   } finally {
     if (file) fs.rm(file, { force: true }, () => {});
@@ -30,16 +33,24 @@ export async function saveFailureShot({ file, projectId, issueId, tcId, error, u
 }
 
 /** One screenshot (row-level security decides whether this user may see it). */
-export async function getShot(id) {
-  return (await q('select id, project_id, mime, data from screenshots where id = $1', [id])).rows[0] || null;
+export async function getShot(id): Promise<any> {
+  const [row] = await orm.select({ id: screenshots.id, projectId: screenshots.projectId, mime: screenshots.mime, data: screenshots.data })
+    .from(screenshots).where(eq(screenshots.id, id));
+  return row || null;
 }
 
 /** Earlier failures for a test case, newest first (no image data). */
 export async function listShots(projectId, tcId) {
-  const { rows } = await q('select id, tc_id, issue_id, error, bytes, created_by, created_at from screenshots where project_id = $1 and ($2::text is null or tc_id = $2) order by created_at desc limit 200', [projectId, tcId || null]);
+  // The keys stay snake_case: they are what the browser receives.
+  const rows = await orm.select({
+    id: screenshots.id, tc_id: screenshots.tcId, issue_id: screenshots.issueId, error: screenshots.error,
+    bytes: screenshots.bytes, created_by: screenshots.createdBy, created_at: screenshots.createdAt,
+  }).from(screenshots)
+    .where(tcId ? and(eq(screenshots.projectId, projectId), eq(screenshots.tcId, tcId)) : eq(screenshots.projectId, projectId))
+    .orderBy(desc(screenshots.createdAt)).limit(200);
   return rows.map((r) => ({ ...r, url: `/api/screenshots/${r.id}` }));
 }
 
 export async function deleteProjectShots(projectId) {
-  await q('delete from screenshots where project_id = $1', [projectId]);
+  await orm.delete(screenshots).where(eq(screenshots.projectId, projectId));
 }

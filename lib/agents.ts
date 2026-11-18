@@ -9,7 +9,7 @@
 //
 // Administrators can turn agents on or off and set their model, effort and extra instructions in
 // Administration → Agents. Overrides are stored in app_meta under "agent_settings".
-import { qs } from './db';
+import { getMeta, setMeta } from './appmeta';
 import { askAI } from './claude';
 import { wsKey, wsCache } from './wsmeta';
 
@@ -395,7 +395,7 @@ function clean(o: any = {}) {
 export async function getAgentSettings({ fresh = false }: any = {}) {
   if (!fresh && C.v !== undefined && Date.now() - C.at < 30000) return C.v;
   let saved = null;
-  try { saved = (await qs('select value from app_meta where key = $1', [wsKey(KEY)])).rows[0]?.value || null; } catch { /* database not ready */ }
+  try { saved = (await getMeta(wsKey(KEY))) || null; } catch { /* database not ready */ }
   if (typeof saved === 'string') { try { saved = JSON.parse(saved); } catch { saved = null; } }
   C.v = { agents: clean(saved?.agents), custom: cleanCustom(saved?.custom), removed: cleanRemoved(saved?.removed), roles: cleanRoles(saved?.roles), updatedBy: saved?.updatedBy || null, updatedAt: saved?.updatedAt || null };
   C.at = Date.now();
@@ -408,7 +408,7 @@ export async function saveAgentSettings(actor, agents, custom?, { removed, roles
   const cur = await getAgentSettings({ fresh: true });
   const v = { agents: clean(agents ?? cur.agents), custom: custom === undefined ? cur.custom : cleanCustom(custom), removed: removed === undefined ? cur.removed : cleanRemoved(removed),
     roles: roles === undefined ? cur.roles : cleanRoles(roles), updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(KEY), JSON.stringify(v)]);
+  await setMeta(wsKey(KEY), v);
   C.v = v; C.at = Date.now();
   return v;
 }

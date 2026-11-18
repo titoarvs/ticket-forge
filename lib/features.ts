@@ -1,6 +1,6 @@
 // Feature flags: the owner can lock any feature (Administration → Features). A locked feature is hidden in the app and
 // its API routes refuse requests for everyone (owners included) until the owner unlocks it. Stored in app_meta.
-import { qs } from './db';
+import { getMeta, setMeta } from './appmeta';
 import { wsKey, wsCache } from './wsmeta';
 
 /**
@@ -55,7 +55,7 @@ const C: any = wsCache('__tfFlagsWs');
 export async function getFlags({ fresh = false }: any = {}) {
   if (!fresh && C.v !== undefined && Date.now() - C.at < 15000) return C.v;
   let v = null;
-  try { v = (await qs('select value from app_meta where key = $1', [wsKey(KEY)])).rows[0]?.value || null; } catch { /* database not ready */ }
+  try { v = (await getMeta(wsKey(KEY))) || null; } catch { /* database not ready */ }
   if (typeof v === 'string') { try { v = JSON.parse(v); } catch { v = null; } }
   const locked: any = {};
   for (const [id, x] of Object.entries<any>(v?.locked || {})) if (IDS.has(id)) locked[id] = { at: x?.at || null, by: x?.by || null, note: String(x?.note || '').slice(0, 300) };
@@ -82,7 +82,7 @@ export async function setFlags(actor, changes) {
   }
   for (const f of FEATURES as any[]) if (f.off) delete locked[f.id]; // its lock comes from starting locked, not from the owner
   const v = { locked, unlocked, updatedBy: actor?.name || null, updatedAt: at };
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(KEY), JSON.stringify(v)]);
+  await setMeta(wsKey(KEY), v);
   return getFlags({ fresh: true });
 }
 export async function isLocked(id) { return Boolean((await getFlags()).locked[id]); }

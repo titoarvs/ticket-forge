@@ -6,7 +6,8 @@
 // Self-hosted, and the service's own default workspace, have no limits.
 // Every feature is open to every plan (TF-101): only a positive number is a limit that stops anything. A plan value of
 // 0 used to mean "not included in this plan"; it is no longer a gate, so the feature works on every plan.
-import { qs, currentWs, DEFAULT_WS } from './db';
+import { asSystem, currentWs, DEFAULT_WS } from './db';
+import { orm, workspaces, projects, workspaceMembers, invites, files, screenshots, usageCounters, eq, and, isNull, gt, sql } from './orm';
 import { isSaas } from './platform';
 import { PLANS, LIMIT_DEFS } from './plans';
 import { getPlanVersion } from './billing-plans';
@@ -18,6 +19,16 @@ const UNLIMITED = { projects: null, members: null, aiCalls: null, codeJobs: null
 export const billingOn = () => isSaas();
 /** Whether a plan value is a limit that stops things: a positive number. `null` (no limit) and 0 (no longer a gate) aren't. */
 const enforced = (limit) => limit != null && limit > 0;
+
+/** Runs a Drizzle query in system context (these counts are about the whole workspace, whoever asks). */
+const sys = <T>(run: () => PromiseLike<T>): Promise<T> => asSystem(async () => await run());
+/** The workspace's plan facts. The keys stay snake_case, as the plan code below reads them. */
+const planRow = async (ws): Promise<any> => (await sys(() => orm.select({
+  plan: workspaces.plan, plan_version: workspaces.planVersion, subscription_status: workspaces.subscriptionStatus, trial_ends_at: workspaces.trialEndsAt,
+  current_period_end: workspaces.currentPeriodEnd, cancel_at_period_end: workspaces.cancelAtPeriodEnd,
+}).from(workspaces).where(eq(workspaces.id, ws))))[0];
+const count = sql<number>`count(*)::int`;
+const bytesOf = (col) => sql<string>`coalesce(sum(${col}), 0)::bigint`;
 const period = (d = new Date()) => d.toISOString().slice(0, 7); // YYYY-MM (UTC)
 
 /** Subscription states that keep the paid plan: paying, in a Stripe trial, or a failed payment Stripe is still retrying. */
@@ -45,7 +56,7 @@ function trialEndedUnpaid(w, now = new Date()) {
 /** { locked, reason, plan: { id, name }, trialEndedAt }: whether the workspace is locked and the pay prompt is shown (SaaS only). */
 export async function lockStatus(ws = currentWs()) {
   if (!billingOn() || !ws || ws === DEFAULT_WS) return { locked: false };
-  const w = (await qs('select plan, plan_version, subscription_status, trial_ends_at, cancel_at_period_end from workspaces where id = $1', [ws])).rows[0];
+  const w = await planRow(ws);
   if (!trialEndedUnpaid(w)) return { locked: false };
   const def = await getPlanVersion(w.plan, w.plan_version || 1);
   return { locked: true, reason: 'trial_ended', plan: { id: w.plan, name: def?.name || PLANS[w.plan]?.name || w.plan }, trialEndedAt: w.trial_ends_at };
@@ -54,7 +65,7 @@ export async function lockStatus(ws = currentWs()) {
 /** The plan in force for a workspace: { id, name, limits, source: 'subscription' | 'trial' | 'locked' | 'free' | 'unlimited', … }. */
 export async function effectivePlan(ws = currentWs()) {
   if (!billingOn() || !ws || ws === DEFAULT_WS) return { id: 'unlimited', name: 'Unlimited', limits: UNLIMITED, source: 'unlimited' };
-  const w = (await qs('select plan, plan_version, subscription_status, trial_ends_at, current_period_end, cancel_at_period_end from workspaces where id = $1', [ws])).rows[0];
+  const w = await planRow(ws);
   if (!w) return { id: 'free', name: PLANS.free.name, limits: PLANS.free.limits, source: 'free' };
   // The plan version the workspace subscribed to: later edits to the plan don't change it (billing-plans.js).
   const def = w.plan && w.plan !== 'free' ? (await getPlanVersion(w.plan, w.plan_version || 1)) || PLANS[w.plan] : null;
@@ -100,18 +111,20 @@ function limitError(metric, limit, plan) {
 /** What the workspace uses now (for the Billing page and the counted limits). */
 export async function usage(ws = currentWs()) {
   const p = period();
-  const [proj, mem, inv, files, shots, ctr] = await Promise.all([
-    qs('select count(*)::int n from projects where workspace_id = $1', [ws]),
-    qs("select count(*)::int n from workspace_members where workspace_id = $1 and status = 'active'", [ws]),
-    qs('select count(*)::int n from invites where workspace_id = $1 and accepted_at is null and revoked_at is null and expires_at > now()', [ws]),
-    qs('select coalesce(sum(f.bytes), 0)::bigint b from files f join projects p on p.id = f.project_id where p.workspace_id = $1', [ws]),
-    qs('select coalesce(sum(s.bytes), 0)::bigint b from screenshots s join projects p on p.id = s.project_id where p.workspace_id = $1', [ws]),
-    qs('select metric, n from usage_counters where workspace_id = $1 and period = $2', [ws, p]),
+  const [[proj], [mem], [inv], [fileBytes], [shotBytes], ctr] = await Promise.all([
+    sys(() => orm.select({ n: count }).from(projects).where(eq(projects.workspaceId, ws))),
+    sys(() => orm.select({ n: count }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, ws), eq(workspaceMembers.status, 'active')))),
+    sys(() => orm.select({ n: count }).from(invites)
+      .where(and(eq(invites.workspaceId, ws), isNull(invites.acceptedAt), isNull(invites.revokedAt), gt(invites.expiresAt, sql`now()`)))),
+    sys(() => orm.select({ b: bytesOf(files.bytes) }).from(files).innerJoin(projects, eq(projects.id, files.projectId)).where(eq(projects.workspaceId, ws))),
+    sys(() => orm.select({ b: bytesOf(screenshots.bytes) }).from(screenshots).innerJoin(projects, eq(projects.id, screenshots.projectId)).where(eq(projects.workspaceId, ws))),
+    sys(() => orm.select({ metric: usageCounters.metric, n: usageCounters.n }).from(usageCounters)
+      .where(and(eq(usageCounters.workspaceId, ws), eq(usageCounters.period, p)))),
   ]);
-  const monthly = Object.fromEntries(ctr.rows.map((r) => [r.metric, r.n]));
+  const monthly = Object.fromEntries(ctr.map((r) => [r.metric, r.n]));
   return {
-    projects: proj.rows[0].n, members: mem.rows[0].n, pendingInvites: inv.rows[0].n,
-    storageMb: Math.round((Number(files.rows[0].b) + Number(shots.rows[0].b)) / 1048576 * 10) / 10,
+    projects: proj.n, members: mem.n, pendingInvites: inv.n,
+    storageMb: Math.round((Number(fileBytes.b) + Number(shotBytes.b)) / 1048576 * 10) / 10,
     aiCalls: monthly.aiCalls || 0, codeJobs: monthly.codeJobs || 0, period: p,
   };
 }
@@ -139,13 +152,15 @@ export async function consume(metric, ws = currentWs()) {
   const limit = plan.limits[metric];
   if (!enforced(limit)) return () => {};
   const p = period();
-  const r = await qs(`insert into usage_counters (workspace_id, metric, period, n) values ($1, $2, $3, 1)
-    on conflict (workspace_id, metric, period) do update set n = usage_counters.n + 1 where usage_counters.n < $4 returning n`, [ws, metric, p, limit]);
-  if (!r.rows[0]) throw limitError(metric, limit, plan);
+  const [taken] = await sys(() => orm.insert(usageCounters).values({ workspaceId: ws, metric, period: p, n: 1 })
+    .onConflictDoUpdate({ target: [usageCounters.workspaceId, usageCounters.metric, usageCounters.period], set: { n: sql`${usageCounters.n} + 1` }, setWhere: sql`${usageCounters.n} < ${limit}` })
+    .returning({ n: usageCounters.n }));
+  if (!taken) throw limitError(metric, limit, plan);
   let given = false;
   return () => {
     if (given) return;
     given = true;
-    qs('update usage_counters set n = greatest(n - 1, 0) where workspace_id = $1 and metric = $2 and period = $3', [ws, metric, p]).catch(() => {});
+    sys(() => orm.update(usageCounters).set({ n: sql`greatest(${usageCounters.n} - 1, 0)` })
+      .where(and(eq(usageCounters.workspaceId, ws), eq(usageCounters.metric, metric), eq(usageCounters.period, p)))).catch(() => {});
   };
 }

@@ -1,5 +1,5 @@
 // In-app notifications and the "automated test failed" report.
-import { q } from './db';
+import { orm, notifications, eq, and, isNull, inArray, desc, sql } from './orm';
 import { newId, listUsers, sendMail, emailLayout } from './auth';
 import { getProject, appendComment, canAccess } from './store';
 import { analysisText } from './failures';
@@ -8,20 +8,27 @@ const pad = (n) => String(n).padStart(2, '0');
 const oneLine = (s, n = 220) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 export async function notify({ userId, projectId, issueId, kind, title, body, link }: any) {
-  await q('insert into notifications (id, user_id, project_id, issue_id, kind, title, body, link) values ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [newId(), userId, projectId || null, issueId || null, kind, String(title).slice(0, 300), String(body || '').slice(0, 2000), link || '']);
+  await orm.insert(notifications).values({
+    id: newId(), userId, projectId: projectId || null, issueId: issueId || null, kind,
+    title: String(title).slice(0, 300), body: String(body || '').slice(0, 2000), link: link || '',
+  });
 }
 export async function listNotifications(userId) {
   // One query (every open browser polls this): the latest 50 and, over all of the user's notifications, the unread count.
-  const { rows } = await q(`select id, project_id, issue_id, kind, title, body, link, created_at, read_at,
-      (count(*) filter (where read_at is null) over ())::int as unread_total
-    from notifications where user_id = $1 order by created_at desc limit 50`, [userId]);
+  // The keys stay snake_case: they are what the browser receives.
+  const rows = await orm.select({
+    id: notifications.id, project_id: notifications.projectId, issue_id: notifications.issueId, kind: notifications.kind,
+    title: notifications.title, body: notifications.body, link: notifications.link, created_at: notifications.createdAt,
+    read_at: notifications.readAt,
+    unread_total: sql<number>`(count(*) filter (where ${notifications.readAt} is null) over ())::int`,
+  }).from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(50);
   const unread = rows[0]?.unread_total || 0;
   return { items: rows.map(({ unread_total: _u, ...r }: any) => r), unread };
 }
 export async function markRead(userId, ids) {
-  if (Array.isArray(ids) && ids.length) await q('update notifications set read_at = now() where user_id = $1 and id = any($2) and read_at is null', [userId, ids]);
-  else await q('update notifications set read_at = now() where user_id = $1 and read_at is null', [userId]);
+  const mine = and(eq(notifications.userId, userId), isNull(notifications.readAt));
+  const where = Array.isArray(ids) && ids.length ? and(mine, inArray(notifications.id, ids)) : mine;
+  await orm.update(notifications).set({ readAt: sql`now()` }).where(where);
 }
 
 /**

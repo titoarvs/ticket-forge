@@ -1,6 +1,7 @@
 // The help chatbot: rule-based, no AI. It answers from the FAQ below and from live ticket data. Ticket data is limited
 // by the person's role: only projects they have access to, and people counts only with "Manage users and access".
-import { q, qs } from './db';
+import { asSystem } from './db';
+import { orm, projects, issues, workspaceMembers, eq, and, sql } from './orm';
 import { canAccess, has } from './store';
 
 /** Help content. `k`: words or phrases that point to the entry (matched anywhere in the question). */
@@ -53,8 +54,9 @@ const doneNames = (workflow) => new Set(workflow?.length ? workflow.filter((w) =
 
 /** Counts for one project the person can read (the database also filters by their access). */
 async function projectStats(project, user) {
-  const meta = (await q('select data from projects where id = $1', [project.id])).rows[0]?.data || {};
-  const rows = (await q('select data from issues where project_id = $1 and not is_sub', [project.id])).rows;
+  const [projectRow] = await orm.select({ data: projects.data }).from(projects).where(eq(projects.id, project.id));
+  const meta: any = projectRow?.data || {};
+  const rows: any[] = await orm.select({ data: issues.data }).from(issues).where(and(eq(issues.projectId, project.id), eq(issues.isSub, false)));
   const done = doneNames(meta.workflow);
   const byStatus: Map<any, any> = new Map();
   let open = 0, mine = 0;
@@ -77,7 +79,7 @@ async function ticketAnswer(user, text) {
   const m = norm(text);
   // Every project name in the workspace is compared with the question (names only, never data) so a project the person
   // can't open is refused instead of being treated as "not found".
-  const all = (await qs('select id, name, key from projects where workspace_id = $1', [user.workspace_id || ''])).rows;
+  const all = await asSystem(async () => await orm.select({ id: projects.id, name: projects.name, key: projects.key }).from(projects).where(eq(projects.workspaceId, user.workspace_id || '')));
   const keyOf = (p) => String(p.key || '').toLowerCase().replace(/[^\w]/g, '');
   const named = all.filter((p) => (p.name && m.includes(norm(p.name))) || (keyOf(p) && new RegExp(`\\b${keyOf(p)}\\b`).test(m)));
   const denied = named.filter((p) => !canAccess(user, p.id));
@@ -95,7 +97,8 @@ async function ticketAnswer(user, text) {
 /** People counts need the "Manage users and access" permission. */
 async function peopleAnswer(user) {
   if (!has(user, 'users.manage')) return tell('You don’t have permission to see user information, so I can’t answer that. Ask an administrator.', 'denied');
-  const n = (await qs('select count(*)::int n from workspace_members where workspace_id = $1', [user.workspace_id || ''])).rows[0]?.n || 0;
+  const [counted] = await asSystem(async () => await orm.select({ n: sql<number>`count(*)::int` }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, user.workspace_id || '')));
+  const n = counted?.n || 0;
   return tell(`There ${n === 1 ? 'is' : 'are'} ${n} ${n === 1 ? 'person' : 'people'} in this workspace.`, 'data');
 }
 
