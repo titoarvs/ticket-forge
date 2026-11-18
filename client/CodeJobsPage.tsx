@@ -18,6 +18,31 @@ const LABEL: Record<string, string> = {
 };
 type Filter = 'live' | 'review' | 'all';
 
+/**
+ * The issue "Write code" opened this page for (TF-124, /code-jobs?project=…&ticket=…): its ID, the coding prompt and the
+ * linked repository or spec. With no repository or spec only the ID and the prompt show.
+ */
+function TicketContext({ projectId, ticketId }: { projectId: string; ticketId: string }) {
+  const [c, setC] = useState<Any>(null);
+  const [error, setError] = useState<Any>(null);
+  const load = () => { setError(null); api(`/api/projects/${encodeURIComponent(projectId)}/code-context?ticketId=${encodeURIComponent(ticketId)}`).then(setC).catch(setError); };
+  useEffect(load, [projectId, ticketId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (error) return <div className="card" style={{ padding: 16, marginBottom: 12 }}><ErrorState title="Couldn’t load the issue" error={error} onRetry={load}><p>Open the issue again from its project.</p></ErrorState></div>;
+  if (!c) return <div className="card" style={{ padding: 16, marginBottom: 12 }}><Spinner /> Loading the issue…</div>;
+  return (
+    <div className="card" style={{ padding: 16, marginBottom: 12 }} aria-label="Issue to code">
+      <div className="job-l1"><code>{c.key || c.ticketId}</code><span className="job-title">{c.title}</span></div>
+      {(c.repos.length > 0 || c.spec) && <ul className="small" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+        {c.repos.map((r: Any) => <li key={r.label}>{r.label}: <code>{r.name}</code></li>)}
+        {c.spec && <li>Coding spec: {c.spec.status === 'ready' ? 'ready for coding' : 'draft'}{c.spec.files.length ? <> · {c.spec.files.map((f: Any) => <code key={f.path} style={{ marginRight: 6 }}>{f.path}</code>)}</> : null}{c.spec.modules.length ? ` · modules: ${c.spec.modules.join(', ')}` : ''}</li>}
+      </ul>}
+      <h4 style={{ margin: '12px 0 4px' }}>Prompt</h4>
+      <pre className="small" style={{ whiteSpace: 'pre-wrap', maxHeight: 320, overflow: 'auto', margin: 0 }}>{c.prompt}</pre>
+      <button className="btn sm subtle" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(c.prompt).then(() => toast('Prompt copied.'), () => toast('Couldn’t copy the prompt.', 'err'))}>Copy prompt</button>
+    </div>
+  );
+}
+
 /** The Code jobs page. With `projectId` it is that project's page (Development → Code jobs): its jobs only, links stay in the project. */
 export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   useStore();
@@ -29,6 +54,12 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   const [busy, setBusy] = useState('');
   const [diffOpen, setDiffOpen] = useState<string | null>(null);
   const timer = useRef<Any>(null);
+  // Opened by "Write code" on an issue (TF-124): /code-jobs?project=…&ticket=…
+  const [asked, setAsked] = useState<{ project: string; ticket: string } | null>(null);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('project') && sp.get('ticket')) setAsked({ project: sp.get('project') || '', ticket: sp.get('ticket') || '' });
+  }, []);
 
   const load = async () => {
     try {
@@ -73,6 +104,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
       <div className="page-h"><div><h1>Code jobs</h1><p className="muted small" style={{ margin: '2px 0 0' }}>{scoped ? `What AI agents are writing for ${P()?.name || 'this project'}, live. Open a job to review its changes, then open the pull request.` : `What AI agents are writing across your projects${S.user?.workspaceName ? ` in ${S.user.workspaceName}` : ''}, live.`}</p></div>
         {scoped && <Link className="btn" href={`/p/${projectId}/prs`} style={{ marginLeft: 12 }}><Ico svg={I.pr} />Pull requests</Link>}
         <div className="spacer" /><button className="btn" onClick={load}><Ico svg={I.undo} />Refresh</button></div>
+      {asked && <TicketContext projectId={asked.project} ticketId={asked.ticket} />}
       {!d ? <div className="card" style={{ padding: 20 }}><Spinner /> Loading code jobs…</div> : <>
         <div className="cjp-sum">
           <div className={n(LIVE) ? 'on' : ''}><b>{n(['running', 'starting'])}</b><span>working</span></div>

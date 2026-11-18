@@ -837,6 +837,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   );
 }
 export const openCode = (t: Any, side?: string) => openModal(<CodeModal t={t} initialSide={side} />);
+/** "Write code" on an issue or an epic's issue (TF-124): Code Jobs in a new tab with the issue; this tab stays as it is. The page loads the prompt and the linked repository or spec itself. */
+export const openWriteCode = (t: Any) => { window.open(`/code-jobs?project=${encodeURIComponent(P().id)}&ticket=${encodeURIComponent(t.id)}`, '_blank', 'noopener'); };
 
 // ---------------------------------------------------------------- update an open pull / merge request with AI
 const UPDATE_MODES: [string, string, string][] = [

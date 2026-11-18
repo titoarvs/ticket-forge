@@ -9,7 +9,7 @@ import { q, tx, qs, DATA_DIR, currentWs, DEFAULT_WS } from './db';
 import { HttpError, verifyPassword } from './auth';
 import { checkLimit } from './limits';
 import { describeSection } from './activity';
-import { findOverlaps, describeOverlap, specConfig } from './specs';
+import { findOverlaps, describeOverlap, specConfig, specPrompt } from './specs';
 
 const TICKETS = 'tickets';
 const SETTINGS_KEYS = ['name', 'key', 'summary', 'assumptions', 'openQuestions', 'workflow', 'members', 'automation', 'sourceName', 'sourceText'];
@@ -558,6 +558,29 @@ export async function listSpecs(projectId, epicId = '') {
       changes: changes.rows.filter((c) => c.ticket_id === s.ticketId).map(changeOut) })),
     overlaps, config,
   };
+}
+
+/**
+ * What the Code jobs page shows when "Write code" opens it from a ticket (TF-124): the ticket, its coding prompt (the saved
+ * coding spec's, else one written from the ticket now), and the linked repository and spec when there are any. Anyone who
+ * can open the project can read it, the same as the ticket itself. { ticketId, key, title, prompt, repos: [{ label, name }], spec }.
+ */
+export async function codeContext(projectId, ticketId) {
+  const project = await getProject(projectId);
+  const ticket = (project.tickets || []).find((t) => t.id === String(ticketId));
+  if (!ticket) throw new HttpError(404, 'Issue not found');
+  const row = (await q('select * from coding_specs where project_id = $1 and ticket_id = $2', [projectId, ticket.id])).rows[0];
+  const spec = row ? specOut(row) : null;
+  const epic = (project.epics || []).find((e) => e.id === ticket.epicId);
+  const subtasks = project.tickets.filter((x) => x.parentId === ticket.id);
+  const prompt = spec?.prompt || specPrompt({ project, epic, ticket, subtasks });
+  const repos: { label: string; name: string }[] = [];
+  const addRepo = (label, d) => { const name = d?.repo || String(d?.source?.url || '').replace(/\/\/[^@/]*@/, '//'); if (name) repos.push({ label, name }); };
+  const split = Boolean(project.devBackend?.enabled);
+  if (split && ticket.layer === 'backend') addRepo('Backend', project.devBackend);
+  else { addRepo(split ? 'Frontend' : 'Repository', project.dev); if (split && ticket.layer === 'both') addRepo('Backend', project.devBackend); }
+  return { ticketId: ticket.id, key: ticket.key || '', title: ticket.title || '', prompt, repos,
+    spec: spec ? { status: spec.status, files: spec.files, modules: spec.modules } : null };
 }
 
 /** Saves generated specs (lib/specgen.ts), replacing each ticket's earlier spec: it goes back to draft. */
