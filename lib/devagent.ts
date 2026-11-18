@@ -12,6 +12,9 @@ import { claudeCodeCommand, askJson, agentModel, noteAgentUsage } from './claude
 import { reviewWorktree } from './coderabbit';
 import { resolveAgent, claudeAgentsJson, codeAgentIds, ensureAgent, REVIEW_LENSES, requireRole } from './agents';
 import { isSaas } from './platform';
+import { appEnv } from './childenv';
+import { testDatabase } from './appdb';
+import { migrationCheck } from './dbschema';
 
 const G = globalThis;
 G.__tfDevJobs ??= new Map();
@@ -21,7 +24,7 @@ const MAX_DIFF = 400_000;
 
 function git(cwd, args, { timeout = 120000, input }: any = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile('git', args, { cwd, timeout, maxBuffer: 32 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (err, stdout, stderr) => {
+    const child = execFile('git', args, { cwd, timeout, maxBuffer: 32 * 1024 * 1024, env: { ...appEnv(), GIT_TERMINAL_PROMPT: '0' } }, (err, stdout, stderr) => {
       if (err) reject(Object.assign(new Error(String(stderr || err.message).trim().split('\n').slice(-3).join(' ')), { status: 400 }));
       else resolve(String(stdout));
     });
@@ -273,13 +276,20 @@ function prompt(t, agent, extra, round, context = '') {
 async function runAgent(j, agentId, text, { resume = false }: any = {}) {
   const agent = await resolveAgent(agentId);
   if (!agent.enabled) throw Object.assign(new Error(`The ${agent.name} agent is turned off in Administration → Agents.`), { status: 400 });
-  const { bin, env } = await claudeCodeCommand();
+  const { bin, env: baseEnv } = await claudeCodeCommand();
+  // The project's Test database (or the person's own), never TicketForge's own database or secrets. Looked up each round,
+  // so the connection string is never kept on the job (which is saved and shown in the app).
+  const db = await testDatabase(j.projectId, j.userId, { local: true }).catch(() => null);
+  const env = appEnv(baseEnv, db?.url || '');
   const extra = checkTools(j.dev.checkCommand);
   const agents = await claudeAgentsJson({ notes: j.dev.notes || '', checkTool: extra });
   if (!agents[agentId]) throw Object.assign(new Error(`The ${agent.name} agent isn’t available.`), { status: 400 });
   const tools = [...agent.tools, ...extra];
   const note = verifyNote(j, agent.writes);
   if (note) text = `${text}\n\n${note}`;
+  if (!resume) text = `${text}\n\n${db
+    ? `DATABASE: DATABASE_URL and TEST_DATABASE_URL in your environment point to ${db.name} (${db.engineLabel}: ${db.database} on ${db.host}), a test database for this app. Run migrations, seeds and tests against it when the work needs a database. Never connect to any other database, and never print or write the connection string into files.`
+    : 'DATABASE: no test database is set up for this project (Project settings → Database), so DATABASE_URL is not set. Don’t run migrations or tests that need a database; say in your summary what should be run against one.'}`;
   // The Repository Profile (Learn from repository): how this codebase is built, for the first round of a job.
   const profile = String(j.dev.repoProfile?.markdown || '').trim();
   if (profile && !resume) text = `${text}\n\nREPOSITORY PROFILE (learned from this repository${j.dev.repoProfile.commit ? ` at ${j.dev.repoProfile.commit}` : ''}; follow its structure, conventions and patterns, and check it against the code when something looks different):\n${profile}`;
@@ -420,7 +430,8 @@ export async function reviewJob(id, { panel = false, agent = 'review' }: any = {
       const t = j.ticket;
       const text = [`Review the changes made for issue ${t.key}: ${t.title}.`, t.userStory && `User story: ${t.userStory}`,
         t.acceptanceCriteria?.length && `Acceptance criteria:\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
-        `Changed files: ${j.files.map((f) => f.path).join(', ')}`, `The diff (staged, uncommitted):\n\`\`\`diff\n${diff.slice(0, 120000)}\n\`\`\``].filter(Boolean).join('\n\n');
+        `Changed files: ${j.files.map((f) => f.path).join(', ')}`, `The diff (staged, uncommitted):\n\`\`\`diff\n${diff.slice(0, 120000)}\n\`\`\``,
+        await dbCheck(j.projectId, diff, j.files.map((f) => f.path))].filter(Boolean).join('\n\n');
       let entry;
       if (panel) {
         const lenses = await Promise.all(REVIEW_LENSES.map(async (l) => {
@@ -477,6 +488,11 @@ export async function codeRabbitJob(id, { apiKey = '' }: any = {}) {
   return publicJob(j);
 }
 
+/** The database check for a review: the diff's migrations against the project's saved schema ('' when there are none). */
+async function dbCheck(projectId: string, diff: string, files: string[]) {
+  try { const { getProject } = await import('./store'); return migrationCheck(await getProject(projectId), diff, files); } catch { return ''; }
+}
+
 /** Starts a job: a fresh worktree and branch from the base branch, then Claude Code (queued when the machine is busy). */
 export function startJob(args) { return withRepoLock(path.resolve(String(args.dev?.localPath || '')), () => startJobNow(args)); }
 async function startJobNow({ projectId, ticket, dev, instructions, user, agentId = 'build', context = '', side = 'frontend', target = null, brainFiles = null }: any) {
@@ -493,7 +509,7 @@ async function startJobNow({ projectId, ticket, dev, instructions, user, agentId
   const id = crypto.randomUUID().slice(0, 12);
   const dir = path.join(/*turbopackIgnore: true*/ WT_ROOT, projectId, `${String(ticket.key || id).toLowerCase()}${side === 'backend' ? '-be' : ''}-${id}`);
   const j: any = { id, projectId, ticketId: ticket.id, ticketKey: ticket.key, status: 'starting', branch, base, repo: dev.repo || repo.repo, repoPath: repo.path,
-    dir, dev, log: [], startedAt: new Date().toISOString(), startedBy: user?.name, rounds: 1, files: [], summary: '', ticket, agentId, agentName: agent.name, sessions: {}, reviews: [], todos: [], side, localOnly: Boolean(dev.localOnly), provider: repo.provider || (dev.repo ? 'GitHub' : null), target: target || null };
+    dir, dev, log: [], startedAt: new Date().toISOString(), startedBy: user?.name, userId: user?.id || '', rounds: 1, files: [], summary: '', ticket, agentId, agentName: agent.name, sessions: {}, reviews: [], todos: [], side, localOnly: Boolean(dev.localOnly), provider: repo.provider || (dev.repo ? 'GitHub' : null), target: target || null };
   JOBS.set(id, j);
   if (target) {
     say(j, `Fetching the pull request branch ${branch} from origin…`);
@@ -748,6 +764,7 @@ export async function startPrReview({ projectId, ticket, dev, target, user, agen
     `Changed files (${files.length}): ${files.join(', ')}`,
     `The diff against ${target.base}${diff.length > 120000 ? ' (cut to the first 120,000 characters; read the files for the rest)' : ''}:\n\`\`\`diff\n${diff.slice(0, 120000)}\n\`\`\``,
     focus && `Focus especially on: ${focus}`,
+    await dbCheck(projectId, diff, files),
     'The working folder is the request’s branch as it is now: read any file you need. Do not change files.',
     'Write the review in Markdown: a one-paragraph verdict (approve / approve with comments / request changes), then findings grouped as Blocking, Should fix and Nits, each with file:line, what is wrong and the fix. End with which acceptance criteria are met, missing or untested.'].filter(Boolean).join('\n\n');
   const job = await startJob({ projectId, ticket, dev, instructions, user, agentId, side, target, context: `REVIEWING AN OPEN ${target.provider === 'GitLab' ? 'MERGE' : 'PULL'} REQUEST: ${target.url}. Read-only: report findings, never edit.` });
@@ -862,7 +879,7 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
   const tok = await githubToken(token);
   if (!tok) {
     const out: any = await new Promise((resolve) => execFile('gh', ['pr', 'create', '--repo', repo, '--head', j.branch, '--base', j.base, '--title', prTitle, '--body', prBody, ...(draft ? ['--draft'] : [])],
-      { cwd: j.dir, timeout: 60000, env: { ...process.env, GH_PROMPT_DISABLED: '1' } }, (err, stdout) => resolve(err ? '' : String(stdout).trim())));
+      { cwd: j.dir, timeout: 60000, env: { ...appEnv(), GH_PROMPT_DISABLED: '1' } }, (err, stdout) => resolve(err ? '' : String(stdout).trim())));
     const url = out.split('\n').find((l) => /^https:\/\/github\.com\/.+\/pull\/\d+/.test(l));
     if (url) return done({ url, number: Number(url.match(/\/pull\/(\d+)/)[1]), title: prTitle, draft: Boolean(draft), repo });
     return viaPage('No GitHub token or gh sign-in to open the pull request with, so it opens on GitHub instead (save a token in Project settings → Code & GitHub, or run gh auth login, to have TicketForge open it).');
@@ -919,7 +936,8 @@ CONTRIBUTING, CLAUDE.md or AGENTS.md asks for.`;
  */
 export async function learnRepo({ localPath, model = 'sonnet', onStep = (_text) => {}, signal }: any) {
   const repo = await inspectRepo(localPath);
-  const { bin, env } = await claudeCodeCommand();
+  const { bin, env: baseEnv } = await claudeCodeCommand();
+  const env = appEnv(baseEnv); // read-only profile agent: no database at all
   const commit = (await git(repo.path, ['rev-parse', '--short', 'HEAD']).catch(() => '')).trim();
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--strict-mcp-config', '--permission-mode', 'default',
     '--allowedTools', 'Read Glob Grep LS', '--disallowedTools', 'Bash Edit Write MultiEdit NotebookEdit WebFetch WebSearch Task Agent', '--model', model];

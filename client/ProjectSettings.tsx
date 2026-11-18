@@ -147,8 +147,9 @@ function Danger() {
 export function Settings() {
   const ed = can('project.settings');
   // Sections with their own permission are hidden from people who don't have it.
-  const own: Record<string, string> = { code: 'project.repo', database: 'project.database' };
-  const sections = SECTIONS.filter(([k]) => !own[k] || can(own[k]));
+  // Database: also for people who set up repositories, so they can add their own database there.
+  const own: Record<string, string[]> = { code: ['project.repo'], database: ['project.database', 'project.repo'] };
+  const sections = SECTIONS.filter(([k]) => !own[k] || own[k].some(can));
   const cur = sections.find(([k]) => k === S.setTab)?.[0] || 'details';
   const go = (k: string) => { S.setTab = k; saveUi(); emit(); document.querySelector('.view')?.scrollTo({ top: 0 }); };
   const [, label, , desc] = sections.find(([k]) => k === cur)!;

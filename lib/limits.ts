@@ -2,7 +2,8 @@
 // things that would go over its limits with a 402 the app turns into an "Upgrade" prompt.
 //   Counted things (checked when added): projects, members (people + pending invites), storage (files + screenshots).
 //   Monthly things (counted as used): platform AI calls (only AI paid by the service: a workspace's own API keys and
-//   people's own Claude subscriptions don't count), AI code jobs.
+//   people's own Claude subscriptions don't count), AI code jobs, database schema reads.
+//   Per project (checked when added): database connections.
 // Self-hosted, and the service's own default workspace, have no limits.
 // Every feature is open to every plan (TF-101): only a positive number is a limit that stops anything. A plan value of
 // 0 used to mean "not included in this plan"; it is no longer a gate, so the feature works on every plan.
@@ -14,8 +15,9 @@ import { getPlanVersion } from './billing-plans';
 
 const LABEL = {
   projects: 'projects', members: 'members', aiCalls: 'AI actions this month', codeJobs: 'AI code jobs this month', storageMb: 'MB of storage',
+  dbConnections: 'database connections per project', schemaReads: 'schema reads this month',
 };
-const UNLIMITED = { projects: null, members: null, aiCalls: null, codeJobs: null, storageMb: null };
+const UNLIMITED = { projects: null, members: null, aiCalls: null, codeJobs: null, storageMb: null, dbConnections: null, schemaReads: null };
 export const billingOn = () => isSaas();
 /** Whether a plan value is a limit that stops things: a positive number. `null` (no limit) and 0 (no longer a gate) aren't. */
 const enforced = (limit) => limit != null && limit > 0;
@@ -83,7 +85,7 @@ export async function effectivePlan(ws = currentWs()) {
 }
 
 /** The plan limits the app shows: [key, name, unit]. */
-const SHOWN = Object.entries<any>(LIMIT_DEFS).map(([key, d]) => [key, d.name, d.unit]);
+const SHOWN = Object.entries<any>(LIMIT_DEFS).filter(([, d]) => !d.perProject).map(([key, d]) => [key, d.name, d.unit]);
 /**
  * Every plan limit with its name and current value, what's used and what's left: [{ key, name, unit, used, limit,
  * remaining, reached, note }]. `limit` and `remaining` are null when unlimited. Members count pending invites, like
@@ -125,7 +127,7 @@ export async function usage(ws = currentWs()) {
   return {
     projects: proj.n, members: mem.n, pendingInvites: inv.n,
     storageMb: Math.round((Number(fileBytes.b) + Number(shotBytes.b)) / 1048576 * 10) / 10,
-    aiCalls: monthly.aiCalls || 0, codeJobs: monthly.codeJobs || 0, period: p,
+    aiCalls: monthly.aiCalls || 0, codeJobs: monthly.codeJobs || 0, schemaReads: monthly.schemaReads || 0, period: p,
   };
 }
 
@@ -141,6 +143,13 @@ export async function checkLimit(metric, adding = 1, ws = currentWs()) {
   const now = metric === 'members' ? u.members + u.pendingInvites : metric === 'storageMb' ? u.storageMb : u[metric];
   const add = metric === 'storageMb' ? adding / 1048576 : adding;
   if (now + add > limit) throw limitError(metric, limit, plan);
+}
+
+/** Before adding something counted per project (dbConnections), given how many the project has now. */
+export async function checkPerProject(metric, current, ws = currentWs()) {
+  const plan = await effectivePlan(ws);
+  const limit = plan.limits[metric];
+  if (enforced(limit) && current + 1 > limit) throw limitError(metric, limit, plan);
 }
 
 /**

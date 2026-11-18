@@ -648,6 +648,15 @@ export async function importJsonProjects() {
 }
 
 /** The project timeline's server-side part (section changes, deleted issues), newest first. */
+/**
+ * One entry on the project's Activity timeline for a change kept outside the project data (its database connections
+ * and test setup live in app_meta). kind is the timeline group, e.g. 'settings'.
+ */
+export async function logActivity(projectId, user, kind, text, target = '') {
+  await q(`insert into activity (project_id, version, user_id, author, kind, target, text)
+    select id, version, $2, $3, $4, $5, $6 from projects where id = $1`, [projectId, user?.id || null, user?.name || '', kind, target, String(text).slice(0, 500)]);
+}
+
 export async function listActivity(id, { before = null, limit = 300 }: any = {}) {
   const n = Math.min(Math.max(Number(limit) || 300, 1), 1000);
   const rows = before

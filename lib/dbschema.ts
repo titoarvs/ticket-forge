@@ -18,7 +18,8 @@ export type Snapshot = {
 const MAX_TABLES = 300;
 const MAX_COLUMNS = 120;
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
-export const tableKey = (t: { schema: string; name: string }) => (t.schema && t.schema !== 'public' ? `${t.schema}.${t.name}` : t.name);
+// The default schema of each engine (public, dbo, main) isn't written; MySQL and SQLite have none ('').
+export const tableKey = (t: { schema: string; name: string }) => (t.schema && !['public', 'dbo', 'main'].includes(t.schema) ? `${t.schema}.${t.name}` : t.name);
 
 // ---------------------------------------------------------------- from the repository
 
@@ -176,11 +177,14 @@ function statements(src: string) {
   return out;
 }
 /** SQL migrations, applied in file order: create table, alter table add/drop column, drop table, create type … as enum. */
-export function parseSql(files: { file: string; text: string }[]) {
+export function parseSql(files: { file: string; text: string }[], base: Table[] = []) {
   const tables = new Map<string, Table>();
   const enums = new Map<string, Enum>();
   const ident = (s: string) => { const parts = s.split('.').map(unq); return parts.length > 1 ? { schema: parts[0], name: parts[1] } : { schema: 'public', name: parts[0] }; };
   const key = (s: string) => { const i = ident(s); return `${i.schema}.${i.name}`.toLowerCase(); };
+  // Migrations on top of an existing schema (the PR check): start from copies of its tables. Default schemas match
+  // unqualified names, as the database would.
+  for (const t of base) tables.set(`${t.schema && !['dbo', 'main', ''].includes(t.schema) ? t.schema : 'public'}.${t.name}`.toLowerCase(), structuredClone(t));
   const column = (def: string): Column | null => {
     const m = def.match(/^("[^"]+"|`[^`]+`|\[[^\]]+\]|\w+)\s+([\s\S]+)$/);
     if (!m || /^(constraint|primary|foreign|unique|check|exclude|key|index)$/i.test(m[1])) return null;
@@ -318,6 +322,64 @@ export function makeSnapshot(read: { source: Snapshot['source']; tables: Table[]
   // Reading the same schema again keeps the earlier change list, so it doesn't vanish on a refresh.
   const changes = prev?.fingerprint === fp ? prev.changes ?? null : diff(prev, { tables });
   return { source: read.source, readAt: new Date().toISOString(), readBy: actor?.name || null, fingerprint: fp, truncated, tables, enums, changes };
+}
+
+// ---------------------------------------------------------------- migrations in a pull request
+
+const MIGRATION = /(^|\/)(migrations?|migrate|db|database|schema|supabase|prisma|drizzle|sql)(\/|\.)|\.sql$|\.prisma$/i;
+/** The added lines of one file in a unified diff (the new text of a new file). */
+function addedLines(diff: string, file: string) {
+  const out: string[] = [];
+  let inFile = false;
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ')) { inFile = line.endsWith(` b/${file}`); continue; }
+    if (inFile && line.startsWith('+') && !line.startsWith('+++')) out.push(line.slice(1));
+  }
+  return out.join('\n');
+}
+
+/**
+ * What a change does to the database, checked against the project's saved schema: the migrations and schema files in
+ * the diff, the tables and columns they add, remove or change, and the risky parts. '' when the diff has none.
+ * For the review agents (their prompt gets it as facts to check against).
+ */
+export function migrationCheck(project: any, diffText: string, files: string[]) {
+  const schema: Snapshot | undefined = project?.dbSchema;
+  const touched = files.map((f) => f.replace(/\s+\(\+\d+\/.\d+\)$/, '')).filter((f) => MIGRATION.test(f) && !SCHEMA_SKIP.test(f) && !/(seed|fixture)/i.test(f));
+  if (!touched.length) return '';
+  const sql = touched.filter((f) => /\.sql$/i.test(f));
+  const lines = [`DATABASE CHECK (from TicketForge): this change touches ${touched.length} database file${touched.length === 1 ? '' : 's'}: ${touched.slice(0, 20).join(', ')}.`];
+  if (!schema?.tables?.length) {
+    lines.push('No schema is saved for this project (Project settings → Database), so the migrations can’t be compared with the current database.');
+  } else if (sql.length) {
+    const after = parseSql(sql.map((f) => ({ file: f, text: addedLines(diffText, f) })), schema.tables);
+    const ch = diff(schema, after);
+    if (!ch) lines.push(`Compared with the schema read on ${schema.readAt.slice(0, 10)}, the SQL in this change doesn’t add, remove or change any table or column.`);
+    else {
+      const risky: string[] = [];
+      for (const t of ch.removedTables) risky.push(`drops table ${t} (its data is lost)`);
+      for (const t of ch.changedTables) {
+        for (const c of t.removedColumns) risky.push(`drops column ${t.table}.${c} (its data is lost)`);
+        for (const c of t.changedColumns) risky.push(`changes ${t.table}.${c.name} from ${c.from} to ${c.to} (check existing rows convert)`);
+        const table = after.tables.find((x) => tableKey(x) === t.table);
+        for (const c of t.addedColumns) {
+          const col = table?.columns.find((x) => x.name === c);
+          if (col && !col.nullable && !col.default && !col.pk) risky.push(`adds required column ${t.table}.${c} without a default (fails on a table that has rows)`);
+        }
+      }
+      lines.push(`Compared with the schema read on ${schema.readAt.slice(0, 10)}:`,
+        ...ch.addedTables.map((t) => `- new table ${t}`),
+        ...ch.changedTables.flatMap((t) => [t.addedColumns.length && `- ${t.table}: adds ${t.addedColumns.join(', ')}`, t.removedColumns.length && `- ${t.table}: removes ${t.removedColumns.join(', ')}`,
+          t.changedColumns.length && `- ${t.table}: changes ${t.changedColumns.map((c) => `${c.name} (${c.from} → ${c.to})`).join(', ')}`].filter(Boolean) as string[]),
+        ...ch.removedTables.map((t) => `- removes table ${t}`));
+      if (risky.length) lines.push('Risky, check each has a plan for existing data (backfill, default, or a two-step migration):', ...risky.map((r) => `- ${r}`));
+    }
+  } else {
+    lines.push('The schema files changed but no SQL migration is in the change: check a migration is generated and committed (for example with prisma migrate or drizzle-kit), or explain why none is needed.');
+  }
+  lines.push('As a reviewer, also check: the code uses the new tables and columns by their exact names; every table or column the code now needs has a migration; '
+    + 'new foreign keys have an index; and the migration can run on a database that already has data.');
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------- for AI prompts

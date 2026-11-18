@@ -8,14 +8,25 @@ import { TF, SF, MenuItem } from './fields';
 
 type Env = { id: string; name: string; kind: string; engine: string; host: string; port: number; database: string; user: string; updatedAt: string; updatedBy: string | null;
   lastTest?: { ok: boolean; at: string; by: string | null; version?: string; tables?: number; canWrite?: boolean; error?: string } | null };
-type Data = { envs: Env[]; engines: Record<string, string>; kinds: Record<string, string> };
+type Setup = { kind: string; value: string; updatedAt?: string; updatedBy?: string | null };
+type Data = { manage: boolean; local: boolean; mine: Env | null; envs: Env[]; setup: Setup | null; engines: Record<string, string>; kinds: Record<string, string>; setupKinds: Record<string, string> };
 
 const KIND_HELP: Record<string, string> = {
-  test: 'A database you can reset. Later, tests and code jobs can read and write it.',
+  test: 'A database you can reset. Code jobs and the step before each test run may write to it.',
   staging: 'A shared copy of the app. TicketForge only reads from it.',
   production: 'The live database. TicketForge reads its structure only, never its rows.',
 };
 const blank = { id: '', name: 'Test', kind: 'test', engine: 'postgres', url: '' };
+// What a connection string looks like for each engine, and where it points (a SQLite connection is a file).
+const EXAMPLE: Record<string, string> = {
+  postgres: 'postgresql://user:password@host:5432/database', supabase: 'postgresql://postgres.<ref>:password@aws-0-<region>.pooler.supabase.com:5432/postgres',
+  mysql: 'mysql://user:password@host:3306/database', sqlite: '/full/path/to/app.db', sqlserver: 'sqlserver://user:password@host:1433/database',
+};
+const LOCAL_EXAMPLE: Record<string, string> = {
+  postgres: 'postgresql://postgres:postgres@localhost:5432/myapp_test', mysql: 'mysql://root:root@localhost:3306/myapp_test',
+  sqlite: '/Users/me/myapp/dev.db', sqlserver: 'sqlserver://sa:Passw0rd!@localhost:1433/myapp_test',
+};
+const where = (e: { engine: string; host: string; port: number; database: string }) => (e.engine === 'sqlite' ? e.database : `${e.host}:${e.port}/${e.database}`);
 
 export function DatabaseSettings() {
   const base = `/api/projects/${P().id}/database`;
@@ -28,6 +39,8 @@ export function DatabaseSettings() {
 
   if (err) return <ErrorState compact title="Couldn’t load the database settings" error={err} onRetry={() => { setErr(null); load(); }} />;
   if (!data) return <SetCard title="Databases"><Spinner /> Loading…</SetCard>;
+  // Without the Set up the database permission: only your own database.
+  if (!data.manage) return <MineCard base={base} data={data} setData={setData} />;
 
   const act = async (key: string, payload: Any, ok?: string) => {
     setBusy(key);
@@ -52,7 +65,7 @@ export function DatabaseSettings() {
   const edit = (e: Env) => setForm({ id: e.id, name: e.name, kind: e.kind, engine: e.engine, url: '' });
 
   return <>
-    <SetCard title="Databases" desc="Connect the databases of the app this project builds. Later phases use them to read the real tables for specs and issues, and to run tests on a test database."
+    <SetCard title="Databases" desc="Connect the databases of the app this project builds. The schema is read from them for specs and issues, and code jobs and tests use the Test database."
       right={!form && <button className="btn primary" disabled={!!busy} onClick={() => setForm({ ...blank, name: data.envs.some((e) => e.kind === 'test') ? '' : 'Test' })}><Ico svg={I.plus} />Add connection</button>}>
       {data.envs.length ? (
         <table className="tbl set-tbl">
@@ -60,7 +73,7 @@ export function DatabaseSettings() {
           <tbody>{data.envs.map((e) => (
             <tr key={e.id}>
               <td><b>{e.name}</b><div className="muted small">{data.kinds[e.kind] || e.kind} · {data.engines[e.engine] || e.engine}</div></td>
-              <td><code>{e.host}:{e.port}/{e.database}</code><div className="muted small">as {e.user || 'default user'}</div></td>
+              <td><code>{where(e)}</code>{e.engine !== 'sqlite' && <div className="muted small">as {e.user || 'default user'}</div>}</td>
               <td><TestResult env={e} busy={busy === `test:${e.id}`} /></td>
               <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                 <button className="btn sm" disabled={!!busy} onClick={() => test(e.id)}>Test</button>{' '}
@@ -92,8 +105,11 @@ export function DatabaseSettings() {
       <p className="muted small" style={{ margin: '6px 0 12px' }}>{KIND_HELP[form.kind]}</p>
       <label className="field" style={{ margin: 0 }}><span>Connection string</span>
         <TF type="password" autoComplete="off" spellCheck={false} value={form.url} onChange={(e: Any) => setForm({ ...form, url: e.target.value })}
-          placeholder={form.id ? 'Leave empty to keep the saved connection string' : 'postgresql://user:password@host:5432/database'} /></label>
+          placeholder={form.id ? 'Leave empty to keep the saved connection string' : EXAMPLE[form.engine] || EXAMPLE.postgres} /></label>
       {form.engine === 'supabase' && <p className="muted small" style={{ margin: '6px 0 0' }}>In Supabase: Project Settings → Database → Connection string → URI. The Session pooler (port 5432) works on networks without IPv6.</p>}
+      {form.engine === 'mysql' && <p className="muted small" style={{ margin: '6px 0 0' }}>Works with MySQL 5.7+ and MariaDB 10.2+. Connections that aren’t local use TLS; add <code>?ssl=false</code> for a server without it.</p>}
+      {form.engine === 'sqlite' && <p className="muted small" style={{ margin: '6px 0 0' }}>The full path of the database file on the computer TicketForge runs on. Not available on the hosted service.</p>}
+      {form.engine === 'sqlserver' && <p className="muted small" style={{ margin: '6px 0 0' }}>Encrypted by default; add <code>?encrypt=false</code> for a server without TLS. SQL Server has no read-only mode, so every read TicketForge does is rolled back.</p>}
       <div className="row" style={{ gap: 8, marginTop: 14 }}>
         <button className="btn primary" disabled={!!busy || !form.name.trim() || (!form.id && !form.url.trim())} onClick={save}>
           {busy === 'save' ? <><Spinner />Saving…</> : form.url ? 'Save and test' : 'Save'}</button>
@@ -101,8 +117,82 @@ export function DatabaseSettings() {
       </div>
     </SetCard>}
 
+    <UsageCard base={base} data={data} setData={setData} />
+    <MineCard base={base} data={data} setData={setData} />
     <SchemaCard base={base} envs={data.envs} />
   </>;
+}
+
+/** Which database code jobs and tests use, and what runs before each test run. */
+function UsageCard({ base, data, setData }: { base: string; data: Data; setData: (f: (d: Data | null) => Data | null) => void }) {
+  const test = data.envs.find((e) => e.kind === 'test');
+  const [kind, setKind] = useState(data.setup?.kind || 'none');
+  const [value, setValue] = useState(data.setup?.value || '');
+  const [busy, setBusy] = useState(false);
+  const dirty = kind !== (data.setup?.kind || 'none') || (kind !== 'none' && value.trim() !== (data.setup?.value || ''));
+  const save = async () => {
+    setBusy(true);
+    try { const r = await api(base, { method: 'POST', body: { action: 'saveSetup', kind, value } }); setData((d) => d && { ...d, setup: r.setup }); setValue(r.setup.value); toast('Saved'); }
+    catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  const used = data.local && data.mine ? <>your own database (<code>{where(data.mine)}</code>) on this computer, otherwise the project’s <b>{test?.name || 'Test'}</b> database</>
+    : test ? <>the <b>{test.name}</b> database (<code>{where(test)}</code>, {data.engines[test.engine] || test.engine})</> : null;
+  return (
+    <SetCard title="Code jobs and tests" desc="Only a Test database is ever written to. Staging and Production are never given to code jobs or tests.">
+      {used ? <p style={{ marginTop: 0 }}>Code jobs and test runs use {used}.</p>
+        : <div className="warn-banner"><Ico svg={I.warn} /><span>No Test database yet: code jobs run without a database, and tests can’t check saved data. Add a connection of type <b>Test</b> above.</span></div>}
+      <ul className="muted small" style={{ margin: '0 0 12px', paddingLeft: 18 }}>
+        <li><b>Code jobs</b> (on this computer) get it as <code>DATABASE_URL</code> and <code>TEST_DATABASE_URL</code>, so agents can run migrations and tests. TicketForge’s own database and keys are never passed to them.</li>
+        <li><b>Test runs</b> on this server can check saved data with <code>app.db.query()</code>, read-only. Runs on GitHub Actions don’t get it.</li>
+      </ul>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <label className="field" style={{ flex: 1, minWidth: 240, margin: 0 }}><span>Before each test run</span>
+          <SF value={kind} onChange={(e: Any) => setKind(e.target.value)}>
+            {Object.entries(data.setupKinds).map(([k, l]) => <MenuItem key={k} value={k}>{l}</MenuItem>)}</SF></label>
+        {kind !== 'none' && <label className="field" style={{ flex: 1, minWidth: 200, margin: 0 }}><span>{kind === 'sql' ? 'SQL file' : 'npm script'}</span>
+          <TF value={value} spellCheck={false} placeholder={kind === 'sql' ? 'db/seed.sql' : 'db:reset'} onChange={(e: Any) => setValue(e.target.value)} /></label>}
+        <button className="btn primary" disabled={busy || !dirty || (kind !== 'none' && !value.trim())} onClick={save}>{busy ? <><Spinner />Saving…</> : 'Save'}</button>
+      </div>
+      <p className="muted small" style={{ margin: '6px 0 0' }}>{kind === 'sql' ? 'The file is read from the project’s repository and run on the Test database in one transaction, so a failure changes nothing. If it fails, the tests don’t run.'
+        : kind === 'npm' ? 'Runs npm run <script> in the repository folder on this computer, with DATABASE_URL set to the Test database. If it fails, the tests don’t run.'
+        : 'Tests use the Test database as it is.'}</p>
+    </SetCard>
+  );
+}
+
+/** Your own database for this project: used instead of the project's Test one for your code jobs and test runs. */
+function MineCard({ base, data, setData }: { base: string; data: Data; setData: (f: (d: Data | null) => Data | null) => void }) {
+  const [url, setUrl] = useState('');
+  const [engine, setEngine] = useState(data.mine?.engine === 'supabase' ? 'postgres' : data.mine?.engine || 'postgres');
+  const [busy, setBusy] = useState('');
+  const call = async (key: string, payload: Any, ok?: string) => {
+    setBusy(key);
+    try { const r = await api(base, { method: 'POST', body: payload }); setData((d) => d && { ...d, mine: r.mine }); if (ok) toast(ok); return r; }
+    catch (e: Any) { toast(e.message, 'err'); return null; } finally { setBusy(''); }
+  };
+  const save = async () => { const r = await call('save', { action: 'setMine', url, engine }); if (r) { setUrl(''); const t = await call('test', { action: 'testMine' }); if (t) toast(t.mine?.lastTest?.ok ? 'Connected' : 'Couldn’t connect', t.mine?.lastTest?.ok ? 'ok' : 'err'); } };
+  const m = data.mine;
+  return (
+    <SetCard title="Your own database" desc="A database on your computer, such as a local Postgres, for your own code jobs and test runs. Only you use it, and it never changes the project’s settings.">
+      {!data.local ? <p className="muted small" style={{ margin: 0 }}>Your own database can be set up only when TicketForge runs on your computer and is opened at localhost.</p> : <>
+        {m && <div className="row" style={{ gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+          <span><code>{where(m)}</code> <span className="muted small">{data.engines[m.engine] || m.engine}{m.engine !== 'sqlite' ? ` · as ${m.user || 'default user'}` : ''}</span></span>
+          <TestResult env={m} busy={busy === 'test'} />
+          <span className="spacer" />
+          <button className="btn sm" disabled={!!busy} onClick={async () => { const t = await call('test', { action: 'testMine' }); if (t) toast(t.mine?.lastTest?.ok ? 'Connected' : 'Couldn’t connect', t.mine?.lastTest?.ok ? 'ok' : 'err'); }}>Test</button>
+          <button className="btn sm subtle" disabled={!!busy} onClick={() => call('forget', { action: 'setMine', url: '' }, 'Your own database is forgotten')}>Forget</button>
+        </div>}
+        <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <label className="field" style={{ width: 180, margin: 0 }}><span>Engine</span>
+            <SF value={engine} onChange={(e: Any) => setEngine(e.target.value)}>
+              {Object.entries(data.engines).filter(([k]) => k !== 'supabase').map(([k, l]) => <MenuItem key={k} value={k}>{l}</MenuItem>)}</SF></label>
+          <label className="field" style={{ flex: 1, minWidth: 240, margin: 0 }}><span>{m ? 'Replace with another connection string' : 'Connection string'}</span>
+            <TF type="password" autoComplete="off" spellCheck={false} value={url} placeholder={LOCAL_EXAMPLE[engine] || LOCAL_EXAMPLE.postgres} onChange={(e: Any) => setUrl(e.target.value)} /></label>
+          <button className="btn primary" disabled={!!busy || !url.trim()} onClick={save}>{busy === 'save' ? <><Spinner />Saving…</> : 'Save and test'}</button>
+        </div>
+      </>}
+    </SetCard>
+  );
 }
 
 type Column = { name: string; type: string; nullable: boolean; default?: string; pk?: boolean };
@@ -203,5 +293,5 @@ function TestResult({ env, busy }: { env: Env; busy: boolean }) {
   if (!t) return <span className="loz s-todo">Not tested</span>;
   if (!t.ok) return <><span className="loz t-fail">Failed</span><div className="muted small" style={{ maxWidth: 320 }}>{t.error}</div></>;
   return <><span className="loz t-pass">Connected</span>
-    <div className="muted small">PostgreSQL {t.version} · {t.tables} table{t.tables === 1 ? '' : 's'} · {t.canWrite ? 'can write' : 'read-only user'} · {ago(t.at)}</div></>;
+    <div className="muted small">{/^\d/.test(String(t.version)) ? `PostgreSQL ${t.version}` : t.version} · {t.tables} table{t.tables === 1 ? '' : 's'} · {t.canWrite ? 'can write' : 'read-only user'} · {ago(t.at)}</div></>;
 }

@@ -4,13 +4,13 @@
 // A plan with `archived: true` stays in force for workspaces already on it, but is no longer offered for new purchases.
 export const PLANS = {
   free: { id: 'free', name: 'Free', blurb: 'Try TicketForge with a small team.', price: { month: 0, year: 0 }, archived: false,
-    limits: { projects: 2, members: 3, aiCalls: 100, codeJobs: 0, storageMb: 200 },
+    limits: { projects: 2, members: 3, aiCalls: 100, codeJobs: 0, storageMb: 200, dbConnections: 1, schemaReads: 20 },
     features: ['2 projects, 3 members', '100 AI actions a month', 'Backlog, board, timeline, test cases', 'Bring your own AI keys or Claude subscription'] },
   pro: { id: 'pro', name: 'Pro', blurb: 'For teams shipping every week.', price: { month: 19, year: 190 }, archived: false,
-    limits: { projects: 25, members: 10, aiCalls: 2000, codeJobs: 50, storageMb: 5000 },
+    limits: { projects: 25, members: 10, aiCalls: 2000, codeJobs: 50, storageMb: 5000, dbConnections: 5, schemaReads: 300 },
     features: ['25 projects, 10 members', '2,000 AI actions a month', '50 AI code jobs a month', 'Test automation and GitHub Actions', 'Problem Statements, Feature Briefs, Architecture Records'] },
   team: { id: 'team', name: 'Team', blurb: 'For larger teams and many projects.', price: { month: 49, year: 490 }, archived: false,
-    limits: { projects: null, members: 50, aiCalls: 10000, codeJobs: 300, storageMb: 50000 },
+    limits: { projects: null, members: 50, aiCalls: 10000, codeJobs: 300, storageMb: 50000, dbConnections: 10, schemaReads: 2000 },
     features: ['Unlimited projects, 50 members', '10,000 AI actions a month', '300 AI code jobs a month', 'Review panels and CodeRabbit', 'Priority support'] },
 };
 export const PLAN_ORDER = ['free', 'pro', 'team'];
@@ -26,6 +26,9 @@ export const LIMIT_DEFS = {
   aiCalls: { name: 'AI actions this month', unit: 'count' },
   codeJobs: { name: 'AI code jobs this month', unit: 'count' },
   storageMb: { name: 'Storage', unit: 'mb' },
+  // Per project, not per workspace (checked when a connection is added): not on the usage list.
+  dbConnections: { name: 'Database connections per project', unit: 'count', perProject: true },
+  schemaReads: { name: 'Schema reads this month', unit: 'count' },
 };
 const LIMIT_UNITS = ['count', 'mb'];
 

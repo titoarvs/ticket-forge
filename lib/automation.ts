@@ -267,6 +267,9 @@ function appMapText(app: any, snapshot) {
     for (const r of roles) lines.push(`- "${r.name}"${r.description ? `: ${r.description}` : ''} (${how(r)})${ready(r) ? '' : ' (no credentials saved yet)'}`);
     lines.push(`Login form: ${app.login?.path || 'found automatically'} (app.loginAs handles it).`);
   } else lines.push('', 'No user roles are set up: the app may not need signing in.');
+  if (app.db?.name) lines.push('', `Database: await app.db.query(sql, params) runs a read-only SQL query on ${app.db.name} (${app.db.engineLabel || 'PostgreSQL'}; placeholders are written ${app.db.placeholder || '$1'}, ${app.db.placeholder === '@p1' ? '@p2' : app.db.placeholder === '?' ? '?' : '$2'}…) and returns the rows, e.g.`,
+    `  const [row] = await app.db.query('select status from orders where id = ${app.db.placeholder || '$1'}', [orderId]); expect(row?.status).toBe('paid');`,
+    'Use it after the UI steps when the expected result is about saved data, with the exact names from the DATABASE SCHEMA. Never write data with it.');
   if (app.notes) lines.push('', `Notes from the team: ${app.notes}`);
   if (snapshot?.notes?.length) lines.push('', `While taking the snapshot: ${snapshot.notes.join(' ')}`);
   return lines.join('\n');
