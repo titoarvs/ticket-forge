@@ -1,7 +1,7 @@
 // Generation rules: the team's standard for tickets, test cases and automation scripts, set by an administrator
 // in Administration → Generation. Every generation gets them as instructions; a few are also enforced in code
 // (story points, ticket types, labels, test-case count and titles) so results stay consistent.
-import { qs } from './db';
+import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { wsKey, wsCache } from './wsmeta';
 
 export const TICKET_TYPES = ['Story', 'Task', 'Bug', 'Spike'];
@@ -135,7 +135,7 @@ const C: any = wsCache('__tfRulesWs', () => ({ v: undefined, at: 0, meta: null }
 export async function getRules({ fresh = false }: any = {}) {
   if (!fresh && C.v !== undefined && Date.now() - C.at < 30000) return C.v;
   let saved = null;
-  try { saved = (await qs('select value from app_meta where key = $1', [wsKey(KEY)])).rows[0]?.value || null; } catch { /* database not ready */ }
+  try { saved = (await getMeta(wsKey(KEY))) || null; } catch { /* database not ready */ }
   C.v = normalizeRules(saved?.rules || {});
   C.meta = saved ? { updatedBy: saved.updatedBy || null, updatedAt: saved.updatedAt || null } : null;
   C.at = Date.now();
@@ -144,13 +144,12 @@ export async function getRules({ fresh = false }: any = {}) {
 export async function rulesMeta() { await getRules(); return C.meta; }
 export async function saveRules(actor, rules) {
   const v = normalizeRules(rules);
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value',
-    [wsKey(KEY), JSON.stringify({ rules: v, updatedBy: actor?.name || null, updatedAt: new Date().toISOString() })]);
+  await setMeta(wsKey(KEY), { rules: v, updatedBy: actor?.name || null, updatedAt: new Date().toISOString() });
   C.v = v; C.meta = { updatedBy: actor?.name || null, updatedAt: new Date().toISOString() }; C.at = Date.now();
   return v;
 }
 export async function resetRules() {
-  await qs('delete from app_meta where key = $1', [wsKey(KEY)]);
+  await deleteMeta(wsKey(KEY));
   C.v = normalizeRules({}); C.meta = null; C.at = Date.now();
   return C.v;
 }
@@ -259,7 +258,7 @@ const cleanApply = (a: any = {}) => ({ tickets: a.tickets !== false, tests: a.te
 export async function getGuide({ fresh = false }: any = {}) {
   if (!fresh && GC.v !== undefined && Date.now() - GC.at < 30000) return GC.v;
   let v = null;
-  try { v = (await qs('select value from app_meta where key = $1', [wsKey(GUIDE_KEY)])).rows[0]?.value || null; } catch { /* database not ready */ }
+  try { v = (await getMeta(wsKey(GUIDE_KEY))) || null; } catch { /* database not ready */ }
   GC.v = v?.text ? { ...v, applyTo: cleanApply(v.applyTo), chars: v.text.length } : null;
   GC.at = Date.now();
   return GC.v;
@@ -269,12 +268,12 @@ export async function saveGuide(actor, { text, name, applyTo }: any) {
   if (!t) throw Object.assign(new Error('The guide is empty.'), { status: 400 });
   if (t.length > GUIDE_MAX) throw Object.assign(new Error(`The guide is too long (${t.length.toLocaleString()} characters; the limit is ${GUIDE_MAX.toLocaleString()}). Shorten it so the AI can use all of it.`), { status: 400 });
   const v = { text: t, name: String(name || 'generation-guide.md').slice(0, 120), applyTo: cleanApply(applyTo), updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(GUIDE_KEY), JSON.stringify(v)]);
+  await setMeta(wsKey(GUIDE_KEY), v);
   GC.v = { ...v, chars: t.length }; GC.at = Date.now();
   return GC.v;
 }
 export async function clearGuide() {
-  await qs('delete from app_meta where key = $1', [wsKey(GUIDE_KEY)]);
+  await deleteMeta(wsKey(GUIDE_KEY));
   GC.v = null; GC.at = Date.now();
 }
 /** The guide as AI context, when it applies to any of `parts` ('tickets' | 'tests' | 'automation'). */

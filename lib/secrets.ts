@@ -1,17 +1,17 @@
 // Passwords for the roles in a project's App setup (Test automation). They're stored encrypted (AES-256-GCM)
 // in app_meta, which row-level security limits to the server. They never go into the project data, so they're
 // never sent to the browser, exported, or shown to the AI; test runs get them only while they run.
-import { qs } from './db';
+import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { encrypt, decrypt } from './settings';
 
 const KEY = (projectId) => `project_secrets:${projectId}`;
 
 async function load(projectId) {
-  const row = (await qs('select value from app_meta where key = $1', [KEY(projectId)])).rows[0];
-  return row?.value?.roles ? row.value : { roles: {} };
+  const value = await getMeta(KEY(projectId));
+  return value?.roles ? value : { roles: {} };
 }
 async function store(projectId, v) {
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [KEY(projectId), JSON.stringify(v)]);
+  await setMeta(KEY(projectId), v);
 }
 
 /**
@@ -50,7 +50,7 @@ export async function clearRoleSecrets(projectId, roleId) {
 }
 
 export async function deleteProjectSecrets(projectId) {
-  await qs('delete from app_meta where key = $1', [KEY(projectId)]);
+  await deleteMeta(KEY(projectId));
 }
 
 /**

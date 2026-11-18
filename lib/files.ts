@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import mammoth from 'mammoth';
-import { q } from './db';
+import { orm, files, eq } from './orm';
 import { checkLimit } from './limits';
 import { referenceType, typeMessage, sizeMessage, maxBytes } from './references';
 
@@ -45,16 +45,17 @@ export async function saveFile({ projectId, name, data, user, purpose = 'origina
   if (data.length > MAX_FILE) throw Object.assign(new Error('The file is larger than 20 MB.'), { status: 413 });
   await checkLimit('storageMb', data.length); // the plan's storage (SaaS)
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-  await q('insert into files (id, project_id, name, mime, bytes, data, created_by) values ($1,$2,$3,$4,$5,$6,$7)',
-    [id, projectId, String(name).slice(0, 200), mime, data.length, data, user?.name || null]);
+  await orm.insert(files).values({ id, projectId, name: String(name).slice(0, 200), mime, bytes: data.length, data, createdBy: user?.name || null });
   return { id, name: String(name).slice(0, 200), mime, bytes: data.length };
 }
 
-export async function getFile(id) {
-  return (await q('select id, project_id, name, mime, bytes, data from files where id = $1', [id])).rows[0] || null;
+export async function getFile(id): Promise<any> {
+  const [row] = await orm.select({ id: files.id, projectId: files.projectId, name: files.name, mime: files.mime, bytes: files.bytes, data: files.data })
+    .from(files).where(eq(files.id, id));
+  return row || null;
 }
-export async function deleteFile(id) { await q('delete from files where id = $1', [id]); }
-export async function deleteProjectFiles(projectId) { await q('delete from files where project_id = $1', [projectId]); }
+export async function deleteFile(id) { await orm.delete(files).where(eq(files.id, id)); }
+export async function deleteProjectFiles(projectId) { await orm.delete(files).where(eq(files.projectId, projectId)); }
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

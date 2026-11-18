@@ -1,6 +1,7 @@
 // Per-person preferences kept on the server (user_prefs, row-level security: only that person). Today: the guided
 // tours someone has finished or skipped, so a tour shows once per person, on any browser.
-import { q, currentContext } from './db';
+import { currentContext } from './db';
+import { orm, userPrefs, eq, sql } from './orm';
 
 const uid = () => currentContext().user?.id || null;
 const TOUR_ID = /^[a-z][\w-]{0,39}$/;
@@ -22,7 +23,7 @@ function clean(d) {
 export async function getPrefs(userId = uid()) {
   if (!userId) return clean({});
   try {
-    const row = (await q('select data from user_prefs where user_id = $1', [userId])).rows[0];
+    const [row] = await orm.select({ data: userPrefs.data }).from(userPrefs).where(eq(userPrefs.userId, userId));
     return clean(row ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {});
   } catch { return clean({}); }
 }
@@ -42,7 +43,7 @@ export async function savePrefs(change: any = {}) {
     else if (p.local[m.projectId]) { delete p.local[m.projectId][m.side]; if (!Object.keys(p.local[m.projectId]).length) delete p.local[m.projectId]; }
   }
   if (Object.keys(p.tours).length > 60) p.tours = Object.fromEntries(Object.entries<any>(p.tours).slice(-60));
-  await q(`insert into user_prefs (user_id, data, updated_at) values ($1, $2, now())
-    on conflict (user_id) do update set data = excluded.data, updated_at = now()`, [userId, JSON.stringify(p)]);
+  await orm.insert(userPrefs).values({ userId, data: p, updatedAt: sql`now()` })
+    .onConflictDoUpdate({ target: userPrefs.userId, set: { data: p, updatedAt: sql`now()` } });
   return p;
 }

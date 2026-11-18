@@ -13,7 +13,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
-import { SERVERLESS, currentContext, qs, currentWs, DEFAULT_WS } from './db';
+import { SERVERLESS, currentContext, asSystem, currentWs, DEFAULT_WS } from './db';
+import { orm, aiUsage as aiUsageTable, and, eq, gte, sql } from './orm';
 import { wsCache } from './wsmeta';
 import { isSaas } from './platform';
 import { consume } from './limits';
@@ -624,10 +625,14 @@ function recordUsage(o, { text = '', ms = 0, cached = false, ok = true }: any) {
   const cost = cached || !ok ? 0 : costOf(model, tok, o.routing?.prices);
   const user = ctx.user || null;
   const projectId = o.projectId || ctx.projectId || null;
-  qs(`insert into ai_usage (project_id, user_id, user_name, task, engine, model, tier, input, output, cache_read, cache_write, estimated, chars, ms, cached, escalated, ok, cost, workspace_id)
-    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-  [projectId, user?.id || null, user?.name || '', o.task || 'other', engine, model.slice(0, 80), o.config ? `cfg:${o.config.name}` : o.tier || '',
-    tok.input || 0, tok.output || 0, tok.cacheRead || 0, tok.cacheWrite || 0, !real, sent + String(text || '').length, Math.round(ms), cached, Boolean(o.escalated), ok, cost, currentWs() || DEFAULT_WS])
+  asSystem(async () => {
+    await orm.insert(aiUsageTable).values({
+      projectId, userId: user?.id || null, userName: user?.name || '', task: o.task || 'other', engine, model: model.slice(0, 80),
+      tier: o.config ? `cfg:${o.config.name}` : o.tier || '', input: tok.input || 0, output: tok.output || 0, cacheRead: tok.cacheRead || 0,
+      cacheWrite: tok.cacheWrite || 0, estimated: !real, chars: sent + String(text || '').length, ms: Math.round(ms), cached,
+      escalated: Boolean(o.escalated), ok, cost, workspaceId: currentWs() || DEFAULT_WS,
+    });
+  })
     .then(() => { if (engine === 'api' && cost) B.at = 0; }) // refresh the budget total soon
     .catch(() => { /* table not migrated yet: usage still shows in memory */ });
 }
@@ -637,7 +642,11 @@ export async function budgetState(routing) {
   const limit = routing?.budget?.monthlyUsd || 0;
   if (!limit) return { limit: 0, spent: 0, pct: 0, over: false, near: false };
   if (Date.now() - B.at > 60000) {
-    try { B.spent = Number((await qs("select coalesce(sum(cost), 0) as s from ai_usage where workspace_id = $1 and engine = 'api' and at >= date_trunc('month', now())", [currentWs() || DEFAULT_WS])).rows[0].s) || 0; } catch { /* keep the last total */ }
+    try {
+      const [row] = await asSystem(async () => await orm.select({ s: sql<number>`coalesce(sum(${aiUsageTable.cost}), 0)` }).from(aiUsageTable)
+        .where(and(eq(aiUsageTable.workspaceId, currentWs() || DEFAULT_WS), eq(aiUsageTable.engine, 'api'), gte(aiUsageTable.at, sql`date_trunc('month', now())`))));
+      B.spent = Number(row.s) || 0;
+    } catch { /* keep the last total */ }
     B.at = Date.now();
   }
   const pct = B.spent / limit;
@@ -675,8 +684,12 @@ export async function agentModel(agentId, agent) {
 /** Usage of one Claude Code agent run (it reports its own cost). */
 export function noteAgentUsage({ task, model, ms, costUsd }: any) {
   const ctx = currentContext();
-  qs(`insert into ai_usage (project_id, user_id, user_name, task, engine, model, estimated, ms, cost, workspace_id) values ($1,$2,$3,$4,'account',$5,true,$6,$7,$8)`,
-    [ctx.projectId || null, ctx.user?.id || null, ctx.user?.name || '', task || 'code', `Claude Code · ${model}`.slice(0, 80), Math.round(ms || 0), costUsd ?? null, currentWs() || DEFAULT_WS]).catch(() => {});
+  asSystem(async () => {
+    await orm.insert(aiUsageTable).values({
+      projectId: ctx.projectId || null, userId: ctx.user?.id || null, userName: ctx.user?.name || '', task: task || 'code', engine: 'account',
+      model: `Claude Code · ${model}`.slice(0, 80), estimated: true, ms: Math.round(ms || 0), cost: costUsd ?? null, workspaceId: currentWs() || DEFAULT_WS,
+    });
+  }).catch(() => {});
   const u = (U.tasks[task] ??= { calls: 0, chars: 0, ms: 0, models: {} });
   u.calls += 1; u.ms += ms || 0; u.cost = (u.cost || 0) + (costUsd || 0);
   const m = `Claude Code · ${model}`;

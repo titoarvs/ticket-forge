@@ -500,25 +500,39 @@ nothing is created until the end:
 
 ## Drizzle ORM
 
-[Drizzle ORM](https://orm.drizzle.team) is set up next to the existing database code, so new code can use typed queries
-instead of hand-written SQL. Existing `q()` / `qs()` queries keep working unchanged.
+[Drizzle ORM](https://orm.drizzle.team) is the data access layer. It is being ported module by module from hand-written
+SQL: these modules already use it, the rest still call `q()` / `qs()` / `tx()` and keep working unchanged.
+Ported: `appmeta` (the `app_meta` settings table, used by settings, features, agents, generation rules, secrets, Google
+Drive and GitHub connection), `doctemplates` (the PSD, FBD and ARD templates), `files`, `shots`, `remote-jobs`, `notify`,
+`prefs`, `user-ai`, `gateways`, `gateway-keys`, `aicache`, `limits`, `subscription`, `chatbot`, and the AI usage rows
+written by `claude`. Not ported yet: `store`, `auth`, `brain`, `epic-review`, `billing-plans`, `subscriptions`, `stripe`,
+`paymongo*`, `aiusage` (reports), `gdrive` (the `drive_docs` queue), `coderabbit-pr`, the table setup, row-level
+security and one-time migrations in `lib/db.ts`, and `scripts/db-push.ts`.
+
+If the connection string in `DATABASE_URL` is not a valid `postgresql://` address, or the database can't be reached,
+TicketForge stops at start-up (`instrumentation.ts`) with a message that says what to fix, instead of starting and
+failing later.
 
 - **`lib/orm.ts`**: the `orm` client (and the tables and the usual operators: `eq`, `and`, `inArray`, `desc`, `sql`…).
-  It sends every statement through `lib/db.ts`, so it uses the same database (Supabase/PostgreSQL or the built-in local
-  one), the same pool and the same **row-level security**: queries run as the signed-in user's role and workspace, and
-  `asSystem(() => orm…)` is the system context, exactly like `qs()`.
+  It sends every statement through `lib/db.ts` (node-postgres), so it uses the same database (Supabase/PostgreSQL or the
+  built-in local one), the same pool and the same **row-level security**: queries run as the signed-in user's role and
+  workspace, and `asSystem(async () => await orm…)` is the system context, exactly like `qs()`. (Await the query inside
+  the `asSystem` function: a Drizzle query only runs when it is awaited.)
   ```ts
   import { orm, projects, eq, desc } from '@/lib/orm';
   const mine = await orm.select().from(projects).where(eq(projects.workspaceId, ws)).orderBy(desc(projects.updatedAt));
   ```
   Relational queries work too (`orm.query.workspaces.findMany({ with: { workspaceMembers: true } })`). Drizzle's own
   `orm.transaction` isn't available through this driver: use `tx()` from `lib/db.ts` for transactions.
-- **`lib/schema.ts`** and **`lib/relations.ts`**: every table, typed. They are generated, not written by hand: tables,
-  policies, triggers and migrations are still defined in `lib/db.ts` (Drizzle Kit doesn't know about row-level security),
-  so there is deliberately no `drizzle-kit push` or `migrate`.
-- **`npm run db:schema`** rebuilds the two files: it creates a throwaway local database with `lib/db.ts`, reads it back
-  with Drizzle Kit and writes the schema. It never touches your own database. Run it after changing a table in
-  `lib/db.ts` and commit the result. **`npm run db:check`** fails when they are out of date (for CI).
+- **`lib/schema/`**: every table, typed, **one file per table** (`lib/schema/users.ts`, `lib/schema/issues.ts`…;
+  `index.ts` re-exports them and `bytea.ts` is the shared binary column type), plus **`lib/relations.ts`**. They are
+  generated, not written by hand: tables, policies, triggers and migrations are still defined in `lib/db.ts` (Drizzle Kit
+  doesn't know about row-level security), so there is deliberately no `drizzle-kit push` or `migrate`.
+- **`npm run db:schema`** rebuilds those files: it creates a throwaway local database with `lib/db.ts`, reads it back
+  with Drizzle Kit and writes the schema, one file per table. It never touches your own database. Run it after changing a
+  table in `lib/db.ts` and commit the result. **`npm run db:check`** fails when they are out of date (for CI).
+- **`npm run db:generate`** has Drizzle Kit write a SQL migration of `lib/schema/` into `drizzle/`, to compare with the
+  tables `lib/db.ts` creates.
 - **`npm run db:studio`** opens Drizzle Studio on your database (`DATABASE_URL`, or `data/db` when there is none).
 
 Notes: timestamps are `Date` objects; `bytea` columns (`files.data`, `screenshots.data`) are a `Buffer` on PostgreSQL

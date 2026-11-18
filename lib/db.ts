@@ -114,9 +114,34 @@ const explain = (e) => {
   return e;
 };
 
+/** The connection string must be a postgres:// or postgresql:// address; anything else stops the app with a clear message. */
+function checkConnectionString(url: string) {
+  let u: URL;
+  try { u = new URL(url); } catch { u = null; }
+  if (!u || !/^postgres(ql)?:$/.test(u.protocol) || !u.hostname) {
+    throw new Error('DATABASE_URL is not a valid PostgreSQL connection string. Use the form postgresql://user:password@host:5432/database '
+      + '(URL-encode special characters in the password, such as @ # / as %40 %23 %2F), or remove DATABASE_URL to use the built-in local database.');
+  }
+}
+/** Turns the first connection failure into a message that says what to fix, instead of a bare network error code. */
+function connectionFailure(e: any, host: string) {
+  const why = ({
+    ECONNREFUSED: 'the connection was refused. Check that PostgreSQL is running and the host and port are right.',
+    ENOTFOUND: 'the host name was not found. Check the host in DATABASE_URL.',
+    ETIMEDOUT: 'the connection timed out. Check the host, the port and any firewall.',
+    '3D000': 'the database named in DATABASE_URL does not exist.',
+  } as Record<string, string>)[e?.code];
+  if (!why) return explain(e);
+  const err: any = new Error(`Can't connect to the database at ${host || 'DATABASE_URL'}: ${why}`);
+  err.code = e.code;
+  err.cause = e;
+  return err;
+}
+
 async function connect() {
   const url = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
   if (url) {
+    checkConnectionString(url);
     const { default: pg } = await import('pg');
     try { prepareValue = (await import('pg/lib/utils.js')).default.prepareValue; } catch { /* keep identity */ }
     const host = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
@@ -133,7 +158,8 @@ async function connect() {
           + `e.g. postgresql://postgres.${host.split('.')[1]}:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`);
       }
       if (e.code === '28P01') throw new Error('The database rejected the password in DATABASE_URL. Check it (and URL-encode special characters such as @ # / as %40 %23 %2F).');
-      throw explain(e);
+      await pool.end().catch(() => {});
+      throw connectionFailure(e, host);
     }
     dbInfo.kind = 'postgres';
     dbInfo.label = /supabase\.(co|com)/.test(host) ? `Supabase (${host})` : `PostgreSQL (${host})`;

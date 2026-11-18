@@ -4,7 +4,7 @@
 // It needs a GitHub OAuth App's client ID (Device Flow enabled): TICKETFORGE_GITHUB_CLIENT_ID, or saved by an
 // administrator from the Connect GitHub dialog. The client ID is public; no client secret is used.
 import crypto from 'node:crypto';
-import { qs } from './db';
+import { getMeta, setMeta } from './appmeta';
 import { githubToken } from './devagent';
 import { err } from './errors';
 
@@ -17,7 +17,7 @@ const PENDING = G.__tfGhDevice;
 export async function getClientId() {
   if (process.env.TICKETFORGE_GITHUB_CLIENT_ID) return { clientId: process.env.TICKETFORGE_GITHUB_CLIENT_ID, source: 'env' };
   try {
-    let v = (await qs('select value from app_meta where key = $1', [KEY])).rows[0]?.value;
+    let v = await getMeta(KEY);
     if (typeof v === 'string') v = JSON.parse(v);
     return v?.clientId ? { clientId: v.clientId, source: 'saved' } : { clientId: '', source: '' };
   } catch { return { clientId: '', source: '' }; }
@@ -25,7 +25,7 @@ export async function getClientId() {
 export async function saveClientId(clientId) {
   const id = String(clientId || '').trim();
   if (id && !/^(Iv1\.|Ov2|Iv23)?[A-Za-z0-9._-]{10,40}$/.test(id)) throw err('That doesn’t look like a GitHub OAuth App client ID (for example Ov23li… or Iv1.…).');
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [KEY, JSON.stringify({ clientId: id })]);
+  await setMeta(KEY, { clientId: id });
   return getClientId();
 }
 

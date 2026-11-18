@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { q, qs, asWorkspace, currentWs } from './db';
 import { wsKey } from './wsmeta';
+import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { encrypt, decrypt } from './settings';
 import { isLocked } from './features';
 import { projectWorkspace } from './store';
@@ -31,13 +32,13 @@ const creds = () => ({ clientId: process.env.TICKETFORGE_GDRIVE_CLIENT_ID || '',
 // ---------------------------------------------------------------- the connection (one per workspace)
 // { accessEnc, refreshEnc, expiresAt, account: { email, name }, folder: { id, name, selectedAt, selectedBy }, connectedAt, connectedBy }
 async function readConn(): Promise<any> {
-  let v = (await qs('select value from app_meta where key = $1', [wsKey(KEY)])).rows[0]?.value;
+  let v = await getMeta(wsKey(KEY));
   if (typeof v === 'string') { try { v = JSON.parse(v); } catch { v = null; } }
   return v?.refreshEnc ? v : null;
 }
 async function writeConn(v: any) {
-  if (!v) { await qs('delete from app_meta where key = $1', [wsKey(KEY)]); return; }
-  await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(KEY), JSON.stringify(v)]);
+  if (!v) { await deleteMeta(wsKey(KEY)); return; }
+  await setMeta(wsKey(KEY), v);
 }
 
 /** What the admin setting shows. Never the tokens. */
