@@ -101,7 +101,15 @@ export async function api(url: string, { method = 'GET', body, raw, signal }: { 
   const opts: RequestInit = { method, headers: { 'X-TF-Run-On': runPlace() }, signal };
   if (body instanceof FormData) opts.body = body;
   else if (body !== undefined) { opts.body = JSON.stringify(body); (opts.headers as Any)['Content-Type'] = 'application/json'; }
-  const res = await fetch(url, opts);
+  let res = await fetch(url, opts);
+  // The database is moving to another host (docs/postgres-host-migration.md): the server refused this request before
+  // running it, so asking again is safe. The retry reaches a server that already uses the new host.
+  for (let attempt = 1; res.status === 503 && attempt <= 8; attempt++) {
+    const moved = await res.clone().json().then((b: Any) => b?.code === 'db-moved', () => false);
+    if (!moved) break;
+    await new Promise((r) => setTimeout(r, 500 * attempt));
+    res = await fetch(url, opts);
+  }
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`, errBody: Any = null;
     try { errBody = await res.json(); msg = errBody.error || msg; } catch { /* not json */ }
