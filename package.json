@@ -17,8 +17,7 @@
     "db:studio": "drizzle-kit studio",
     "docs:overview": "node --import tsx scripts/overview-docx.ts",
     "docs:pain-points": "node --import tsx scripts/pain-points-docx.ts",
-    "docs:problem-statement": "node --import tsx scripts/problem-statement-docx.ts",
-    "legacy": "node --env-file-if-exists=.env --import tsx legacy/server.js"
+    "docs:problem-statement": "node --import tsx scripts/problem-statement-docx.ts"
   },
   "license": "UNLICENSED",
   "private": true,
@@ -44,11 +43,9 @@
     "docx": "^9.15.2",
     "drizzle-orm": "^0.45.4",
     "exceljs": "^4.4.0",
-    "express": "^5.3.0",
     "fflate": "0.8.3",
     "mammoth": "^1.13.0",
     "mssql": "^11.0.2",
-    "multer": "^2.5.0",
     "mysql2": "^3.24.6",
     "next": "^16.4.5",
     "nodemailer": "^10.3.1",

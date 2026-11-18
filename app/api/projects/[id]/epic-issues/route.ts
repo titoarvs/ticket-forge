@@ -3,7 +3,6 @@ import * as store from '@/lib/store';
 import { generateEpicIssues } from '@/lib/epic-issues';
 import { approvalCheck } from '@/lib/approval';
 import { withDraftEpic } from '@/lib/feature-docs';
-import { signedOffDocs } from '@/lib/epic-review';
 
 // Writing the issues of an epic takes a minute or two.
 export const maxDuration = 300;
@@ -35,12 +34,10 @@ export const POST = api(async (req, p) => {
     project = withDraftEpic(project, epic);
   }
   if (!epic) throw new HttpError(404, 'That epic isn’t in this project (save first if you just created it).');
-  // From the documents uploaded for review: allowed only once the epic is signed off (lib/epic-review.ts).
-  const reviewedDocs = b.reviewed === true ? await signedOffDocs(p.id, String(b.epicId)) : null;
-  const c = reviewedDocs ? { ok: true, docs: [], blocking: '' } : approvalCheck(epic);
+  const c = approvalCheck(epic);
   if (!c.ok) { const e: any = new HttpError(409, `Issues are written from approved documents. Still to approve for “${epic.title}”: ${c.blocking}.`); e.extra = { code: 'docs-not-approved', docs: c.docs }; throw e; }
   return ndjson(req, async (send, signal) => {
-    const result = await generateEpicIssues({ project, epicId: String(b.epicId), instructions: String(b.instructions || ''), options: { granularity: b.granularity, includeTests: b.includeTests, testsPerTicket: b.testsPerTicket }, ai: aiOpts(b), signal, reviewedDocs, emit: (e: any) => send({ type: 'progress', ...e }) });
+    const result = await generateEpicIssues({ project, epicId: String(b.epicId), instructions: String(b.instructions || ''), options: { granularity: b.granularity, includeTests: b.includeTests, testsPerTicket: b.testsPerTicket }, ai: aiOpts(b), signal, emit: (e: any) => send({ type: 'progress', ...e }) });
     send({ type: 'done', result });
   });
 });

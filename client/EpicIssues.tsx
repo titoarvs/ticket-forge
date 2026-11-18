@@ -46,18 +46,15 @@ export function ApprovalSection({ epic }: { epic: Any }) {
   );
 }
 
-// `reviewed`: the documents uploaded to the epic and signed off in its document review (EpicReview.tsx) are the source.
-function RunModal({ epic, reviewed = false }: { epic: Any; reviewed?: boolean }) {
-  const check = reviewed ? { ok: true } : approvalCheck(epic);
+function RunModal({ epic }: { epic: Any }) {
+  const check = approvalCheck(epic);
   const [text, setText] = useState('');
   const [gran, setGran] = useState('balanced');
   const [tests, setTests] = useState(true);
   return (
-    <Modal title={`Write issues · ${epic.title}`} actions={[{ label: 'Cancel' }, { label: 'Write the issues', kind: 'ai', disabled: !check.ok, onClick: () => { closeModal(); run(epic, text, gran, tests, reviewed); } }]}>
-      <p className="muted small" style={{ marginTop: 0 }}>{reviewed
-        ? 'The AI writes draft issues from the PSD, FBD and ARD that were approved and signed off for this epic, and nothing outside the documents is added. Text is read from DOCX files only. You review the drafts before they’re added.'
-        : 'The AI writes the issues from the approved documents below: every acceptance scenario of the Feature Brief is covered, the technical scope follows the Architecture Record, and nothing outside the documents is added. You review them before they’re added.'}</p>
-      {!reviewed && <DocRows epic={epic} />}
+    <Modal title={`Write issues · ${epic.title}`} actions={[{ label: 'Cancel' }, { label: 'Write the issues', kind: 'ai', disabled: !check.ok, onClick: () => { closeModal(); run(epic, text, gran, tests); } }]}>
+      <p className="muted small" style={{ marginTop: 0 }}>The AI writes the issues from the approved documents below: every acceptance scenario of the Feature Brief is covered, the technical scope follows the Architecture Record, and nothing outside the documents is added. You review them before they’re added.</p>
+      <DocRows epic={epic} />
       <label className="field"><span>Size of issues</span>
         <SF value={gran} onChange={(e) => setGran(e.target.value)}><MenuItem value="coarse">Fewer, larger issues</MenuItem><MenuItem value="balanced">Balanced</MenuItem><MenuItem value="fine">Many small issues</MenuItem></SF></label>
       <CB label="Also write test cases for each issue" checked={tests} onChange={(e: Any) => setTests(e.target.checked)} />
@@ -66,14 +63,12 @@ function RunModal({ epic, reviewed = false }: { epic: Any; reviewed?: boolean })
   );
 }
 export const openEpicIssues = (epic: Any) => openModal(<RunModal epic={epic} />);
-/** Draft issues from the epic's signed-off review documents (the server refuses before the sign-off). */
-export const openReviewedEpicIssues = (epic: Any) => openModal(<RunModal epic={epic} reviewed />);
 
-async function run(epic: Any, instructions: string, granularity: string, includeTests: boolean, reviewed = false) {
+async function run(epic: Any, instructions: string, granularity: string, includeTests: boolean) {
   const ctrl = new AbortController();
   const task = startTask(`Writing issues for ${epic.title}`, { kind: 'ai', cancel: () => ctrl.abort() });
   try {
-    const res = await api(`/api/projects/${P().id}/epic-issues`, { method: 'POST', raw: true, signal: ctrl.signal, body: aiBody({ epicId: epic.id, instructions, granularity, includeTests, ...(reviewed ? { reviewed: true } : {}) }) });
+    const res = await api(`/api/projects/${P().id}/epic-issues`, { method: 'POST', raw: true, signal: ctrl.signal, body: aiBody({ epicId: epic.id, instructions, granularity, includeTests }) });
     let out: Any = null;
     await readNdjson(res, (ev) => {
       if (ev.type === 'progress') task.update({ detail: ev.message });

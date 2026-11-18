@@ -17,7 +17,6 @@ import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { PsdSection } from './Psd';
 import { ApprovalSection } from './EpicIssues';
-import { EpicReviewSection } from './EpicReview';
 import { approvalCheck } from '../lib/approval';
 import { FbdSection, ArdSection } from './Fbd';
 import { openSpecs } from './Specs';
@@ -500,8 +499,7 @@ function EpicPanel({ e }: { e: Any }) {
       {feat('docs') && <><PsdSection epic={e} />
       <FbdSection epic={e} />
       <ArdSection epic={e} />
-      <ApprovalSection epic={e} />
-      <EpicReviewSection epic={e} /></>}
+      <ApprovalSection epic={e} /></>}
       <div className="sec"><div className="sec-title"><h3>Dates</h3>
         {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>
         <div className="grid2 epic-dates">

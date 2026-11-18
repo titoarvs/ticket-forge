@@ -90,7 +90,7 @@ export function isLocalHost(hostHeader) {
 function isLocalRequest() {
   const c = currentContext();
   if (typeof c.local === 'boolean') return c.local;
-  return !SERVERLESS; // scripts and the legacy server run on this computer
+  return !SERVERLESS; // scripts run on this computer
 }
 /** "account" (your Claude account through Claude Code) or "api" (the configured AI API). */
 export function aiMode() {

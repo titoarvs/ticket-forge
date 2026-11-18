@@ -1,6 +1,6 @@
 # Ticket Forge: Problem Statement — Building Code Together
 
-> **Source and status.** This document follows Ticket Forge's own Problem Statement (PSD) structure (`lib/psd.ts`). It focuses on development: how a team builds code together, and how every member can keep contributing when tickets, code or documents are already "done", whether by a teammate or by AI. It is based on the README and the app's code (code jobs in `lib/devagent.ts`, per-person repositories in `lib/mylocal.ts`, document review in `lib/epic-review.ts` and `lib/approval.ts`). It describes the problem, not the design. It contains no measured data from any named team. Each claim that still needs proof is marked *[To validate: …]* and listed in Part 8. Status: **Draft**.
+> **Source and status.** This document follows Ticket Forge's own Problem Statement (PSD) structure (`lib/psd.ts`). It focuses on development: how a team builds code together, and how every member can keep contributing when tickets, code or documents are already "done", whether by a teammate or by AI. It is based on the README and the app's code (code jobs in `lib/devagent.ts`, per-person repositories in `lib/mylocal.ts`, document approval in `lib/approval.ts`). It describes the problem, not the design. It contains no measured data from any named team. Each claim that still needs proof is marked *[To validate: …]* and listed in Part 8. Status: **Draft**.
 
 ## 1. At a Glance
 

@@ -513,7 +513,7 @@ SQL: these modules already use it, the rest still call `q()` / `qs()` / `tx()` a
 Ported: `appmeta` (the `app_meta` settings table, used by settings, features, agents, generation rules, secrets, Google
 Drive and GitHub connection), `doctemplates` (the PSD, FBD and ARD templates), `files`, `shots`, `remote-jobs`, `notify`,
 `prefs`, `user-ai`, `gateways`, `gateway-keys`, `aicache`, `limits`, `subscription`, `chatbot`, and the AI usage rows
-written by `claude`. Not ported yet: `store`, `auth`, `brain`, `epic-review`, `billing-plans`, `subscriptions`, `stripe`,
+written by `claude`. Not ported yet: `store`, `auth`, `brain`, `billing-plans`, `subscriptions`, `stripe`,
 `paymongo*`, `aiusage` (reports), `gdrive` (the `drive_docs` queue), `coderabbit-pr`, the table setup, row-level
 security and one-time migrations in `lib/db.ts`, and `scripts/db-push.ts`.
 
@@ -995,7 +995,6 @@ lib/                       Server modules
 scripts/db-push.ts         Copies the local database to DATABASE_URL
 scripts/db-migrate-host.ts Copies a PostgreSQL host to another one, verifies counts and checksums, cuts over
 scripts/db-cutover-load.mjs  Load script for the cutover: failed requests and lost writes
-legacy/                    The previous Express + vanilla JS version (run with `TICKETFORGE_RLS=off npm run legacy`)
 ```
 
 ### Code layers (UI, logic, API)
@@ -1142,15 +1141,6 @@ In an epic's panel, **Coding specs** (needs a connected git remote: Project sett
 - **Mark ready** follows the project's setting (Coding specs → Settings, needs *Edit project settings*): **block** refuses with a message naming the issues and files, **warn** marks the specs ready and shows the overlap. Specs without an overlap are marked ready with no warning. Blocking is the default.
 - **Reviewer approval:** link AI-produced changes (a branch, pull request or commit) to a ready spec. They can be marked accepted only after one of the project's required reviewers (chosen in the same settings) has approved them; until then the server answers 409.
 - Tables `coding_specs` and `spec_changes` (`lib/db.ts`); API under `/api/projects/:id/specs`.
-
-## Document review before an epic's issues are created
-
-In an epic's panel, **Document review** (when the *Epic documents* feature is on; `lib/epic-review.ts`):
-- **Upload** the PSD, FBD and ARD as PDF, DOCX or PNG, up to 10 MB each (needs *Manage epics*). Anything else is refused with **415** / **413** and the message "Only PDF, DOCX and PNG files up to 10 MB can be uploaded as a PSD, FBD or ARD." The file is kept in `files`; text is read from DOCX files (PDF parsing stays off, see `lib/parse.ts`).
-- **Reviewers** are listed on the epic (`epic.reviewers`, chosen in the section by someone with *Manage epics*). Each can **approve** the current version or **request changes**, and comment. Anyone else gets **403**. A document is **approved** when it has a reviewer and every listed reviewer approved its current version.
-- **Versions:** uploading a document again saves a new version; earlier versions stay in its history (`epic_doc_versions`, with the file and its text) so a restore or diff is possible later. The new version needs approval again and withdraws the epic's sign-off.
-- **Sign-off:** the epic owner (*Manage epics*) records it once all three documents are approved; before that the server answers **409** ("All three documents … must be approved …"). Only then does the **Add issue** option appear, with two paths: create issues by hand, or **Generate draft issues with AI** from the signed-off documents (`POST /api/projects/:id/epic-issues` with `reviewed: true`, refused with 409 before the sign-off).
-- Tables `epic_doc_versions`, `epic_doc_reviews`, `epic_doc_comments` and `epic_signoffs` (`lib/db.ts`); API under `/api/projects/:id/epic-review`.
 
 ## Epic drafts (save an AI-generated epic and publish it later)
 

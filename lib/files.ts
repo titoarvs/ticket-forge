@@ -24,18 +24,8 @@ export function attachmentType(name) { return ATTACHMENT[path.extname(String(nam
 /** Types a browser may show in place; everything else is always downloaded. */
 export const showsInline = (mime) => /^(image\/(png|jpeg|gif|webp)|application\/pdf|video\/(mp4|webm|quicktime))$/.test(mime);
 
-// Epic documents (PSD, FBD, ARD) uploaded for review: PDF, Word or PNG, up to 10 MB (a file of exactly 10 MB is accepted).
-export const EPIC_DOC_MAX = 10 * 1024 * 1024;
-const EPIC_DOC = { '.pdf': 'application/pdf', '.docx': VIEWABLE['.docx'], '.png': 'image/png' };
-export const EPIC_DOC_MESSAGE = 'Only PDF, DOCX and PNG files up to 10 MB can be uploaded as a PSD, FBD or ARD.';
-export const epicDocType = (name) => EPIC_DOC[path.extname(String(name || '')).toLowerCase()] || null;
-
 export async function saveFile({ projectId, name, data, user, purpose = 'original' }: any) {
-  if (purpose === 'epic-doc') {
-    if (!epicDocType(name)) throw Object.assign(new Error(EPIC_DOC_MESSAGE), { status: 415 });
-    if (data?.length > EPIC_DOC_MAX) throw Object.assign(new Error(EPIC_DOC_MESSAGE), { status: 413 });
-  }
-  const mime = purpose === 'epic-doc' ? epicDocType(name) : purpose === 'reference' ? referenceType(name) : purpose === 'attachment' ? attachmentType(name) : fileType(name);
+  const mime = purpose === 'reference' ? referenceType(name) : purpose === 'attachment' ? attachmentType(name) : fileType(name);
   if (!mime && purpose === 'reference') throw Object.assign(new Error(typeMessage()), { status: 415 });
   if (purpose === 'reference' && data?.length > maxBytes()) throw Object.assign(new Error(sizeMessage()), { status: 413 });
   if (!mime) throw Object.assign(new Error(purpose === 'attachment'
