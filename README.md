@@ -990,6 +990,7 @@ Migrated so far: issue versions (`api/versions.ts`, `logic/versions.ts`), Admini
 
 ## Notes
 
+- [Scrum team pain points in the building phase](docs/scrum-pain-points.md), and how Ticket Forge may help, for the Scrum Master, Product Owner, developers and QA. A Word copy is built with `npm run docs:pain-points` (`docs/scrum-pain-points.docx`).
 - Keep `.env` private: it holds your database and email passwords. It is excluded from git.
 - Scanned PDFs (images only) have no text layer; run OCR first or paste the text.
 - Legacy `.doc` files are not supported; save as `.docx` or PDF.

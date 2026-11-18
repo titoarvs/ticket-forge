@@ -13,6 +13,7 @@
     "db:check": "node scripts/drizzle-schema.mjs --check",
     "db:studio": "drizzle-kit studio",
     "docs:overview": "node --import tsx scripts/overview-docx.ts",
+    "docs:pain-points": "node --import tsx scripts/pain-points-docx.ts",
     "legacy": "node --env-file-if-exists=.env --import tsx legacy/server.js"
   },
   "license": "UNLICENSED",
