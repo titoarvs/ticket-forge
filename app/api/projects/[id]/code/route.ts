@@ -6,7 +6,6 @@ import { codeRabbitJob, issueContext, apiContract, listJobs, queueInfo, startJob
 import { compareTarget, remoteCompare } from '@/lib/codecompare';
 import { publicAgents, agentForRole, requireRole } from '@/lib/agents';
 import { getProjectSecret } from '@/lib/secrets';
-import { ardContext } from '@/lib/ard';
 import { markdownToDocx } from '@/lib/md-docx';
 import { codeTask, branchFor, writePrText } from '@/lib/devagent';
 import { gh as ghApi } from '@/lib/gh-actions';
@@ -273,7 +272,7 @@ export const POST = api(async (req, p) => {
     if (prev && prev.kind !== 'pr-review' && FINISHED_CODE.includes(prev.status)) throw alreadyCoded(ticket);
     const agentId = String(b.agentId || await requireRole(side === 'backend' && backendDev(project) ? 'backend' : 'build'));
     const brain = await brainFor(project, ticket, true);
-    const context = [sideNote(project, ticket, side), agentId === 'architecture-record' ? await ardContext(project, ticket) : issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
+    const context = [sideNote(project, ticket, side), issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
     return startJob({ projectId: p.id, ticket, dev, instructions: String(b.instructions || '').slice(0, 4000), user, agentId, context, side, brainFiles: brain.files });
   }
   // Frontend + Backend issues, both at once: one API contract first (a few seconds), then both jobs in parallel.
@@ -311,7 +310,7 @@ export const POST = api(async (req, p) => {
     own(b.jobId);
     return codeRabbitJob(b.jobId, { apiKey: (await getProjectSecret(p.id, 'coderabbitKey')) || '' });
   }
-  if (b.action === 'docx') { // a read-only agent's report (e.g. the Architecture Record Design) as a Word document
+  if (b.action === 'docx') { // a read-only agent's report as a Word document
     await guard(p, ['export']);
     const j = own(b.jobId);
     if (!j.summary) throw new HttpError(400, 'This job has no report to download yet.');

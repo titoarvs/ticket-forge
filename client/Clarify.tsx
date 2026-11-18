@@ -47,7 +47,7 @@ export function QuestionsView({ q: { qs, err, ans, setAns }, subject }: { q: Ret
   return <>
     <p className="muted small" style={{ marginTop: 0 }}>Before it writes {subject}, the AI asks what would most change the result. Pick an answer, type your own, or leave it blank.</p>
     {err ? <div className="warn-banner"><span>Couldn’t get the questions: {err}. You can continue without them.</span></div>
-      : !qs ? <div className="psd-running"><Spinner /> Reading what it was given to see what it needs to know…</div>
+      : !qs ? <div className="ai-running"><Spinner /> Reading what it was given to see what it needs to know…</div>
       : !qs.length ? <p className="muted small">Nothing to ask: the material already answers what matters.</p>
       : <ol className="clarify-list">{qs.map((q) => (
         <li key={q.id}>

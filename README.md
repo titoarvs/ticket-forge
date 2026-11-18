@@ -142,25 +142,6 @@ All settings live in `.env` (see `.env.example`):
      message. Changing an assignee or priority sends an in-app notification to the assignee only. On a tablet or
      phone the board shows one column at a time, with a tab per column, so nothing scrolls sideways.
    - **Epics**: progress bars per epic; create, rename, recolour or delete; **Re-organize with Claude**.
-   - **Problem Statement (PSD) per epic**: in the epic panel (or **Write missing PSDs** on the Epics page) the AI
-     writes the feature's Problem Statement in your template's sections: At a Glance, Background and Current
-     Situation, Problem Statement (with the gaps table), Who Is Affected, Impact on the business, Impact on Users
-     (one table per role), Cost of Inaction and Evidence Needed. It works from the epic, its issues, the project
-     description and the source documents, and marks claims to confirm as *[To validate …]*. View it in the app,
-     set its version and status, rewrite it with instructions, and **Download .docx**. An administrator uploads
-     the team's PSD template once (Administration → Generation → Problem Statement template): its cover, logo,
-     styles, fonts, header and footer are kept; the product and feature name, version and status are replaced;
-     sign-off names, signatures and dates are left empty to fill in. Unused bold font files are dropped on upload
-     so templates and PSDs stay under serverless size limits. Without a template, PSDs use a plain layout.
-   - **Feature Brief (FBD) per epic**: in the epic panel (or **Write missing FBDs** on the Epics page) the AI fills
-     the team's Markdown Feature Brief template: At a Glance, Problem and Evidence, Proposed User Experience,
-     Scope and Requirements (FR-01…), Acceptance Criteria in Given / When / Then, Success Measures, Dependencies
-     and Risks, Rollout, Document Control, Sign-Off and Revision History. It builds on the epic's issues and their
-     acceptance criteria, the epic's PSD when there is one, and the source documents; anything unknown becomes a
-     *[To confirm: …]* point for the team, and sign-off names, signatures and dates stay empty. View it, edit the
-     Markdown, set its version and status (the Document Control row follows), rewrite it with instructions, and
-     download it as **.md** or **.docx**. The bundled template is the default; an administrator can replace it under
-     Administration → Generation → Feature Brief template (any Markdown with `## ` sections) or reset it.
    - **Timeline**: every epic on a calendar (weeks, months or quarters), with a sprints row and a today line. Each
      epic has a start and due date (set them in the epic panel, or on the timeline: click or drag an empty row to
      schedule, drag a bar to move it, drag its ends to change dates; arrow keys work too). Epics without dates
@@ -451,27 +432,6 @@ On the hosted service (`TICKETFORGE_MODE=saas`) each workspace has a plan. Self-
     proration yet) and cancelling keeps access until the paid period ends. Paying through PayMongo or Xendit is one
     payment per period: renewals are not charged automatically yet.
 
-## Issues from approved documents
-
-An epic's issues are written from its three documents, and only once all three are **approved**: the **Problem
-Statement (PSD)**, the **Feature Brief (FBD)** and the **Architecture Record Design (ARD)**.
-
-- **Approving**: each document has a status (*Draft*, *For Review*, *Approved*). Setting it to *Approved* records who
-  approved it, when, and a fingerprint of that version (`approvedBy`, `approvedAt`, `approvedFp`). Changing the status
-  or an edit that changes the content, such as a new version, shows **Changed after approval** and needs approving
-  again. Documents approved before this existed count as approved. Needs the *Manage epics* permission.
-- **Epic panel → Issues from approved documents** (when the *Epic documents* feature is on): shows the three documents
-  with their state and **Approve** / **Open** buttons. **Write issues from the documents** is enabled when all three are
-  approved. `POST /api/projects/<id>/epic-issues` refuses with **409** (`code: docs-not-approved`) otherwise.
-- **What the AI writes**: the Feature Brief's acceptance scenarios (AS-01…) become issues and their acceptance
-  criteria, the Architecture Record's components and decisions (AD-01…) set the technical scope, and the Problem
-  Statement keeps the work on the problem. Each issue says what it covers ("Covers: AS-01. Decisions: AD-02."). Things
-  the documents leave open become *open questions*, not guesses. Issues the epic already has are not repeated.
-- **Review before adding**: you see every issue (story, description, criteria, test cases), which scenarios have no
-  issue yet (shown as a warning), and add the ones you choose.
-- **Write issue with Claude** (one issue in an epic, `POST /api/ai/new-ticket`) follows the same rule when the epic
-  documents feature is on.
-
 ## Decisions with Jev (optional)
 
 [Jev](https://docs.typesafe.ai) (TypeSafe AI, early access) is a fast model for decisions: you give it the state of something
@@ -489,32 +449,12 @@ too), turn it on, and use **Test the connection**. `TICKETFORGE_JEV_URL` points 
 descriptions and test names being decided are sent to TypeSafe, so check their terms first. Client: `lib/jev.ts`
 (`POST https://api.typesafe.ai/v1/systemone`, `jev-latest`, retries 429/529 twice).
 
-## Add feature: brainstorm first, documents approved, then issues
-
-**Add feature with AI** no longer plans issues straight from a description. A new feature is worked through in steps, and
-nothing is created until the end:
-
-1. **Brainstorm** (`POST /api/projects/<id>/brainstorm`, `lib/brainstorm.ts`): after the usual clarifying questions the
-   AI works the feature through like a product lead and a tech lead: the problem, goals and what is out of scope, who it is
-   for, options with pros and cons (one recommended), risks, assumptions, open questions, and the **epics** it needs (an
-   epic that already exists is recognised by its title). You can change the epic titles, drop an epic, and add your own
-   decisions, which override the brainstorm in every document.
-2. **Documents** (`POST /api/projects/<id>/feature-docs`, `lib/feature-docs.ts`): for each epic the AI writes the
-   **Problem Statement**, then the **Feature Brief**, then the **Architecture Record Design**, each from the brainstorm and
-   the one before it, in your templates. You read them, edit the Markdown ones, rewrite any, and **approve** each (the
-   approval records who and which version, like on the epic panel). Editing an approved document means approving it again.
-3. **Issues**: `POST /api/projects/<id>/epic-issues` with the epic still being planned (`draftEpic`) writes the issues
-   from the approved documents only, covering every acceptance scenario of the brief (see *Issues from approved
-   documents*). Refused (409) while any of the three isn't approved.
-4. **Review**: the usual review step, then the epics are added **with their approved documents** (an existing epic gets
-   the documents approved here), and the issues with their test cases.
-
 ## Drizzle ORM
 
 [Drizzle ORM](https://orm.drizzle.team) is the data access layer. It is being ported module by module from hand-written
 SQL: these modules already use it, the rest still call `q()` / `qs()` / `tx()` and keep working unchanged.
 Ported: `appmeta` (the `app_meta` settings table, used by settings, features, agents, generation rules, secrets, Google
-Drive and GitHub connection), `doctemplates` (the PSD, FBD and ARD templates), `files`, `shots`, `remote-jobs`, `notify`,
+Drive and GitHub connection), `files`, `shots`, `remote-jobs`, `notify`,
 `prefs`, `user-ai`, `gateways`, `gateway-keys`, `aicache`, `limits`, `subscription`, `chatbot`, and the AI usage rows
 written by `claude`. Not ported yet: `store`, `auth`, `brain`, `billing-plans`, `subscriptions`, `stripe`,
 `paymongo*`, `aiusage` (reports), `gdrive` (the `drive_docs` queue), `coderabbit-pr`, the table setup, row-level
@@ -633,10 +573,7 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.ts`), sh
 
 | Phase | Agent | What it does | Works in |
 | --- | --- | --- | --- |
-| Prepare | Problem Statement | Drafts the Problem Statement from the epic’s What and Why | Documents |
-| Prepare | Feature Brief | Fills the Feature Brief template from the approved Problem Statement | Documents |
-| Prepare | Epic | Creates the epic for JIRA from the Feature Brief | Documents |
-| Plan | Architecture Record | Explores the codebase and writes the Architecture Decision Record (read-only) | Repo, read-only |
+| Prepare | Epic | Creates the epic for JIRA from the epic and its issues | Documents |
 | Plan | Test Plan · Working Tickets · Kick Off | Test cases, sized tickets, kick-off notes | Documents |
 | Build | **Build a Ticket** | Plans, codes and unit-tests one issue; runs the check command | Own git worktree |
 | Build | **Feature Tests** | Turns the issue’s test cases into automated tests and runs them | Own git worktree |
@@ -653,13 +590,13 @@ TicketForge has one agent per job in the feature lifecycle (`lib/agents.ts`), sh
 | General | **Free Worker** | Any task you describe, same safety rules as Build | Own git worktree |
 
 **Hiring agents.** Every agent can be hired: use **Hire** on a card in Administration → Agents and pick the project
-and epic. (Epic and issue panels don't list agents.) Problem Statement, Feature Brief, Working Tickets, Test Plan and Feature Verification
+and epic. (Epic and issue panels don't list agents.) Working Tickets, Test Plan and Feature Verification
 run TicketForge's existing writers with the agent's instructions. Epic, Kick Off, Demo, Sign-Off and Manual, Deploy,
-Release Certification and Review a Submission write a Markdown document from the epic, its documents, issues, test
+Release Certification and Review a Submission write a Markdown document from the epic, its issues, test
 results and pull requests, saved on the epic (`lib/agentdocs.ts`). Code agents ask which issue to work on. In the code
 window, **Review panel** runs three Review agents in parallel (correctness, security, tests & acceptance).
 
-The agents in bold (and Architecture Record) run as real Claude Code agents: TicketForge passes them to
+The agents in bold run as real Claude Code agents: TicketForge passes them to
 `claude -p --agents <json> --agent <id>`, so each one gets its own system prompt and an enforced tool list, and Build
 can delegate to Feature Tests and Review as subagents. Follow-up rounds resume the same Claude Code session
 (`--resume`), so the agent keeps its context. Administrators can turn each agent off and set its model, effort and
@@ -770,8 +707,7 @@ TicketForge runs on your computer (opened at localhost).
   and versions, where each kind of code lives, how one or two real features are built end to end, conventions,
   data and migrations, tests, commands, what to reuse, and rules from the README / CONTRIBUTING / CLAUDE.md. You can
   view, edit, download or clear it, and learn again after big changes (it records the commit it learned).
-- Every code job (and code review) gets the profile with its task, together with the issue, sub-tasks, epic, Feature
-  Brief and Architecture Record, so new code is built the way the repository already works.
+- Every code job (and code review) gets the profile with its task, together with the issue, sub-tasks and epic, so new code is built the way the repository already works.
 - **Repo-native Builder** (Create agent → Start from a template, or the button on an empty Agents page): a code agent
   that reads the profile, finds the closest existing feature and uses it as the pattern (file placement, names,
   libraries, data access, errors, tests), reuses existing helpers, adds no new dependencies unless needed, and says in
@@ -781,7 +717,7 @@ TicketForge runs on your computer (opened at localhost).
 
 - **Built-in agents** (Administration → Agents) lists TicketForge's agents: remove any of them, or all at once with
   **Remove all built-in agents**. Removed agents leave the catalog and every picker; restore them at any time. Document
-  features (Problem Statement, Feature Brief, test cases…) keep working from the epic; testing agents that are removed
+  features (test cases, agent documents…) keep working from the epic; testing agents that are removed
   are simply off in test runs.
 - **Create agent**: describe it and the AI writes its rules, write the Markdown yourself, import a `.md` file, or
   **start from a template**, including any built-in agent (also from a built-in agent's details: **Copy as custom
@@ -1061,18 +997,12 @@ On Postgres (Supabase), every table has row-level security switched on:
 
 Migrations and `npm run db:push` run as the table owner. The policies are recreated on every start, and **Admin → Email & database** shows whether they're active. Set `TICKETFORGE_RLS=off` to run without the restricted role (the tables stay locked to Supabase's public roles).
 
-## Document templates and questions before the AI writes
+## Questions before the AI writes
 
-- **Per-epic documents:** each epic can have a Problem Statement (PSD), a Feature Brief (FBD) and an Architecture Record Design (ARD), written by the AI from the epic, its issues, the earlier documents and the source documents. View, edit, or download each as .md or .docx from the epic panel or the Epics page.
-- **Templates:**
-  - Administration → Generation sets the team's templates.
-  - Project settings → Templates gives one project its own templates. Its PSD, FBD and ARD then use those instead.
-  - Without either, the built-in defaults are used.
 - **Questions first:** before the AI writes anything, it reads what it was given and asks up to 5 questions, each with suggested answers. You answer what you can or skip; your answers go to the AI as instructions. This applies to:
   - generating a project or adding a feature;
   - writing, enhancing or splitting an issue;
-  - acceptance criteria and test cases;
-  - the PSD, FBD and ARD.
+  - acceptance criteria and test cases.
 
 ## Test automation: repository sync and run settings
 
@@ -1145,8 +1075,8 @@ Project settings → Code & GitHub → **Backend repository**: tick "This projec
 - **Build both at once** (faster): for a Frontend + Backend issue, TicketForge first agrees a short API contract from the
   issue (a few seconds), then runs the backend and frontend agents in parallel, each told to implement or call exactly
   that contract. The contract shows in the panel. It takes about half the time of one after the other.
-- Speed: the coding agents (Build, Frontend, Backend, Fix a Bug) default to Sonnet at medium effort; Review and
-  Architecture Record stay on Opus. Change either in Administration → Agents. Each job's worktree links the installed
+- Speed: the coding agents (Build, Frontend, Backend, Fix a Bug) default to Sonnet at medium effort; Review stays
+  on Opus. Change either in Administration → Agents. Each job's worktree links the installed
   dependencies (node_modules, vendor, .venv) from your checkout, so the check command runs without installing.
 - **Pull requests from either repository:** "Commit, push and open PR/MR" opens a **GitHub pull request** or a **GitLab merge request** (gitlab.com or self-hosted), depending on the repository's origin.
   - GitLab needs an access token (scopes `api` and `write_repository`), saved in the Backend card or set as `GITLAB_TOKEN`.
@@ -1237,7 +1167,7 @@ Each tier maps to a model on every AI:
 - each AI API. A blank field uses the provider's own model, e.g. set OpenAI's Light tier to `gpt-4.1-mini`.
 
 Claude Code agents are routed too:
-- **Coding agents** (Build, Frontend and Backend Developer, Fix a Bug, Architecture Record) use High.
+- **Coding agents** (Build, Frontend and Backend Developer, Fix a Bug) use High.
 - **Test and helper agents** (Feature Tests, Test Automation, Free Worker) use Standard.
 - **Code review** (Review a Pull Request, Review Panel, UI/UX Review) uses High.
 - **Document agents** use Standard.
@@ -1318,7 +1248,7 @@ A feature marked `off` in the catalog is still being rolled out: it **starts loc
 
 ### Google Drive storage (Administration → Google Drive, owner only, behind the "Google Drive storage" feature)
 
-The Super Admin (the owner) connects **one** Google account for the workspace with OAuth and pastes the link of **one** Drive folder. From then on, generated documents (PSD, FBD, ARD and agent documents, as .docx) and documents uploaded for epic review are saved to that folder instead of TicketForge storage (the `files` table). Nothing in Drive is browsed except that folder; documents already in the old storage are not moved.
+The Super Admin (the owner) connects **one** Google account for the workspace with OAuth and pastes the link of **one** Drive folder. From then on, generated agent documents (as .docx) are saved to that folder instead of TicketForge storage (the `files` table). Nothing in Drive is browsed except that folder; documents already in the old storage are not moved.
 
 - **Set up:** create a Google Cloud OAuth client (Web application, Drive API on) with the redirect URI `APP_URL/api/gdrive/callback`, then set `TICKETFORGE_GDRIVE_CLIENT_ID` and `TICKETFORGE_GDRIVE_CLIENT_SECRET`. The Select folder action stays disabled until Google Drive is connected.
 - **Tokens** are encrypted in `app_meta` and never reach the browser. An expired access token is refreshed with the refresh token.
@@ -1466,8 +1396,7 @@ and the code agents never miss a project's context.
 - **What's in it.** One note per thing TicketForge knows, each with frontmatter (`title`, `type`, `key`, `status`,
   `tags`, `updated`, `origin`): an *Index* and *Project Overview* (summary, assumptions, open questions), every epic
   and issue (user story, description, acceptance criteria, status, sprint, Fix versions, dependencies, links, sub-tasks,
-  test cases, pull requests, recent comments), releases, source documents, the epic documents (Problem Statement,
-  Feature Brief, Architecture Record), the decisions (`AD-xx`) and open decisions (`Qxx`) written in them, the
+  test cases, pull requests, recent comments), releases, source documents, the
   project's open questions, the **App context** and the **Repository profile** from *Learn from repository*. Links go
   both ways: issue ↔ epic, issue ↔ dependencies and links, epic ↔ release, decision ↔ issue, question ↔ issue.
 - **Always up to date.** The notes are rebuilt from the project whenever its version changes (when the Brain page or an
@@ -1480,7 +1409,7 @@ and the code agents never miss a project's context.
   interactive **Graph** (drag, pan, zoom, "around the open note") drawn on a canvas, with no extra dependency. Light and
   dark themes, and phone width (list, then note).
 - **AI uses it.** Before ticket writing and enhancing, test cases (backlog and test management), splits, test plans,
-  Problem Statements, Feature Briefs, ARDs, document agents and test scripts, TicketForge picks the notes for the task:
+  document agents and test scripts, TicketForge picks the notes for the task:
   the notes of its issue or epic, the notes they link to and that link to them (one and two hops; decisions, questions,
   documents and team notes at two hops), and the best keyword matches. They go at the start of the prompt as a compact
   **PROJECT BRAIN** block (about 9,000 characters at most, less for light tasks). The system prompt, with the App

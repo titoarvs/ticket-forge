@@ -8,8 +8,6 @@ import { TF, TA, SF, CB, RB, MenuItem } from './fields';
 import { Loading, Sk } from './ui';
 import { GuideCard } from './GuideCard';
 import { AiTold } from './AiTold';
-import { PsdTemplateCard } from './Psd';
-import { FbdTemplateCard, ArdTemplateCard } from './Fbd';
 
 const TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 const REASONING: [string, string, string][] = [
@@ -98,7 +96,7 @@ export function GenerationTab() {
     { key: 'tickets', label: 'Tickets', hint: 'Titles, criteria, points, types', icon: I.backlog, badge: dot(['tickets']) },
     { key: 'tests', label: 'Test cases & scripts', hint: 'Test cases on issues, Playwright', icon: I.test, badge: dot(['tests', 'automation']) },
     { key: 'testmgmt', label: 'Test management', hint: 'Corporate test standard', icon: I.check, badge: dot(['testmgmt']) },
-    { key: 'documents', label: 'Documents', hint: 'Guide and document templates', icon: I.doc },
+    { key: 'documents', label: 'Documents', hint: 'The generation guide', icon: I.doc },
     { key: 'prompts', label: 'What the AI is told', hint: 'Preview of every prompt', icon: I.summary },
   ];
   return (
@@ -216,9 +214,6 @@ export function GenerationTab() {
 
       {sec === 'documents' && <div className="cards">
         <GuideCard onChange={refreshPrompts} />
-        <PsdTemplateCard />
-        <FbdTemplateCard />
-        <ArdTemplateCard />
       </div>}
 
       {sec === 'prompts' && <div className="cards"><AiTold prompts={prompts} /></div>}

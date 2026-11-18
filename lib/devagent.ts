@@ -201,25 +201,19 @@ const say = (j, text, kind = 'info') => { j.log.push({ at: new Date().toISOStrin
 const TOOL_VERB = { Read: 'Reading', Edit: 'Editing', MultiEdit: 'Editing', Write: 'Writing', Glob: 'Finding files', Grep: 'Searching', LS: 'Listing', Bash: 'Running', TodoWrite: 'Planning', Task: 'Delegating to', Agent: 'Delegating to' };
 
 const clipText = (x, n) => { const t = String(x || '').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
-/** The `## ` sections of a Markdown document whose heading matches `re`. */
-const mdSections = (md, re) => String(md || '').split(/^(?=##\s)/m).filter((sec) => re.test(sec.split('\n')[0])).join('\n').trim();
 /**
- * The feature around an issue, so the agent builds the right thing: the epic, the issue's sub-tasks, the other
- * issues in the epic (so it doesn't build their parts), and the epic's Feature Brief requirements and Architecture Record.
+ * The feature around an issue, so the agent builds the right thing: the epic, the issue's sub-tasks, and the other
+ * issues in the epic (so it doesn't build their parts).
  */
 export function issueContext(project, ticket) {
   const epic = (project.epics || []).find((e) => e.id === ticket.epicId);
   const subtasks = project.tickets.filter((t) => t.parentId === ticket.id);
   const siblings = epic ? project.tickets.filter((t) => t.epicId === epic.id && !t.parentId && t.id !== ticket.id) : [];
-  const fbd = epic?.fbd?.markdown ? mdSections(epic.fbd.markdown, /scope|requirement|acceptance/i) : '';
-  const ard = epic?.ard?.markdown || '';
   return [
     `PROJECT: ${project.name}${project.description ? ` — ${clipText(project.description, 600)}` : ''}`,
     epic && `FEATURE (epic) this issue belongs to: ${epic.key || ''} ${epic.title}${epic.description ? `\n${clipText(epic.description, 1200)}` : ''}`,
     subtasks.length && `Sub-tasks of this issue (all part of this job):\n${subtasks.slice(0, 30).map((t) => `- ${t.key || ''} ${t.title}${t.description ? `: ${clipText(t.description, 300)}` : ''}`).join('\n')}`,
     siblings.length && `Other issues in the same feature (separate jobs: don't build them, but stay compatible with them):\n${siblings.slice(0, 30).map((t) => `- ${t.key || ''} ${t.title}`).join('\n')}`,
-    fbd && `From the feature's Feature Brief (requirements and acceptance criteria; the parts that concern this issue apply):\n${clipText(fbd, 6000)}`,
-    ard && `The feature's Architecture Record Design (follow its decisions):\n${clipText(ard, 8000)}`,
   ].filter(Boolean).join('\n\n');
 }
 
@@ -248,7 +242,6 @@ function prompt(t, agent, extra, round, context = '') {
   const lines = [
     round > 1 ? `Continue the work on issue ${t.key}. Your previous changes are already in the working tree; adjust them as asked below.`
       : agent.id === 'feature-tests' ? `Write and run the automated tests for issue ${t.key}.`
-      : agent.id === 'architecture-record' ? `Write the Architecture Record Design for the feature that issue ${t.key} belongs to.`
       : agent.id === 'free-worker' ? `Work on this task in the context of issue ${t.key}.`
       : agent.id === 'bug-fix' ? `Fix the bug described in issue ${t.key}.`
       : agent.id === 'test-automation' ? `Write the end-to-end tests for issue ${t.key}.`

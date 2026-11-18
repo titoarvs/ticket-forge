@@ -8,7 +8,7 @@ export const PLANS = {
     features: ['2 projects, 3 members', '100 AI actions a month', 'Backlog, board, timeline, test cases', 'Bring your own AI keys or Claude subscription'] },
   pro: { id: 'pro', name: 'Pro', blurb: 'For teams shipping every week.', price: { month: 19, year: 190 }, archived: false,
     limits: { projects: 25, members: 10, aiCalls: 2000, codeJobs: 50, storageMb: 5000, dbConnections: 5, schemaReads: 300 },
-    features: ['25 projects, 10 members', '2,000 AI actions a month', '50 AI code jobs a month', 'Test automation and GitHub Actions', 'Problem Statements, Feature Briefs, Architecture Records'] },
+    features: ['25 projects, 10 members', '2,000 AI actions a month', '50 AI code jobs a month', 'Test automation and GitHub Actions'] },
   team: { id: 'team', name: 'Team', blurb: 'For larger teams and many projects.', price: { month: 49, year: 490 }, archived: false,
     limits: { projects: null, members: 50, aiCalls: 10000, codeJobs: 300, storageMb: 50000, dbConnections: 10, schemaReads: 2000 },
     features: ['Unlimited projects, 50 members', '10,000 AI actions a month', '300 AI code jobs a month', 'Review panels and CodeRabbit', 'Priority support'] },

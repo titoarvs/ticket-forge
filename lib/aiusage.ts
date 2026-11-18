@@ -82,7 +82,7 @@ function suggest({ routing, totals, byTask, noCtx, avgIn, labels }: any) {
   if (!routing.escalate && escalatable.length) out.push({ id: 'escalate', impact: 'high', title: 'Try Standard first for High work',
     text: `${escalatable.map((t) => labels[t] || t).join(', ')} run on High (${escalatable.reduce((a, t) => a + calls(t), 0)} calls). Trying Standard first and stepping up to High only when the answer isn’t usable usually costs 40–60% less on these tasks.`, action: 'escalate' });
   if (totals.calls >= 20 && totals.cached / Math.max(1, totals.calls) < 0.05) {
-    const missing = ['tests', 'docs', 'plan', 'repo'].filter((t) => !routing.cacheTasks.includes(t) && calls(t) > 0);
+    const missing = ['tests', 'plan', 'repo'].filter((t) => !routing.cacheTasks.includes(t) && calls(t) > 0);
     if (!routing.cache) out.push({ id: 'cache', impact: 'medium', title: 'Turn on reusing answers', text: 'Identical requests are sent to the AI again every time. Reusing answers costs nothing when the input hasn’t changed.', action: 'cache' });
     else if (missing.length) out.push({ id: 'cache-tasks', impact: 'medium', title: `Reuse answers for ${missing.map((t) => labels[t] || t).join(', ')}`, text: 'These tasks are often asked the same thing again (the same issue, the same repository). Reused answers cost nothing; “Again” still asks fresh.', action: 'cache-tasks', tasks: missing });
   }

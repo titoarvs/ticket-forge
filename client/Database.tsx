@@ -228,7 +228,7 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
   const qq = q.trim().toLowerCase();
   const shown = (schema?.tables || []).filter((t) => !qq || tname(t).toLowerCase().includes(qq) || t.columns.some((c) => c.name.toLowerCase().includes(qq)));
   return (
-    <SetCard title="Schema" desc="The app’s tables, columns and relations, never its rows. Coding specs, Problem Statements, Feature Briefs, Architecture Records and issue writing use it, so the AI names real tables and says when a migration is needed.">
+    <SetCard title="Schema" desc="The app’s tables, columns and relations, never its rows. Coding specs, agent documents, test cases and issue writing use it, so the AI names real tables and says when a migration is needed.">
       <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <label className="field" style={{ flex: 1, minWidth: 220, margin: 0 }}><span>Read from</span>
           <SF value={source} onChange={(e: Any) => setSource(e.target.value)}>

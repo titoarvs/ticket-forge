@@ -31,7 +31,6 @@ export async function saveEpicDraft(e: Any, items: Any[]): Promise<boolean> {
   mutate((pp) => {
     pp.epics.push({
       id, key: nextEpicKey(), title: e.title, description: e.description || '', color: COLORS[pp.epics.length % COLORS.length],
-      ...(e.docs?.psd ? { psd: e.docs.psd } : {}), ...(e.docs?.fbd ? { fbd: e.docs.fbd } : {}), ...(e.docs?.ard ? { ard: e.docs.ard } : {}),
       draft: true, draftBy: { id: S.user?.id || null, name: me() }, draftAt: nowIso(), aiOriginal: originalOf(e, items),
     });
   });

@@ -1,15 +1,13 @@
 'use client';
 // The TicketForge agents in the app: the catalog (from /api/agents), the agent card, and "Hire": what happens when
-// you put an agent to work on an epic. Generators open the writers that already exist (Problem Statement, Feature
-// Brief, test cases, new issues, test runs); document agents write their document and save it on the epic; code
+// you put an agent to work on an epic. Generators open the writers that already exist (test cases, new issues,
+// test runs); document agents write their document and save it on the epic; code
 // agents open Code Jobs in a new tab (TF-124) for one of the epic's issues.
 import { useEffect, useState } from 'react';
 import { S, P, api, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, ticket, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA } from './fields';
 import { Markdown } from './GuideCard';
-import { openWritePsd, openPsd } from './Psd';
-import { openWriteFbd, openFbd } from './Fbd';
 import { bulkTests, runTests, NewWithClaudeModal } from './actions';
 import { openWriteCode } from './DevCode';
 import { DriveState } from './Drive';
@@ -79,7 +77,7 @@ function DocHireModal({ epic, a }: { epic: Any; a: Any }) {
   return (
     <Modal title={`Hire ${a.name}`} actions={[{ label: 'Cancel' }, { label: had ? 'Write it again' : 'Write it', kind: 'ai', onClick: () => { closeModal(); runDoc(epic, a, text); } }]}>
       <div className="hire-intro"><span className="agent-icon" aria-hidden>{a.icon}</span><div><b>{a.summary}</b><ul className="small muted">{a.does.map((d: string) => <li key={d}>{d}</li>)}</ul></div></div>
-      <p className="muted small">It reads <b>{epic.title}</b>: the epic, its Problem Statement and Feature Brief, {P().tickets.filter((t: Any) => t.epicId === epic.id).length} issues with their status and test results, and the documents other agents wrote. What it can’t know becomes <i>[To confirm: …]</i>.{had ? ' The current document is replaced (you can undo).' : ''}</p>
+      <p className="muted small">It reads <b>{epic.title}</b>: the epic, {P().tickets.filter((t: Any) => t.epicId === epic.id).length} issues with their status and test results, and the documents other agents wrote. What it can’t know becomes <i>[To confirm: …]</i>.{had ? ' The current document is replaced (you can undo).' : ''}</p>
       <label className="field"><span>Extra instructions (optional)</span><TA rows={3} value={text} placeholder="e.g. The demo is for the finance director; keep it to 10 minutes." onChange={(e) => setText(e.target.value)} /></label>
     </Modal>
   );
@@ -128,8 +126,6 @@ export function hireAgent(a: Any, epic: Any) {
   if (a.runner === 'code' || a.runner === 'panel') return openModal(<PickIssueModal epic={epic} a={a} />);
   if (a.runner === 'document') return openModal(<DocHireModal epic={epic} a={a} />);
   switch (a.use) {
-    case 'psd': return openWritePsd(epic);
-    case 'fbd': return openWriteFbd(epic);
     case 'tickets': return openModal(<NewWithClaudeModal epicId={epic.id} />);
     case 'tests':
       if (!issues.length) return toast('This epic has no issues to write test cases for.', 'err');

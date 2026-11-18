@@ -1,6 +1,6 @@
 // Document agents (lib/agents.ts, runner "document"): Epic, Kick Off, Demo, Sign-Off and Manual, Deploy, Release
 // Certification and Review a Submission. Each writes one Markdown document for an epic from everything TicketForge
-// knows about it: the epic, its Problem Statement and Feature Brief, its issues with their status, points, assignees,
+// knows about it: the epic, its issues with their status, points, assignees,
 // test results and pull requests, and the documents the other agents already wrote. The app saves the result on the
 // epic (epic.agentDocs[agentId]).
 import { askClaude } from './claude';
@@ -29,10 +29,6 @@ export function epicContext(project, epic) {
     t.testCases?.length && `  Tests: ${t.testCases.slice(0, 8).map((tc) => `${clip(tc.title, 90)} (${tc.status || 'Not run'})`).join(' | ')}`,
     t.prs?.length && `  Pull requests: ${t.prs.map((pr) => `${pr.repo || ''}#${pr.number} ${pr.status || ''}`).join(', ')}`,
   ].filter(Boolean).join('\n')).join('\n');
-  const psd = epic.psd ? `Problem Statement (${epic.psd.status || 'Draft'}): ${clip(epic.psd.problemStatement, 1200)}
-At a glance: ${clip(epic.psd.atAGlance?.problem, 300)} / Why it matters: ${clip(epic.psd.atAGlance?.whyItMatters, 300)}
-Affected: ${(epic.psd.affected || []).map((a) => a.who).join(', ')}` : 'Problem Statement: not written yet.';
-  const fbd = epic.fbd?.markdown ? `Feature Brief (${epic.fbd.status || 'Draft'}):\n${clip(epic.fbd.markdown, 9000)}` : 'Feature Brief: not written yet.';
   const others = Object.entries<any>(epic.agentDocs || {}).map(([id, d]: any) => `### Earlier document: ${d.name || id}\n${clip(d.markdown, 2500)}`).join('\n\n');
   return `PROJECT: ${project.name}${project.key ? ` (${project.key})` : ''}
 Project description: ${clip(project.description, 1200) || 'n/a'}
@@ -43,10 +39,6 @@ Epic description: ${clip(epic.description, 1500) || 'n/a'}
 Dates: start ${epic.startDate || epic.start || 'not set'}, due ${epic.dueDate || epic.end || 'not set'}
 Totals: ${tickets.length} issues (${tickets.filter((t) => /done/i.test(t.status || '')).length} done), ${points} story points;
 ${tests.length} test cases: ${count('Passed')} passed, ${count('Failed')} failed, ${count('Blocked')} blocked, ${tests.length - count('Passed') - count('Failed') - count('Blocked')} not run.
-
-${psd}
-
-${fbd}
 
 ISSUES:
 ${issues || '- (no issues yet)'}

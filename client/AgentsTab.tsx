@@ -57,7 +57,7 @@ You are a senior engineer on this team. You implement one issue so the change lo
 same structure, names, libraries, patterns and tests. You never invent a new way when the repository already has one.
 
 ## Before you write code
-- Read the REPOSITORY PROFILE in your task (when there is one) and the issue, its sub-tasks, the epic and the Feature Brief.
+- Read the REPOSITORY PROFILE in your task (when there is one) and the issue, its sub-tasks and the epic.
 - Find the closest existing feature to this one (Grep for similar routes, components, models or names) and read it
   end to end: entry point, API, service, data access, UI, tests. Name it in your plan: it is your pattern.
 - Check the profile against the code: when they differ, the code wins; mention it in your summary.
@@ -237,7 +237,7 @@ function BuiltInsModal({ data: first, onData }: { data: Any; onData: (d: Any) =>
   const active = list.filter((b) => !b.removed), removed = list.filter((b) => b.removed);
   const kind = (b: Any) => (b.runner === 'code' ? (b.writes ? 'Edits code' : 'Reviews code') : b.runner === 'testing' ? 'Test runs' : b.runner === 'panel' ? 'Review panel' : 'Documents');
   return <Modal title="Built-in agents" wide actions={[{ label: 'Close' }]}>
-    <p className="muted small" style={{ marginTop: 0 }}>TicketForge comes with these agents. Remove the ones you don’t want; your custom agents take over their jobs (set which under <b>Default agents</b>). Removed agents can be restored at any time. Document features (Problem Statement, Feature Brief…) keep working from the epic; they just leave this catalog.</p>
+    <p className="muted small" style={{ marginTop: 0 }}>TicketForge comes with these agents. Remove the ones you don’t want; your custom agents take over their jobs (set which under <b>Default agents</b>). Removed agents can be restored at any time. Document features (test cases, agent documents…) keep working from the epic; they just leave this catalog.</p>
     <div className="bi-bar">
       <button className="btn danger-subtle" disabled={!!busy || !active.length} onClick={() => act('remove', active.map((b) => b.id))}>{busy === 'remove' ? <Spinner /> : null}Remove all built-in agents ({active.length})</button>
       {removed.length > 0 && <button className="btn" disabled={!!busy} onClick={() => act('restore', removed.map((b) => b.id))}>Restore all ({removed.length})</button>}

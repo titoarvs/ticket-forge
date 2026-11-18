@@ -87,7 +87,7 @@ function states(epicId: string, fresh: boolean): Promise<Any[]> {
 
 /**
  * The Google Drive save state of one document of an epic: saved, queued (being retried) or failed (contact the Super
- * Admin). `kind` is psd, fbd, ard or agent; `docKey` is the agent id, or 'upload' for an uploaded document. `again`
+ * Admin). `kind` is agent; `docKey` is the agent id. `again`
  * changes when the document is written again, so the state is read again. Shows nothing when Google Drive is off.
  */
 export function DriveState({ epic, kind, docKey = '', again = '' }: { epic: Any; kind: string; docKey?: string; again?: string }) {
