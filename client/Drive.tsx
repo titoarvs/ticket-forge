@@ -51,7 +51,7 @@ export function DriveTab() {
           <span className="spacer" />
           <button className="btn primary" disabled={!!busy || !st.configured} onClick={connect}>{busy === 'connect' ? <><Spinner />Opening Google…</> : st.connected ? 'Connect another account' : 'Connect Google Drive'}</button>
           {st.connected && <button className="btn" disabled={!!busy} onClick={() => openModal(<Confirm title="Disconnect Google Drive?" label="Disconnect" text="New documents are saved to TicketForge storage again only after you select a folder. Documents already in Drive stay there."
-            onYes={() => run('disconnect', disconnectDrive, 'Google Drive disconnected')} />)}>Disconnect</button>}
+            onYes={async () => { await run('disconnect', disconnectDrive, 'Google Drive disconnected'); }} />)}>Disconnect</button>}
         </div>
         {!st.configured && <p className="muted small" style={{ marginBottom: 0 }}>Google Drive isn’t set up on this server yet: set <code>TICKETFORGE_GDRIVE_CLIENT_ID</code> and <code>TICKETFORGE_GDRIVE_CLIENT_SECRET</code> (a Google OAuth client) first.</p>}
       </div>
