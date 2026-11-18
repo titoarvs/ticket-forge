@@ -22,6 +22,7 @@ import { SmartSelectModal } from './TestSelect';
 import { RemoteBrowser } from './RemoteBrowser';
 import { GitHubRunner } from './GitHubRunner';
 import { epicRange } from './Timeline';
+import { DraftBadge } from './EpicDrafts';
 import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy, openDoc, openWriteDoc, downloadDocDocx, docBusy, writeMissingDocs } from './Fbd';
 import { openPsd, openWritePsd, downloadPsd, writeMissingPsds, psdBusy } from './Psd';
 import { ItemText } from './ListEditor';
@@ -441,7 +442,7 @@ export function Epics() {
           const pr = epicProgress(e);
           return (
             <tr key={e.id} className="click" onClick={() => openDrawer('epic', e.id)}>
-              <td className="ep-main"><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b></span>
+              <td className="ep-main"><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b>{e.draft && <DraftBadge />}</span>
                 {e.description && <div className="muted small ep-desc" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
               <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Dates">{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
               <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Problem Statement" onClick={(ev) => ev.stopPropagation()}>{psdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>

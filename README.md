@@ -1127,6 +1127,14 @@ In an epic's panel, **Document review** (when the *Epic documents* feature is on
 - **Sign-off:** the epic owner (*Manage epics*) records it once all three documents are approved; before that the server answers **409** ("All three documents … must be approved …"). Only then does the **Add issue** option appear, with two paths: create issues by hand, or **Generate draft issues with AI** from the signed-off documents (`POST /api/projects/:id/epic-issues` with `reviewed: true`, refused with 409 before the sign-off).
 - Tables `epic_doc_versions`, `epic_doc_reviews`, `epic_doc_comments` and `epic_signoffs` (`lib/db.ts`); API under `/api/projects/:id/epic-review`.
 
+## Epic drafts (save an AI-generated epic and publish it later)
+
+In **Add feature with AI**, each new epic in the review step has **Save as draft** (shown only with *Manage epics*, the permission that creates epics; `client/EpicDrafts.tsx`):
+- A draft is an epic with `draft: true`, saved with the project like any epic change. It keeps the AI's output as generated (`aiOriginal`: title, description and the planned issues) and who saved it (`draftBy`). Its planned issues are not added to the backlog.
+- Drafts show in the **Epics** list among real epics, with a **Draft** badge. Open one to edit its title and description (saved and shown again on reload) and to see **Original AI output**, which is never edited.
+- **Publish** (in the draft's panel) removes the draft flag, so it becomes a real epic. A draft with an empty title can't be published: the app shows a message, and the server refuses a save that does it with **400**.
+- **Notifications:** saving or publishing sends an in-app notification (the bell, kinds `epic-draft-saved` and `epic-published`) to the person who saved the draft and to the project owner, once each. `POST /api/projects/:id/epic-drafts` (`lib/epic-drafts.ts`) sends it after checking what was saved.
+
 ## GitHub Copilot as the local AI
 
 When TicketForge is opened at localhost, it can use **GitHub Copilot** through the Copilot CLI with your own Copilot subscription, the same way it uses your Claude account through Claude Code.

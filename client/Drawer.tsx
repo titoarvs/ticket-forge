@@ -27,6 +27,7 @@ import { PrFindingChips, openPrFindings } from './CodeRabbit';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
 import { VersionHistory } from './Versions';
+import { DraftBanner, DraftReference } from './EpicDrafts';
 import { ReferencesSection } from './References';
 import { useAutoTour } from './tour';
 import { CodeChip } from './codeStatus';
@@ -485,6 +486,7 @@ function EpicPanel({ e }: { e: Any }) {
   return <>
     <Head crumb={<Crumb type="Epic" keyText={e.key} />} menu={ed ? <button style={{ color: 'var(--danger)' }} onClick={() => openModal(<DeleteEpicModal ep={e} />)}><Ico svg={I.trash} />Delete epic</button> : <span className="muted small" style={{ padding: '8px 16px', display: 'block' }}>No actions available</span>} />
     <div className="dr-scroll">
+      {e.draft && <DraftBanner e={e} />}
       <TA title rows={1} aria-label="Epic name" disabled={!ed} value={e.title} onChange={(ev) => mutate(() => { e.title = ev.target.value.replace(/\n/g, ' '); }, { tag: `e.title${e.id}` })} />
       <div className="dr-actions">
         {can('issue.create') && <button className="btn" onClick={() => openModal(<CreateIssueModal epicId={e.id} />)}><Ico svg={I.plus} />Create issue</button>}
@@ -494,6 +496,7 @@ function EpicPanel({ e }: { e: Any }) {
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
+      <DraftReference e={e} />
       {feat('docs') && <><PsdSection epic={e} />
       <FbdSection epic={e} />
       <ArdSection epic={e} />

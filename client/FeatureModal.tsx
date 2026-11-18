@@ -8,6 +8,7 @@ import { Modal, Ico, I, Spinner, TypeIcon, EmptyState } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { useQuestions, QuestionsView } from './Clarify';
 import { FeatureBrainstorm } from './FeatureBrainstorm';
+import { saveEpicDraft } from './EpicDrafts';
 
 type Step = 'input' | 'ask' | 'brainstorm' | 'running' | 'review';
 
@@ -46,8 +47,11 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   };
 
   // ---------------------------------------------------------------- add the chosen issues
-  const chosen = result ? result.tickets.filter((t: Any) => pick[t.id]) : [];
+  // An epic saved as a draft is kept out of what gets added here (its issues stay in the draft's AI output).
+  const [drafted, setDrafted] = useState<Record<string, boolean>>({});
+  const chosen = result ? result.tickets.filter((t: Any) => pick[t.id] && !drafted[t.epicId]) : [];
   const canEpic = can('epic.manage');
+  const draft = async (e: Any, items: Any[]) => { if (await saveEpicDraft(e, items)) setDrafted((d) => ({ ...d, [e.id]: true })); };
   const newEpics = result ? result.epics.filter((e: Any) => !e.existing && chosen.some((t: Any) => t.epicId === e.id)) : [];
   const add = () => {
     const created: string[] = [], issueIds: string[] = [], epicIds = new Set<string>();
@@ -134,9 +138,14 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
                 <span className="muted small" style={{ marginLeft: 'auto' }}>{items.filter((t: Any) => pick[t.id]).length} of {items.length}</span>
               </label>
               {!e.existing && e.description && <p className="muted small feat-desc">{e.description}</p>}
+              {!e.existing && canEpic && <div className="row" style={{ margin: '4px 0' }}>
+                {drafted[e.id] ? <span className="loz t-blocked">Saved as draft</span>
+                  : <button className="btn sm" title="Keep this epic as a draft in the epic list, to review and publish later" onClick={() => draft(e, items)}>Save as draft</button>}
+                {drafted[e.id] && <span className="muted small">Find it in the Epics list, with a Draft badge.</span>}
+              </div>}
               {items.map((t: Any) => (
-                <div key={t.id} className={`feat-row ${pick[t.id] ? '' : 'off'}`}>
-                  <input type="checkbox" checked={Boolean(pick[t.id])} onChange={(ev) => setPick({ ...pick, [t.id]: ev.target.checked })} aria-label={`Add ${t.title}`} />
+                <div key={t.id} className={`feat-row ${pick[t.id] && !drafted[e.id] ? '' : 'off'}`}>
+                  <input type="checkbox" disabled={Boolean(drafted[e.id])} checked={Boolean(pick[t.id]) && !drafted[e.id]} onChange={(ev) => setPick({ ...pick, [t.id]: ev.target.checked })} aria-label={`Add ${t.title}`} />
                   <button type="button" className="feat-main" onClick={() => setOpen({ ...open, [t.id]: !open[t.id] })} aria-expanded={Boolean(open[t.id])}>
                     <TypeIcon type={t.type} /><span className="feat-title">{t.title}</span>
                     <span className="muted small">{t.storyPoints ?? '–'} pts · {t.acceptanceCriteria.length} AC · {t.testCases.length} tests</span>
