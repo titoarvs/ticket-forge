@@ -302,6 +302,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .modal-back { position: fixed; inset: 0; background: var(--blanket); display: grid; place-items: start center; z-index: 100; padding: 60px 16px 16px; overflow: auto; }
 .modal { background: var(--overlay); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-overlay); width: min(600px, 100%); max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
 .modal.wide { width: min(880px, 100%); }
+.modal.xl { width: min(1360px, 100%); } /* the code review dialog (TF-123): as much width as the screen gives */
 .modal header { padding: 20px 24px 12px; display: flex; align-items: center; gap: 10px; }
 .modal header h3 { margin: 0; font-size: 20px; font-weight: 500; flex: 1; }
 .modal .mb { padding: 4px 24px 16px; overflow: auto; }
@@ -2554,7 +2555,7 @@ td.danger-text { color: var(--danger); }
 .cj-badge svg { width: 14px; height: 14px; }
 .cj-badge.s-running, .cj-badge.s-starting { background: var(--ai-bg); color: var(--ai); }
 .cj-badge.s-review, .cj-badge.s-report { background: var(--selected-bg); color: var(--selected-text); }
-.cj-badge.s-pr, .cj-badge.s-committed { background: var(--success-bg); color: var(--success); }
+.cj-badge.s-pr, .cj-badge.s-merged, .cj-badge.s-committed { background: var(--success-bg); color: var(--success); }
 .cj-badge.s-failed, .cj-badge.s-cancelled { background: var(--danger-bg); color: var(--danger); }
 .cj-agent { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-subtle); }
 .cj-agent svg { width: 13px; height: 13px; }
@@ -2588,6 +2589,18 @@ td.danger-text { color: var(--danger); }
 @keyframes cj-pulse { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 .cj-panel { max-height: min(52vh, 560px); overflow: auto; padding: 14px 16px; }
+.cj-panel.cj-panel-diff { max-height: min(76vh, 960px); padding: 10px 12px; } /* TF-123: the diff gets the room */
+.cj-panel > .dv { margin: 0; }
+/* Approvals (TF-123) */
+.cj-approve { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 12px; background: var(--bg-sunken); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cj-approve-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.cj-approve-n { font-weight: 600; font-size: 13px; padding: 2px 10px; border-radius: 999px; background: var(--bg-neutral-2); color: var(--text); }
+.cj-approve-n.ok { background: var(--success-bg); color: var(--success); }
+.cj-approve-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.cj-approve-list li { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.cj-approve-list svg { width: 13px; height: 13px; color: var(--success); flex-shrink: 0; }
+.cj-approve-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (max-width: 599px) { .cj-approve-btns .btn { flex: 1 1 100%; justify-content: center; } }
 .cj-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
 .cj-toolbar .spacer { flex: 1; }
 .cj-verdict { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; padding: 4px 10px; border-radius: var(--radius); background: var(--bg-neutral); }

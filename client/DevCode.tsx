@@ -8,6 +8,7 @@ import { Ico, I, Modal, Spinner, Confirm, SetCard, LAYER_LABEL } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
 import { CodeRabbitPanel, saveReview, setPrFixer } from './CodeRabbit';
+import { DiffReview } from './DiffReview';
 
 const dev = () => P().dev || {};
 const be = () => P().devBackend || {};
@@ -340,6 +341,8 @@ export function DevSettings({ ed }: { ed: boolean }) {
         <label className="field"><span>Branch prefix</span><TF disabled={!ed} value={d.branchPrefix ?? 'tf/'} spellCheck={false} onChange={(e) => setDev('branchPrefix', e.target.value.trim())} />
           <small className="muted">Branches look like <code>{(d.branchPrefix ?? 'tf/')}pay-12-short-title</code></small></label>
         <label className="field"><span>Claude model</span><SF disabled={!ed} value={d.model || ''} onChange={(e) => setDev('model', e.target.value)}><MenuItem value="">Each agent’s own (Administration → Agents)</MenuItem>{['opus', 'sonnet', 'haiku'].map((m) => <MenuItem key={m} value={m}>{m} for every agent</MenuItem>)}</SF></label>
+        <label className="field"><span>Approvals needed to merge</span><TF disabled={!ed} type="number" min={1} max={10} value={String(d.requiredApprovals ?? 1)} onChange={(e) => setDev('requiredApprovals', Math.min(10, Math.max(1, Math.floor(Number(e.target.value)) || 1)))} />
+          <small className="muted">How many members must approve AI-written code before “Approve and merge” merges its pull request (1 to 10).</small></label>
       </div>
       <CB label="Open pull requests as drafts" disabled={!ed} checked={d.draft !== false} onChange={(e: Any) => setDev('draft', e.target.checked)} />
       <details className="rc-adv"><summary className="small">Advanced</summary>
@@ -512,27 +515,43 @@ function BackendRepoCard({ ed, local, env, setEnv }: { ed: boolean; local: boole
 /** Whether "Write code with AI" can be offered for issues in this project. */
 export const codeReady = () => feat('code') && Boolean(myPath('frontend') || dev().repo);
 
-const STATUS: Record<string, string> = { committed: 'Committed locally', report: 'Report ready', starting: 'Starting…', queued: 'Waiting for a free agent slot', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', discarded: 'Discarded' };
+const STATUS: Record<string, string> = { committed: 'Committed locally', report: 'Report ready', starting: 'Starting…', queued: 'Waiting for a free agent slot', running: 'Claude Code is working…', review: 'Ready for review', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped', pr: 'Pull request open', merged: 'Merged', discarded: 'Discarded' };
 
-function DiffView({ jobId, file }: { jobId: string; file: string }) {
-  const [text, setText] = useState<string | null>(null);
-  useEffect(() => { api(`/api/projects/${P().id}/code?jobId=${jobId}&diff=1&file=${encodeURIComponent(file)}`, { raw: true }).then((r: Any) => r.text()).then(setText).catch((e: Any) => setText(`Couldn’t load the diff: ${e.message}`)); }, [jobId, file]);
-  if (text === null) return <div className="muted small" style={{ padding: 8 }}><Spinner /> Loading…</div>;
-  return <pre className="diff">{text.split('\n').filter((l) => !/^(diff --git|index |new file mode|deleted file mode)/.test(l)).map((l, i) =>
-    <span key={i} className={l.startsWith('+++') || l.startsWith('---') ? 'dh' : l.startsWith('@@') ? 'dc' : l.startsWith('+') ? 'da' : l.startsWith('-') ? 'dr' : ''}>{l || ' '}{'\n'}</span>)}</pre>;
+/**
+ * Approvals on a code job (TF-123): who approved, the count against what the project asks for, and Approve / Approve and
+ * merge. Any member who can open the project can approve; merging needs the pull request to be open. Not enough
+ * approvals blocks the merge with how many are still needed (the server's message).
+ */
+function ApprovalBox({ job, busy, onApprove, onMerge }: { job: Any; busy: string; onApprove: () => void; onMerge: () => void }) {
+  const approvals: Any[] = job.approvals || [];
+  const need = job.required || 1;
+  const mine = approvals.some((a) => a.userId === S.user?.id);
+  if (job.status === 'merged') return <div className="ok-banner" role="status"><Ico svg={I.check} /><span>{job.pr?.url ? <>Pull request <a href={job.pr.url} target="_blank" rel="noopener noreferrer">#{job.pr.number}</a> merged</> : 'Merged'}{job.merged?.by ? <> by <b>{job.merged.by}</b></> : ''}{job.merged?.at ? ` ${ago(job.merged.at)}` : ''}{job.merged?.sha ? <> (<code>{job.merged.sha}</code>)</> : ''} with <b>{approvals.length} of {need}</b> approval{need === 1 ? '' : 's'}{approvals.length ? `: ${approvals.map((a) => a.name).join(', ')}` : ''}.</span></div>;
+  return <div className="cj-approve">
+    <div className="cj-approve-h"><b>Approvals</b>
+      <span className={`cj-approve-n ${approvals.length >= need ? 'ok' : ''}`} aria-live="polite">{approvals.length} of {need}</span>
+      <span className="muted small">{approvals.length >= need ? 'Enough approvals to merge.' : `${need - approvals.length} more approval${need - approvals.length === 1 ? '' : 's'} needed.`}</span></div>
+    {approvals.length > 0 && <ul className="cj-approve-list small">{approvals.map((a) => <li key={a.userId}><Ico svg={I.check} />{a.name}<span className="muted"> · {ago(a.at)}</span></li>)}</ul>}
+    <div className="cj-approve-btns">
+      <button className="btn" disabled={!!busy || mine} onClick={onApprove} title={mine ? 'You already approved this code' : 'Approve this code'}>{busy === 'approve' ? <><Spinner />Approving…</> : <><Ico svg={I.check} />{mine ? 'You approved' : 'Approve'}</>}</button>
+      {job.status === 'pr' && job.pr
+        ? <button className="btn primary" disabled={!!busy} onClick={onMerge} title={`Approves, then merges pull request #${job.pr.number} on GitHub once there are ${need} approval${need === 1 ? '' : 's'}`}>{busy === 'merge' ? <><Spinner />Merging…</> : <><Ico svg={I.pr} />Approve and merge</>}</button>
+        : <span className="muted small">Open the pull request to merge it.</span>}
+    </div>
+  </div>;
 }
 
 /** Where the job is: set up → agent working → your review → shipped (or the report, for read-only agents). */
 function JobSteps({ job }: { job: Any }) {
   const report = job.status === 'report' || job.kind === 'pr-review';
   const steps = report ? ['Set up', 'Agent reading', 'Report ready'] : ['Set up', 'Agent working', 'Your review', job.target ? 'Pushed' : 'Pull request'];
-  const at: Record<string, number> = { starting: 0, queued: 0, running: 1, review: 2, empty: 2, failed: 1, cancelled: 1, report: 2, committed: 3, pr: 3 };
+  const at: Record<string, number> = { starting: 0, queued: 0, running: 1, review: 2, empty: 2, failed: 1, cancelled: 1, report: 2, committed: 3, pr: 3, merged: 3 };
   const cur = at[job.status] ?? 1;
   const bad = ['failed', 'cancelled'].includes(job.status);
-  const finished = report ? job.status === 'report' : ['committed', 'pr'].includes(job.status);
+  const finished = report ? job.status === 'report' : ['committed', 'pr', 'merged'].includes(job.status);
   return <ol className="cj-steps">{steps.map((label, i) => {
     const state = i < cur || (finished && i === cur) ? 'done' : i === cur ? (bad ? 'bad' : 'on') : '';
-    return <li key={label} className={state}><span className="dot">{state === 'done' ? <Ico svg={I.check} /> : state === 'bad' ? '!' : i + 1}</span><span>{job.status === 'committed' && i === 3 ? 'Committed' : label}</span></li>;
+    return <li key={label} className={state}><span className="dot">{state === 'done' ? <Ico svg={I.check} /> : state === 'bad' ? '!' : i + 1}</span><span>{job.status === 'committed' && i === 3 ? 'Committed' : job.status === 'merged' && i === 3 ? 'Merged' : label}</span></li>;
   })}</ol>;
 }
 
@@ -552,12 +571,6 @@ function Activity({ log, running }: { log: Any[]; running: boolean }) {
     {running && <li className="ev live"><span className="ev-ic"><Spinner /></span><span className="ev-text muted">Working…</span></li>}
   </ol>;
 }
-/** Five little blocks showing the share of added and removed lines, like GitHub. */
-const DiffBar = ({ a, r }: { a: number; r: number }) => {
-  const total = a + r || 1, add = Math.round((a / total) * 5);
-  return <span className="diffbar" aria-hidden>{[0, 1, 2, 3, 4].map((i) => <i key={i} className={i < add ? 'a' : i < Math.min(5, add + Math.ceil((r / total) * 5)) ? 'r' : ''} />)}</span>;
-};
-
 /** Issue panel → Write code with AI: start, watch, review, ask for changes, open the pull request. */
 export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: { t: Any; agentId?: string; initialSide?: string }) {
   // Projects with a separate backend: one job per repository (Frontend / Backend). "Both" issues start with the backend.
@@ -574,7 +587,6 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [follow, setFollow] = useState('');
-  const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
   const [contract, setContract] = useState('');
   const [title, setTitle] = useState(`${t.key}: ${t.title}`);
@@ -657,6 +669,18 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     mutate(() => { t.prs.push({ id: uid(), ...r.pr, checkedAt: nowIso() }); logEvent(t, `opened ${noun} ${r.pr.repo} #${r.pr.number} with code written by AI`, 'Development'); });
     toast(`Opened ${r.pr.repo} #${r.pr.number}`);
   };
+  /** Approve the code (TF-123). Approve and merge also records the approval; when it is blocked the approval stays, so the job is read again for the new count. */
+  const reloadJob = async () => { try { const r = await api(`${base}?jobId=${job.id}&since=${job.logSize || 0}`); setJob((j: Any) => ({ ...r, log: [...(j?.log || []), ...r.log] })); } catch { /* the next poll or reopening shows it */ } };
+  const approve = async () => {
+    const r = await act('approve', { action: 'approve' });
+    if (r) toast(`Approved ${r.approvals?.length || 0} of ${r.required}`); else await reloadJob();
+  };
+  const merge = async () => {
+    const r = await act('merge', { action: 'merge' });
+    if (!r) { await reloadJob(); return; }
+    mutate(() => { const pr = t.prs.find((x: Any) => (x.url && x.url === r.pr?.url) || (x.number && x.number === r.pr?.number && x.repo === r.repo)); if (pr) { pr.status = 'Merged'; pr.mergedAt = r.merged?.at || nowIso(); } logEvent(t, `merged pull request #${r.pr?.number} after ${r.approvals?.length || 0} of ${r.required} approvals`, 'Development'); });
+    toast(`${r.repo} #${r.pr?.number} is merged.`, 'ok', { title: 'Code merged', action: r.pr?.url ? { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') } : undefined });
+  };
   const running = job && ['starting', 'queued', 'running'].includes(job.status);
   const d = dev();
   // An AI review of an open pull request: remember the verdict on the linked request (Pull requests page).
@@ -674,7 +698,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     toast(`The review is a comment on ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number} now.`, 'ok', { title: 'Review posted', action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') } });
   };
   return (
-    <Modal title={`${isPrReview ? `Code review · ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number}` : 'Write code'} · ${t.key}`} wide persistent={running} actions={[{ label: running ? 'Close (keeps running)' : 'Close' }]}>
+    <Modal title={`${isPrReview ? `Code review · ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number}` : 'Write code'} · ${t.key}`} wide="xl" persistent={running} actions={[{ label: running ? 'Close (keeps running)' : 'Close' }]}>
       {backend && !loading && <div className="side-tabs" role="tablist" aria-label="Repository">
         {(['backend', 'frontend'] as const).map((k) => { const jj = jobs[k]; const busyK = jj && ['starting', 'queued', 'running'].includes(jj.status); return (
           <button key={k} role="tab" aria-selected={side === k} className={side === k ? 'on' : ''} onClick={() => setSide(k)}>
@@ -714,7 +738,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             {job.rounds > 1 && <span className="cj-agent">Round {job.rounds}</span>}
             <span className="spacer" />
             {running && <button className="btn sm" onClick={() => act('cancel', { action: 'cancel' })}><Ico svg={I.stop} />Stop</button>}
-            {!running && job.status !== 'pr' && <button className="btn sm subtle" onClick={() => openModal(<Confirm title="Discard these changes?" label="Discard" text={`The worktree and the local branch ${job.branch} are removed. Nothing was pushed.`} onYes={async () => { await act('discard', { action: 'discard' }); setJob(null); openModal(<CodeModal t={t} />); }} />)}><Ico svg={I.trash} />Discard</button>}
+            {!running && !['pr', 'merged'].includes(job.status) && <button className="btn sm subtle" onClick={() => openModal(<Confirm title="Discard these changes?" label="Discard" text={`The worktree and the local branch ${job.branch} are removed. Nothing was pushed.`} onYes={async () => { await act('discard', { action: 'discard' }); setJob(null); openModal(<CodeModal t={t} />); }} />)}><Ico svg={I.trash} />Discard</button>}
           </div>
           <div className="cj-meta small">
             <span className="cj-branch" title={`${job.branch} → ${job.base}`}><Ico svg={I.pr} /><code>{job.branch}</code><span className="muted">→</span><code>{job.base}</code></span>
@@ -734,12 +758,12 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             job.coderabbit && { id: 'coderabbit', label: 'CodeRabbit', n: job.coderabbit.status === 'running' ? undefined : (job.coderabbit.findings || []).length },
             { id: 'activity', label: running ? 'Live activity' : 'Activity', n: job.log.filter((l: Any) => l.kind === 'tool').length },
           ].filter(Boolean) as { id: string; label: string; n?: number }[];
-          const cur = tabs.find((x) => x.id === tab)?.id || (running ? 'activity' : tabs[0].id);
+          const cur = tabs.find((x) => x.id === tab)?.id || (running ? 'activity' : tabs.find((x) => x.id === 'changes')?.id || tabs[0].id); // finished code opens on its diff (TF-123)
           const rawVerdict = (job.summary || '').match(/^\s*\*\*Verdict:\s*([^*]+?)\.?\*\*/i)?.[1] || '';
           const vClass = /request|block|reject/i.test(rawVerdict) ? 'bad' : /comment/i.test(rawVerdict) ? 'warn' : /approve/i.test(rawVerdict) ? 'ok' : '';
           return <div className="cj-box">
             <div className="cj-tabs" role="tablist">{tabs.map((x) => <button key={x.id} role="tab" aria-selected={cur === x.id} className={cur === x.id ? 'on' : ''} onClick={() => setTab(x.id)}>{x.id === 'activity' && running && <span className="live-dot" />}{x.label}{x.n != null && <span className="cj-n">{x.n}</span>}</button>)}</div>
-            <div className="cj-panel" ref={cur === 'activity' ? logRef : undefined}>
+            <div className={`cj-panel ${cur === 'changes' ? 'cj-panel-diff' : ''}`} ref={cur === 'activity' ? logRef : undefined}>
               {cur === 'summary' && <>
                 {(rawVerdict || (job.status === 'report' && (isPrReview || can('export')))) && <div className="cj-toolbar">
                   {rawVerdict && <span className={`cj-verdict v-${vClass}`}><Ico svg={vClass === 'ok' ? I.check : I.warn} />{rawVerdict}</span>}
@@ -754,13 +778,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                 </div>}
                 <div className="cj-doc code-md"><Markdown text={rawVerdict ? job.summary.replace(/^\s*\*\*Verdict:[^*]*\*\*\s*/i, '') : job.summary} /></div>
               </>}
-              {cur === 'changes' && <div className="cj-files">
-                <div className="cj-files-h small"><b>{job.files.length} file{job.files.length === 1 ? '' : 's'} changed</b><span className="da">+{job.files.reduce((n: number, f: Any) => n + f.added, 0)}</span><span className="dr">−{job.files.reduce((n: number, f: Any) => n + f.removed, 0)}</span></div>
-                {job.files.map((f: Any) => <div key={f.path} className="cj-file">
-                  <button className="code-file" onClick={() => setOpen(open === f.path ? null : f.path)}><Ico svg={I.chevron} className={open === f.path ? '' : 'closed'} /><code>{f.path}</code><span className="spacer" /><DiffBar a={f.added} r={f.removed} /><span className="da">+{f.added}</span><span className="dr">−{f.removed}</span></button>
-                  {open === f.path && job.status !== 'pr' && <DiffView jobId={job.id} file={f.path} />}
-                </div>)}
-              </div>}
+              {cur === 'changes' && <DiffReview job={job} />}
               {cur === 'reviews' && (() => { const rv = job.reviews[job.reviews.length - 1]; const lens = rv.lenses?.[Math.min(reviewTab, rv.lenses.length - 1)]; return <>
                 <div className="cj-toolbar"><b className="small">{rv.panel ? 'Review Panel' : rv.agent || 'Review agent'} · round {rv.round}</b><span className="spacer" />
                   {job.status === 'review' && <button className="btn sm ai" disabled={!!busy} onClick={() => act('follow', { action: 'follow', text: `Fix these review findings (skip any you disagree with and say why):\n\n${rv.text}` })}><Ico svg={I.sparkle} />Fix the findings</button>}</div>
@@ -775,6 +793,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             </div>
           </div>;
         })()}
+        {job.remote && ['review', 'pr', 'merged'].includes(job.status) && <ApprovalBox job={job} busy={busy} onApprove={approve} onMerge={merge} />}
         {['review', 'report', 'empty', 'failed', 'cancelled'].includes(job.status) && <div className="code-follow cj-compose">
           <TA rows={2} value={follow} placeholder="Ask for changes: e.g. also handle the empty state, and rename the hook to usePayslips" onChange={(e) => setFollow(e.target.value)} />
           <button className="btn ai" disabled={!follow.trim() || !!busy} onClick={async () => { if (await act('follow', { action: 'follow', text: follow })) setFollow(''); }}><Ico svg={I.sparkle} />Make changes</button>
@@ -812,7 +831,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           </div>
         </div>}
         {job.pr?.compare && <div className="ok-banner"><Ico svg={I.check} /><span>Committed and pushed <code>{job.branch}</code> with your git setup. <a href={job.pr.url} target="_blank" rel="noopener noreferrer">Open the {job.provider === 'GitLab' ? 'merge request' : 'pull request'} on {job.provider || 'GitHub'}</a> to finish; link it to this issue in Development once it’s open.</span></div>}
-        {job.pr && !job.pr.compare && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}</span></div>}
+        {job.pr && !job.pr.compare && job.status !== 'merged' && <div className="ok-banner"><Ico svg={I.check} /><span>{job.provider === 'GitLab' ? 'Merge request' : 'Pull request'} <a href={job.pr.url} target="_blank" rel="noopener noreferrer">{job.provider === 'GitLab' ? '!' : '#'}{job.pr.number} {job.pr.title}</a> {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}</span></div>}
       </>}
     </Modal>
   );

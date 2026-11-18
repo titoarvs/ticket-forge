@@ -11,7 +11,7 @@ import { markdownToDocx } from '@/lib/md-docx';
 import { codeTask, branchFor, writePrText } from '@/lib/devagent';
 import { gh as ghApi } from '@/lib/gh-actions';
 import { brainForCode } from '@/lib/brain';
-import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs';
+import { isRemoteId, loadJob, publicRemote, startRemoteJob, refreshJob, followRemote, cancelRemote, discardRemote, prRemote, approveRemote, mergeRemote, requiredApprovals, remoteJobsFor, remoteJobsForProject, remoteDiff } from '@/lib/remote-jobs';
 
 // ---------------------------------------------------------------- code jobs through the AI API and GitHub
 // Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code next to a checkout, so
@@ -50,8 +50,14 @@ async function specAtFor(projectId: string, ticketId: string) {
   return s?.generatedAt ? new Date(s.generatedAt).toISOString() : '';
 }
 const remoteDev = (project: any, side: string) => (side === 'backend' ? (project.devBackend?.enabled && project.devBackend?.repo ? { draft: project.dev?.draft, ...project.devBackend } : null) : project.dev || {});
+/** The job as the browser gets it, with how many approvals the project asks for (TF-123). */
+const withApprovals = (project: any, pub: any) => pub && ({ ...pub, required: requiredApprovals(project) });
+// An issue whose code is finished doesn't get a second AI job (TF-123): open the existing one, or discard it to start over.
+const FINISHED_CODE = ['review', 'pr', 'merged', 'committed'];
+const alreadyCoded = (ticket: any) => new HttpError(409, `${ticket.key} already has finished code. Open it from the issue to review it; discard it first to write new code.`);
 async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '', ai }: any) {
   const dev = remoteDev(project, side);
+  if ((await remoteJobsFor(project.id, ticket.id)).some((j: any) => (j.side || 'frontend') === side && FINISHED_CODE.includes(j.status))) throw alreadyCoded(ticket);
   if (!dev?.repo) throw new HttpError(400, side === 'backend' ? 'Set the backend repository first.' : 'Choose the GitHub repository first (Project settings → Code & GitHub).');
   const gh = await ghFor(project, dev);
   const id = agentId || await requireRole(side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build');
@@ -79,7 +85,7 @@ async function remoteGet(p: any, sp: URLSearchParams) {
       return remoteCompare(j, target, { token: gh?.token || '', defaultBranch: gh?.defaultBranch || j.base, jobs: await remoteJobsFor(p.id, j.ticketId), specAt: await specAtFor(p.id, j.ticketId), stored: remoteDiff(j, '') });
     }
     if (['starting', 'queued', 'running'].includes(j.status)) j = await refreshJob(j).catch(() => j);
-    return publicRemote(j, Number(sp.get('since') || 0));
+    return withApprovals(project, publicRemote(j, Number(sp.get('since') || 0)));
   }
   if (sp.get('list')) {
     const jobs = await remoteJobsForProject(p.id);
@@ -87,7 +93,7 @@ async function remoteGet(p: any, sp: URLSearchParams) {
   }
   const ticketId = String(sp.get('ticketId') || '');
   const all = ticketId ? await remoteJobsFor(p.id, ticketId) : [];
-  const newest = (side: string) => publicRemote(all.find((j: any) => (j.side || 'frontend') === side)) || null;
+  const newest = (side: string) => withApprovals(project, publicRemote(all.find((j: any) => (j.side || 'frontend') === side))) || null;
   const { agents } = await publicAgents();
   return { remote: true, job: newest('frontend'), jobs: { frontend: newest('frontend'), backend: newest('backend') }, backend: Boolean(remoteDev(project, 'backend')),
     agents: agents.filter((a: any) => a.runner === 'code' && !a.broken && a.writes),
@@ -118,6 +124,14 @@ async function remotePost(req: Request, p: any, b: any) {
     if (b.action === 'start') return started[0];
     if (b.action === 'start-both') return { jobs: Object.fromEntries(started.map((j: any) => [j.side, j])), contract: '' };
     return { started, skipped, queue: { max: 'GitHub' } };
+  }
+  // Approving and merging (TF-123): any member of the workspace who can open the project, no extra permission.
+  if (b.action === 'approve' || b.action === 'merge') {
+    const member = await userOk(p, []);
+    const job = await loadJob(String(b.jobId));
+    if (!job || job.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
+    if (b.action === 'approve') return withApprovals(project, publicRemote(await approveRemote(job, member)));
+    return withApprovals(project, publicRemote(await mergeRemote(job, { user: member, required: requiredApprovals(project), gh: () => ghFor(project, remoteDev(project, job.side)) })));
   }
   const user = await userOk(p, b.action === 'prDraft' ? ['ai.use'] : ['issue.edit']);
   const j = await loadJob(String(b.jobId));
@@ -198,7 +212,9 @@ async function startForIssue(project: any, ticket: any, { both = false, instruct
   const pick = async (role: string) => (agentId && agents.some((a: any) => a.id === agentId && a.enabled) ? agentId : requireRole(be ? role : 'build'));
   const brain = await brainFor(project, ticket, true);
   const ctx = [issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
+  const coded = (s: string) => { const j: any = jobForTicket(project.id, ticket.id, s); return j && j.kind !== 'pr-review' && FINISHED_CODE.includes(j.status); };
   if (be && fe && (both || ticket.layer === 'both')) {
+    if (coded('backend') || coded('frontend')) throw alreadyCoded(ticket);
     const contract = await apiContract({ project, ticket, ai }).catch(() => '');
     const shared = contract ? `API CONTRACT (agreed before both jobs started; the backend and frontend are being built AT THE SAME TIME in separate jobs):
 ${contract}` : 'The backend and frontend are being built AT THE SAME TIME in separate jobs. Derive the API from the issue and list every endpoint in your summary.';
@@ -213,6 +229,7 @@ ${contract}` : 'The backend and frontend are being built AT THE SAME TIME in sep
   const side = be && (ticket.layer === 'backend' || !fe) ? 'backend' : 'frontend';
   const dev = side === 'backend' ? be : fe;
   if (!dev?.localPath) throw new HttpError(400, 'Set up your own local copy of the repository first (Project settings → Code & GitHub; each person has their own folder).');
+  if (coded(side)) throw alreadyCoded(ticket);
   const job = await startJob({ projectId: project.id, ticket, dev, instructions, user, agentId: await pick(side), context: [sideNote(project, ticket, side), ctx].filter(Boolean).join('\n\n'), side, brainFiles: brain.files });
   return { jobs: { [side]: job } };
 }
@@ -252,6 +269,8 @@ export const POST = api(async (req, p) => {
     if (!dev?.localPath) throw new HttpError(400, side === 'backend' ? 'Set up your own local copy of the backend repository first (Project settings → Code & GitHub).' : 'Set up your own local copy of the repository first (Project settings → Code & GitHub; each person has their own folder).');
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
+    const prev: any = jobForTicket(p.id, ticket.id, side);
+    if (prev && prev.kind !== 'pr-review' && FINISHED_CODE.includes(prev.status)) throw alreadyCoded(ticket);
     const agentId = String(b.agentId || await requireRole(side === 'backend' && backendDev(project) ? 'backend' : 'build'));
     const brain = await brainFor(project, ticket, true);
     const context = [sideNote(project, ticket, side), agentId === 'architecture-record' ? await ardContext(project, ticket) : issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');

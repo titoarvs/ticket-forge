@@ -59,7 +59,7 @@ export function Menu({ id, button, children, left = false, style }: { id: string
 export type Action = { label: string; onClick?: () => void; kind?: 'primary' | 'danger' | 'ai' | 'subtle'; disabled?: boolean; busy?: boolean; hidden?: boolean };
 /** Dialog frame. Render it from a component passed to openModal(). */
 /** persistent: clicking outside or pressing Escape doesn't close it (work in progress). */
-export function Modal({ title, children, actions = [], wide = false, left, persistent = false }: { title: string; children: ReactNode; actions?: Action[]; wide?: boolean; left?: ReactNode; persistent?: boolean }) {
+export function Modal({ title, children, actions = [], wide = false, left, persistent = false }: { title: string; children: ReactNode; actions?: Action[]; wide?: boolean | 'xl'; left?: ReactNode; persistent?: boolean }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !persistent) closeModal(); };
     document.addEventListener('keydown', h);
@@ -67,7 +67,7 @@ export function Modal({ title, children, actions = [], wide = false, left, persi
   }, [persistent]);
   return (
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !persistent) closeModal(); }}>
-      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal ${wide ? 'wide' : ''} ${wide === 'xl' ? 'xl' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <header><h3>{title}</h3><button className="icon-btn" onClick={closeModal} aria-label="Close"><Ico svg={I.close} /></button></header>
         <div className="mb">{children}</div>
         <footer>

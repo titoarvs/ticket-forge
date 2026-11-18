@@ -19,7 +19,7 @@ export function codeInfo(t: Any): CodeInfo {
   const jobs = (G.pid === P()?.id ? G.byTicket[t.id] : null) || [];
   const live = jobs.filter((j) => LIVE.includes(j.status));
   const prs: Any[] = t.prs || [];
-  const merged = prs.some((r) => r.status === 'Merged');
+  const merged = prs.some((r) => r.status === 'Merged') || jobs.some((j) => j.status === 'merged'); // a job merged from TicketForge (TF-123)
   const open = prs.some((r) => ['Open', 'Draft'].includes(r.status)) || jobs.some((j) => j.status === 'pr' && !merged);
   if (live.length) {
     const j = live[0];
@@ -33,6 +33,17 @@ export function codeInfo(t: Any): CodeInfo {
   const newest = jobs[0];
   if (newest && newest.status === 'failed') return { state: 'failed', label: 'Code failed', title: `The last code job for ${t.key} failed. Open the issue to see why and try again.`, coded: false };
   return NONE;
+}
+const FINISHED = ['review', 'pr', 'merged', 'committed'];
+/**
+ * The issue already has finished AI code (TF-123): "Write code" is disabled and the existing code is shown instead.
+ * An issue built in both repositories is finished when each side has its code.
+ */
+export function finishedCode(t: Any): boolean {
+  const done = ((G.pid === P()?.id ? G.byTicket[t.id] : null) || []).filter((j) => FINISHED.includes(j.status));
+  if (!done.length) return false;
+  if (!(P()?.devBackend?.enabled && t.layer === 'both')) return true;
+  return ['frontend', 'backend'].every((s) => done.some((j) => (j.side || 'frontend') === s));
 }
 /** Goes into a row's redraw signature, so rows redraw when their coding state changes. */
 export const codeSig = (t: Any) => { const c = codeInfo(t); return c.state ? `${c.state}${c.label}` : ''; };
@@ -95,7 +106,8 @@ export function refreshCodeStatus() { const pid = P()?.id; if (pid && G.pid === 
 /** Starts keeping the open project's coding state fresh: every 4 s while something is running, else every 30 s. */
 export function watchCodeStatus(pid: string) {
   stopWatching();
-  if (!pid || !can('ai.use') || !feat('code')) { G.pid = pid; G.byTicket = {}; return; }
+  // Every member sees the coding state, not only those who can use AI: they review and approve the code (TF-123).
+  if (!pid || !feat('code')) { G.pid = pid; G.byTicket = {}; return; }
   let on = true;
   const tick = async () => {
     if (!on) return;
