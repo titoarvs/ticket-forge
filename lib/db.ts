@@ -603,6 +603,19 @@ create table if not exists workspace_members (
   primary key (workspace_id, user_id)
 );
 create index if not exists workspace_members_user on workspace_members(user_id);
+-- API tokens (MCP clients): a token acts as one person in one workspace. Only a hash of it is stored.
+create table if not exists api_tokens (
+  id text primary key,
+  token_hash text not null unique,
+  user_id text not null references users(id) on delete cascade,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null default '',
+  created_at timestamptz not null default now(),
+  expires_at timestamptz,
+  last_used_at timestamptz,
+  revoked_at timestamptz
+);
+create index if not exists api_tokens_user on api_tokens(user_id);
 -- Billing (SaaS): the workspace's plan and its Stripe subscription, kept in step by the Stripe webhook.
 alter table workspaces add column if not exists stripe_customer_id text;
 alter table workspaces add column if not exists stripe_subscription_id text;
@@ -1022,6 +1035,7 @@ export const TABLES = [
   'drive_docs',
   'helper_perms',
   'ticket_drafts',
+  'api_tokens',
 ];
 const FUNCS = [
   'tf_uid()',
@@ -1129,6 +1143,7 @@ create policy tf_write on roles for all to ${APP_ROLE} using (tf_system()) with 
 create policy tf_system_only on sessions for all to ${APP_ROLE} using (tf_system()) with check (tf_system());
 create policy tf_system_only on invites for all to ${APP_ROLE} using (tf_system()) with check (tf_system());
 create policy tf_system_only on password_resets for all to ${APP_ROLE} using (tf_system()) with check (tf_system());
+create policy tf_system_only on api_tokens for all to ${APP_ROLE} using (tf_system()) with check (tf_system());
 create policy tf_system_only on app_meta for all to ${APP_ROLE} using (tf_system()) with check (tf_system());
 create policy tf_system_only on ai_cache for all to ${APP_ROLE} using (tf_system()) with check (tf_system());
 create policy tf_system_only on ai_usage for all to ${APP_ROLE} using (tf_system()) with check (tf_system());

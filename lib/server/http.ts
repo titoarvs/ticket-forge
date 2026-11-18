@@ -109,17 +109,28 @@ type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
 const resolve = async (fn: Handler, req: Request, p: Promise<Record<string, string>>) => fn(req, (await p) || {});
 
-/** Wraps a handler: setup, cross-site check, JSON responses and error mapping. */
-export function api(fn: Handler) {
+/** The person an API token (Authorization: Bearer tfk_…) acts as, or null when it is missing, unknown, revoked or expired. */
+async function bearerUser(req: Request) {
+  const m = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') || '');
+  return m ? auth.apiTokenUser(m[1]) : null;
+}
+
+/**
+ * Wraps a handler: setup, cross-site check, JSON responses and error mapping.
+ * { bearer: true } is for routes called by other programs (MCP): the caller is the person of the API token in the
+ * Authorization header, never the browser's session cookie (so there is nothing for a cross-site page to ride on, and no
+ * origin check). Without a valid token the handler sees no user (`authed()` refuses).
+ */
+export function api(fn: Handler, opts: { bearer?: boolean } = {}) {
   return async (req: Request, ctx: Ctx) => {
     try {
       await ready();
-      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      if (!opts.bearer && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         const origin = req.headers.get('origin');
         if (origin && new URL(origin).host !== req.headers.get('host')) throw new HttpError(403, 'Cross-site request blocked');
       }
       // Every query in this request runs as the signed-in user, so database row-level security applies.
-      const user = await currentUser();
+      const user = opts.bearer ? await bearerUser(req) : await currentUser();
       // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
       // On the hosted service (SaaS) never: the server's own Claude sign-in must not answer for other companies.
       const local = requestIsLocal(isLocalHost, req.headers);

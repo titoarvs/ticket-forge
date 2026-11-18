@@ -375,6 +375,84 @@ export async function switchWorkspace(t, user, ws) {
   await q('update sessions set workspace_id=$2 where token_hash=$1', [sha(String(t || '')), ws]);
 }
 
+// ---------------------------------------------------------------- API tokens (MCP clients)
+// A token acts as one person in one workspace, with that person's role at the time of each call (nothing about the role is
+// copied into the token). Only the hash is stored: the token itself is shown once, when it is made.
+export const API_TOKEN_PREFIX = 'tfk_';
+const API_TOKEN_DEFAULT_DAYS = 90;
+const API_TOKEN_MAX_DAYS = 365;
+const API_TOKEN_MAX_ACTIVE = 20;
+
+/** Makes a token for the signed-in person (in their current workspace). Returns { token, id, name, expiresAt }; `token` is never shown again. */
+export async function createApiToken(user, { name, expiresInDays }: any = {}) {
+  const label = String(name || '')
+    .trim()
+    .slice(0, 80);
+  if (!label) throw new HttpError(400, 'Give the token a name, for example the tool that will use it.');
+  const days = expiresInDays == null ? API_TOKEN_DEFAULT_DAYS : Number(expiresInDays);
+  if (!Number.isInteger(days) || days < 1 || days > API_TOKEN_MAX_DAYS)
+    throw new HttpError(400, `Expiry must be a whole number of days from 1 to ${API_TOKEN_MAX_DAYS}.`);
+  const active = (
+    await q('select count(*)::int n from api_tokens where user_id = $1 and workspace_id = $2 and revoked_at is null and (expires_at is null or expires_at > now())', [
+      user.id,
+      user.workspace_id,
+    ])
+  ).rows[0].n;
+  if (active >= API_TOKEN_MAX_ACTIVE) throw new HttpError(400, `You already have ${API_TOKEN_MAX_ACTIVE} active tokens. Revoke one first.`);
+  const raw = `${API_TOKEN_PREFIX}${token()}`;
+  const id = newId();
+  const expiresAt = new Date(Date.now() + days * 86400000);
+  await q('insert into api_tokens (id, token_hash, user_id, workspace_id, name, expires_at) values ($1,$2,$3,$4,$5,$6)', [
+    id,
+    sha(raw),
+    user.id,
+    user.workspace_id,
+    label,
+    expiresAt,
+  ]);
+  return { token: raw, id, name: label, expiresAt };
+}
+/** The person's own tokens in this workspace (never the token itself). */
+export async function listApiTokens(user) {
+  return (
+    await q(
+      `select id, name, created_at as "createdAt", expires_at as "expiresAt", last_used_at as "lastUsedAt", revoked_at as "revokedAt"
+      from api_tokens where user_id = $1 and workspace_id = $2 order by created_at desc`,
+      [user.id, user.workspace_id],
+    )
+  ).rows;
+}
+export async function revokeApiToken(user, id) {
+  const done = await q(
+    'update api_tokens set revoked_at = now() where id = $1 and user_id = $2 and workspace_id = $3 and revoked_at is null returning id',
+    [String(id || ''), user.id, user.workspace_id],
+  );
+  if (!done.rows[0]) throw new HttpError(404, 'Token not found');
+}
+/**
+ * Who a token acts as: the person as a member of the token's workspace (so their role, permissions and project access are
+ * read fresh on every call), or null when the token is unknown, revoked or expired, or the person or membership is no
+ * longer active.
+ */
+export async function apiTokenUser(raw) {
+  const t = String(raw || '');
+  if (!t.startsWith(API_TOKEN_PREFIX) || t.length > 200) return null;
+  const { rows } = await q(
+    `select ${MEMBER_COLS}, t.id as token_id from api_tokens t join users u on u.id = t.user_id
+    join workspace_members m on m.user_id = u.id and m.workspace_id = t.workspace_id
+    join workspaces w on w.id = m.workspace_id left join roles r on r.workspace_id = m.workspace_id and r.id = m.role_id
+    where t.token_hash = $1 and t.revoked_at is null and (t.expires_at is null or t.expires_at > now())`,
+    [sha(t)],
+  );
+  const r = rows[0];
+  if (!r || r.status !== 'active') return null;
+  // "Last used" is only for the person's token list: written at most once a minute per token.
+  await q("update api_tokens set last_used_at = now() where id = $1 and (last_used_at is null or last_used_at < now() - interval '1 minute')", [
+    r.token_id,
+  ]).catch(() => {});
+  return r;
+}
+
 // Simple in-memory throttle for login / forgot-password.
 const attempts: Map<any, any> = new Map();
 export function throttle(key, limit = 8, windowMs = 15 * 60000) {
