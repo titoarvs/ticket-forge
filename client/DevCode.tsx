@@ -912,12 +912,21 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
   const base = `/api/projects/${P().id}/code`;
   useEffect(() => { api(`${base}?ticketId=`).then((r) => setAgents((r.agents || []).filter((a: Any) => a.enabled && a.writes))).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const jobsCount = tickets.reduce((n: number, x: Any) => n + (sideOf(x) === 'both' ? 2 : 1), 0);
-  const start = async (only?: string[]) => {
+  const start = async () => {
     setBusy(true);
     try {
-      const ticketIds = only || tickets.map((x: Any) => x.id);
-      const r = await api(base, { method: 'POST', body: aiBody({ action: 'start-many', ticketIds, instructions: text, agentId }) });
-      setResult({ ...r, held: tickets.filter((x: Any) => !ticketIds.includes(x.id)).map((x: Any) => x.key) }); refreshCodeStatus();
+      const r = await api(base, { method: 'POST', body: aiBody({ action: 'start-many', ticketIds: tickets.map((x: Any) => x.id), instructions: text, agentId }) });
+      setResult(r); refreshCodeStatus();
+      mutate(() => { for (const x of tickets) if (r.started.some((j: Any) => j.ticketId === x.id)) logEvent(x, 'started writing code with AI (batch)', 'Development'); });
+      S.checked.clear(); emit();
+    } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  // Jev planning: start only the issues the conflict check says can run together now (ParallelCheck, client/DevPlan.tsx).
+  const startSafe = async (ids: string[]) => {
+    setBusy(true);
+    try {
+      const r = await api(base, { method: 'POST', body: aiBody({ action: 'start-many', ticketIds: ids, instructions: text, agentId }) });
+      setResult({ ...r, held: tickets.filter((x: Any) => !ids.includes(x.id)).map((x: Any) => x.key) }); refreshCodeStatus();
       mutate(() => { for (const x of tickets) if (r.started.some((j: Any) => j.ticketId === x.id)) logEvent(x, 'started writing code with AI (batch)', 'Development'); });
       S.checked.clear(); emit();
     } catch (e: Any) { toast(e.message, 'err'); } finally { setBusy(false); }
@@ -939,8 +948,8 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
           {agents.map((a: Any) => <MenuItem key={a.id} value={a.id}>{a.icon} {a.name} · {a.model}</MenuItem>)}</SF></label>
     </div>
     <label className="field"><span>Extra instructions for every issue (optional)</span><TA rows={3} value={text} placeholder="e.g. Follow the patterns in src/features/orders. Add a Vitest test for each acceptance criterion." onChange={(e) => setText(e.target.value)} /></label>
-    <ParallelCheck ids={tickets.map((x: Any) => x.id)} busy={busy} onStart={(ids) => start(ids)} />
-    <button className="btn ai" disabled={busy || !tickets.length} onClick={() => start()}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{tickets.length > 1 ? `Start all ${jobsCount} job${jobsCount === 1 ? '' : 's'}` : `Start ${jobsCount} job${jobsCount === 1 ? '' : 's'}`}</>}</button>
+    <ParallelCheck ids={tickets.map((x: Any) => x.id)} busy={busy} onStart={startSafe} />
+    <button className="btn ai" disabled={busy || !tickets.length} onClick={start}>{busy ? <><Spinner />Starting {jobsCount} jobs…</> : <><Ico svg={I.sparkle} />Start {jobsCount} job{jobsCount === 1 ? '' : 's'}</>}</button>
   </Modal>;
 }
 

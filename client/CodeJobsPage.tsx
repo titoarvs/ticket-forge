@@ -7,7 +7,6 @@ import { S, P, api, toast, ago, useStore, closeProject, type Any } from './core'
 import { Ico, I, Spinner, EmptyState, ErrorState } from './ui';
 import { TF, SF, MenuItem } from './fields';
 import { DiffReview } from './DiffReview';
-import { StartCoding } from './DevPlan';
 
 const LIVE = ['starting', 'queued', 'running'];
 const REVIEW = ['review', 'report'];
@@ -39,13 +38,7 @@ function TicketContext({ projectId, ticketId }: { projectId: string; ticketId: s
       </ul>}
       <h4 style={{ margin: '12px 0 4px' }}>Prompt</h4>
       <pre className="small" style={{ whiteSpace: 'pre-wrap', maxHeight: 320, overflow: 'auto', margin: 0 }}>{c.prompt}</pre>
-      <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-        {/* The issue's code panel in its project: start the agent, watch it, review the diff and open the pull request. */}
-        <Link className="btn sm ai" href={`/p/${encodeURIComponent(projectId)}/backlog?issue=${encodeURIComponent(c.ticketId)}&code=${c.repos.length === 1 && c.repos[0].label === 'Backend' ? 'backend' : 'frontend'}`}
-          title="Opens this issue’s code panel: start the AI agent, review its changes, then open the pull request"><Ico svg={I.sparkle} />Start writing code</Link>
-        <Link className="btn sm subtle" href={`/p/${encodeURIComponent(projectId)}/codejobs`} title="The project’s Code jobs page: start coding one ticket or a whole feature">Code a whole feature…</Link>
-        <button className="btn sm subtle" onClick={() => navigator.clipboard?.writeText(c.prompt).then(() => toast('Prompt copied.'), () => toast('Couldn’t copy the prompt.', 'err'))}>Copy prompt</button>
-      </div>
+      <button className="btn sm subtle" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(c.prompt).then(() => toast('Prompt copied.'), () => toast('Couldn’t copy the prompt.', 'err'))}>Copy prompt</button>
     </div>
   );
 }
@@ -112,7 +105,6 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
         {scoped && <Link className="btn" href={`/p/${projectId}/prs`} style={{ marginLeft: 12 }}><Ico svg={I.pr} />Pull requests</Link>}
         <div className="spacer" /><button className="btn" onClick={load}><Ico svg={I.undo} />Refresh</button></div>
       {asked && <TicketContext projectId={asked.project} ticketId={asked.ticket} />}
-      {scoped && <StartCoding />}
       {!d ? <div className="card" style={{ padding: 20 }}><Spinner /> Loading code jobs…</div> : <>
         <div className="cjp-sum">
           <div className={n(LIVE) ? 'on' : ''}><b>{n(['running', 'starting'])}</b><span>working</span></div>

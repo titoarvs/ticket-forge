@@ -4,22 +4,13 @@
 // - Parallel check: before code jobs start on several issues, which of them touch the same code and should wait.
 // Jev (Administration → AI → Decisions) makes the small decisions when it is on; otherwise the AI, or the rules.
 import { useEffect, useState } from 'react';
-import { S, P, api, aiBody, can, feat, isDone, toast, mutate, closeModal, openModal, type Any } from './core';
-import { BulkCodeModal, codeReady, openCode } from './DevCode';
-import { finishedCode } from './codeStatus';
+import { P, api, aiBody, can, toast, mutate, closeModal, openModal, type Any } from './core';
 import { Ico, I, Modal, Spinner, LayerChip, PriorityIcon } from './ui';
-import { CB, SF, MenuItem } from './fields';
+import { CB } from './fields';
 import { applyOrder } from '@/lib/reorder';
 
 const ENGINE: Record<string, string> = { jev: 'Jev', ai: 'the AI', 'jev+ai': 'Jev and the AI', rules: 'the rules (links, priority, layer, size)' };
 const engineNote = (d: Any) => (d.engine === 'rules' ? 'Decided by the rules only.' : `Hints from ${ENGINE[d.engine]}${d.byJev ? ` · Jev answered ${d.byJev}` : ''}${d.byAi ? ` · the AI answered ${d.byAi}` : ''}.`);
-
-/** Whether this person can start code jobs here (Write code with AI). */
-export const canWriteCode = () => feat('code') && can('ai.use') && can('issue.edit') && codeReady();
-/** Write code for many issues at once, in development order, with the conflict check (BulkCodeModal). */
-export const openBulkCode = (ids: string[]) => openModal(<BulkCodeModal ids={ids} />);
-/** The open issues of an epic, top level, for "Write code for the epic". */
-export const epicCodeIds = (epicId: string) => P().tickets.filter((t: Any) => t.epicId === epicId && !t.parentId && !finishedCode(t) && !isDone(t)).map((t: Any) => t.id);
 
 /** Opens the Development order dialog of an epic or a sprint. */
 export const openDevOrder = (scope: { epicId?: string; sprintId?: string; title: string }) => openModal(<DevOrderModal scope={scope} />);
@@ -36,8 +27,6 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
   };
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const canApply = can('issue.edit') || can('sprint.manage') || can('epic.manage');
-  const codeOk = canWriteCode();
-  const toCode = (d?.order || []).map((o: Any) => P().tickets.find((x: Any) => x.id === o.ticketId)).filter((t: Any) => t && !finishedCode(t)).map((t: Any) => t.id);
   const apply = () => {
     const ids = d.order.map((o: Any) => o.ticketId);
     mutate((pp: Any) => {
@@ -48,7 +37,7 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
     toast(`${ids.length} issues of ${scope.title} are now in the suggested order.`, 'ok', { title: 'Backlog reordered' });
   };
   return (
-    <Modal title={`Development order · ${scope.title}`} wide actions={[{ label: 'Close' }, { label: `Write code for all ${toCode.length}`, kind: 'ai', hidden: !codeOk || toCode.length < 1, disabled: busy, onClick: () => openBulkCode(toCode) }, { label: 'Apply to backlog order', kind: 'primary', disabled: !d?.order?.length || busy || !canApply, onClick: apply }]}
+    <Modal title={`Development order · ${scope.title}`} wide actions={[{ label: 'Close' }, { label: 'Apply to backlog order', kind: 'primary', disabled: !d?.order?.length || busy || !canApply, onClick: apply }]}
       left={<CB label="Use Jev / AI hints" disabled={busy || !can('ai.use')} checked={smart} onChange={(e: Any) => { setSmart(e.target.checked); load(e.target.checked); }} />}>
       <p className="muted small" style={{ marginTop: 0 }}>The order to build these issues in: blocked issues come after their blockers, then priority, what other issues need first, backend before the screens that use it, and smaller issues first. Applying it moves only these issues within the places they hold in the backlog.</p>
       {busy && <div className="muted"><Spinner /> Working out the order…</div>}
@@ -65,13 +54,6 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
                 <span className="do-meta" title={`${o.priority} priority`}><PriorityIcon p={o.priority} />{o.storyPoints != null ? `${o.storyPoints} pts` : ''}</span></div>
               <div className="do-why muted small">{o.reason}</div>
             </div>
-            {codeOk && (() => {
-              const t = P().tickets.find((x: Any) => x.id === o.ticketId);
-              if (!t) return null;
-              return finishedCode(t)
-                ? <button className="btn sm subtle" title="Review the code, approve it and merge the pull request" onClick={() => openCode(t)}><Ico svg={I.pr} />View code</button>
-                : <button className="btn sm ai" title={`Write the code for ${o.key} with AI`} onClick={() => openCode(t)}><Ico svg={I.sparkle} />Write code</button>;
-            })()}
           </li>))}</ol>
         {d.done?.length > 0 && <p className="muted small">Already done, left out: {d.done.map((x: Any) => x.key).join(', ')}.</p>}
       </>}
@@ -118,44 +100,3 @@ export function ParallelCheck({ ids, busy, onStart }: { ids: string[]; busy: boo
   </div>;
 }
 
-/**
- * Code jobs page → Start coding: one ticket (its code panel: start the agent, review the diff, open the pull request)
- * or a whole feature (epic): every open issue without finished code, through the bulk dialog with the conflict check.
- */
-export function StartCoding() {
-  const [mode, setMode] = useState<'ticket' | 'feature'>('feature');
-  const [epicId, setEpicId] = useState('');
-  const [ticketId, setTicketId] = useState('');
-  const p = P();
-  if (!p || !feat('code')) return null;
-  const epics = (p.epics || []).filter((e: Any) => !e.draft).map((e: Any) => ({ e, ids: epicCodeIds(e.id) }));
-  const tickets = p.tickets.filter((t: Any) => !t.parentId && !isDone(t));
-  const ep = epics.find((x: Any) => x.e.id === epicId);
-  const t = tickets.find((x: Any) => x.id === ticketId);
-  const ok = canWriteCode();
-  return (
-    <div className="card start-coding" aria-label="Start coding">
-      <div className="sc-head"><h3>Start coding</h3>
-        <div className="seg" role="tablist" aria-label="What to code">{([['feature', 'A feature (epic)'], ['ticket', 'One ticket']] as const).map(([k, l]) => (
-          <button key={k} role="tab" aria-selected={mode === k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>))}</div></div>
-      {!ok && <p className="muted small" style={{ margin: '0 0 8px' }}>{!can('ai.use') || !can('issue.edit') ? 'Starting code jobs needs the Use AI and Edit issues permissions.'
-        : <>Set up Write code with AI first: your local repository folder or the GitHub repository, in <a href={`/p/${p.id}/settings`} onClick={() => { (S as Any).setTab = 'code'; }}>Project settings → Code &amp; GitHub</a>.</>}</p>}
-      {mode === 'feature' ? <div className="sc-row">
-        <SF searchable value={epicId} onChange={(e: Any) => setEpicId(String(e.target.value))} aria-label="Feature (epic)" sx={{ minWidth: 280 }}>
-          <MenuItem value="">Choose a feature (epic)…</MenuItem>
-          {epics.map(({ e, ids }: Any) => <MenuItem key={e.id} value={e.id}>{e.key ? `${e.key} · ` : ''}{e.title} ({ids.length} to code)</MenuItem>)}</SF>
-        <button className="btn" disabled={!ep} onClick={() => openDevOrder({ epicId: ep.e.id, title: ep.e.title })} title="The order to build its issues in, with a reason for each"><Ico svg={I.up} />Development order</button>
-        <button className="btn ai" disabled={!ok || !ep || !ep.ids.length} onClick={() => openBulkCode(ep.ids)} title="One code job per open issue, checked first for issues that touch the same code">
-          <Ico svg={I.sparkle} />{ep ? `Write code for ${ep.ids.length} issue${ep.ids.length === 1 ? '' : 's'}` : 'Write code for the feature'}</button>
-        {ep && !ep.ids.length && <span className="muted small">Every open issue of this feature already has code.</span>}
-      </div> : <div className="sc-row">
-        <SF searchable value={ticketId} onChange={(e: Any) => setTicketId(String(e.target.value))} aria-label="Ticket" sx={{ minWidth: 320 }}>
-          <MenuItem value="">Choose a ticket…</MenuItem>
-          {tickets.slice(0, 500).map((x: Any) => <MenuItem key={x.id} value={x.id}>{x.key} · {x.title}</MenuItem>)}</SF>
-        {t && finishedCode(t)
-          ? <button className="btn" disabled={!ok} onClick={() => openCode(t)} title="Review the code, approve it and merge the pull request"><Ico svg={I.pr} />View code</button>
-          : <button className="btn ai" disabled={!ok || !t} onClick={() => openCode(t)} title="Start the AI agent, review its changes, then open the pull request"><Ico svg={I.sparkle} />Write code</button>}
-      </div>}
-    </div>
-  );
-}

@@ -470,11 +470,6 @@ places they hold in the backlog now, and the change is saved (and undone) like a
    too, the rules above decide alone. A suggested prerequisite never overrides a link and is dropped when it would make
    a loop. The reason line says where each hint came from ("Jev: builds on it").
 
-**Writing the code from it** (needs *Use AI*, *Edit issues* and Write code with AI set up): each issue in the list has
-**Write code** (or **View code** when its code is finished), which opens that issue's code job right in the app, and
-**Write code for all N** starts the whole epic or sprint at once through the bulk dialog, with the conflict check and rounds
-below. The epic panel also has **Write code for epic** for its open issues that have no finished code yet.
-
 API: `POST /api/projects/:id/devorder` with `{ epicId | sprintId | ticketIds, smart }`. Nothing is saved there.
 
 ## Coding several issues at once without conflicts
@@ -490,8 +485,8 @@ When you select issues in the backlog and choose **Write code with AI**, the dia
 - **Likely**: an issue has no coding spec, and Jev (or the AI) expects it to edit the same code as another selected issue.
 
 It then splits the issues into rounds, in development order: round 1 can be coded together now, each later round after
-the one before it. **Start the N safe now** starts round 1 only; **Start all** starts everything anyway (the queue still
-runs `TICKETFORGE_CODE_PARALLEL` jobs at once). Module overlaps that Jev or the AI judges to be separate files are shown
+the one before it. **Start the N safe now** starts round 1 only; the dialog's usual **Start N jobs** button is unchanged and
+starts everything (the queue still runs `TICKETFORGE_CODE_PARALLEL` jobs at once). Module overlaps that Jev or the AI judges to be separate files are shown
 but don't hold an issue back. With Jev off, the AI answers; when the AI fails or *Use AI* is missing, the rules decide
 (a shared module is a conflict, issues without a spec are listed as unchecked).
 
@@ -826,12 +821,6 @@ Set up once per project in **Project settings → Code & GitHub**:
 Then on an issue: **Development → Write code**. It opens the **Code jobs** page in a new tab (the issue stays as it is)
 showing the issue ID, its coding prompt and the linked repository or coding spec (just the ID and prompt when it has
 none). The same goes for an issue picked from an epic's code agent. Every member who can open the issue gets the button.
-**Start writing code** on that card opens the issue's code panel in its project, where the steps below happen (start,
-review, pull request). The Development order dialog's **Write code** and the epic's **Write code for epic** open it directly.
-A project's **Code jobs** page (Development → Code jobs) also has **Start coding**: pick **One ticket** and **Write code**
-(its code panel: start, review, pull request), or pick **A feature (epic)** and **Write code for N issues** (every open
-issue without finished code, through the bulk dialog with the conflict check and rounds), with **Development order** beside it.
-**Code a whole feature…** on the ticket card above leads there.
 1. TicketForge creates a branch (`tf/pay-12-short-title`) from the base branch in its **own git worktree**, so your
    checkout and uncommitted work are never touched.
 2. Claude Code (your account) implements the issue from its story, acceptance criteria and test cases, plus any

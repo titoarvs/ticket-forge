@@ -3551,8 +3551,3 @@ hr.sep { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .par-kind { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px; margin-right: 6px; background: var(--warning-bg); color: var(--warning); }
 .par-kind.k-job, .par-kind.k-blocked { background: var(--danger-bg); color: var(--danger); }
 .par-kind.k-likely { background: var(--border); color: var(--text-subtle); }
-.dev-order li > .btn { flex-shrink: 0; align-self: center; }
-.start-coding { padding: 16px; margin-bottom: 12px; }
-.sc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.sc-head h3 { margin: 0 0 12px; }
-.sc-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
