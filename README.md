@@ -1167,6 +1167,16 @@ In **Add feature with AI**, each new epic in the review step has **Save as draft
 - **Publish** (in the draft's panel) removes the draft flag, so it becomes a real epic. A draft with an empty title can't be published: the app shows a message, and the server refuses a save that does it with **400**.
 - **Notifications:** saving or publishing sends an in-app notification (the bell, kinds `epic-draft-saved` and `epic-published`) to the person who saved the draft and to the project owner, once each. `POST /api/projects/:id/epic-drafts` (`lib/epic-drafts.ts`) sends it after checking what was saved.
 
+## AI helper in every project (search, generate and assign tickets)
+
+Every project page has an **AI helper** chat panel (bottom right, beside the help chatbot; `client/ProjectHelper.tsx`, `lib/helper.ts`). Pick **Search**, **Generate** or **Assign** and type:
+- **Access:** every call is checked on the server. A person who can't open the project (it isn't on their `workspace_members.project_access` list) gets **404 Project not found** and no project data. Only people who can open the project are offered as assignees, and the server refuses anyone else.
+- **Per-person settings:** `helper_perms` holds search, generate and assign for each person in each project. With no row, search is on and generate and assign are off; workspace owners can do everything. People with *Edit project settings* change them in the panel (**Access**) or with `GET/PUT /api/projects/:id/helper/permissions`. A refused action shows the server's message in the chat and changes nothing. No role definitions change.
+- **Search:** tickets of this project whose key, title, user story or description contain the text.
+- **Generate:** also needs *Use Claude*. The AI's ticket is saved in `ticket_drafts` as a **Draft**, not as an issue, so it isn't in the backlog, the Issues page or search. **Approve** (needs *Create issues*) turns it into an issue with the next key and the first workflow status; **Discard** drops it (`POST /api/projects/:id/helper/drafts/:draftId`).
+- **Assign:** gives a ticket (by key) to a person of the project; a draft must be approved first. Saved like any issue change (history entry, new project version, notification to the assignee).
+- Tables `helper_perms` and `ticket_drafts` (`lib/db.ts`, created on start); API under `/api/projects/:id/helper`. Tests: `tests/tf-125-ai-helper.test.ts`.
+
 ## GitHub Copilot as the local AI
 
 When TicketForge is opened at localhost, it can use **GitHub Copilot** through the Copilot CLI with your own Copilot subscription, the same way it uses your Claude account through Claude Code.

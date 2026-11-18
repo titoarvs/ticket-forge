@@ -814,6 +814,35 @@ create table if not exists drive_docs (
   primary key (project_id, epic_id, kind, doc_key)
 );
 create index if not exists drive_docs_queue on drive_docs(state, next_attempt_at);
+-- AI helper (client/ProjectHelper.tsx, lib/helper.ts). helper_perms: what each person may do with the helper in one
+-- project (search, generate, assign). No row means the defaults (search only). ticket_drafts: tickets the helper
+-- generated. They are not issues: a draft only becomes an issue when a person approves it. Its status is draft,
+-- approved or discarded, and issue_id is the issue it became. (No semicolons in these comments: PGlite splits on them.)
+create table if not exists helper_perms (
+  project_id text not null references projects(id) on delete cascade,
+  user_id text not null,
+  can_search boolean not null default true,
+  can_generate boolean not null default false,
+  can_assign boolean not null default false,
+  updated_by text,
+  updated_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+create table if not exists ticket_drafts (
+  project_id text not null references projects(id) on delete cascade,
+  id text not null,
+  idea text not null default '',
+  data jsonb not null,
+  status text not null default 'draft',
+  created_by text,
+  created_by_name text not null default '',
+  created_at timestamptz not null default now(),
+  decided_by text,
+  decided_at timestamptz,
+  issue_id text,
+  primary key (project_id, id)
+);
+create index if not exists ticket_drafts_status on ticket_drafts(project_id, status, created_at desc);
 `;
 
 // Older TicketForge versions sharing the database (another server not updated yet) don't record issue and section
@@ -991,6 +1020,8 @@ export const TABLES = [
   'coding_specs',
   'spec_changes',
   'drive_docs',
+  'helper_perms',
+  'ticket_drafts',
 ];
 const FUNCS = [
   'tf_uid()',
@@ -1129,13 +1160,16 @@ create policy tf_system_only on usage_counters for all to ${APP_ROLE} using (tf_
 -- Workspace isolation, added on top of every rule above (restrictive): rows of another workspace never show, even to
 -- someone with access to "all projects". System work stays inside the request's workspace in the app code.
 ${['projects', 'roles', 'invites'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using (tf_system() or workspace_id = tf_ws()) with check (tf_system() or workspace_id = tf_ws())`).join(';\n')};
-${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
+${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs', 'helper_perms', 'ticket_drafts'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
 create policy tf_all on code_jobs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_notes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_state for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on coding_specs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on spec_changes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on drive_docs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_all on ticket_drafts for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_select on helper_perms for select to ${APP_ROLE} using (${ACCESS('project_id')});
+create policy tf_write on helper_perms for all to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or tf_can('project.settings'))) with check (${ACCESS('project_id')} and (select tf_system() or tf_can('project.settings')));
 create policy tf_select on notifications for select to ${APP_ROLE} using (tf_system() or user_id = tf_uid());
 create policy tf_insert on notifications for insert to ${APP_ROLE} with check (tf_system() or tf_uid() is not null);
 create policy tf_update on notifications for update to ${APP_ROLE} using (tf_system() or user_id = tf_uid()) with check (tf_system() or user_id = tf_uid());

@@ -18020,6 +18020,117 @@ hr.sep {
   }
 }
 
+/* Project AI helper (TF-125, client/ProjectHelper.tsx): a chat panel docked bottom right on every project page, beside the
+   help chatbot's button. It reuses the chat message and input styles above. */
+.helper {
+  position: fixed;
+  right: 84px;
+  bottom: 24px;
+  z-index: 170;
+  width: min(380px, calc(100vw - 108px));
+  display: flex;
+  flex-direction: column;
+  background: var(--overlay);
+  color: var(--text);
+  border-radius: 12px;
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+.helper.open {
+  height: min(520px, calc(100vh - 120px));
+}
+.helper-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.helper.open .helper-h {
+  border-bottom: 1px solid var(--border);
+}
+.helper-log {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.helper-modes {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--border);
+}
+.helper .chat-in {
+  border-top: 0;
+  flex-wrap: wrap;
+}
+.helper .chat-in .select {
+  flex: 0 1 140px;
+}
+.helper-results {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.helper-results li {
+  display: flex;
+  flex-direction: column;
+}
+.helper-results .link-btn {
+  text-align: left;
+  color: var(--brand);
+}
+.helper-sub,
+.helper-note {
+  color: var(--text-subtlest);
+  font-size: 12px;
+}
+.helper-drafts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.helper-draft {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.helper-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.helper-settings table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.helper-settings th,
+.helper-settings td {
+  padding: 4px 6px;
+  text-align: center;
+}
+.helper-settings th:first-child,
+.helper-settings td:first-child {
+  text-align: left;
+}
+@media (max-width: 640px) {
+  .helper {
+    right: 16px;
+    bottom: 76px;
+    width: calc(100vw - 32px);
+  }
+}
+
 /* Diff review (TF-121, client/DiffReview.tsx): one file at a time. Changed files on the left, the chosen file's diff on
    the right; Split or Unified. The component switches to its narrow layout by its own width (class .narrow). Long lines
    wrap, so nothing scrolls sideways. Colours are soft so a long review is easy on the eyes. */
