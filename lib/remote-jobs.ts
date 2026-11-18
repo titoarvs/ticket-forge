@@ -5,7 +5,7 @@
 import crypto from 'node:crypto';
 import { orm, codeJobs, eq, and, desc, sql } from './orm';
 import { consume } from './limits';
-import { runApiCode, openCodePr, deleteBranch } from './api-code';
+import { runApiCode, openCodePr, mergeCodePr, deleteBranch } from './api-code';
 import { err } from './errors';
 
 const LIVE = ['starting', 'queued', 'running'];
@@ -91,6 +91,7 @@ export async function followRemote(j, { gh, task, user, text, ai, defer = (fn) =
   if (j.pr) throw err('The pull request is already open. Start a new job to change it.', 409);
   if (!j.engine) throw err('This job ran on GitHub Actions, which TicketForge no longer uses. Start a new code job.', 409);
   j.rounds = (j.rounds || 1) + 1;
+  j.approvals = []; // the code is about to change, so earlier approvals no longer count
   say(j, `You: ${text}`, 'you');
   j.status = 'starting'; j.error = null;
   await save(j);
@@ -104,6 +105,7 @@ export async function cancelRemote(j) {
   return save(j);
 }
 export async function discardRemote(j, gh) {
+  if (j.status === 'merged') throw err('This code is already merged, so it can’t be discarded.', 409);
   if (LIVE.includes(j.status)) await cancelRemote(j);
   if (!j.pr) await deleteBranch({ repo: j.repo, token: gh.token, branch: j.branch });
   j.status = 'discarded';
@@ -116,6 +118,41 @@ export async function prRemote(j, gh, { title, body, draft }: any) {
   say(j, `Opened pull request #${pr.number}.`, 'done');
   await save(j);
   return { pr: { url: pr.url, number: pr.number, title: pr.title, draft: pr.draft, repo: j.repo, provider: 'GitHub', status: pr.draft ? 'Draft' : 'Open', branch: j.branch, base: j.base } };
+}
+
+// ---------------------------------------------------------------- approvals and merge (TF-123)
+/** Approvals the project asks for before the pull request can be merged (Project settings → Code & GitHub); 1 unless set. */
+export const requiredApprovals = (project) => { const n = Number(project?.dev?.requiredApprovals); return Number.isInteger(n) && n >= 1 && n <= 10 ? n : 1; };
+const approvalsOf = (j) => (Array.isArray(j.approvals) ? j.approvals : []);
+/** "Approved 1 of 2. 1 more approval needed" (or just "Approved 2 of 2" once there are enough). */
+export const approvalNote = (have, need) => `Approved ${have} of ${need}${have < need ? `. ${need - have} more approval${need - have === 1 ? '' : 's'} needed` : ''}`;
+/**
+ * Records a workspace member's approval on the job (kept in code_jobs.data): once per member, with their name. Any
+ * member can approve, including the person who started the job. Changing the code again clears the approvals.
+ */
+export async function approveRemote(j, user) {
+  if (j.status === 'merged') throw err('This code is already merged.', 409);
+  if (!['review', 'pr'].includes(j.status)) throw err('There is no finished code to approve yet.', 409);
+  if (approvalsOf(j).some((a) => a.userId === user.id)) return j;
+  const name = user.name || user.email || 'A member';
+  j.approvals = [...approvalsOf(j), { userId: user.id, name, at: now() }];
+  say(j, `${name} approved the code (${approvalsOf(j).length}).`, 'done');
+  return save(j);
+}
+/**
+ * Approve and merge: records the member's approval, then merges the pull request when there are enough approvals.
+ * `gh()` gives the GitHub token; it is only asked for once the approvals are enough, so a blocked merge never needs GitHub.
+ */
+export async function mergeRemote(j, { user, required, gh }: any) {
+  if (j.status === 'merged') return j;
+  if (j.status !== 'pr' || !j.pr) throw err('Open the pull request first, then approve and merge it.', 409);
+  await approveRemote(j, user);
+  const have = approvalsOf(j).length;
+  if (have < required) throw err(approvalNote(have, required), 409);
+  const r = await mergeCodePr({ repo: j.repo, token: (await gh()).token, number: j.pr.number, title: j.pr.title });
+  j.status = 'merged'; j.merged = { at: r.mergedAt, by: user.name || user.email || '', sha: r.sha };
+  say(j, `Merged pull request #${j.pr.number}${r.sha ? ` (${r.sha})` : ''} after ${have} of ${required} approvals.`, 'done');
+  return save(j);
 }
 export async function remoteJobsFor(projectId, ticketId) {
   const rows = await orm.select({ data: codeJobs.data }).from(codeJobs)

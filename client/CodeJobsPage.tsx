@@ -10,11 +10,11 @@ import { DiffReview } from './DiffReview';
 
 const LIVE = ['starting', 'queued', 'running'];
 const REVIEW = ['review', 'report'];
-const SHIPPED = ['pr', 'committed'];
+const SHIPPED = ['pr', 'merged', 'committed'];
 const TROUBLE = ['failed', 'cancelled', 'empty'];
 const LABEL: Record<string, string> = {
   starting: 'Starting', queued: 'Waiting', running: 'Working', review: 'Ready for review', report: 'Report ready', committed: 'Committed',
-  pr: 'Pull request open', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped',
+  pr: 'Pull request open', merged: 'Merged', empty: 'No changes', failed: 'Failed', cancelled: 'Stopped',
 };
 type Filter = 'live' | 'review' | 'all';
 

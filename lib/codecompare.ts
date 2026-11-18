@@ -99,6 +99,8 @@ async function blobText(repo: string, sha: string | undefined, token: string) {
  */
 export async function remoteCompare(j: any, target: CompareTarget, { token, defaultBranch, jobs, specAt = '', stored = '' }: { token: string; defaultBranch: string; jobs: any[]; specAt?: string; stored?: string }) {
   if (target === 'default') {
+    // Once merged, the default branch already has the change (a live comparison would be empty): show what was merged.
+    if (j.status === 'merged') return compareResult(target, { against: `${defaultBranch} (before the merge)`, diff: stored });
     try {
       const c: any = await ghApi('GET', `repos/${j.repo}/compare/${enc(defaultBranch)}...${enc(j.branch)}`, { token });
       const diff = (c.files || []).map((f: any) => (f.patch ? `diff --git a/${f.previous_filename || f.filename} b/${f.filename}\n--- ${f.status === 'added' ? '/dev/null' : `a/${f.previous_filename || f.filename}`}\n+++ ${f.status === 'removed' ? '/dev/null' : `b/${f.filename}`}\n${f.patch}\n` : `diff --git a/${f.filename} b/${f.filename}\nBinary files differ\n`)).join('');

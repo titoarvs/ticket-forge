@@ -29,7 +29,7 @@ import { VersionHistory } from './Versions';
 import { DraftBanner, DraftReference } from './EpicDrafts';
 import { ReferencesSection } from './References';
 import { useAutoTour } from './tour';
-import { CodeChip } from './codeStatus';
+import { CodeChip, finishedCode } from './codeStatus';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
 const close = () => { S.drawer = null; S.full = false; emit(); };
@@ -217,10 +217,12 @@ function IssuePanel({ t }: { t: Any }) {
 
           <TestsSection t={t} />
           <div className="sec"><div className="sec-title"><Ico svg={I.pr} /><h3>Development</h3><span className="count">{t.prs.length}</span><CodeChip t={t} />
-            {edit && <div className="tools">
-              {can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" data-tour="drawer-code" onClick={() => openCode(t)} title="Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request"><Ico svg={I.sparkle} />Write code with AI</button>
+            {(edit || (feat('code') && codeReady() && finishedCode(t))) && <div className="tools">
+              {/* TF-123: finished code is shown, not rewritten; every member who can open the issue can review and approve it */}
+              {feat('code') && codeReady() && finishedCode(t) && <button className="btn sm" onClick={() => openCode(t)} title="Review the code, approve it and merge the pull request"><Ico svg={I.pr} />View code</button>}
+              {edit && can('ai.use') && feat('code') && (codeReady() ? <button className="btn sm ai" data-tour="drawer-code" disabled={finishedCode(t)} onClick={() => openCode(t)} title={finishedCode(t) ? 'This issue already has code. Open it with View code; discard it first to write new code.' : 'Claude Code implements this issue in its own branch; you review the diff, then it opens the pull request'}><Ico svg={I.sparkle} />Write code with AI</button>
                 : can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>)}
-              {feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
+              {edit && feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
             {t.prs.map((r: Any) => (
               <div key={r.id} className="pr-row"><Ico svg={I.pr} /><div className="pr-main"><a href={r.url} target="_blank" rel="noopener noreferrer">{r.title}</a>
                 <div className="muted small">{r.provider} · {r.repo}{r.number ? ` #${r.number}` : ''}{r.branch ? ` · ${r.branch} → ${r.base || ''}` : ''}{r.author ? ` · ${r.author}` : ''}{r.checkedAt ? ` · checked ${ago(r.checkedAt)}` : ''}</div><PrFindingChips t={t} r={r} /></div>

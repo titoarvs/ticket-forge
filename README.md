@@ -811,6 +811,19 @@ appears when there is nothing different. The diff is always side by side: on nar
 list sits beside the diff on desktop (1024px and up) and above it on tablet and phone, like the sidenav breakpoints, and
 the chosen comparison is kept while the window is resized. Nothing can be edited or committed from it.
 
+**Approve and merge.** The issue's **Write code** window is now a large, responsive dialog whose **Changes** tab is this
+same diff (line numbers, added and removed lines marked, long lines scroll inside the panel). For code jobs that run
+through the AI API and GitHub, any member who can open the project can **Approve** the code (recorded on the job in
+`code_jobs.data` with their name, once per member; the person who started the job may approve too). The project asks for
+a number of approvals (**Project settings → Code & GitHub → Approvals needed to merge**, 1 to 10, default 1). When the
+pull request is open, **Approve and merge** records your approval and merges the pull request on GitHub once there are
+enough; otherwise nothing is merged and you see, for example, *Approved 1 of 2. 1 more approval needed*. A draft pull
+request is marked ready for review first. Asking the agent for more changes clears the approvals. After the merge the job
+and the issue show the code as **Merged**. An issue that already has finished code (ready for review, pull request open,
+merged or committed) has **Write code with AI** disabled and a **View code** button instead; the server also refuses to
+start a second job for it (discard the code first to start over). Local jobs (Claude Code on this computer) have no
+approval step.
+
 **Done on code completion.** When a code job finishes with code for an issue (ready for review, committed or in a
 pull request) while the project is open, the issue moves to the workflow's *Done* status by itself, from any status
 including custom ones, with no approval step. An issue that is already done stays done, and an issue whose job failed,

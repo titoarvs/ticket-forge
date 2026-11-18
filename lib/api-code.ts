@@ -211,6 +211,23 @@ export async function openCodePr({ repo, token, head, base, title, body, draft }
   const pr = await gh('POST', `repos/${repo}/pulls`, { token, body: { title, head, base, body, draft: Boolean(draft) } });
   return { number: pr.number, url: pr.html_url, title: pr.title, draft: pr.draft };
 }
+/**
+ * Merges an open pull request on GitHub (TF-123). A draft is first marked ready for review (GitHub's GraphQL API is the
+ * only way); a request that is closed without merging can't be merged. Returns the merge commit and when it happened.
+ */
+export async function mergeCodePr({ repo, token, number, title }: any) {
+  const pr = await gh('GET', `repos/${repo}/pulls/${number}`, { token });
+  if (pr.merged) return { sha: String(pr.merge_commit_sha || '').slice(0, 7), mergedAt: pr.merged_at || new Date().toISOString() };
+  if (pr.state === 'closed') throw err(`Pull request #${number} was closed on GitHub without being merged. Reopen it there, or start new code.`, 409);
+  if (pr.draft) {
+    try {
+      const r = await gh('POST', 'graphql', { token, body: { query: 'mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { isDraft } } }', variables: { id: pr.node_id } } });
+      if (r?.errors?.length) throw new Error(r.errors[0].message);
+    } catch (e) { throw err(`Pull request #${number} is still a draft and TicketForge couldn’t mark it ready (${e.message}). Click “Ready for review” on GitHub, then merge again.`, 409); }
+  }
+  const r = await gh('PUT', `repos/${repo}/pulls/${number}/merge`, { token, body: { merge_method: 'merge', ...(title ? { commit_title: title } : {}) } });
+  return { sha: String(r?.sha || '').slice(0, 7), mergedAt: new Date().toISOString() };
+}
 export async function deleteBranch({ repo, token, branch }: any) {
   await gh('DELETE', `repos/${repo}/git/refs/heads/${enc(branch)}`, { token }).catch(() => {});
 }
