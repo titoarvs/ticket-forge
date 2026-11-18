@@ -2,7 +2,8 @@ import { after } from 'next/server';
 import { api, authed, body, HttpError, appUrl, aiOpts } from '@/lib/server/http';
 import * as store from '@/lib/store';
 import { SERVERLESS, currentContext } from '@/lib/db';
-import { codeRabbitJob, issueContext, apiContract, listJobs, queueInfo, startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview } from '@/lib/devagent';
+import { codeRabbitJob, issueContext, apiContract, listJobs, queueInfo, startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview, compareJob } from '@/lib/devagent';
+import { compareTarget, remoteCompare } from '@/lib/codecompare';
 import { publicAgents, agentForRole, requireRole } from '@/lib/agents';
 import { getProjectSecret } from '@/lib/secrets';
 import { ardContext } from '@/lib/ard';
@@ -43,6 +44,11 @@ async function userOk(p: any, perms: string[]) {
   if (missing.length) throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
   return user;
 }
+/** When the issue's current coding spec was generated (the "prior spec version" comparison looks at runs before it), or ''. */
+async function specAtFor(projectId: string, ticketId: string) {
+  const s = (await store.listSpecs(projectId)).specs.find((x: any) => x.ticketId === ticketId);
+  return s?.generatedAt ? new Date(s.generatedAt).toISOString() : '';
+}
 const remoteDev = (project: any, side: string) => (side === 'backend' ? (project.devBackend?.enabled && project.devBackend?.repo ? { draft: project.dev?.draft, ...project.devBackend } : null) : project.dev || {});
 async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '', ai }: any) {
   const dev = remoteDev(project, side);
@@ -66,6 +72,12 @@ async function remoteGet(p: any, sp: URLSearchParams) {
     let j = await loadJob(id);
     if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
     if (sp.get('diff')) return new Response(remoteDiff(j, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    if (sp.get('compare')) {
+      const target = compareTarget(sp.get('compare'));
+      const dev = remoteDev(project, j.side);
+      const gh = await ghFor(project, dev).catch((e: any) => { if (target !== 'default') throw e; return null; });
+      return remoteCompare(j, target, { token: gh?.token || '', defaultBranch: gh?.defaultBranch || j.base, jobs: await remoteJobsFor(p.id, j.ticketId), specAt: await specAtFor(p.id, j.ticketId), stored: remoteDiff(j, '') });
+    }
     if (['starting', 'queued', 'running'].includes(j.status)) j = await refreshJob(j).catch(() => j);
     return publicRemote(j, Number(sp.get('since') || 0));
   }
@@ -212,6 +224,11 @@ export const GET = api(async (req, p) => {
   await guard(p, []);
   const id = sp.get('jobId');
   if (id && sp.get('diff')) return new Response(await jobDiff(id, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  if (id && sp.get('compare')) { // everyone with access to the project can review the changes (no extra permission)
+    const j = getJob(id);
+    if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).');
+    return compareJob(id, compareTarget(sp.get('compare')), await specAtFor(p.id, j.ticketId));
+  }
   if (sp.get('list')) return { jobs: listJobs(p.id), queue: queueInfo() };
   if (id) { const j = getJob(id, Number(sp.get('since') || 0)); if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).'); return j; }
   const { agents } = await publicAgents();

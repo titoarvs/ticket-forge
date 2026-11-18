@@ -799,6 +799,15 @@ for review*, *All recent*), a project filter and search. Each job can be stopped
 issue opens with its code job), or followed to its branch and pull request on GitHub. You only see projects you
 have access to.
 
+**Diff review.** A job's **Changes** button on the Code jobs page, and the expanded row of its pull request on the Pull
+requests page, show what the AI changed as a side-by-side diff (added and removed lines highlighted) with a file list.
+Everyone who can open the project sees it; no special role is needed. Choose what to compare with: the *Repository
+default branch*, the *Previous job run* for the same issue, or the *Prior spec version* (specs keep no history, so this is
+the last run made before the current spec was generated). The active comparison is shown above the diff, and *No changes*
+appears when there is nothing different. The diff is always side by side: on narrow screens it scrolls sideways. The file
+list sits beside the diff on desktop (1024px and up) and above it on tablet and phone, like the sidenav breakpoints, and
+the chosen comparison is kept while the window is resized. Nothing can be edited or committed from it.
+
 **Done on code completion.** When a code job finishes with code for an issue (ready for review, committed or in a
 pull request) while the project is open, the issue moves to the workflow's *Done* status by itself, from any status
 including custom ones, with no approval step. An issue that is already done stays done, and an issue whose job failed,

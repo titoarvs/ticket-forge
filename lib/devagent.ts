@@ -15,6 +15,7 @@ import { isSaas } from './platform';
 import { appEnv } from './childenv';
 import { testDatabase } from './appdb';
 import { migrationCheck } from './dbschema';
+import { baseJobFor, noBaseReason, compareResult, type CompareTarget } from './codecompare';
 
 const G = globalThis;
 G.__tfDevJobs ??= new Map();
@@ -359,6 +360,35 @@ export async function jobDiff(id, file?) {
   if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
   const out: any = await git(j.dir, ['diff', '--cached', '--no-color', ...(file ? ['--', file] : [])]);
   return out.length > MAX_DIFF ? `${out.slice(0, MAX_DIFF)}\n… (diff cut at ${MAX_DIFF.toLocaleString()} characters)` : out;
+}
+
+/** A job's output as a git tree: what its worktree holds now, or its branch once the worktree is gone (after the pull request opened). */
+async function outputOf(j) {
+  if (j.dir && fs.existsSync(/*turbopackIgnore: true*/ j.dir)) { await stageAll(j); return { tree: (await git(j.dir, ['write-tree'])).trim(), cwd: j.dir, head: 'HEAD' }; }
+  return { tree: j.branch, cwd: j.repoPath, head: j.branch };
+}
+/**
+ * The job's output compared with the previous job run, the repository's default branch or the last run before the prior
+ * spec (lib/codecompare.ts). Returns { target, label, available, reason, against, diff } with `diff` as a unified diff.
+ */
+export async function compareJob(id, target: CompareTarget, specAt = '') {
+  const j = JOBS.get(id);
+  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  try {
+    const cur = await outputOf(j);
+    if (target === 'default') {
+      const def = (await inspectRepo(j.repoPath)).defaultBranch;
+      const ref = await git(cur.cwd, ['rev-parse', '--verify', '--quiet', `origin/${def}`]).then(() => `origin/${def}`, () => def);
+      const from = (await git(cur.cwd, ['merge-base', ref, cur.head])).trim();
+      return compareResult(target, { against: def, diff: await git(cur.cwd, ['diff', '--no-color', from, cur.tree]) });
+    }
+    const prev = baseJobFor(j, [...JOBS.values()], target, specAt);
+    if (!prev) return compareResult(target, { reason: noBaseReason(target, specAt) });
+    const against = `${prev.ticketKey} run of ${String(prev.startedAt).slice(0, 16).replace('T', ' ')} (${prev.branch})`;
+    return compareResult(target, { against, diff: await git(cur.cwd, ['diff', '--no-color', (await outputOf(prev)).tree, cur.tree]) });
+  } catch (e: any) {
+    return compareResult(target, { reason: `Couldn’t compare these changes: ${e.message}` });
+  }
 }
 
 // How many agent rounds run at once on this machine; the rest wait in order (status "queued"). Each round is a
