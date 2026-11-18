@@ -12,6 +12,7 @@ import { openCode, openUpdatePr, codeReady } from './DevCode';
 import Link from 'next/link';
 import { useAgents } from './Agents';
 import { PrFindingChips, openPrFindings } from './CodeRabbit';
+import { DiffReview } from './DiffReview';
 
 const prCls = (s: string) => ({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' } as Any)[s] || 'pr-open';
 const ref = (r: Any) => (r.number ? `${r.provider === 'GitLab' ? '!' : '#'}${r.number}` : '');
@@ -114,6 +115,21 @@ function SizeChip({ s }: { s: Any }) {
 }
 const StatusIcon = ({ r }: { r: Any }) => <span className={`pr-ico s-${String(r.status).toLowerCase()}`} title={r.status}><Ico svg={r.status === 'Merged' ? I.check : r.status === 'Declined' ? I.close : I.pr} /></span>;
 
+/** The AI code job behind a request (when it came from Write code with AI), as a side-by-side diff. Everyone who sees the page sees it. */
+function PrCodeChanges({ t, r }: { t: Any; r: Any }) {
+  const [job, setJob] = useState<Any>(null);
+  useEffect(() => {
+    let live = true;
+    const same = (x: Any) => (x.pr?.url && x.pr.url === r.url) || (x.pr?.number && x.pr.number === r.number && x.repo === r.repo) || (x.branch && x.branch === r.branch);
+    api(`/api/projects/${encodeURIComponent(P().id)}/code?ticketId=${encodeURIComponent(t.id)}`)
+      .then((d: Any) => { if (live) setJob([d.jobs?.frontend, d.jobs?.backend, d.job].filter(Boolean).find(same) || null); })
+      .catch(() => { if (live) setJob(null); });
+    return () => { live = false; };
+  }, [t.id, r.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!job || !job.files?.length) return null;
+  return <section className="pr-d-code"><h4>Code changes <span className="muted small">written by {job.agentName || 'an AI agent'}</span></h4><DiffReview job={job} /></section>;
+}
+
 /** The expanded part of a row: description, checks, reviews, AI review and timeline. */
 function PrDetails({ t, r }: { t: Any; r: Any }) {
   const [more, setMore] = useState(false);
@@ -152,6 +168,7 @@ function PrDetails({ t, r }: { t: Any; r: Any }) {
         </ul>
         <button type="button" className="pr-issue small" onClick={() => openDrawer('issue', t.id)}><TypeIcon type={t.type} /><span className="key">{t.key}</span><span className="pr-issue-t">{t.title}</span></button>
       </aside>
+      <PrCodeChanges t={t} r={r} />
     </div>
   );
 }

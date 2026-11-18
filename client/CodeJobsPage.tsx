@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { S, P, api, toast, ago, useStore, closeProject, type Any } from './core';
 import { Ico, I, Spinner, EmptyState, ErrorState } from './ui';
 import { TF, SF, MenuItem } from './fields';
+import { DiffReview } from './DiffReview';
 
 const LIVE = ['starting', 'queued', 'running'];
 const REVIEW = ['review', 'report'];
@@ -26,6 +27,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   const [q, setQ] = useState('');
   const [project, setProject] = useState('');
   const [busy, setBusy] = useState('');
+  const [diffOpen, setDiffOpen] = useState<string | null>(null);
   const timer = useRef<Any>(null);
 
   const load = async () => {
@@ -96,7 +98,8 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
           <div className="jobs-list cjp-list">{shown.map((j) => {
             const add = (j.files || []).reduce((s: number, f: Any) => s + (f.added || 0), 0), del = (j.files || []).reduce((s: number, f: Any) => s + (f.removed || 0), 0);
             return (
-              <div key={j.id} className={`job-row s-${j.status}`}>
+              <div key={j.id} className="cjp-item">
+              <div className={`job-row s-${j.status}`}>
                 <span className={`cj-badge s-${j.status}`}>{j.live ? <Spinner /> : <Ico svg={TROUBLE.includes(j.status) ? I.warn : I.check} />}{LABEL[j.status] || j.status}</span>
                 <div className="job-main">
                   <div className="job-l1"><code>{j.ticketKey}</code><span className="job-title">{j.title}</span>
@@ -114,11 +117,14 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                   </div>
                 </div>
                 <div className="cjp-actions">
+                  {j.files?.length > 0 && !j.live && <button className="btn sm subtle" aria-expanded={diffOpen === j.id} onClick={() => setDiffOpen(diffOpen === j.id ? null : j.id)} title="Review the changes as a side-by-side diff">Changes</button>}
                   {j.url && <a className="btn sm subtle" href={j.url} target="_blank" rel="noopener noreferrer" title="Open the GitHub Actions run"><Ico svg={I.external} /></a>}
                   {j.pr?.url && <a className="btn sm subtle" href={j.pr.url} target="_blank" rel="noopener noreferrer">PR #{j.pr.number}</a>}
                   {j.live && <button className="btn sm subtle" disabled={busy === j.id} onClick={() => stop(j)}>{busy === j.id ? <Spinner /> : <Ico svg={I.stop} />}{j.status === 'queued' ? 'Remove' : 'Stop'}</button>}
                   <Link className={`btn sm ${REVIEW.includes(j.status) ? 'primary' : ''}`} href={openHref(j)}>{REVIEW.includes(j.status) ? 'Review' : 'Open'}</Link>
                 </div>
+              </div>
+              {diffOpen === j.id && <div className="cjp-diff"><DiffReview job={j} /></div>}
               </div>
             );
           })}</div>
