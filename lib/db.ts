@@ -630,6 +630,28 @@ create table if not exists epic_signoffs (
   signed_at timestamptz not null default now(),
   primary key (project_id, epic_id)
 );
+-- Documents saved to the workspace's shared Google Drive folder (lib/gdrive.ts). state: saved, queued (waiting for a retry)
+-- or failed (gave up after the maximum retries). The bytes are kept only while queued, so nothing is stored here once the
+-- document is in Drive. One row per document: writing it again replaces the row.
+create table if not exists drive_docs (
+  project_id text not null references projects(id) on delete cascade,
+  epic_id text not null,
+  kind text not null,
+  doc_key text not null default '',
+  name text not null default '',
+  mime text not null default '',
+  state text not null default 'queued',
+  attempts integer not null default 0,
+  next_attempt_at timestamptz,
+  last_error text not null default '',
+  drive_file_id text not null default '',
+  data bytea,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (project_id, epic_id, kind, doc_key)
+);
+create index if not exists drive_docs_queue on drive_docs(state, next_attempt_at);
 `;
 
 // Older TicketForge versions sharing the database (another server not updated yet) don't record issue and section
@@ -746,7 +768,7 @@ async function checkPrivileges(d) {
 }
 
 // ---------------------------------------------------------------- RLS setup (PostgreSQL / Supabase)
-const TABLES = ['roles', 'users', 'sessions', 'invites', 'password_resets', 'projects', 'issues', 'issue_tombstones', 'activity', 'issue_versions', 'app_meta', 'ai_cache', 'ai_usage', 'notifications', 'screenshots', 'files', 'doc_templates', 'code_jobs', 'user_ai', 'legal_acceptances', 'signup_requests', 'user_prefs', 'workspaces', 'workspace_members', 'schema_migrations', 'billing_events', 'payment_gateways', 'billing_plans', 'usage_counters', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments', 'epic_signoffs'];
+const TABLES = ['roles', 'users', 'sessions', 'invites', 'password_resets', 'projects', 'issues', 'issue_tombstones', 'activity', 'issue_versions', 'app_meta', 'ai_cache', 'ai_usage', 'notifications', 'screenshots', 'files', 'doc_templates', 'code_jobs', 'user_ai', 'legal_acceptances', 'signup_requests', 'user_prefs', 'workspaces', 'workspace_members', 'schema_migrations', 'billing_events', 'payment_gateways', 'billing_plans', 'usage_counters', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments', 'epic_signoffs', 'drive_docs'];
 const FUNCS = ['tf_uid()', 'tf_system()', 'tf_ws()', 'tf_can(text)', 'tf_can_delete_project(text)', 'tf_access(text)', 'tf_all_access()', 'tf_access_list()', 'tf_ws_projects()', 'tf_coworkers()', 'tf_my_workspaces()'];
 
 const LOCKDOWN_SQL = `
@@ -872,7 +894,7 @@ create policy tf_system_only on usage_counters for all to ${APP_ROLE} using (tf_
 -- Workspace isolation, added on top of every rule above (restrictive): rows of another workspace never show, even to
 -- someone with access to "all projects". System work stays inside the request's workspace in the app code.
 ${['projects', 'roles', 'invites'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using (tf_system() or workspace_id = tf_ws()) with check (tf_system() or workspace_id = tf_ws())`).join(';\n')};
-${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments', 'epic_signoffs'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
+${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments', 'epic_signoffs', 'drive_docs'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
 create policy tf_all on code_jobs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_notes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_state for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
@@ -882,6 +904,7 @@ create policy tf_all on epic_doc_versions for all to ${APP_ROLE} using (${ACCESS
 create policy tf_all on epic_doc_reviews for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on epic_doc_comments for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on epic_signoffs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_all on drive_docs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_select on notifications for select to ${APP_ROLE} using (tf_system() or user_id = tf_uid());
 create policy tf_insert on notifications for insert to ${APP_ROLE} with check (tf_system() or tf_uid() is not null);
 create policy tf_update on notifications for update to ${APP_ROLE} using (tf_system() or user_id = tf_uid()) with check (tf_system() or user_id = tf_uid());

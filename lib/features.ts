@@ -6,7 +6,8 @@ import { wsKey, wsCache } from './wsmeta';
 /**
  * The features. `api`: pathname patterns of the API routes that belong to it (checked for every request by the API
  * wrapper); `views`: the project pages it owns (hidden from the navigation when locked); `perms`: permissions that
- * mean nothing while it's locked (the app hides every control behind them).
+ * mean nothing while it's locked (the app hides every control behind them). `off`: a feature still being rolled out: it
+ * starts locked and the owner turns it on (unlocks it) when the workspace is ready.
  */
 export const FEATURES = [
   // Planning
@@ -38,6 +39,8 @@ export const FEATURES = [
   // Data
   { id: 'export', group: 'Data', label: 'Export', desc: 'Excel, Word, PDF, CSV and backup exports.', perms: ['export'], api: [/^\/api\/export\//] },
   { id: 'attachments', group: 'Data', label: 'Attachments', desc: 'Uploading and opening files on issues and comments.', api: [/^\/api\/files\//, /^\/api\/projects\/[^/]+\/files(\/|$)/] },
+  { id: 'gdrive', group: 'Data', label: 'Google Drive storage', off: true, desc: 'Save generated and uploaded project documents to a shared Google Drive folder instead of TicketForge storage. Turn it on to show Administration → Google Drive.',
+    api: [/^\/api\/gdrive(\/|$)/, /^\/api\/projects\/[^/]+\/gdrive(\/|$)/] },
 ];
 const IDS = new Set(FEATURES.map((f) => f.id));
 
@@ -45,7 +48,10 @@ const KEY = 'feature_flags';
 const G = globalThis;
 const C: any = wsCache('__tfFlagsWs');
 
-/** { locked: { [id]: { at, by, note } }, updatedBy, updatedAt } — cached for 15 s so other server instances follow. */
+/**
+ * { locked: { [id]: { at, by, note } }, unlocked: { [id]: { at, by } }, updatedBy, updatedAt } — cached for 15 s so other
+ * server instances follow. `unlocked` is only for features that start locked (`off`): they stay locked until it lists them.
+ */
 export async function getFlags({ fresh = false }: any = {}) {
   if (!fresh && C.v !== undefined && Date.now() - C.at < 15000) return C.v;
   let v = null;
@@ -53,7 +59,10 @@ export async function getFlags({ fresh = false }: any = {}) {
   if (typeof v === 'string') { try { v = JSON.parse(v); } catch { v = null; } }
   const locked: any = {};
   for (const [id, x] of Object.entries<any>(v?.locked || {})) if (IDS.has(id)) locked[id] = { at: x?.at || null, by: x?.by || null, note: String(x?.note || '').slice(0, 300) };
-  C.v = { locked, updatedBy: v?.updatedBy || null, updatedAt: v?.updatedAt || null };
+  const unlocked: any = {};
+  for (const [id, x] of Object.entries<any>(v?.unlocked || {})) if (IDS.has(id)) unlocked[id] = { at: x?.at || null, by: x?.by || null };
+  for (const f of FEATURES as any[]) if (f.off && !unlocked[f.id]) locked[f.id] = { at: null, by: null, note: 'Not turned on yet.' };
+  C.v = { locked, unlocked, updatedBy: v?.updatedBy || null, updatedAt: v?.updatedAt || null };
   C.at = Date.now();
   return C.v;
 }
@@ -61,16 +70,20 @@ export async function getFlags({ fresh = false }: any = {}) {
 export async function setFlags(actor, changes) {
   const cur = await getFlags({ fresh: true });
   const locked = { ...cur.locked };
+  const unlocked = { ...cur.unlocked };
   const at = new Date().toISOString();
   for (const [id, c] of Object.entries<any>(changes || {})) {
     if (!IDS.has(id)) continue;
-    if (c?.locked) locked[id] = { at: locked[id]?.at || at, by: locked[id]?.by || actor?.name || null, note: String(c.note ?? locked[id]?.note ?? '').slice(0, 300) };
+    if ((FEATURES as any[]).find((f) => f.id === id).off) {
+      // Starts locked: turning it on is remembered in `unlocked`; locking it again forgets that.
+      if (c?.locked) delete unlocked[id]; else unlocked[id] = { at: unlocked[id]?.at || at, by: unlocked[id]?.by || actor?.name || null };
+    } else if (c?.locked) locked[id] = { at: locked[id]?.at || at, by: locked[id]?.by || actor?.name || null, note: String(c.note ?? locked[id]?.note ?? '').slice(0, 300) };
     else delete locked[id];
   }
-  const v = { locked, updatedBy: actor?.name || null, updatedAt: at };
+  for (const f of FEATURES as any[]) if (f.off) delete locked[f.id]; // its lock comes from starting locked, not from the owner
+  const v = { locked, unlocked, updatedBy: actor?.name || null, updatedAt: at };
   await qs('insert into app_meta (key, value) values ($1, $2) on conflict (key) do update set value = excluded.value', [wsKey(KEY), JSON.stringify(v)]);
-  C.v = v; C.at = Date.now();
-  return v;
+  return getFlags({ fresh: true });
 }
 export async function isLocked(id) { return Boolean((await getFlags()).locked[id]); }
 

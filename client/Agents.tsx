@@ -12,6 +12,7 @@ import { openWritePsd, openPsd } from './Psd';
 import { openWriteFbd, openFbd } from './Fbd';
 import { bulkTests, runTests, NewWithClaudeModal } from './actions';
 import { CodeModal, codeReady } from './DevCode';
+import { DriveState } from './Drive';
 
 // ---------------------------------------------------------------- catalog
 let cache: Any = null;
@@ -99,6 +100,7 @@ function DocViewModal({ epic, a }: { epic: Any; a: Any }) {
   return (
     <Modal title={`${a.name} · ${epic.title}`} wide actions={[{ label: 'Close' }, { label: 'Download .md', onClick: () => download(file, d.markdown) }, { label: 'Download .docx', kind: 'primary', onClick: () => downloadDocx(epic, a), hidden: !can('export') }]}>
       <p className="muted small" style={{ marginTop: 0 }}>Written by the {a.name} agent {ago(d.generatedAt)}{d.generatedBy ? ` for ${d.generatedBy}` : ''}.</p>
+      <DriveState epic={epic} kind="agent" docKey={a.id} again={d.generatedAt} />
       <div className="agent-doc"><Markdown text={d.markdown} /></div>
     </Modal>
   );

@@ -1262,7 +1262,7 @@ Features you can lock:
 - **AI:** AI features (every AI action), Epic documents, Agents, Split issues.
 - **Quality:** Test cases page, Test management, Test automation, AI failure analysis, Repository sync.
 - **Development:** Coding agents, Pull requests.
-- **Data:** Export, Attachments.
+- **Data:** Export, Attachments, Google Drive storage (starts locked: see below).
 
 A locked feature:
 - disappears from the navigation, buttons and menus; opening its page directly shows a "locked" notice;
@@ -1271,6 +1271,18 @@ A locked feature:
 Locking **AI features** hides every AI control, because the `ai.use` permission counts only while AI is on. Test automation does the same for `test.run`, and Export for `export`.
 
 Data is never deleted: unlocking brings everything back as it was. Flags are stored in `app_meta` (`feature_flags`), and the catalog is in `lib/features.ts`.
+
+A feature marked `off` in the catalog is still being rolled out: it **starts locked** and the owner turns it on. Only **Google Drive storage** is like that today.
+
+### Google Drive storage (Administration → Google Drive, owner only, behind the "Google Drive storage" feature)
+
+The Super Admin (the owner) connects **one** Google account for the workspace with OAuth and pastes the link of **one** Drive folder. From then on, generated documents (PSD, FBD, ARD and agent documents, as .docx) and documents uploaded for epic review are saved to that folder instead of TicketForge storage (the `files` table). Nothing in Drive is browsed except that folder; documents already in the old storage are not moved.
+
+- **Set up:** create a Google Cloud OAuth client (Web application, Drive API on) with the redirect URI `APP_URL/api/gdrive/callback`, then set `TICKETFORGE_GDRIVE_CLIENT_ID` and `TICKETFORGE_GDRIVE_CLIENT_SECRET`. The Select folder action stays disabled until Google Drive is connected.
+- **Tokens** are encrypted in `app_meta` and never reach the browser. An expired access token is refreshed with the refresh token.
+- **Save state:** each document shows *Saved*, *Queued* or *Failed* (the `drive_docs` table, `GET /api/projects/:id/gdrive?epicId=`).
+- **Retries:** a save that fails is queued and retried in the background with exponential backoff (30 s, 1 min, 2 min… up to 1 hour), up to `TICKETFORGE_GDRIVE_MAX_RETRIES` retries (default 5, to be confirmed). After that the document shows *Failed*, with a message to contact the Super Admin, and nothing retries it again. The file is kept only while queued. The retry timer runs in the server process (`lib/gdrive.ts`), so it needs a long-running server.
+- **Feature off:** documents use the existing storage and the admin setting is hidden. There is no fallback to the old storage while the feature is on and Drive is down.
 
 ### AI testing agents (Administration → Agents → Test)
 

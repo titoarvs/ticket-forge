@@ -1,6 +1,7 @@
 import { api, authed, body, HttpError, aiOpts, ndjson } from '@/lib/server/http';
 import * as store from '@/lib/store';
 import { generateFbd } from '@/lib/fbd';
+import { saveGeneratedToDrive } from '@/lib/epic-docx';
 
 export const maxDuration = 300;
 
@@ -17,6 +18,7 @@ export const POST = api(async (req, p) => {
   return ndjson(req, async (send) => {
     send({ type: 'progress', message: 'Filling the Feature Brief template from the epic, its issues and its Problem Statement…' });
     const out = await generateFbd({ project, epicId: String(b.epicId), instructions: String(b.instructions || '').slice(0, 2000), ai: aiOpts(b), meta });
-    send({ type: 'done', ...out, meta });
+    const drive = out?.markdown ? await saveGeneratedToDrive({ kind: 'fbd', project, epic, user, doc: { markdown: out.markdown, version: meta.version } }) : null;
+    send({ type: 'done', ...out, meta, drive });
   });
 });

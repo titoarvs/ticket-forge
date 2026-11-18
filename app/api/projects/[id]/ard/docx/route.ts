@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
 import * as store from '@/lib/store';
-import { markdownToDocx } from '@/lib/md-docx';
+import { epicDocx, docxResponse } from '@/lib/epic-docx';
 
 export const maxDuration = 60;
 
@@ -12,7 +12,6 @@ export const POST = api(async (req, p) => {
   const project = await store.getProject(p.id);
   const epic = project.epics.find((e: any) => e.id === b.epicId);
   if (!epic?.ard?.markdown) throw new HttpError(404, 'This epic has no Architecture Record Design yet.');
-  const buf = await markdownToDocx(epic.ard.markdown, { title: `Architecture Record Design for ${epic.title}` });
-  const name = `Architecture Record Design - ${epic.title} - ${epic.ard.version || 'v1.0'}.docx`.replace(/[\\/:*?"<>|]+/g, ' ');
-  return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'Content-Length': String(buf.length), 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' } });
+  const { name, buf } = await epicDocx({ kind: 'ard', project, epic, doc: epic.ard, user });
+  return docxResponse(name, buf);
 });
