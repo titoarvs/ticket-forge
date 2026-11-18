@@ -21,7 +21,7 @@ export function DecisionsSection() {
   return (
     <div className="cards"><div className="card wide">
       <h3>Decisions with Jev</h3>
-      <p className="sub">Jev, from <a href="https://docs.typesafe.ai" target="_blank" rel="noopener noreferrer">TypeSafe AI</a>, answers fixed-format questions (pick one of several options, yes or no) with probabilities in a fraction of a second, for far less than a general AI. It can’t write text, so it only takes the small classification calls: <b>frontend, backend or both</b> for each issue, and <b>which automated tests are worth running</b>. What it isn’t sure about, and anything when it is off or unreachable, goes to your AI as before.</p>
+      <p className="sub">Jev, from <a href="https://docs.typesafe.ai" target="_blank" rel="noopener noreferrer">TypeSafe AI</a>, answers fixed-format questions (pick one of several options, yes or no) with probabilities in a fraction of a second, for far less than a general AI. It can’t write text, so it only takes the small classification calls: <b>frontend, backend or both</b> for each issue, <b>which automated tests are worth running</b>, the <b>development order</b> of an epic or sprint (which issue needs another first, how early to build it), and, before code jobs run on several issues at once, <b>which issues will edit the same code</b>. What it isn’t sure about, and anything when it is off or unreachable, goes to your AI as before.</p>
       <div className={`gha-row ${d.configured ? 'ok' : ''}`}>
         <span className="gha-icon"><Ico svg={I.sparkle} /></span>
         <div className="gha-text">{d.configured

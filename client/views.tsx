@@ -28,6 +28,7 @@ import { BulkCodeModal, codeReady } from './DevCode';
 import { CodeReviewReport } from './CodeRabbit';
 import { useAutoTour } from './tour';
 import { CodeChip, codeSig } from './codeStatus';
+import { openDevOrder } from './DevPlan';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -369,6 +370,7 @@ export function Backlog() {
             <span className="sec-actions">
               <Tally items={g.items} />
               {g.epic && <button className="btn sm subtle" onClick={() => openDrawer('epic', g.epic.id)}>Details</button>}
+              {s && g.items.length > 1 && <button className="btn sm subtle" title="The order to build this sprint’s issues in, with a reason for each" onClick={() => openDevOrder({ sprintId: s.id, title: s.name })}>Development order</button>}
               {s && can('sprint.manage') && <>
                 {s.state === 'active' ? <button className="btn sm" onClick={() => openModal(<CompleteSprintModal s={s} />)}>Complete sprint</button>
                   : <button className={`btn sm ${act ? '' : 'primary'}`} disabled={Boolean(act)} title={act ? 'Complete the active sprint first' : ''} onClick={() => openModal(<SprintModal s={s} mode="start" />)}>Start sprint</button>}

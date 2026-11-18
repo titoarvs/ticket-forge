@@ -2,7 +2,9 @@
 // the state of something and questions (choose one of up to 255 options, rate 0-9, yes/no), and it returns typed
 // answers with calibrated probabilities in a few hundred milliseconds. TicketForge uses it, when an owner turns it on
 // (Administration → AI → Decisions), for the small classification calls that otherwise go to the AI: frontend / backend
-// / both for an issue, and which tests are worth running. When it is off, unreachable, or unsure, the AI answers as before.
+// / both for an issue, which tests are worth running, the development order of an epic or sprint (lib/devorder.ts), and
+// which issues would edit the same code when coded in parallel (lib/parallel.ts). When it is off, unreachable, or unsure,
+// the AI answers as before (and the rules when the AI fails too).
 //   TYPESAFE_API_KEY          the API key, when you'd rather not save one in the app
 //   TICKETFORGE_JEV_URL       the API address (default https://api.typesafe.ai), for tests against a stand-in
 import { getMeta, setMeta } from './appmeta';

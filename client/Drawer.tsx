@@ -16,6 +16,7 @@ import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { openSpecs } from './Specs';
+import { openDevOrder, canWriteCode, openBulkCode, epicCodeIds } from './DevPlan';
 import { openSplitIssues } from './Split';
 import { codeReady, openCode, openWriteCode, openUpdatePr } from './DevCode';
 import { PrFindingChips, openPrFindings } from './CodeRabbit';
@@ -491,6 +492,8 @@ function EpicPanel({ e }: { e: Any }) {
         {can('issue.create') && can('ai.use') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
         {can('issue.create') && can('ai.use') && feat('split') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
         <button className="btn" onClick={() => openSpecs(e)} title="One coding prompt per issue, with the files it touches and overlaps between issues"><Ico svg={I.doc} />Coding specs</button>
+        <button className="btn" onClick={() => openDevOrder({ epicId: e.id, title: e.title })} title="The order to build this epic’s issues in, with a reason for each"><Ico svg={I.up} />Development order</button>
+        {canWriteCode() && epicCodeIds(e.id).length > 0 && <button className="btn ai" onClick={() => openBulkCode(epicCodeIds(e.id))} title="One code job per open issue of this epic, checked for issues that touch the same code first"><Ico svg={I.sparkle} />Write code for epic</button>}
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
