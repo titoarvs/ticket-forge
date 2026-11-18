@@ -8,6 +8,6 @@ const dir = path.join(import.meta.dirname, '..', 'docs');
 const src = path.join(dir, 'ticket-forge-problem-statement.md');
 const out = path.join(dir, 'ticket-forge-problem-statement.docx');
 
-const buf = await markdownToDocx(fs.readFileSync(src, 'utf8'), { title: 'Ticket Forge: Problem Statement', creator: 'TicketForge' });
+const buf = await markdownToDocx(fs.readFileSync(src, 'utf8'), { title: 'Ticket Forge: Problem Statement — Building Code Together', creator: 'TicketForge' });
 fs.writeFileSync(out, buf);
 console.log(`Wrote ${path.relative(process.cwd(), out)} (${buf.length} bytes)`);

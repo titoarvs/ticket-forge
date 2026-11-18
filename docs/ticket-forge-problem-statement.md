@@ -1,113 +1,118 @@
-# Ticket Forge: Problem Statement
+# Ticket Forge: Problem Statement — Building Code Together
 
-> **Source and status.** This document follows Ticket Forge's own Problem Statement (PSD) structure (`lib/psd.ts`). It is based on the README, the overview document (TF-115, TF-116) and the scrum pain points document (TF-117). It describes the problem, not the design. It contains no measured data from any named team. Each claim that still needs proof is marked *[To validate: …]* and listed in Part 8. Status: **Draft**.
+> **Source and status.** This document follows Ticket Forge's own Problem Statement (PSD) structure (`lib/psd.ts`). It focuses on development: how a team builds code together, and how every member can keep contributing when tickets, code or documents are already "done", whether by a teammate or by AI. It is based on the README and the app's code (code jobs in `lib/devagent.ts`, per-person repositories in `lib/mylocal.ts`, document review in `lib/epic-review.ts` and `lib/approval.ts`). It describes the problem, not the design. It contains no measured data from any named team. Each claim that still needs proof is marked *[To validate: …]* and listed in Part 8. Status: **Draft**.
 
 ## 1. At a Glance
 
 | Item | Summary |
 |---|---|
-| **The problem** | Turning a requirements document into a backlog the team can build and test is slow manual work, and it goes wrong often. The meaning of the requirement gets lost at each handoff between the Product Owner, the developer and QA. |
-| **Why it matters** | Sprints start with tickets that are not ready, "done" means different things to different people, and defects are found late, when they cost the most to fix. |
-| **Who is affected** | Product Owners, Scrum Masters, Developers, QA testers, and the business that pays for each sprint. |
-| **What is proposed** | One workspace that turns a requirements document into connected epics, tickets, acceptance criteria, test cases and project documents, and keeps them linked from the first draft to delivery. |
+| **The problem** | When a ticket is finished, by a person or by AI, the rest of the team has no clear way to take part. They cannot easily see what was built, review it, improve it, build on it or pick up the next piece. So development ends up in the hands of one or two people. |
+| **Why it matters** | Code that only one person understands is slow to review, risky to change, and stops when that person is away. New contributors take weeks to become useful, and the team's skills go unused. |
+| **Who is affected** | Developers (senior and new), QA testers, Product Owners, Scrum Masters, tech leads and reviewers, and outside contributors such as freelancers or a client's own developers. |
+| **What is proposed** | One workspace where every ticket, document, branch, pull request and review is linked. Each person sees what they can contribute next and works on their own copy without getting in anyone's way. |
 
-**What is a "ready" ticket?** A ticket the team can start without asking anyone a question. It has a clear user story, testable acceptance criteria and test cases, and it can be traced back to the requirement it came from.
+**What does "contribute" mean here?** Any work that moves a feature forward: writing or reviewing a requirement document, building or reviewing code, testing, fixing a bug found in review, improving AI-written code, adding tests, or documenting a decision. "Done" for one person should be the starting point for the next.
 
 ## 2. Background and Current Situation
 
-Requirements reach a scrum team as a PRD, a BRD, a feature brief, meeting notes or an email thread. Before anyone can write code, someone has to break the requirement into epics and tickets, write acceptance criteria, write test cases, write the documents the project needs (problem statement, feature brief, architecture), and then keep all of it up to date while the sprint is running.
+A feature passes through many hands: the Product Owner writes the requirement, an architect or tech lead plans it, developers build it, reviewers check it, QA tests it, and someone keeps the documents current. With AI tools, a large part of the first draft (tickets, documents, even code) can now be produced in minutes.
 
-Today this is mostly done by hand, spread over several tools:
+That raises a new question for the team: **if the AI or one fast teammate has already done the task, what is left for everyone else, and how do they join in?**
 
-- The Product Owner reads the document and re-types it as epics and tickets in the tracker, usually alone and under time pressure.
-- Acceptance criteria are written late, often during refinement or after development has started, and each author writes them differently.
-- QA writes test cases from tickets that are still changing, in a separate sheet or tool, and falls behind the developers.
-- Project documents are written last, if at all, and are out of date by the next sprint.
-- Ticket status, pull requests and test results live in different places, so the board rarely shows the real state of the work.
+Today the answer is unclear:
+
+- Code is written on one person's machine and only appears to others as a large pull request at the end.
+- AI-written code is either merged without a real review, or thrown away because nobody trusts it.
+- Two developers start on the same ticket, or change the same files, because nobody can see who is working on what.
+- A new developer cannot tell where to start. Setup steps, the repository, the branch rules and the "why" behind the code live in people's heads.
+- When a ticket is marked done, the follow-up work (review comments, missing tests, edge cases, documents) is not tracked as work anyone can pick up.
+- Review and approval of documents and code are done in chat, so nobody can see who approved what, or which version.
 
 ## 3. Problem Statement
 
-There is no single, reliable path from **"here is what we need"** to **"here is a tested, delivered feature"**. Each step from requirement to ticket, ticket to acceptance criteria, criteria to test case, and code to status is a manual rewrite by a different person in a different tool. Every rewrite loses part of the original intent, and nothing connects the pieces afterwards. Because of this, teams start sprints without enough ready work, build against criteria that can be read more than one way, test late, and cannot show what changed or why.
+Teams have no shared, visible flow for building code together. Work moves from requirement to ticket to code to pull request, but each step belongs to one person and is hidden until it is finished. When a step is done, by a teammate or by AI, nothing tells the others what they can do next: review it, test it, improve it, or build the next part on top of it. Because of this, a few people carry the development, reviews become a bottleneck, AI output is not checked well, new contributors stay on the sidelines, and the team cannot grow its output by adding people.
 
-### Why the link between requirement and delivery breaks today
+### Why other people cannot contribute today
 
 | Gap | What it means | Examples |
 |---|---|---|
-| **Manual translation** | A person rewrites the requirement into tickets, and details are dropped or misread without anyone noticing. | **Backlog:** a 30-page PRD becomes 12 tickets, and two business rules from the appendix are missing. *[To validate: typical document size and ticket count.]* |
-| **Inconsistent "done"** | Acceptance criteria are missing, vague or written in different styles, so Dev and QA read them differently. | **Ticket:** "User can export the report" with no format, limits or error case. **Review:** the feature is rejected at demo because the PO expected PDF and the developer built CSV. |
-| **Testing starts late** | Test cases are written after the code, by hand, from tickets that keep changing. | **QA:** test cases for sprint 3 are still being written in sprint 4. **Dev:** bug reports arrive without screenshots or steps to reproduce. |
-| **Documents fall behind** | Problem statements, feature briefs and architecture documents are written late or not at all. | **Onboarding:** a new developer learns the feature from Slack history. **Audit:** nobody can show the reasoning behind a scope decision. |
-| **No traceability** | Requirements, tickets, tests, code and status are not linked, so changes cannot be followed. | **Mid-sprint change:** a ticket is edited and nobody can show what it said before. **Board:** a ticket says "In progress" although its pull request was merged two days ago. |
+| **Work is invisible until it is finished** | Nobody can see who is building what, on which branch, or how far it has got. | **Board:** two developers both pick up "Export report" and build it twice. **Standup:** "almost done" for three days, with no branch anyone can look at. |
+| **"Done" has no next step** | Finishing a ticket does not create the follow-up work for others: review, tests, fixes, documents. | **Pull request:** merged with three open review comments that nobody owns. **QA:** finds out a ticket is "done" only when the sprint ends. |
+| **AI output has no owner** | Code or tickets written by AI are not clearly assigned to a person who reviews, accepts and improves them. | **Code job:** AI writes a change that passes its own check, but nobody on the team reads the diff before it is merged. *[To validate: share of AI-written changes merged without a human review.]* |
+| **Contributors get in each other's way** | People work in the same checkout, the same branch or the same files, and their changes collide. | **Repository:** a teammate's local folder path is saved in the project and breaks for everyone else. **Merge:** two branches change the same module and conflict on the last day. |
+| **Joining is hard** | A new or outside contributor has no clear entry point: setup, access, rules and context are scattered. | **Onboarding:** a freelancer needs a week of calls before their first commit. **Client developer:** cannot see which tickets are safe to take. |
+| **Reviews and approvals are not recorded** | Who reviewed or approved a document or a change, and which version, is not tracked. | **Document:** the architecture record is edited after sign-off, and the team builds from a version nobody approved. |
 
 ## 4. Who Is Affected
 
 | Who | Relationship to Ticket Forge | How they are affected |
 |---|---|---|
-| **Product Owner** | Owns the requirements and the backlog. | Spends a large part of each week writing and rewriting tickets instead of talking to customers and setting priorities. *[To validate: hours per week spent on backlog writing.]* |
-| **Scrum Master** | Runs refinement, planning and the sprint. | Refinement turns into writing sessions, sprints start with too few ready tickets, and status has to be chased person by person. |
-| **Developer** | Builds the tickets. | Stops work to ask what a ticket means, builds against unclear criteria, and updates ticket status and pull request details by hand. |
-| **QA tester** | Writes and runs the tests. | Writes test cases from changing tickets, repeats the same manual checks every sprint, and collects proof of failures by hand. |
-| **Business owner / client** | Pays for the sprints and waits for the feature. | Gets features later than planned, pays for rework, and cannot see clearly how far the work has progressed. |
+| **Developer (experienced)** | Builds and reviews most of the code. | Becomes the bottleneck for every review and question, and cannot hand work off because nobody else knows it well enough. |
+| **Developer (new or junior)** | Joins the project and wants to help. | Cannot find a safe first task, cannot set up the repository alone, and waits for someone to have time for them. |
+| **Outside contributor** (freelancer, partner or client developer) | Works on the project part-time or with limited access. | Has no clear view of which work is open, which rules to follow, or how their work will be reviewed and merged. |
+| **Tech lead / reviewer** | Reviews code and approves designs. | Gets large, late pull requests and AI-written changes with no context, and approves by trust instead of by evidence. |
+| **QA tester** | Tests what was built. | Is not told when something is ready to test, and cannot link a failure back to the change that caused it. |
+| **Product Owner and Scrum Master** | Own the scope and the flow of work. | Cannot see who is doing what, cannot spread work across the team, and cannot tell whether "done" is really done. |
 
 ## 5. Impact on the Business
 
 | Pain point | What happens today | Consequence for the business |
 |---|---|---|
-| Slow backlog creation | Turning a requirements document into a ready backlog takes days of PO time. *[To validate: days per project.]* | Development starts late, and the team's first sprint is partly idle or works on unready tickets. |
-| Rework from misunderstood requirements | Features are built to the wrong reading of a ticket and rejected at review. | Paid sprint capacity is spent twice on the same feature. *[To validate: share of tickets reopened after review.]* |
-| Late defect discovery | Testing starts at the end of the sprint. | Defects reach staging or production, where they cost more to fix and can damage client trust. |
-| Missing documentation | Documents are skipped when the sprint is busy. | Onboarding is slow, knowledge leaves with people, and client or audit questions cannot be answered from a record. |
-| Unreliable status | The board does not match the code and the tests. | Managers and clients make delivery decisions on wrong information, and commitments slip. |
+| Development depends on a few people | One or two developers hold the knowledge and do most reviews. | Delivery stops when they are away, and losing one of them is a serious risk to the project. |
+| Paid capacity sits idle | New or part-time contributors wait for tasks, setup or context. | The team pays for people who cannot contribute yet. *[To validate: days from joining to first merged change.]* |
+| Duplicate and conflicting work | People cannot see what others are building. | Time is spent building the same thing twice and fixing merge conflicts late in the sprint. |
+| Unchecked AI output | AI-written code is merged without a real human review, or thrown away. | Defects and security risks reach production, or the speed gain from AI is lost. |
+| No record of review and approval | Approvals happen in chat, on unknown versions. | Disputes about scope cannot be settled, and the team cannot show a client or auditor who approved what. |
 
 ## 6. Impact on Users
 
-### Product Owner
+### Developer (experienced)
 
 | When this happens… | They cannot… | Consequence for them |
 |---|---|---|
-| A new requirements document arrives. | Get from the document to a reviewable backlog quickly. | They spend evenings writing tickets, and the backlog is thin when the sprint starts. |
-| A developer asks what a ticket means. | Point to the exact line of the requirement the ticket came from. | They answer the same question several times and become a bottleneck. |
-| A ticket changes during the sprint. | Show what it said before and why it changed. | Scope arguments happen at review, with no record to settle them. |
+| They finish a ticket. | Hand the follow-up (tests, review fixes, documents) to a teammate as tracked work. | They do it all themselves, or it is never done. |
+| AI writes a change for an issue. | Review the diff against the acceptance criteria before it is committed and pushed. | They either trust it blindly or rewrite it from scratch. |
+| They go on leave. | Leave their work in a state someone else can pick up. | Their tickets stop, or they get called during their time off. |
 
-### Scrum Master
-
-| When this happens… | They cannot… | Consequence for them |
-|---|---|---|
-| Sprint planning starts. | See which tickets are actually ready. | Planning runs long, and the sprint is committed on guesses. |
-| Someone asks for status. | Trust the board to show the real state of code and tests. | They chase people one by one for updates. |
-| A new person joins the team. | Hand them up-to-date documents for each feature. | Onboarding takes longer, and the rest of the team loses time explaining. |
-
-### Developer
+### Developer (new or junior)
 
 | When this happens… | They cannot… | Consequence for them |
 |---|---|---|
-| They pick up a ticket. | Start without first clarifying the criteria. | Work waits for an answer, or is built on an assumption that is wrong. |
-| They finish the code. | Have the ticket status and pull request details update by themselves. | Status is forgotten, and the board falls out of date. |
-| QA reports a bug. | See the failing step, screenshot and test case together. | They spend time reproducing the bug before they can fix it. |
+| They join the project. | Connect the repository on their own computer without changing the project for everyone else. | They depend on a senior developer for setup. |
+| They look for work. | See which tickets are open, ready and safe for them to take. | They wait to be told, or pick something already in progress. |
+| They want to learn the feature. | Read the problem statement, feature brief and architecture record behind the code. | They learn from questions and old chat messages, slowly. |
 
-### QA tester
+### Outside contributor
 
 | When this happens… | They cannot… | Consequence for them |
 |---|---|---|
-| A ticket is ready for test. | Start from test cases that already match its acceptance criteria. | They write cases under time pressure, and coverage is thin. |
-| A regression check is due. | Re-run the same checks automatically, logged in as the right user. | They repeat manual work every sprint, and regressions slip through. |
-| A test fails. | Attach proof of the failure without extra effort. | Bug reports are weak, and the fix-and-retest loop is slow. |
+| They are invited to help. | Get access with the right role, and only to the projects they need. | Access is given too wide, too narrow, or too late. |
+| They send a change. | Follow the project's branch and pull request rules without asking. | Their pull requests are rejected for format, not for content. |
+| Their change is reviewed. | See the review result linked to the ticket it belongs to. | They do not know whether their work counted, or what to fix. |
+
+### Tech lead / reviewer
+
+| When this happens… | They cannot… | Consequence for them |
+|---|---|---|
+| A pull request arrives. | See the ticket, its acceptance criteria and its test results next to the diff. | Reviews take longer and miss what the change was meant to do. |
+| A design document changes after approval. | Tell that it changed, and require a new approval. | The team builds from a version they did not agree to. |
+| Several people work on one epic. | See all their branches and pull requests in one place. | Conflicts and gaps are found only at merge time. |
 
 ## 7. Cost of Inaction
 
-- **Rework keeps growing.** Each new feature repeats the same manual translation, so the same misunderstandings and reopened tickets come back every sprint.
-- **Teams cannot grow without more admin.** Adding developers needs more ready tickets, and more PO and QA hours to write them. The bottleneck moves but does not go away.
-- **Quality depends on who wrote the ticket.** Without one standard for stories, criteria and tests, the result changes from person to person and from project to project.
-- **Knowledge is lost.** With no documents and no trace from requirement to code, the reasons behind decisions leave with the people who made them.
-- **Clients lose confidence.** Late features, defects found in production and a board that is wrong make delivery commitments hard to believe. *[To validate with account managers: client complaints linked to delivery or quality.]*
+- **AI makes the bottleneck worse, not better.** AI produces more tickets and more code, but if only one or two people can review and own it, the queue grows faster than it is cleared.
+- **The team cannot grow.** Adding developers adds setup, questions and conflicts, not output, so bigger teams do not deliver much more.
+- **Knowledge stays with a few people.** Every person who leaves takes part of the project with them.
+- **Contributors lose motivation.** People who cannot find meaningful work, or whose work is not reviewed, disengage or leave. *[To validate with team leads: feedback from new joiners.]*
+- **Quality drops quietly.** Unreviewed changes and untracked follow-ups pile up as defects and technical debt that surface later, when they cost more.
 
 ## 8. Evidence Needed
 
 | Evidence | What it proves | Source | Status |
 |---|---|---|---|
-| Hours a Product Owner spends turning one requirements document into a ready backlog. | The size of the manual translation cost. | Time logs or interviews with 2 to 3 Product Owners. | Not collected |
-| Share of tickets reopened or rejected at sprint review, and why. | How much rework comes from unclear tickets or criteria. | Tracker history for the last 3 to 6 sprints. | Not collected |
-| Share of tickets that start a sprint without acceptance criteria or test cases. | How often teams start work that is not ready. | Backlog snapshot at sprint planning. | Not collected |
-| Number of defects found after the sprint they were built in. | The cost of testing late. | Bug tracker, tagged by the sprint found and the sprint built. | Not collected |
-| Number of features with no current problem statement, feature brief or architecture document. | The size of the documentation gap. | Project document folders. | Not collected |
-| Time from code merged to ticket marked done. | How far the board lags behind the real state of the code. | Pull request and tracker timestamps. | Not collected |
+| Days from a developer joining to their first merged change. | How hard it is to start contributing. | Account creation and pull request dates for recent joiners. | Not collected |
+| Share of pull requests reviewed by the same one or two people. | How concentrated review and knowledge are. | Repository review history for the last 3 months. | Not collected |
+| Share of AI-written changes merged with and without a human review. | Whether AI output has a real owner. | Code job and pull request records. | Not collected |
+| Number of tickets worked on by two people at once, or rebuilt. | How much work is duplicated because it is not visible. | Tracker and branch history. | Not collected |
+| Open review comments and follow-ups left on merged pull requests. | How often "done" leaves untracked work behind. | Pull request comments after merge. | Not collected |
+| Documents built from a version that was not approved. | The risk of missing review and approval records. | Document version and approval history. | Not collected |
