@@ -1177,6 +1177,16 @@ Every project page has an **AI helper** chat panel (bottom right, beside the hel
 - **Assign:** gives a ticket (by key) to a person of the project; a draft must be approved first. Saved like any issue change (history entry, new project version, notification to the assignee).
 - Tables `helper_perms` and `ticket_drafts` (`lib/db.ts`, created on start); API under `/api/projects/:id/helper`. Tests: `tests/tf-125-ai-helper.test.ts`.
 
+## MCP server (create, list, search and read issues and epics from other tools)
+
+`POST /api/mcp` is a stateless MCP server (Streamable HTTP, JSON-RPC 2.0, in the same app; `app/api/mcp/route.ts`, `lib/mcp.ts`) for AI agents, IDE and automation tools and other apps. There is no session and no server-to-client stream (`GET`/`DELETE` answer 405).
+- **Credential:** an API token, sent as `Authorization: Bearer tfk_…`. A signed-in person makes one with `POST /api/me/tokens` `{ name, expiresInDays? }` (default 90 days, at most 365; shown once, only its hash is stored in `api_tokens`), lists them with `GET /api/me/tokens` and revokes one with `DELETE /api/me/tokens/:id`. A token acts as that person in that workspace; their role, permissions and project access are read again on every call, so changing a role or disabling the person applies at once. The browser's session cookie is never used on this route. A missing, unknown, revoked or expired token gets **401** before any tool runs. (A browser sign-in/OAuth flow for MCP clients isn't built; tokens cover every client type.)
+- **Tools:** `create_issue` (`projectId`, `title`; optional `type`, `priority`, `description`, `userStory`, `acceptanceCriteria`, `labels`, `storyPoints`, `epicId`), `list_issues` (optional `query` search, `status`, `type`, `priority`, `assignee`, `epicId`, `limit`, `offset`), `get_issue` (id or key), `list_epics` (optional `query`), `get_epic` (id or key, with its issues). Draft epics aren't shown.
+- **Access:** every tool opens the project through the same checks as the app. A project that doesn't exist, belongs to another workspace or isn't on the person's access list is **404 Project not found** with no data (for `create_issue` an id that doesn't exist at all is a **400** validation error). Reading needs project access; `create_issue` also needs *Create issues* (**403** otherwise, and the tool isn't listed for roles without it).
+- **Created issues** go to the end of the project's backlog with the first workflow status and no sprint, the person as reporter and creator (`createdBy`), a history entry and a project timeline entry, and the project version is bumped so open browsers pick them up. A missing title or an invalid field is a **400** and nothing is saved.
+- **Errors:** a refused tool returns a normal result with `isError: true` and `structuredContent.error` `{ status, code: validation_error | permission_denied | not_found, message }`.
+- Table `api_tokens` (`lib/db.ts`, created on start). Tests: `tests/tf-126-mcp.test.ts`.
+
 ## GitHub Copilot as the local AI
 
 When TicketForge is opened at localhost, it can use **GitHub Copilot** through the Copilot CLI with your own Copilot subscription, the same way it uses your Claude account through Claude Code.
