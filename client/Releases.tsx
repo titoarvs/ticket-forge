@@ -15,7 +15,7 @@ import { Header } from './views';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const STATUS_LABEL: Record<string, string> = { unreleased: 'Unreleased', released: 'Released', archived: 'Archived' };
-export const canRelease = () => can('sprint.manage') || can('project.settings');
+const canRelease = () => can('sprint.manage') || can('project.settings');
 /** Issues (not sub-tasks) with this fix version. */
 export const releaseIssues = (id: string) => P().tickets.filter((t: Any) => !isSub(t) && (t.fixVersions || []).includes(id));
 const overdue = (r: Any) => r.status === 'unreleased' && r.releaseDate && r.releaseDate < today();

@@ -10,8 +10,7 @@ import { encrypt } from './settings';
 import { PROVIDERS, gatewayRow, secretFor } from './gateway-keys';
 import { stripe } from './stripe';
 import { supportedMethods } from './payment-methods';
-
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
+import { err } from './errors';
 
 /** What each gateway is, the currencies it takes, and what a valid secret key looks like (a quick check before asking the gateway). */
 export const GATEWAYS = {

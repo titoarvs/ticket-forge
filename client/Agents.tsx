@@ -57,7 +57,6 @@ export function AgentCard({ a, onDetails, onHire, hireLabel = 'Hire' }: { a: Any
 // ---------------------------------------------------------------- document agents
 const busy = new Set<string>();
 const busyKey = (epicId: string, agentId: string) => `${epicId}:${agentId}`;
-export const agentBusy = (epicId: string, agentId: string) => busy.has(busyKey(epicId, agentId));
 
 async function runDoc(epic: Any, a: Any, instructions: string) {
   const k = busyKey(epic.id, a.id);

@@ -8,8 +8,8 @@
 // The result has the same shape the code window shows for local jobs: summary, changed files and a diff.
 import { gh } from './gh-actions';
 import { askJson } from './claude';
+import { err } from './errors';
 
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 const enc = (s) => String(s).split('/').map(encodeURIComponent).join('/');
 
 const SKIP_DIR = /(^|\/)(node_modules|\.git|dist|build|\.next|out|coverage|vendor|\.venv|venv|__pycache__|\.turbo|\.cache|target)\//;

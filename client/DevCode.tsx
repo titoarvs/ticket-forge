@@ -14,8 +14,8 @@ const be = () => P().devBackend || {};
 const setBe = (k: string, v: Any) => mutate((pp) => { pp.devBackend = { ...(pp.devBackend || {}), [k]: v }; }, { tag: `devBackend.${k}` });
 /** The project has a separate backend repository set up. */
 /** This person's own folder for a repository (set up on their computer), else the project's shared one. */
-export const myPath = (side: 'frontend' | 'backend'): string => S.auth?.prefs?.local?.[P().id]?.[side]?.path || (side === 'backend' ? be().localPath : dev().localPath) || '';
-export const hasBackend = () => Boolean(be().enabled && myPath('backend'));
+const myPath = (side: 'frontend' | 'backend'): string => S.auth?.prefs?.local?.[P().id]?.[side]?.path || (side === 'backend' ? be().localPath : dev().localPath) || '';
+const hasBackend = () => Boolean(be().enabled && myPath('backend'));
 const setDev = (k: string, v: Any) => mutate((pp) => { pp.dev = { ...(pp.dev || {}), [k]: v }; }, { tag: `dev.${k}` });
 
 /** Pick a folder on this computer: click through folders (git repositories are marked), then choose one. */

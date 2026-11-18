@@ -9,7 +9,7 @@ const LEAD = /^\s*([^:]{2,32}):\s+(?=\S)/;
 const FLAG = /\((?:[^)]*\b(unconfirmed|pending|tbc|tbd|to be confirmed)\b[^)]*)\)/i;
 
 /** Splits "A-PR-01 (from PRD, unconfirmed): text" into its code, lead, text and whether it's unconfirmed. */
-export function parseItem(s: string) {
+function parseItem(s: string) {
   let rest = String(s || '').trim();
   let code = '', lead = '';
   const flag = FLAG.test(rest);

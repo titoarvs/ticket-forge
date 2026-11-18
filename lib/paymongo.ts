@@ -5,8 +5,7 @@
 import crypto from 'node:crypto';
 import { qs } from './db';
 import { GRACE_DAYS } from './plans';
-
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
+import { err } from './errors';
 
 /** Checks the Paymongo-Signature header: "t=<timestamp>,te=<test signature>,li=<live signature>", an HMAC-SHA256 of "<timestamp>.<body>". */
 export function verifySignature(rawBody, header, secret = process.env.PAYMONGO_WEBHOOK_SECRET) {

@@ -11,11 +11,7 @@ import { qs } from './db';
 import { getPlanVersion, listBillingPlans } from './billing-plans';
 import { activeGateways, createCheckout, readCheckout } from './gateways';
 import { stripe } from './stripe';
-
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
-
-/** Subscription states that count as "has a paid plan" (the same ones limits.js keeps the plan for). */
-export const PAID_STATES = ['active', 'trialing', 'past_due'];
+import { err } from './errors';
 
 const addPeriod = (from, interval) => {
   const d = new Date(from);

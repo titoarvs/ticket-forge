@@ -8,15 +8,15 @@ import { Ico, I, Spinner, Modal } from './ui';
 import { Markdown } from './GuideCard';
 import { openDrawer } from './actions';
 
-export const SEVS = ['critical', 'major', 'minor', 'trivial', 'info'];
+const SEVS = ['critical', 'major', 'minor', 'trivial', 'info'];
 const SEV_LABEL: Record<string, string> = { critical: 'Critical', major: 'Major', minor: 'Minor', trivial: 'Trivial', info: 'Info' };
 const SEV_PRIORITY: Record<string, string> = { critical: 'Highest', major: 'High', minor: 'Medium', trivial: 'Low', info: 'Low' };
-export const FINDING_STATUS: Record<string, string> = { open: 'Open', bug: 'Filed as bug', agent: 'Sent to agent', resolved: 'Resolved on PR', dismissed: 'Dismissed' };
+const FINDING_STATUS: Record<string, string> = { open: 'Open', bug: 'Filed as bug', agent: 'Sent to agent', resolved: 'Resolved on PR', dismissed: 'Dismissed' };
 export const SevChip = ({ s }: { s: string }) => <span className={`sev-chip sev-${s}`}>{SEV_LABEL[s] || s}</span>;
 const where = (f: Any) => `${f.file}${f.startLine ? `:${f.startLine}${f.endLine && f.endLine !== f.startLine ? `-${f.endLine}` : ''}` : ''}`;
 
 /** The saved review for this job round on the issue, or null. */
-export const savedReview = (t: Any, job: Any) => (t.codeReviews || []).find((r: Any) => r.jobId === job.id && r.round === job.coderabbit?.round);
+const savedReview = (t: Any, job: Any) => (t.codeReviews || []).find((r: Any) => r.jobId === job.id && r.round === job.coderabbit?.round);
 
 /** Saves a finished CodeRabbit review on the issue (once per job round). */
 export function saveReview(t: Any, job: Any) {
@@ -51,7 +51,7 @@ export function fileBug(t: Any, review: Any, f: Any, { quiet = false } = {}) {
 export const setStatus = (f: Any, status: string) => mutate(() => { f.status = status; });
 
 /** The text the Build agent gets for findings. */
-export const fixText = (list: Any[]) => `Fix these CodeRabbit review findings. For each one, change the code, keep the change focused, and say in your summary what you did (or why you disagree):\n\n${list.map((f, i) => `${i + 1}. [${f.severity}] ${where(f)}: ${f.title}\n${(f.fix || f.comment || '').slice(0, 2500)}`).join('\n\n')}`;
+const fixText = (list: Any[]) => `Fix these CodeRabbit review findings. For each one, change the code, keep the change focused, and say in your summary what you did (or why you disagree):\n\n${list.map((f, i) => `${i + 1}. [${f.severity}] ${where(f)}: ${f.title}\n${(f.fix || f.comment || '').slice(0, 2500)}`).join('\n\n')}`;
 
 /** The CodeRabbit tab of a code job. */
 export function CodeRabbitPanel({ t, job, busy, run, follow }: { t: Any; job: Any; busy: string; run: () => void; follow: (text: string) => void }) {

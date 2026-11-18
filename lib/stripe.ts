@@ -8,8 +8,8 @@ import crypto from 'node:crypto';
 import { qs } from './db';
 import { PLANS, priceIdFor, planForPrice, purchasable } from './plans';
 import { secretFor } from './gateway-keys';
+import { err } from './errors';
 
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 export const stripeConfigured = () => Boolean(process.env.STRIPE_SECRET_KEY);
 const base = () => (process.env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/$/, '');
 

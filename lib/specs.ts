@@ -2,11 +2,11 @@
 // parallel from touching the same files or modules. Pure functions (no database, no AI): lib/store.ts saves the specs,
 // lib/specgen.ts asks the AI which files a ticket will touch.
 
-export const OVERLAP_MODES = ['block', 'warn'];
+const OVERLAP_MODES = ['block', 'warn'];
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 
 /** A repository path in one form (no ./ or leading /, forward slashes, lower case), or '' when it isn't a usable path. */
-export function normalizePath(p) {
+function normalizePath(p) {
   const s = String(p ?? '').trim().replace(/\\/g, '/').replace(/^(\.\/)+/, '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
   if (!s || s.length > 300 || s.split('/').includes('..')) return '';
   return s.toLowerCase();

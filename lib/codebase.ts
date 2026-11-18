@@ -45,7 +45,7 @@ export function localReader(dir) {
 }
 
 /** "owner/repo", "https://github.com/owner/repo" or ".../tree/<branch>/<subfolder>". */
-export function parseRepo(spec) {
+function parseRepo(spec) {
   const s = String(spec || '').trim().replace(/\.git$/, '').replace(/\/+$/, '');
   let m = s.match(/github\.com[/:]([\w.-]+)\/([\w.-]+)(?:\/tree\/([^/]+)(?:\/(.+))?)?/i);
   if (m) return { owner: m[1], repo: m[2], branch: m[3] || '', sub: m[4] || '' };

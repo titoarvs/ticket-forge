@@ -2,8 +2,7 @@
 // A method the gateway doesn't support is left out, so it is never offered.
 //   PAYMONGO_PAYMENT_METHODS   comma list of the methods the gateway account supports (default: card,gcash,paymaya)
 import { PLANS, purchasable } from './plans';
-
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
+import { err } from './errors';
 
 export const CHECKOUT_CURRENCY = 'PHP';
 /** `id` is PayMongo's name for the method. */
@@ -13,7 +12,7 @@ export const PAYMENT_METHODS = [
   { id: 'paymaya', label: 'Maya', hint: 'Pay in the Maya app' },
 ];
 /** Prices in PHP per paid plan (placeholder numbers, like the plans in plans.js: change them here). */
-export const PHP_PRICES = {
+const PHP_PRICES = {
   pro: { month: 999, year: 9990 },
   team: { month: 2499, year: 24990 },
 };

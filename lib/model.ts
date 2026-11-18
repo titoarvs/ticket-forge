@@ -71,7 +71,7 @@ export function buildProject(raw, { key, sourceName, sourceText }: any) {
   });
 }
 
-export function deriveKey(name) {
+function deriveKey(name) {
   const words = str(name).replace(/[^a-z0-9 ]/gi, ' ').split(/\s+/).filter(Boolean);
   const k = words.length > 1 ? words.slice(0, 4).map((w) => w[0]).join('') : (words[0] || 'PRJ').slice(0, 4);
   return k.toUpperCase() || 'PRJ';

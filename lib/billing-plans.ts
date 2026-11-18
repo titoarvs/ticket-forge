@@ -5,8 +5,7 @@
 // version in place. The default plans in plans.js are copied in the first time the plans are read.
 import { qs } from './db';
 import { PLANS, PLAN_ORDER, TRIAL_DAYS, CURRENCY, validatePlan, publicPlan } from './plans';
-
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
+import { err } from './errors';
 
 export const CURRENCIES = ['PHP', 'USD'];
 export const INTERVALS = ['month', 'year'];

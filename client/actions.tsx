@@ -1,6 +1,6 @@
 'use client';
 // Actions (Claude, automation, pull requests, sprints, exports) and the dialogs that go with them.
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import {
   S, emit, api, aiBody, useStore, ago, readNdjson, toast, withBusy, setBusy, openModal, closeModal, mutate, saveNow, store, pullRemote, loadNotifs,
   P, ticket, epic, isSub, childrenOf, epicTickets, activeSprint, openSprints, tcKey, spSum, isDone, me, can, peopleNames,
@@ -700,7 +700,4 @@ export function BlankProjectModal() {
   );
 }
 
-export const icoBtn = (svg: string, label: string, onClick: () => void, extra: Any = {}): ReactNode => (
-  <button className="icon-btn" title={label} aria-label={label} onClick={(e) => { e.stopPropagation(); onClick(); }} {...extra}><Ico svg={svg} /></button>
-);
 export { I };

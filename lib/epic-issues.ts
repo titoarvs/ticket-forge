@@ -10,9 +10,9 @@ import { normTicket, uid } from './model';
 import { contextBlock } from './appcontext';
 import { writeTestCases } from './generate';
 import { approvalCheck } from './approval';
+import { err } from './errors';
 
 const clip = (s: any, n: number) => { const t = String(s ?? '').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
-const err = (message: string, status = 400) => Object.assign(new Error(message), { status });
 
 /** Throws a 409 naming what still needs approving; returns the check when all three are approved. */
 export function requireApproved(epic: any) {
