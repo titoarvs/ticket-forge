@@ -7,6 +7,7 @@ import * as store from '@/lib/store';
 import { isLocalHost } from '@/lib/claude';
 import { isSaas, scrubSharedTokens, platformAdminEmails, requestIsLocal } from '@/lib/platform';
 import { lockStatus } from '@/lib/limits';
+import { startWorker as startDriveWorker } from '@/lib/gdrive';
 
 const G = globalThis as any;
 
@@ -19,6 +20,7 @@ export function ready(): Promise<void> {
     await auth.seedRoles();
     const n = await asSystem(() => store.importJsonProjects());
     if (n) console.log(`Imported ${n} project(s) from data/projects`);
+    startDriveWorker(); // retries documents that couldn't be saved to Google Drive
   })().catch((e: Error) => { G.__tfReady = null; throw e; });
   return G.__tfReady;
 }

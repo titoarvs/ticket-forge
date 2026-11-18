@@ -7,6 +7,7 @@ import { Ico, I, Modal, Spinner, Confirm } from './ui';
 import { TA, TF, SF, MenuItem } from './fields';
 import { askFirst } from './Clarify';
 import { Running, setDocStatus } from './Fbd';
+import { DriveState } from './Drive';
 
 const STATUSES = ['Draft', 'For Review', 'Approved'];
 const busy = new Map<string, number>(); // epic id → started at
@@ -111,6 +112,7 @@ export function PsdSection({ epic }: { epic: Any }) {
   const set = (k: string, v: string) => (k === 'status' ? setDocStatus(epic, 'psd', v) : mutate(() => { epic.psd = { ...epic.psd, [k]: v }; }, { tag: `psd.${k}${epic.id}` }));
   return (
     <div className="sec psd-sec"><div className="sec-title"><h3>Problem Statement</h3>
+      {psd && <DriveState epic={epic} kind="psd" again={psd.generatedAt} />}
       {psd && <span className="muted small" style={{ marginLeft: 'auto' }}>Written {ago(psd.generatedAt)}{psd.generatedBy ? ` by ${psd.generatedBy}` : ''}</span>}</div>
       {running ? <Running text="Writing the Problem Statement from the epic, its issues and the source documents…" since={busy.get(epic.id) || Date.now()} />
         : !psd ? <div className="psd-empty">

@@ -9,6 +9,7 @@ import { TA, TF, SF, MenuItem } from './fields';
 import { Markdown } from './GuideCard';
 import { askFirst } from './Clarify';
 import { approvalStamp } from '../lib/approval';
+import { DriveState } from './Drive';
 
 type Kind = 'fbd' | 'ard';
 type Doc = { key: Kind; name: string; short: string; heading: string; running: (e: Any) => string; about: (e: Any) => string; write: (e: Any) => string; placeholder: string; stat: (md: string) => string };
@@ -148,6 +149,7 @@ export function DocSection({ k, epic }: { k: Kind; epic: Any }) {
   const glance = f ? (f.markdown.split(/^##\s+/m)[1] || '').split('\n').slice(1).find((l: string) => l.trim() && !l.startsWith('|') && !l.startsWith('<!--')) : '';
   return (
     <div className="sec psd-sec"><div className="sec-title"><h3>{d.name}</h3>
+      {f && <DriveState epic={epic} kind={k} again={f.generatedAt} />}
       {f && <span className="muted small" style={{ marginLeft: 'auto' }}>Written {ago(f.generatedAt)}{f.generatedBy ? ` by ${f.generatedBy}` : ''}{f.editedAt ? ` · edited ${ago(f.editedAt)}` : ''}</span>}</div>
       {busy.has(bk(k, epic.id)) ? <Running text={d.running(epic)} since={busy.get(bk(k, epic.id))!} />
         : !f ? <div className="psd-empty">

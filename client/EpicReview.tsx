@@ -11,6 +11,7 @@ import { Ico, I, Avatar, Modal, ErrorState, Loading, Sk, Spinner } from './ui';
 import { TA, CB } from './fields';
 import { CreateIssueModal } from './actions';
 import { openReviewedEpicIssues } from './EpicIssues';
+import { DriveState } from './Drive';
 
 const ALLOWED = 'Allowed: PDF, DOCX and PNG files, up to 10 MB.';
 const BAD_FILE = 'Only PDF, DOCX and PNG files up to 10 MB can be uploaded as a PSD, FBD or ARD.';
@@ -41,7 +42,7 @@ function Versions({ d }: { d: Any }) {
       <li key={v.number} className={`ver-row ${v.number === d.current.number ? 'on' : ''}`}>
         <b style={{ fontWeight: 500 }}>Version {v.number}{v.number === d.current.number ? ' (current)' : ''}</b>
         {v.approved && <span className="psd-status ok">Approved</span>}
-        <a href={`${fileUrl(v.fileId)}?download=1`} title="Download this version">{v.name}</a>
+        {v.fileId ? <a href={`${fileUrl(v.fileId)}?download=1`} title="Download this version">{v.name}</a> : <span title="Saved to Google Drive">{v.name}</span>}
         <span className="muted">{fmtBytes(v.bytes)} · {v.author || 'Unknown'} · <span title={when(v.at)}>{ago(v.at)}</span></span>
       </li>))}</ol></details>;
 }
@@ -64,7 +65,7 @@ function Comments({ d, canComment, onSend }: { d: Any; canComment: boolean; onSe
   </div>;
 }
 
-function DocCard({ d, me, busy, onUpload, onDecide, onComment }: { d: Any; me: Any; busy: boolean; onUpload: (kind: string, f: File) => void; onDecide: (kind: string, decision: 'approved' | 'changes') => void; onComment: (kind: string, text: string) => Promise<boolean> }) {
+function DocCard({ epic, d, me, busy, onUpload, onDecide, onComment }: { epic: Any; d: Any; me: Any; busy: boolean; onUpload: (kind: string, f: File) => void; onDecide: (kind: string, decision: 'approved' | 'changes') => void; onComment: (kind: string, text: string) => Promise<boolean> }) {
   const input = useRef<HTMLInputElement>(null);
   const mine = d.reviews.find((r: Any) => r.userId === S.user?.id);
   return (
@@ -72,7 +73,8 @@ function DocCard({ d, me, busy, onUpload, onDecide, onComment }: { d: Any; me: A
       <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <b style={{ fontWeight: 500, minWidth: 190 }}>{d.label} ({d.short})</b>
         <span className={`psd-status ${d.status === 'approved' ? 'ok' : ''}`}>{DOC_STATUS[d.status]}</span>
-        {d.current && <span className="muted small">v{d.current.number} · <a href={fileUrl(d.current.fileId)} target="_blank" rel="noopener noreferrer">{d.current.name}</a> · {fmtBytes(d.current.bytes)}</span>}
+        {d.current && <span className="muted small">v{d.current.number} · {d.current.fileId ? <a href={fileUrl(d.current.fileId)} target="_blank" rel="noopener noreferrer">{d.current.name}</a> : d.current.name} · {fmtBytes(d.current.bytes)}</span>}
+        {d.current && !d.current.fileId && <DriveState epic={epic} kind={d.kind} docKey="upload" again={String(d.current.number)} />}
         <span style={{ marginLeft: 'auto' }} className="row">
           {me.canUpload && <>
             <input ref={input} type="file" hidden aria-label={`Upload the ${d.short}`} accept=".pdf,.docx,.png" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onUpload(d.kind, f); }} />
@@ -144,7 +146,7 @@ export function EpicReviewSection({ epic }: { epic: Any }) {
             {people.map((u) => <CB key={u.id} size="small" label={`${u.name} (${u.role})`} checked={listed.some((x) => x.id === u.id)} onChange={(ev: Any) => toggleReviewer(u, ev.target.checked)} />)}
             {!people.length && <span className="muted small">No people found.</span>}</details>}
           {error && <p className="small ref-err" role="alert">{error}</p>}
-          {d.docs.map((x: Any) => <DocCard key={x.kind} d={x} me={d.me} busy={busy} onUpload={upload} onDecide={decide} onComment={comment} />)}
+          {d.docs.map((x: Any) => <DocCard key={x.kind} epic={epic} d={x} me={d.me} busy={busy} onUpload={upload} onDecide={decide} onComment={comment} />)}
           <div className="row" style={{ marginTop: 8, gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
             {d.signoff
               ? <div className="ok-banner" style={{ flex: 1 }}><Ico svg={I.check} /><span>Signed off by {d.signoff.by || 'the epic owner'} <span title={when(d.signoff.at)}>{ago(d.signoff.at)}</span>.</span></div>

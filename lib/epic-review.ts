@@ -6,7 +6,8 @@
 import crypto from 'node:crypto';
 import { q, tx } from './db';
 import { HttpError } from './auth';
-import { saveFile, deleteFile } from './files';
+import { saveFile, deleteFile, epicDocType, EPIC_DOC_MAX, EPIC_DOC_MESSAGE } from './files';
+import { destination, saveDocument } from './gdrive';
 import { extractText } from './parse';
 import { APPROVAL_DOCS } from './approval';
 import { has, requirePerm } from './store';
@@ -95,8 +96,18 @@ export async function uploadDoc(projectId: string, epicId: string, kindIn: any, 
   const kind = kindOf(kindIn);
   await epicOf(projectId, epicId);
   let meta;
-  try { meta = await saveFile({ projectId, name: file.name, data: file.data, user, purpose: 'epic-doc' }); }
-  catch (e: any) { throw new HttpError(e.status || 500, e.message); }
+  const toDrive = Boolean(await destination()); // Google Drive is the document storage: the file goes there, not into files
+  if (toDrive) {
+    // Same checks as the existing storage (type and size), then the Drive folder; a failed save is queued and retried.
+    if (!epicDocType(file.name)) throw new HttpError(415, EPIC_DOC_MESSAGE);
+    if (!file.data?.length) throw new HttpError(400, 'The file is empty.');
+    if (file.data.length > EPIC_DOC_MAX) throw new HttpError(413, EPIC_DOC_MESSAGE);
+    meta = { id: '', name: String(file.name).slice(0, 200), mime: epicDocType(file.name) as string, bytes: file.data.length };
+    await saveDocument({ projectId, epicId, kind, docKey: 'upload', name: meta.name, mime: meta.mime, data: file.data, user });
+  } else {
+    try { meta = await saveFile({ projectId, name: file.name, data: file.data, user, purpose: 'epic-doc' }); }
+    catch (e: any) { throw new HttpError(e.status || 500, e.message); }
+  }
   let text = '';
   if (/\.docx$/i.test(meta.name)) { try { text = await extractText(file.data, meta.name); } catch { /* kept without text */ } }
   try {
@@ -106,7 +117,7 @@ export async function uploadDoc(projectId: string, epicId: string, kindIn: any, 
         [projectId, epicId, kind, next, meta.id, meta.name, meta.mime, meta.bytes, text.slice(0, 200000), user?.name || '', user?.id || null]);
       return settle(t, projectId, epicId, user);
     });
-  } catch (e) { await deleteFile(meta.id); throw e; }
+  } catch (e) { if (meta.id) await deleteFile(meta.id); throw e; }
 }
 
 /** A listed reviewer approves the current version of a document, or asks for changes. */
