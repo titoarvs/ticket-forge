@@ -20,18 +20,21 @@ function clean(d) {
   }
   return { tours, toursOff: d?.toursOff === true, local };
 }
+async function readPrefs(userId: string) {
+  const [row] = await orm.select({ data: userPrefs.data }).from(userPrefs).where(eq(userPrefs.userId, userId));
+  return clean(row ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {});
+}
+/** This person's preferences; defaults when they can't be read (prefs never block a page). */
 export async function getPrefs(userId = uid()) {
   if (!userId) return clean({});
-  try {
-    const [row] = await orm.select({ data: userPrefs.data }).from(userPrefs).where(eq(userPrefs.userId, userId));
-    return clean(row ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {});
-  } catch { return clean({}); }
+  try { return await readPrefs(userId); } catch { return clean({}); }
 }
 /** Merges a change: { tourDone: 'home' }, { tourReset: true } (show every tour again), { toursOff: true|false }. */
 export async function savePrefs(change: any = {}) {
   const userId = uid();
   if (!userId) throw Object.assign(new Error('Sign in to continue.'), { status: 401 });
-  const p = await getPrefs(userId);
+  // Read strictly: saving over a row we couldn't read would wipe the person's other preferences.
+  const p = await readPrefs(userId);
   if (typeof change.tourDone === 'string' && TOUR_ID.test(change.tourDone)) p.tours[change.tourDone] = new Date().toISOString();
   if (change.tourReset === true) { p.tours = {}; p.toursOff = false; }
   if (typeof change.toursOff === 'boolean') p.toursOff = change.toursOff;

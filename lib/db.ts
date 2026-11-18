@@ -233,7 +233,14 @@ async function connect() {
   };
 }
 
+// The connection lives on globalThis so hot reloads in `next dev` reuse it. A connection made by an older version of
+// this file can lack methods this one needs (rows() for Drizzle), so one that doesn't fit is replaced.
+const fits = (impl) => impl && ['query', 'rows', 'tx', 'close'].every((k) => typeof impl[k] === 'function');
 export async function db() {
+  if (G.impl) {
+    const cur = await G.impl.catch(() => null);
+    if (cur && !fits(cur)) { G.impl = null; Promise.resolve().then(() => cur.close?.()).catch(() => {}); }
+  }
   G.impl ??= connect().catch((e) => { G.impl = null; throw e; });
   return G.impl;
 }

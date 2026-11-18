@@ -124,7 +124,10 @@ export function api(fn: Handler) {
         return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
       }, user, { local, projectId, runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local' });
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
-    } catch (e) {
+    } catch (err) {
+      // Drizzle wraps database errors as "Failed query: <sql> params: …", which hides what PostgreSQL said
+      // (and puts the query's parameters in the message). Report the database's own error instead.
+      const e = err?.cause && /^Failed query:/.test(String(err?.message)) ? Object.assign(err.cause, { query: err.query }) : err;
       if (!e.status || e.status >= 500) console.error(e);
       return Response.json({ error: e.message || String(e), ...(e.extra || {}) }, { status: e.status || 500 });
     }
