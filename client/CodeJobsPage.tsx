@@ -7,7 +7,7 @@ import { S, P, api, toast, ago, useStore, closeProject, type Any } from './core'
 import { Ico, I, Spinner, EmptyState, ErrorState } from './ui';
 import { TF, SF, MenuItem } from './fields';
 import { DiffReview } from './DiffReview';
-import { StartCoding } from './DevPlan';
+import { CodingBoard } from './CodingBoard';
 
 const LIVE = ['starting', 'queued', 'running'];
 const REVIEW = ['review', 'report'];
@@ -112,7 +112,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
         {scoped && <Link className="btn" href={`/p/${projectId}/prs`} style={{ marginLeft: 12 }}><Ico svg={I.pr} />Pull requests</Link>}
         <div className="spacer" /><button className="btn" onClick={load}><Ico svg={I.undo} />Refresh</button></div>
       {asked && <TicketContext projectId={asked.project} ticketId={asked.ticket} />}
-      {scoped && <StartCoding />}
+      {scoped && <CodingBoard />}
       {!d ? <div className="card" style={{ padding: 20 }}><Spinner /> Loading code jobs…</div> : <>
         <div className="cjp-sum">
           <div className={n(LIVE) ? 'on' : ''}><b>{n(['running', 'starting'])}</b><span>working</span></div>
@@ -133,7 +133,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
           <div className="card"><EmptyState compact icon={I.bot} tone="neutral"
             title={filter === 'live' ? 'Nothing is running right now' : filter === 'review' ? 'Nothing is waiting for review' : 'No code jobs yet'}
             actions={filter !== 'all' && jobs.length ? <button className="btn" onClick={() => setFilter('all')}>Show all recent jobs</button> : <Link className="btn" href="/projects">Go to projects</Link>}>
-            <p>Start one from an issue’s <b>Write code with AI</b>, or select several issues in a backlog. They show up here while they run.</p></EmptyState></div>
+            <p>{scoped ? <>Start one from <b>Coding</b> above: one ticket, or a whole feature at once.</> : <>Start one from a project’s <b>Code jobs</b> page (one ticket or a whole feature), or select several issues in a backlog.</>} They show up here while they run.</p></EmptyState></div>
         ) : (
           <div className="jobs-list cjp-list">{shown.map((j) => {
             const add = (j.files || []).reduce((s: number, f: Any) => s + (f.added || 0), 0), del = (j.files || []).reduce((s: number, f: Any) => s + (f.removed || 0), 0);
@@ -144,7 +144,9 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                 <div className="job-main">
                   <div className="job-l1"><code>{j.ticketKey}</code><span className="job-title">{j.title}</span>
                     {!scoped && <span className="cjp-proj" title={j.projectName}>{j.projectName}</span>}
+                    {scoped && (() => { const ep = (P()?.epics || []).find((e: Any) => e.id === P()?.tickets.find((t: Any) => t.id === j.ticketId)?.epicId); return ep ? <span className="cjp-proj" title={`Feature: ${ep.title}`}>{ep.title}</span> : null; })()}
                     {j.side === 'backend' && <span className="layer-chip l-backend">Backend</span>}</div>
+                  {j.live && j.todosTotal > 0 && <span className="cjp-plan" aria-label={`Plan ${j.todosDone} of ${j.todosTotal}`}><span style={{ width: `${Math.round((j.todosDone / j.todosTotal) * 100)}%` }} /></span>}
                   <div className="job-l2 muted small">
                     <span>{j.where === 'github' ? 'AI API + GitHub' : 'This computer'}</span>
                     {j.agentName && <span>{j.agentName}</span>}

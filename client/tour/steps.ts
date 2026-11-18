@@ -36,7 +36,6 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
     steps: [
       { target: 'drawer-enhance', title: 'Improve it with AI', text: 'Enhance rewrites the issue with clear acceptance criteria. More AI actions writes test cases, splits it into sub-tasks and more.', perm: 'ai.use' },
       { target: 'drawer-tests', title: 'Run its tests', text: 'Runs this issue’s test cases in a real browser and records the results with screenshots.', perm: 'test.run' },
-      { target: 'drawer-code', title: 'Write the code', text: 'An AI agent builds this issue in its own branch and runs your checks. You review the changes before any pull request is opened.', perm: 'ai.use' },
       { target: 'composer', position: 'top', title: 'Talk it through', text: 'Comment and @mention teammates. They get a notification.' },
     ],
   },
