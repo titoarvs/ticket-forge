@@ -2,7 +2,7 @@
 // The TicketForge agents in the app: the catalog (from /api/agents), the agent card, and "Hire": what happens when
 // you put an agent to work on an epic. Generators open the writers that already exist (Problem Statement, Feature
 // Brief, test cases, new issues, test runs); document agents write their document and save it on the epic; code
-// agents open "Write code with AI" on one of the epic's issues with that agent picked.
+// agents open Code Jobs in a new tab (TF-124) for one of the epic's issues.
 import { useEffect, useState } from 'react';
 import { S, P, api, downloadFrom, saveBlob, can, mutate, toast, openModal, closeModal, readNdjson, aiBody, ago, me, emit, ticket, type Any } from './core';
 import { Ico, I, Modal, Spinner, Confirm } from './ui';
@@ -11,7 +11,7 @@ import { Markdown } from './GuideCard';
 import { openWritePsd, openPsd } from './Psd';
 import { openWriteFbd, openFbd } from './Fbd';
 import { bulkTests, runTests, NewWithClaudeModal } from './actions';
-import { CodeModal, codeReady } from './DevCode';
+import { openWriteCode } from './DevCode';
 import { DriveState } from './Drive';
 
 // ---------------------------------------------------------------- catalog
@@ -111,9 +111,8 @@ function PickIssueModal({ epic, a }: { epic: Any; a: Any }) {
   return (
     <Modal title={`Hire ${a.name} for an issue`} actions={[{ label: 'Cancel' }]}>
       <p className="muted small" style={{ marginTop: 0 }}>{a.summary} It works on one issue at a time, in its own branch and git worktree. Pick the issue:</p>
-      {!codeReady() && <div className="warn-banner"><Ico svg={I.warn} /><span>Set the local repository in Project settings → Code & GitHub first.</span></div>}
       <div className="pick-list">{issues.map((t: Any) => (
-        <button key={t.id} className="pick-row" disabled={!codeReady()} onClick={() => openModal(<CodeModal t={t} agentId={a.id === 'review-panel' ? 'build' : a.id} />)}>
+        <button key={t.id} className="pick-row" onClick={() => { closeModal(); openWriteCode(t); }}>
           <code>{t.key}</code><span className="pick-title">{t.title}</span><span className="muted small">{t.status}</span></button>))}
         {!issues.length && <p className="muted small">This epic has no issues yet.</p>}</div>
       {a.id === 'review-panel' && <p className="muted small">The Review Panel reviews a code job’s changes: start Build a Ticket on the issue, then choose <b>Review panel</b> when the diff is ready.</p>}

@@ -841,7 +841,9 @@ Set up once per project in **Project settings → Code & GitHub**:
 - **GitHub access**: a token saved for the project (encrypted; fine-grained tokens need Contents and Pull requests
   read/write), `GITHUB_TOKEN` on the server, or your `gh` CLI sign-in.
 
-Then on an issue: **Development → Write code with AI**.
+Then on an issue: **Development → Write code**. It opens the **Code jobs** page in a new tab (the issue stays as it is)
+showing the issue ID, its coding prompt and the linked repository or coding spec (just the ID and prompt when it has
+none). The same goes for an issue picked from an epic's code agent. Every member who can open the issue gets the button.
 1. TicketForge creates a branch (`tf/pay-12-short-title`) from the base branch in its **own git worktree**, so your
    checkout and uncommitted work are never touched.
 2. Claude Code (your account) implements the issue from its story, acceptance criteria and test cases, plus any
