@@ -82,7 +82,7 @@ export function pickFor(routing, task) {
 }
 
 /** Custom AI configurations (Administration → AI → Configurations): a named engine + model + reasoning + instructions. */
-export const ENGINES = ['claude', 'copilot', 'api'];
+const ENGINES = ['claude', 'copilot', 'api'];
 export function normalizeConfigs(list) {
   return (Array.isArray(list) ? list : []).filter((c) => c && /^[\w-]{1,40}$/.test(c.id)).slice(0, 30).map((c) => ({
     id: c.id, name: str(c.name, 40) || 'Configuration', engine: ENGINES.includes(c.engine) ? c.engine : 'claude', providerId: str(c.providerId, 40),
@@ -93,7 +93,7 @@ export function normalizeConfigs(list) {
 // ---------------------------------------------------------------- prices (USD per million tokens)
 // Anthropic list prices; cache writes are 1.25x input (5-minute cache). Other providers: add yours in Administration
 // → AI → Model routing → Prices. A model without a price shows tokens only.
-export const PRICES_DEFAULT = {
+const PRICES_DEFAULT = {
   'claude-fable-5-2': { in: 8, out: 40, cacheRead: 0.2 },
   'claude-opus-5-5': { in: 4, out: 20, cacheRead: 0.2 },
   'claude-opus-5': { in: 5, out: 25, cacheRead: 0.5 },
@@ -113,7 +113,7 @@ function normalizePrices(v) {
   return out;
 }
 /** The price of a model: your price, else the built-in one (longest matching name, so dated ids match too). */
-export function priceFor(model, prices: any = {}) {
+function priceFor(model, prices: any = {}) {
   const m = ALIAS[String(model || '').toLowerCase()] || String(model || '');
   if (!m) return null;
   const all = { ...PRICES_DEFAULT, ...prices };

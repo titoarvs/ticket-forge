@@ -22,7 +22,7 @@ const canEdit = () => can('issue.edit');
 const canSprint = () => can('sprint.manage') || can('issue.edit');
 
 /** The issues an action on this row applies to: the whole selection when the row is part of it, else just the row. */
-export const targetIds = (id: string): string[] => (S.checked.has(id) && S.checked.size > 1 ? [...S.checked].filter((x: string) => ticket(x)) : [id]);
+const targetIds = (id: string): string[] => (S.checked.has(id) && S.checked.size > 1 ? [...S.checked].filter((x: string) => ticket(x)) : [id]);
 
 /** Opens the row popup next to a button (or at the mouse, for a right-click). */
 export function openPop(kind: PopKind, ids: string[], from: HTMLElement | { x: number; y: number }) {
@@ -32,7 +32,7 @@ export function openPop(kind: PopKind, ids: string[], from: HTMLElement | { x: n
   S.pop = { kind, ids, x, y, bottom, at: Date.now() } as Pop;
   emit();
 }
-export function closePop() { if (S.pop) { S.pop = null; emit(); } }
+function closePop() { if (S.pop) { S.pop = null; emit(); } }
 const swapPop = (kind: PopKind) => { if (S.pop) { S.pop = { ...S.pop, kind }; emit(); } };
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 /** Props for a field button inside a draggable, clickable row. */
@@ -47,7 +47,7 @@ const cellProps = (label: string, kind: PopKind, t: Any) => ({
 function report(ids: string[], what: string) {
   if (ids.length > 1) toast(`${plural(ids.length, 'issue')} ${what}`, 'ok', { action: { label: 'Undo', onClick: undo } });
 }
-export function setFieldFor(ids: string[], field: string, value: Any, what: string) {
+function setFieldFor(ids: string[], field: string, value: Any, what: string) {
   const list = ids.map(ticket).filter((t: Any) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null));
   if (!list.length) return;
   mutate(() => list.forEach((t: Any) => setField(t, field, value)), { tag: ids.length === 1 ? `t.${field}${ids[0]}` : '' });

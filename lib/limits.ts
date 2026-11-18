@@ -27,7 +27,7 @@ const KEEPS_PLAN = ['active', 'trialing', 'past_due'];
  * A cancelled subscription keeps its paid plan until the period it paid for ends (`cancel_at_period_end` with a
  * `current_period_end`, or the trial end when no period was set); after that the workspace is on Free.
  */
-export function cancelledAndEnded(w, now = new Date()) {
+function cancelledAndEnded(w, now = new Date()) {
   if (!w?.cancel_at_period_end) return false;
   const end = w.current_period_end || w.trial_ends_at;
   return !end || new Date(end) <= now;
@@ -37,7 +37,7 @@ export function cancelledAndEnded(w, now = new Date()) {
  * A trial that ended without a payment: the workspace is locked until the owner pays. A cancelled trial isn't locked
  * (it just ends and the workspace is on Free), and neither is a subscription that is paid or paying.
  */
-export function trialEndedUnpaid(w, now = new Date()) {
+function trialEndedUnpaid(w, now = new Date()) {
   return Boolean(w?.plan && w.plan !== 'free' && w.subscription_status === 'trialing' && !w.cancel_at_period_end
     && w.trial_ends_at && new Date(w.trial_ends_at) <= now);
 }

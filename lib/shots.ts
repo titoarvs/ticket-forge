@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { q } from './db';
 import { checkLimit } from './limits';
 
-export const KEEP_PER_TEST = 5;
+const KEEP_PER_TEST = 5;
 const MAX_BYTES = 3 * 1024 * 1024;
 
 /** Saves a failure screenshot from a local file and returns its URL; removes the local file either way. */

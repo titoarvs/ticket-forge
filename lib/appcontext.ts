@@ -9,7 +9,7 @@ import { readRepo, featureDocs } from './reposync';
 import { localReader } from './codebase';
 
 const clip = (s, n) => { const t = String(s ?? '').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
-export const CONTEXT_MAX = 12000;
+const CONTEXT_MAX = 12000;
 
 /** The block added to system prompts ('' when the project has no app context). Stable text: good for prompt caching. */
 export function contextBlock(project, { short = false }: any = {}) {

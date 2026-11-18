@@ -89,7 +89,7 @@ export const theme = createTheme({
   },
 });
 
-export const MODE_KEY = 'tf-theme';
+const MODE_KEY = 'tf-theme';
 
 /** Switches between the dark (default) and light themes. */
 export function useThemeMode() {

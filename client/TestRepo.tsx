@@ -33,9 +33,9 @@ const canEdit = () => can('test.run') || can('issue.edit');
 export const WF = ['Draft', 'Ready for review', 'Approved', 'Needs update', 'Deprecated'];
 const WF_CLS: Record<string, string> = { Draft: 'wf-draft', 'Ready for review': 'wf-review', Approved: 'wf-approved', 'Needs update': 'wf-changes', Deprecated: 'wf-deprecated' };
 /** Tests from before the workflow existed count as Approved. */
-export const wfOf = (t: Any) => (WF.includes(t?.status) ? t.status : 'Approved');
+const wfOf = (t: Any) => (WF.includes(t?.status) ? t.status : 'Approved');
 export const WfLoz = ({ t }: { t: Any }) => <span className={`wf-loz ${WF_CLS[wfOf(t)]}`}>{wfOf(t)}</span>;
-export const wfSettings = (p: Any = P()) => ({ requireApproval: false, fourEyes: true, ...(repo(p).settings || {}) });
+const wfSettings = (p: Any = P()) => ({ requireApproval: false, fourEyes: true, ...(repo(p).settings || {}) });
 const canReview = () => can('issue.edit');
 /** Tests that may go into plans and executions under the current settings. */
 const plannable = (t: Any, p: Any = P()) => wfOf(t) !== 'Deprecated' && (!wfSettings(p).requireApproval || wfOf(t) === 'Approved');
@@ -68,9 +68,9 @@ export function latestRun(testId: string, p: Any = P(), env = ''): Any | null {
     .sort((a: Any, b: Any) => String(b.run.at || b.e.createdAt).localeCompare(String(a.run.at || a.e.createdAt)));
   return runs[0] ? { ...runs[0].run, execution: runs[0].e } : null;
 }
-export const latestStatus = (testId: string, p?: Any, env = '') => latestRun(testId, p, env)?.status || 'TODO';
+const latestStatus = (testId: string, p?: Any, env = '') => latestRun(testId, p, env)?.status || 'TODO';
 /** The environments executions ran in (staging, production, Chrome…), for per-environment status. */
-export const environmentsOf = (p: Any = P()) => [...new Set(repo(p).executions.map((e: Any) => String(e.environment || '').trim()).filter(Boolean))].sort() as string[];
+const environmentsOf = (p: Any = P()) => [...new Set(repo(p).executions.map((e: Any) => String(e.environment || '').trim()).filter(Boolean))].sort() as string[];
 /** Xray coverage of an issue from its linked tests, optionally in one environment. */
 export function coverageOf(ticketId: string, p: Any = P(), env = '') {
   const tests = repo(p).tests.filter((t: Any) => t.issueIds?.includes(ticketId));

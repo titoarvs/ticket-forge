@@ -156,8 +156,6 @@ export function TaskTray() {
     </section>
   );
 }
-/** Kept for older imports: running work now shows in the tray. */
-export const BusyPill = () => null;
 export const Spinner = ({ style }: { style?: Any }) => <span className="spinner" style={{ color: 'var(--brand)', ...style }} />;
 
 // ---------------------------------------------------------------- loading, empty and error states

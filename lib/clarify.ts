@@ -68,6 +68,3 @@ Return JSON only: { "questions": [ { "question": "...", "why": "...", "options":
   })).filter((q) => q.question);
   return { questions };
 }
-
-/** The person's answers as instructions for the generation. */
-export const answersText = (qa) => qa.filter((x) => x.answer?.trim()).map((x) => `- ${x.question} → ${x.answer.trim()}`).join('\n');

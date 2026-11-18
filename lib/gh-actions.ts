@@ -12,14 +12,14 @@ import { execFile } from 'node:child_process';
 import { unzipSync } from 'fflate';
 import { hsalsa, secretbox } from '@noble/ciphers/salsa';
 import { blake2b } from '@noble/hashes/blake2b';
+import { err } from './errors';
 
-export const WORKFLOW = 'ticketforge-tests.yml';
+const WORKFLOW = 'ticketforge-tests.yml';
 export const SECRET = 'TICKETFORGE_RUN_KEY';
-export const SETUP_BRANCH = 'ticketforge/test-runner';
-export const RUNNER_VERSION = 3;
+const SETUP_BRANCH = 'ticketforge/test-runner';
+const RUNNER_VERSION = 3;
 const MAX_INPUT = 60_000; // GitHub limits workflow_dispatch inputs to 65,535 characters in all
 const RUNNER_SOURCES = ['run-one.mjs', 'app-helpers.mjs', 'browser.mjs', 'totp.mjs'];
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 // GitHub Enterprise Server: set TICKETFORGE_GITHUB_API (e.g. https://github.example.com/api/v3).
 const API = String(process.env.TICKETFORGE_GITHUB_API || 'https://api.github.com').replace(/\/$/, '');
 
@@ -69,7 +69,7 @@ const repoOk = (repo) => /^[\w.-]+\/[\w.-]+$/.test(String(repo || ''));
 
 // ---------------------------------------------------------------- crypto
 /** libsodium's crypto_box_seal, which GitHub requires for secrets (X25519 + XSalsa20-Poly1305, blake2b nonce). */
-export function sealForGitHub(publicKeyB64, message) {
+function sealForGitHub(publicKeyB64, message) {
   const pk = Buffer.from(publicKeyB64, 'base64');
   const { publicKey, privateKey } = crypto.generateKeyPairSync('x25519');
   const epk = publicKey.export({ format: 'der', type: 'spki' }).subarray(-32);
@@ -82,14 +82,14 @@ export function sealForGitHub(publicKeyB64, message) {
   return Buffer.concat([epk, Buffer.from(box)]).toString('base64');
 }
 /** AES-256-GCM over gzipped JSON: iv(12) | tag(16) | ciphertext, base64. The runner does the reverse. */
-export function sealJson(keyB64, obj) {
+function sealJson(keyB64, obj) {
   const key = Buffer.from(keyB64, 'base64');
   const iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', key, iv);
   const ct = Buffer.concat([c.update(zlib.gzipSync(Buffer.from(JSON.stringify(obj)), { level: 9 })), c.final()]);
   return Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64');
 }
-export function openJson(keyB64, data) {
+function openJson(keyB64, data) {
   const b = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'base64');
   const d = crypto.createDecipheriv('aes-256-gcm', Buffer.from(keyB64, 'base64'), b.subarray(0, 12));
   d.setAuthTag(b.subarray(12, 28));
@@ -183,7 +183,7 @@ jobs:
 `;
 }
 /** The files the setup pull request adds: path → content. */
-export function runnerFiles() {
+function runnerFiles() {
   const pw = playwrightVersion();
   const lib = path.join(/*turbopackIgnore: true*/ process.cwd(), 'lib');
   const files = {
@@ -198,7 +198,7 @@ export function runnerFiles() {
 }
 
 // ---------------------------------------------------------------- status and setup
-export async function fileOn(repo, ref, p, token) {
+async function fileOn(repo, ref, p, token) {
   try { return await gh('GET', `repos/${repo}/contents/${p}?ref=${encodeURIComponent(ref)}`, { token }); } catch (e) { if (/couldn’t find/.test(e.message)) return null; throw e; }
 }
 /** What's ready for running tests on GitHub Actions in `repo`. */

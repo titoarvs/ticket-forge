@@ -165,7 +165,7 @@ export function docToText(doc: Any): string {
   return blocks(doc || {}, '\n\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 /** The document to show for a field: its saved formatting if still current, else its plain text. */
-export const docFor = (text: string, rich?: RichValue | null) => (rich?.doc && rich.text === (text || '') ? rich.doc : textToDoc(text || ''));
+const docFor = (text: string, rich?: RichValue | null) => (rich?.doc && rich.text === (text || '') ? rich.doc : textToDoc(text || ''));
 
 /** A rich text input with a formatting toolbar. `ghost` hides the border and toolbar until it is focused. */
 export function RichTextField({ text, rich, onChange, placeholder = '', disabled, ghost, autoFocus, ariaLabel = 'Description' }: {

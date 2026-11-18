@@ -6,8 +6,8 @@ import crypto from 'node:crypto';
 import { q } from './db';
 import { consume } from './limits';
 import { runApiCode, openCodePr, deleteBranch } from './api-code';
+import { err } from './errors';
 
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 const LIVE = ['starting', 'queued', 'running'];
 const now = () => new Date().toISOString();
 const say = (j, text, kind = 'info') => { j.log = [...(j.log || []), { at: now(), kind, text: String(text).slice(0, 500) }].slice(-200); };

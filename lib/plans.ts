@@ -27,7 +27,7 @@ export const LIMIT_DEFS = {
   codeJobs: { name: 'AI code jobs this month', unit: 'count' },
   storageMb: { name: 'Storage', unit: 'mb' },
 };
-export const LIMIT_UNITS = ['count', 'mb'];
+const LIMIT_UNITS = ['count', 'mb'];
 
 /**
  * A plan's limits as a list: [{ key, name, value, unit }]. `value` is a number, or null when the plan has no limit on

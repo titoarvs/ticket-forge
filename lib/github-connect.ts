@@ -6,13 +6,13 @@
 import crypto from 'node:crypto';
 import { qs } from './db';
 import { githubToken } from './devagent';
+import { err } from './errors';
 
 const KEY = 'github_oauth';
 const SCOPES = 'repo read:org workflow';
 const G = globalThis;
 G.__tfGhDevice ??= new Map(); // id → { deviceCode, interval, expiresAt, projectId }
 const PENDING = G.__tfGhDevice;
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 
 export async function getClientId() {
   if (process.env.TICKETFORGE_GITHUB_CLIENT_ID) return { clientId: process.env.TICKETFORGE_GITHUB_CLIENT_ID, source: 'env' };

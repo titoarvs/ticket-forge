@@ -6,8 +6,8 @@
 import { qs } from './db';
 import { PLANS } from './plans';
 import { checkoutQuote, paymentStep, CHECKOUT_CURRENCY } from './payment-methods';
+import { err } from './errors';
 
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 export const paymongoConfigured = () => Boolean(process.env.PAYMONGO_SECRET_KEY);
 const base = () => (process.env.PAYMONGO_API_BASE || 'https://api.paymongo.com').replace(/\/$/, '');
 const KEEPS_PLAN = ['active', 'trialing', 'past_due'];

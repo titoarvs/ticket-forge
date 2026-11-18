@@ -6,7 +6,7 @@ import { api, toast, openModal, ago, type Any } from './core';
 import { Ico, I, Confirm, Spinner, ErrorState } from './ui';
 import { TA, CB } from './fields';
 
-export const GUIDE_TEMPLATE = `# Generation guide
+const GUIDE_TEMPLATE = `# Generation guide
 
 ## Product
 One or two sentences: what the product is and who uses it.

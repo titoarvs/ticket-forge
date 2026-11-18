@@ -4,9 +4,9 @@
 // first (Claude Code with their token), and their code jobs on GitHub Actions run with it too.
 import { q, currentContext } from './db';
 import { encrypt, decrypt } from './settings';
+import { err } from './errors';
 
 const MODELS = ['opus', 'sonnet', 'haiku'];
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 const uid = () => currentContext().user?.id || null;
 
 /** The signed-in person's settings, with the token decrypted (server use only), or null. */

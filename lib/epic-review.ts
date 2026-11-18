@@ -12,10 +12,10 @@ import { extractText } from './parse';
 import { APPROVAL_DOCS } from './approval';
 import { has, requirePerm } from './store';
 
-export const KINDS: string[] = APPROVAL_DOCS.map((d) => d.kind);
+const KINDS: string[] = APPROVAL_DOCS.map((d) => d.kind);
 const LABEL: Record<string, string> = Object.fromEntries(APPROVAL_DOCS.map((d) => [d.kind, d.label]));
 const SHORT: Record<string, string> = Object.fromEntries(APPROVAL_DOCS.map((d) => [d.kind, d.short]));
-export const NOT_APPROVED = 'All three documents (PSD, FBD and ARD) must be approved by every reviewer before the epic can be signed off.';
+const NOT_APPROVED = 'All three documents (PSD, FBD and ARD) must be approved by every reviewer before the epic can be signed off.';
 type Run = (sql: string, params?: any[]) => Promise<{ rows: any[] }>;
 
 const kindOf = (k: any) => {

@@ -553,7 +553,7 @@ function diff(snap: Any) {
   const empty = !Object.keys(patch.meta).length && !patch.upsert.length && !patch.remove.length && !patch.order;
   return empty ? null : patch;
 }
-export const hasLocalChanges = () => Boolean(P() && diff(snapshotOf(P())));
+const hasLocalChanges = () => Boolean(P() && diff(snapshotOf(P())));
 export function setSaveText(t: string) { S.saveText = t; emit(); }
 export function scheduleSave() { clearTimeout(S.saveTimer); S.saveText = 'Saving…'; S.saveTimer = setTimeout(saveNow, 700); }
 

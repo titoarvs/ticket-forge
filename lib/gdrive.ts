@@ -10,21 +10,21 @@ import { wsKey } from './wsmeta';
 import { encrypt, decrypt } from './settings';
 import { isLocked } from './features';
 import { projectWorkspace } from './store';
+import { err } from './errors';
 
 const KEY = 'gdrive';
 const SCOPE = 'https://www.googleapis.com/auth/drive';
 const API = 'https://www.googleapis.com/drive/v3';
 const FOLDER = 'application/vnd.google-apps.folder';
 const G = globalThis as any;
-const err = (message: string, status = 400) => Object.assign(new Error(message), { status });
 
 /** How many times a failed save is retried before the document is marked failed. Still to be confirmed with the team. */
-export const MAX_RETRIES = Math.max(1, Number(process.env.TICKETFORGE_GDRIVE_MAX_RETRIES) || 5);
+const MAX_RETRIES = Math.max(1, Number(process.env.TICKETFORGE_GDRIVE_MAX_RETRIES) || 5);
 const BASE_DELAY = 30 * 1000, MAX_DELAY = 60 * 60 * 1000, TICK = 15 * 1000;
 /** Wait before retry number n (1, 2, 3…): 30 s, 1 min, 2 min, 4 min… up to 1 hour. */
-export const backoffMs = (n: number) => Math.min(MAX_DELAY, BASE_DELAY * 2 ** Math.max(0, n - 1));
+const backoffMs = (n: number) => Math.min(MAX_DELAY, BASE_DELAY * 2 ** Math.max(0, n - 1));
 
-export const FAILED_MESSAGE = 'This document couldn’t be saved to Google Drive. Contact the Super Admin.';
+const FAILED_MESSAGE = 'This document couldn’t be saved to Google Drive. Contact the Super Admin.';
 
 const creds = () => ({ clientId: process.env.TICKETFORGE_GDRIVE_CLIENT_ID || '', clientSecret: process.env.TICKETFORGE_GDRIVE_CLIENT_SECRET || '' });
 

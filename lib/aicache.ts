@@ -9,9 +9,6 @@ const wsPrefix = () => { const w = currentWs() || DEFAULT_WS; return w === DEFAU
 const wsWhere = () => (wsPrefix() ? 'key like $1' : "key not like '%:%'");
 const wsArgs = () => (wsPrefix() ? [`${wsPrefix().replace(/[%_\\]/g, '\\$&')}%`] : []);
 
-/** Tasks whose answers are safe to reuse by default: the same input should give the same answer. */
-export const CACHE_TASKS_DEFAULT = ['quick', 'repo', 'failure', 'pr', 'selection', 'healing', 'plan'];
-
 export const cacheKey = (parts) => wsPrefix() + crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 
 export async function cacheGet(key, days) {

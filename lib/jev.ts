@@ -8,9 +8,9 @@
 import { qs } from './db';
 import { wsKey } from './wsmeta';
 import { encrypt, decrypt } from './settings';
+import { err } from './errors';
 
 const KEY = 'jev';
-const err = (message: string, status = 400) => Object.assign(new Error(message), { status });
 const base = () => String(process.env.TICKETFORGE_JEV_URL || 'https://api.typesafe.ai').replace(/\/$/, '');
 
 export type Question =

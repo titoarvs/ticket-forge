@@ -7,7 +7,7 @@ import { q } from './db';
 import { checkLimit } from './limits';
 import { referenceType, typeMessage, sizeMessage, maxBytes } from './references';
 
-export const MAX_FILE = 20 * 1024 * 1024;
+const MAX_FILE = 20 * 1024 * 1024;
 export const VIEWABLE = { '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 
 export function fileType(name) { return VIEWABLE[path.extname(String(name || '')).toLowerCase()] || null; }

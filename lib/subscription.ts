@@ -4,8 +4,8 @@
 import { qs } from './db';
 import { cancelPayMongoSubscription } from './paymongo';
 import { cancelAtPeriodEnd } from './stripe';
+import { err } from './errors';
 
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
 /** Subscription states that can still be cancelled. */
 const CANCELLABLE = ['active', 'trialing', 'past_due'];
 
