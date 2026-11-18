@@ -100,6 +100,9 @@ export async function seedRoles() {
   // can take it away again afterwards, so this runs only one time).
   const seeded = await q("insert into app_meta (key, value) values ('perm_issue_restore', $1) on conflict (key) do nothing returning key", [JSON.stringify({ at: new Date().toISOString() })]);
   if (seeded.rows[0]) await q(`update roles set permissions = permissions || '["issue.restore"]'::jsonb where id = 'lead' and not permissions ? 'issue.restore'`);
+  // Setting up a project's database: given once to the Project lead role, like issue.restore above.
+  const dbSeeded = await q("insert into app_meta (key, value) values ('perm_project_database', $1) on conflict (key) do nothing returning key", [JSON.stringify({ at: new Date().toISOString() })]);
+  if (dbSeeded.rows[0]) await q(`update roles set permissions = permissions || '["project.database"]'::jsonb where id = 'lead' and not permissions ? 'project.database'`);
 }
 export async function listRoles() {
   const ws = needWs();

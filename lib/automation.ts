@@ -1,8 +1,8 @@
 // Test automation: Claude turns test cases into Playwright scripts, which run in a real
 // (headless) Chromium against the app under test. Each script runs in its own process.
 import { spawn } from 'node:child_process';
-import dns from 'node:dns/promises';
 import { isSaas } from './platform';
+import { isPrivateHost } from './netguard';
 import fs from 'node:fs';
 import path from 'node:path';
 import { askJson } from './claude';
@@ -82,16 +82,12 @@ const pathOf = (u) => { try { const x = new URL(u); return `${x.pathname}${x.has
  * The hosted service (SaaS) runs test browsers on its own servers: the app under test must be on the public internet,
  * not a private or internal address (which would reach the server's own network). Self-hosted, anything goes.
  */
-const PRIVATE_V4 = [/^10\./, /^127\./, /^0\./, /^169\.254\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./];
-const privateIp = (ip) => (ip.includes(':') ? /^(::1?$|f[cd]|fe[89ab]|::ffff:)/i.test(ip) && !/^::ffff:(?!10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(ip) : PRIVATE_V4.some((r) => r.test(ip)));
 export async function assertPublicTarget(url) {
   if (!isSaas() || !url) return;
   let u;
   try { u = new URL(url); } catch { throw Object.assign(new Error('Enter the full address of the app to test, like https://staging.example.com.'), { status: 400 }); }
   if (!/^https?:$/.test(u.protocol)) throw Object.assign(new Error('The app to test must use http:// or https://.'), { status: 400 });
-  const host = u.hostname.replace(/^\[|\]$/g, '');
-  const ips = /^[\d.]+$|:/.test(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => [])).map((a) => a.address);
-  if (/^(localhost|.*\.local|.*\.internal)$/i.test(host) || ips.some(privateIp)) {
+  if (await isPrivateHost(u.hostname)) {
     throw Object.assign(new Error(`${u.host} is a private or internal address. On the hosted service, test an app that's reachable on the internet, or run tests on GitHub Actions.`), { status: 400 });
   }
 }

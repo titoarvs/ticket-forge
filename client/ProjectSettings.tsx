@@ -12,6 +12,7 @@ import { WorkflowSettings } from './WorkflowEditor';
 import { DevSettings } from './DevCode';
 import { AppContextSettings } from './AppContext';
 import { RepoSetupCard } from './RepoSetup';
+import { DatabaseSettings } from './Database';
 import { allSources } from './Sources';
 import { PsdTemplateCard } from './Psd';
 import { ProjectFbdTemplateCard, ProjectArdTemplateCard } from './Fbd';
@@ -23,6 +24,7 @@ const SECTIONS: [string, string, string, string][] = [
   ['templates', 'Templates', 'doc', 'Problem Statement, Feature Brief and Architecture Record Design'],
   ['context', 'App context', 'sparkle', 'What the AI knows about this app, reused in every prompt'],
   ['code', 'Code & GitHub', 'pr', 'Repository, coding agent and pull requests'],
+  ['database', 'Database', 'database', 'The databases of the app this project builds'],
   ['danger', 'Danger zone', 'trash', 'Delete the project'],
 ];
 
@@ -144,7 +146,9 @@ function Danger() {
 
 export function Settings() {
   const ed = can('project.settings');
-  const sections = SECTIONS.filter(([k]) => k !== 'code' || can('project.repo'));
+  // Sections with their own permission are hidden from people who don't have it.
+  const own: Record<string, string> = { code: 'project.repo', database: 'project.database' };
+  const sections = SECTIONS.filter(([k]) => !own[k] || can(own[k]));
   const cur = sections.find(([k]) => k === S.setTab)?.[0] || 'details';
   const go = (k: string) => { S.setTab = k; saveUi(); emit(); document.querySelector('.view')?.scrollTo({ top: 0 }); };
   const [, label, , desc] = sections.find(([k]) => k === cur)!;
@@ -159,7 +163,7 @@ export function Settings() {
       </nav>
       <div className="set-main">
         <div className="set-section-h"><h2>{label}</h2><p className="muted">{desc}.</p></div>
-        {!ed && cur !== 'danger' && <div className="warn-banner"><Ico svg={I.warn} /><span>You can view these settings. To change them, ask an administrator for the <b>Project settings</b> permission.</span></div>}
+        {!ed && !['danger', 'database'].includes(cur) && <div className="warn-banner"><Ico svg={I.warn} /><span>You can view these settings. To change them, ask an administrator for the <b>Project settings</b> permission.</span></div>}
         {cur === 'details' && <Details ed={ed} />}
         {cur === 'people' && <People ed={ed} />}
         {cur === 'workflow' && <WorkflowSettings />}
@@ -168,6 +172,7 @@ export function Settings() {
           <PsdTemplateCard project ed={ed} /><ProjectFbdTemplateCard ed={ed} /><ProjectArdTemplateCard ed={ed} /></div>}
         {cur === 'context' && <AppContextSettings ed={ed} />}
         {cur === 'code' && <><RepoSetupCard key={P().id} /><DevSettings ed={ed} /></>}
+        {cur === 'database' && <DatabaseSettings key={P().id} />}
         {cur === 'danger' && <Danger />}
       </div>
     </div>

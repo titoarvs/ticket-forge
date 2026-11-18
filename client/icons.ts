@@ -51,6 +51,7 @@ export const I = {
   warn: s('<path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5v.2"/>'),
   check: s('<path d="M3 8.5l3 3 7-7"/>'),
   grid: s('<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12M6 6v8"/>'),
+  database: s('<ellipse cx="8" cy="3.6" rx="5.2" ry="1.9"/><path d="M2.8 3.6v8.8c0 1 2.3 1.9 5.2 1.9s5.2-.9 5.2-1.9V3.6"/><path d="M2.8 8c0 1 2.3 1.9 5.2 1.9s5.2-.9 5.2-1.9"/>'),
   folder: s('<path d="M1.8 4.2c0-.6.4-1 1-1h3.4l1.4 1.6h5.6c.6 0 1 .4 1 1v6.9c0 .6-.4 1-1 1H2.8c-.6 0-1-.4-1-1z"/>'),
   user: s('<circle cx="8" cy="5.5" r="2.8"/><path d="M2.8 14c.6-2.6 2.7-4.2 5.2-4.2s4.6 1.6 5.2 4.2"/>'),
   logo: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 3.5h10v2.6H9.4V13H6.6V6.1H3z" fill="#fff"/></svg>',
