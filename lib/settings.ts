@@ -11,15 +11,18 @@ import { wsKey, wsCache } from './wsmeta';
 // ---------------------------------------------------------------- encryption
 // The encryption key comes from TICKETFORGE_SECRET when set. Otherwise it's derived from the database user and
 // password, so every copy of TicketForge that shares the database (your computer, Vercel, any pooler port) can
-// read it. Without a database URL (the built-in local database) it's a random key kept in data/secret.key.
+// read it (after moving to another host see TICKETFORGE_KEY_FROM_URL below and docs/postgres-host-migration.md).
+// Without a database URL (the built-in local database) it's a random key kept in data/secret.key.
 let derived = null;
 function secretKey() {
   if (derived) return derived;
   let material;
   if (process.env.TICKETFORGE_SECRET) {
     material = `secret:${process.env.TICKETFORGE_SECRET}`;
-  } else if (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL) {
-    const raw = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+  } else if (process.env.TICKETFORGE_KEY_FROM_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL) {
+    // After moving to another database host the credentials differ: TICKETFORGE_KEY_FROM_URL (the old connection string)
+    // keeps the key, so saved API keys and payment keys stay readable without re-entering them.
+    const raw = process.env.TICKETFORGE_KEY_FROM_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
     let u = null;
     try { u = new URL(raw); } catch { /* not a URL */ }
     material = `db:${u ? `${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}` : raw}`;

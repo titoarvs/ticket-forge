@@ -107,6 +107,8 @@ All settings live in `.env` (see `.env.example`):
 | `DATABASE_URL` | Supabase / PostgreSQL connection string. Empty = built-in local database in `data/db` |
 | `PGSSL` | Database SSL: empty (encrypted), `verify` (also verify certificate) or `disable` |
 | `PG_POOL_MAX` | Database connections per server (default 5) |
+| `PG_CONNECT_TIMEOUT_MS` | How long start-up waits for the database before failing with a connection error (default 10000) |
+| `TICKETFORGE_CUTOVER_POLL_MS`, `TICKETFORGE_CUTOVER_HOLD_MS` | Moving to another PostgreSQL host: how often servers check for a cutover (default 1000, `0` = off) and how long writes wait during it (default 30000). See [docs/postgres-host-migration.md](docs/postgres-host-migration.md) |
 | `APP_URL` | Public address used in invite and password-reset links |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Email for invites and password resets |
 | `TRUST_PROXY` | Set when running behind a reverse proxy |
@@ -240,6 +242,12 @@ TicketForge stores projects, issues, users, roles and invites in PostgreSQL.
 ```bash
 npm run db:push
 ```
+
+**Moving to another PostgreSQL host** (Supabase, Neon, RDS, your own server) needs configuration only: `DATABASE_URL`,
+`PGSSL`, `PG_POOL_MAX` and `PG_CONNECT_TIMEOUT_MS` are the only settings, and the code has nothing host-specific. To copy the
+data, verify row counts and checksums and switch with no downtime, use `npm run db:migrate-host` (`copy`, `verify`,
+`cutover`, `finish`, `release`) and follow [docs/postgres-host-migration.md](docs/postgres-host-migration.md).
+`npm run db:cutover-load` is the load script that proves no request failed and no write was lost.
 
 The server talks to the database directly with the connection string; nothing is exposed to the browser.
 Without `DATABASE_URL`, TicketForge uses an embedded Postgres stored in `data/db`, so it runs with no setup.
@@ -985,6 +993,8 @@ lib/                       Server modules
   automation.js runner.mjs Playwright test automation
   exporters.js parse.js github.js    Exports, document parsing, PR lookup
 scripts/db-push.ts         Copies the local database to DATABASE_URL
+scripts/db-migrate-host.ts Copies a PostgreSQL host to another one, verifies counts and checksums, cuts over
+scripts/db-cutover-load.mjs  Load script for the cutover: failed requests and lost writes
 legacy/                    The previous Express + vanilla JS version (run with `TICKETFORGE_RLS=off npm run legacy`)
 ```
 
