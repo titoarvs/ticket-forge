@@ -16,11 +16,23 @@ import { err } from './errors';
 /** What each gateway is, the currencies it takes, and what a valid secret key looks like (a quick check before asking the gateway). */
 export const GATEWAYS = {
   paymongo: { name: 'PayMongo', currencies: ['PHP'], keyHint: 'sk_test_… or sk_live_…', keyPattern: /^sk_(test|live)_\S{8,}$/ },
-  xendit: { name: 'Xendit', currencies: ['PHP'], keyHint: 'xnd_development_… or xnd_production_…', keyPattern: /^xnd_(development|production)_\S{8,}$/ },
+  xendit: {
+    name: 'Xendit',
+    currencies: ['PHP'],
+    keyHint: 'xnd_development_… or xnd_production_…',
+    keyPattern: /^xnd_(development|production)_\S{8,}$/,
+  },
   stripe: { name: 'Stripe', currencies: ['PHP', 'USD'], keyHint: 'sk_test_… or sk_live_…', keyPattern: /^[sr]k_(test|live)_\S{8,}$/ },
 };
-const provider = (p) => { if (!PROVIDERS.includes(p)) throw err('Unknown payment gateway.', 404); return p; };
-const base = (p) => ({ paymongo: process.env.PAYMONGO_API_BASE || 'https://api.paymongo.com', xendit: process.env.XENDIT_API_BASE || 'https://api.xendit.co' }[p]).replace(/\/$/, '');
+const provider = (p) => {
+  if (!PROVIDERS.includes(p)) throw err('Unknown payment gateway.', 404);
+  return p;
+};
+const base = (p) =>
+  ({
+    paymongo: process.env.PAYMONGO_API_BASE || 'https://api.paymongo.com',
+    xendit: process.env.XENDIT_API_BASE || 'https://api.xendit.co',
+  })[p].replace(/\/$/, '');
 const basic = (key) => `Basic ${Buffer.from(`${key}:`).toString('base64')}`;
 
 /** One JSON call to PayMongo or Xendit. Throws a 400 with the gateway's own message, or a 502 when it can't be reached. */
@@ -33,7 +45,9 @@ async function call(p, method, path, key, payload?) {
       body: payload === undefined ? undefined : JSON.stringify(payload),
       signal: AbortSignal.timeout(20000),
     });
-  } catch { throw err(`Couldn’t reach ${GATEWAYS[p].name}. Try again.`, 502); }
+  } catch {
+    throw err(`Couldn’t reach ${GATEWAYS[p].name}. Try again.`, 502);
+  }
   const out = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = out?.errors?.[0]?.detail || out?.message || res.statusText;
@@ -62,9 +76,15 @@ export async function listGateways() {
   const saved: any[] = await asSystem(async () => await orm.select().from(paymentGateways));
   const rows = Object.fromEntries(saved.map((r) => [r.provider, r]));
   return PROVIDERS.map((p) => ({
-    provider: p, name: GATEWAYS[p].name, currencies: GATEWAYS[p].currencies, keyFormat: GATEWAYS[p].keyHint,
-    active: Boolean(rows[p]?.active), configured: Boolean(rows[p]?.credentials?.secretKey), keyEnd: rows[p]?.credentials?.hint || '',
-    updatedAt: rows[p]?.updatedAt || null, updatedBy: rows[p]?.updatedBy || null,
+    provider: p,
+    name: GATEWAYS[p].name,
+    currencies: GATEWAYS[p].currencies,
+    keyFormat: GATEWAYS[p].keyHint,
+    active: Boolean(rows[p]?.active),
+    configured: Boolean(rows[p]?.credentials?.secretKey),
+    keyEnd: rows[p]?.credentials?.hint || '',
+    updatedAt: rows[p]?.updatedAt || null,
+    updatedBy: rows[p]?.updatedBy || null,
   }));
 }
 
@@ -84,18 +104,24 @@ export async function saveGateway(p, { active, secretKey }: any = {}, actor) {
   if (!active) {
     if (!row) return (await listGateways()).find((g) => g.provider === p);
     await asSystem(async () => {
-      await orm.update(paymentGateways).set({ active: false, updatedBy: actor?.name || null, updatedAt: sql`now()` }).where(eq(paymentGateways.provider, p));
+      await orm
+        .update(paymentGateways)
+        .set({ active: false, updatedBy: actor?.name || null, updatedAt: sql`now()` })
+        .where(eq(paymentGateways.provider, p));
     });
     return (await listGateways()).find((g) => g.provider === p);
   }
   const key = typed || (row?.credentials?.secretKey ? await secretFor(p) : '');
   if (!key) throw err(`Enter the ${GATEWAYS[p].name} secret key (${GATEWAYS[p].keyHint}).`);
-  if (!GATEWAYS[p].keyPattern.test(key)) throw err(`That doesn’t look like a ${GATEWAYS[p].name} secret key. It should start like ${GATEWAYS[p].keyHint}.`);
+  if (!GATEWAYS[p].keyPattern.test(key))
+    throw err(`That doesn’t look like a ${GATEWAYS[p].name} secret key. It should start like ${GATEWAYS[p].keyHint}.`);
   await verify(p, key); // throws when the gateway rejects it: nothing is saved and the gateway stays as it was
   const credentials = typed ? { secretKey: encrypt(typed), hint: hint(typed) } : row.credentials;
   const by = actor?.name || null;
   await asSystem(async () => {
-    await orm.insert(paymentGateways).values({ provider: p, active: true, credentials, updatedBy: by, updatedAt: sql`now()` })
+    await orm
+      .insert(paymentGateways)
+      .values({ provider: p, active: true, credentials, updatedBy: by, updatedAt: sql`now()` })
       .onConflictDoUpdate({ target: paymentGateways.provider, set: { active: true, credentials, updatedBy: by, updatedAt: sql`now()` } });
   });
   return (await listGateways()).find((g) => g.provider === p);
@@ -115,29 +141,65 @@ export async function createCheckout(p, { ws, email, plan, successUrl, cancelUrl
   const meta = { workspace_id: ws, plan: plan.id, plan_version: String(plan.version) };
   const label = `${plan.name} plan (${plan.interval === 'year' ? 'yearly' : 'monthly'})`;
   if (p === 'stripe') {
-    const s = await stripe('POST', 'checkout/sessions', {
-      mode: 'subscription', client_reference_id: ws, customer_email: email || undefined,
-      line_items: [{ quantity: 1, price_data: { currency: plan.currency.toLowerCase(), unit_amount: minor(plan.price), recurring: { interval: plan.interval }, product_data: { name: label } } }],
-      subscription_data: { metadata: meta }, metadata: meta,
-      success_url: successUrl, cancel_url: cancelUrl,
-    }, { key });
+    const s = await stripe(
+      'POST',
+      'checkout/sessions',
+      {
+        mode: 'subscription',
+        client_reference_id: ws,
+        customer_email: email || undefined,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: plan.currency.toLowerCase(),
+              unit_amount: minor(plan.price),
+              recurring: { interval: plan.interval },
+              product_data: { name: label },
+            },
+          },
+        ],
+        subscription_data: { metadata: meta },
+        metadata: meta,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      },
+      { key },
+    );
     if (!s?.id || !s.url) throw err('Stripe didn’t return a checkout page. Try again.', 502);
     return { url: s.url, ref: s.id };
   }
   if (p === 'paymongo') {
-    const s = (await call(p, 'POST', '/v1/checkout_sessions', key, { data: { attributes: {
-      line_items: [{ name: label, amount: minor(plan.price), currency: plan.currency, quantity: 1 }],
-      payment_method_types: supportedMethods().map((m) => m.id),
-      description: `TicketForge ${plan.name} plan`, reference_number: ws, send_email_receipt: false, show_description: true,
-      success_url: successUrl, cancel_url: cancelUrl, metadata: meta,
-    } } })).data;
+    const s = (
+      await call(p, 'POST', '/v1/checkout_sessions', key, {
+        data: {
+          attributes: {
+            line_items: [{ name: label, amount: minor(plan.price), currency: plan.currency, quantity: 1 }],
+            payment_method_types: supportedMethods().map((m) => m.id),
+            description: `TicketForge ${plan.name} plan`,
+            reference_number: ws,
+            send_email_receipt: false,
+            show_description: true,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            metadata: meta,
+          },
+        },
+      })
+    ).data;
     const url = s?.attributes?.checkout_url;
     if (!s?.id || !url) throw err('PayMongo didn’t return a checkout page. Try again.', 502);
     return { url, ref: s.id };
   }
   const inv = await call(p, 'POST', '/v2/invoices', key, {
-    external_id: `tf-${ws}-${Date.now()}`, amount: Number(plan.price), currency: plan.currency, description: label,
-    payer_email: email || undefined, success_redirect_url: successUrl, failure_redirect_url: cancelUrl, metadata: meta,
+    external_id: `tf-${ws}-${Date.now()}`,
+    amount: Number(plan.price),
+    currency: plan.currency,
+    description: label,
+    payer_email: email || undefined,
+    success_redirect_url: successUrl,
+    failure_redirect_url: cancelUrl,
+    metadata: meta,
   });
   if (!inv?.id || !inv.invoice_url) throw err('Xendit didn’t return a checkout page. Try again.', 502);
   return { url: inv.invoice_url, ref: inv.id };
@@ -153,11 +215,18 @@ export async function readCheckout(p, ref) {
   if (!key) throw err(`${GATEWAYS[p].name} isn’t set up.`, 503);
   if (p === 'stripe') {
     const s = await stripe('GET', `checkout/sessions/${encodeURIComponent(ref)}`, undefined, { key });
-    return { paid: s.status === 'complete' && ['paid', 'no_payment_required'].includes(s.payment_status), meta: s.metadata || {}, subscriptionId: s.subscription || null, customerId: s.customer || null };
+    return {
+      paid: s.status === 'complete' && ['paid', 'no_payment_required'].includes(s.payment_status),
+      meta: s.metadata || {},
+      subscriptionId: s.subscription || null,
+      customerId: s.customer || null,
+    };
   }
   if (p === 'paymongo') {
     const s = (await call(p, 'GET', `/v1/checkout_sessions/${encodeURIComponent(ref)}`, key)).data;
-    const paid = (s?.attributes?.payments || []).some((x) => x?.attributes?.status === 'paid') || s?.attributes?.payment_intent?.attributes?.status === 'succeeded';
+    const paid =
+      (s?.attributes?.payments || []).some((x) => x?.attributes?.status === 'paid') ||
+      s?.attributes?.payment_intent?.attributes?.status === 'succeeded';
     return { paid, meta: s?.attributes?.metadata || {}, subscriptionId: null, customerId: null };
   }
   const inv = await call(p, 'GET', `/v2/invoices/${encodeURIComponent(ref)}`, key);

@@ -18,15 +18,27 @@ export const PUT = api(async (req, p) => {
   const b = await body(req);
   const roleId = String(b.roleId || '');
   if (!/^[\w-]{1,64}$/.test(roleId)) throw new HttpError(400, 'Which role?');
-  if (b.clearAll) { await clearRoleSecrets(p.id, roleId); return credentialStatus(p.id); }
+  if (b.clearAll) {
+    await clearRoleSecrets(p.id, roleId);
+    return credentialStatus(p.id);
+  }
   if ('totp' in b) {
     const t = String(b.totp ?? '').trim();
     if (t.length > 600) throw new HttpError(400, 'That secret is too long.');
-    if (t) { try { checkTotp(t); } catch (e: any) { throw new HttpError(400, e.message); } }
+    if (t) {
+      try {
+        checkTotp(t);
+      } catch (e: any) {
+        throw new HttpError(400, e.message);
+      }
+    }
     await setRoleSecret(p.id, roleId, 'totp', t, user);
     return credentialStatus(p.id);
   }
-  if ('session' in b) { await setRoleSecret(p.id, roleId, 'session', '', user); return credentialStatus(p.id); }
+  if ('session' in b) {
+    await setRoleSecret(p.id, roleId, 'session', '', user);
+    return credentialStatus(p.id);
+  }
   const password = String(b.password ?? '');
   if (password.length > 500) throw new HttpError(400, 'That password is too long.');
   await setRoleSecret(p.id, roleId, 'password', password, user);

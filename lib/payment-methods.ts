@@ -21,7 +21,12 @@ const PHP_PRICES = {
 export function supportedMethods() {
   const raw = process.env.PAYMONGO_PAYMENT_METHODS;
   if (!raw || !raw.trim()) return PAYMENT_METHODS;
-  const on = new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+  const on = new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
   return PAYMENT_METHODS.filter((m) => on.has(m.id));
 }
 

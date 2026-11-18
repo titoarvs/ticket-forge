@@ -19,7 +19,11 @@
     "docs:pain-points": "node --import tsx scripts/pain-points-docx.ts",
     "docs:problem-statement": "node --import tsx scripts/problem-statement-docx.ts",
     "db:remove-psd-fbd-ard": "node --env-file-if-exists=.env --import tsx scripts/remove-psd-fbd-ard.ts",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "test": "node --import tsx --test tests/*.test.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "license": "UNLICENSED",
   "private": true,
@@ -62,6 +66,10 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.5",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.10.1",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },

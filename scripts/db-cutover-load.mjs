@@ -19,7 +19,10 @@ const PROJECT = process.env.PROJECT_ID || '';
 const DURATION_MS = (Number(process.env.DURATION_S) || 120) * 1000;
 const RATE = Number(process.env.RATE) || 5;
 const LEDGER = process.env.LEDGER || path.join(process.cwd(), 'data', 'cutover-load.json');
-if (!COOKIE || !PROJECT) { console.error('Set TF_COOKIE (the tf_session cookie value) and PROJECT_ID.'); process.exit(2); }
+if (!COOKIE || !PROJECT) {
+  console.error('Set TF_COOKIE (the tf_session cookie value) and PROJECT_ID.');
+  process.exit(2);
+}
 
 const headers = { 'Content-Type': 'application/json', Cookie: `tf_session=${COOKIE}` };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -30,7 +33,13 @@ async function call(path_, init) {
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(path_, { ...init, headers });
     if (res.status !== 503 || attempt > 8) return res;
-    const moved = await res.clone().json().then((b) => b?.code === 'db-moved', () => false);
+    const moved = await res
+      .clone()
+      .json()
+      .then(
+        (b) => b?.code === 'db-moved',
+        () => false,
+      );
     if (!moved) return res;
     await sleep(500 * attempt);
   }
@@ -39,39 +48,78 @@ async function call(path_, init) {
 if (process.argv.includes('--check')) {
   const ledger = JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
   const res = await call(url, { method: 'GET' });
-  if (!res.ok) { console.error(`Could not read the project: ${res.status}`); process.exit(1); }
+  if (!res.ok) {
+    console.error(`Could not read the project: ${res.status}`);
+    process.exit(1);
+  }
   const have = new Set((await res.json()).tickets.map((t) => t.id));
   const missing = ledger.confirmed.filter((id) => !have.has(id));
   console.log(`${ledger.confirmed.length - missing.length} of ${ledger.confirmed.length} confirmed issues found on ${BASE}.`);
-  if (missing.length) { console.error(`LOST: ${missing.length} issue(s), for example ${missing.slice(0, 5).join(', ')}`); process.exit(1); }
+  if (missing.length) {
+    console.error(`LOST: ${missing.length} issue(s), for example ${missing.slice(0, 5).join(', ')}`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
 const runId = Date.now().toString(36);
 const confirmed = [];
-let failed = 0, sent = 0, reads = 0;
+let failed = 0,
+  sent = 0,
+  reads = 0;
 const failures = [];
 const end = Date.now() + DURATION_MS;
-const fail = (what, detail) => { failed++; if (failures.length < 10) failures.push(`${what}: ${detail}`); };
+const fail = (what, detail) => {
+  failed++;
+  if (failures.length < 10) failures.push(`${what}: ${detail}`);
+};
 
 async function writeOne(n) {
   const id = `load-${runId}-${n}`;
   const now = new Date().toISOString();
-  const ticket = { id, key: `LOAD-${n}`, epicId: null, sprintId: null, parentId: null, title: `Load test ${runId} #${n}`, type: 'Task', priority: 'Low', storyPoints: null,
-    labels: ['cutover-load'], userStory: '', description: '', acceptanceCriteria: [], dependencies: [], testCases: [], status: '', assignee: '', reporter: '',
-    links: [], prs: [], comments: [], history: [], createdAt: now, updatedAt: now };
+  const ticket = {
+    id,
+    key: `LOAD-${n}`,
+    epicId: null,
+    sprintId: null,
+    parentId: null,
+    title: `Load test ${runId} #${n}`,
+    type: 'Task',
+    priority: 'Low',
+    storyPoints: null,
+    labels: ['cutover-load'],
+    userStory: '',
+    description: '',
+    acceptanceCriteria: [],
+    dependencies: [],
+    testCases: [],
+    status: '',
+    assignee: '',
+    reporter: '',
+    links: [],
+    prs: [],
+    comments: [],
+    history: [],
+    createdAt: now,
+    updatedAt: now,
+  };
   sent++;
   try {
     const res = await call(url, { method: 'PATCH', body: JSON.stringify({ upsert: [ticket] }) });
-    if (res.ok) confirmed.push(id); else fail(`write #${n}`, `${res.status} ${(await res.text()).slice(0, 120)}`);
-  } catch (e) { fail(`write #${n}`, e.message); }
+    if (res.ok) confirmed.push(id);
+    else fail(`write #${n}`, `${res.status} ${(await res.text()).slice(0, 120)}`);
+  } catch (e) {
+    fail(`write #${n}`, e.message);
+  }
 }
 async function readOne() {
   reads++;
   try {
     const res = await call(`${BASE}/api/status`, { method: 'GET' });
     if (!res.ok) fail('read', `${res.status}`);
-  } catch (e) { fail('read', e.message); }
+  } catch (e) {
+    fail('read', e.message);
+  }
 }
 
 const inflight = new Set();

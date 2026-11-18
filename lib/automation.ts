@@ -31,30 +31,53 @@ export async function browserSpec() {
 }
 
 /** What to do when no test browser is available. */
-export const noBrowser = () => (SERVERLESS
-  ? 'This server can’t run a browser (serverless hosting such as Vercel). An administrator can connect a remote browser (for example Browserless) in Test automation → Settings → Remote browser, or run TicketForge on a computer.'
-  : 'No test browser is available. An administrator can install Chromium in Test automation → Settings, install Google Chrome or Microsoft Edge, or connect a remote browser.');
+export const noBrowser = () =>
+  SERVERLESS
+    ? 'This server can’t run a browser (serverless hosting such as Vercel). An administrator can connect a remote browser (for example Browserless) in Test automation → Settings → Remote browser, or run TicketForge on a computer.'
+    : 'No test browser is available. An administrator can install Chromium in Test automation → Settings, install Google Chrome or Microsoft Edge, or connect a remote browser.';
 
 export async function engineStatus() {
-  let installed = false, version = null;
+  let installed = false,
+    version = null;
   try {
     await import('@playwright/test');
     installed = true;
     version = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules', '@playwright', 'test', 'package.json'), 'utf8')).version;
-  } catch { /* not installed */ }
+  } catch {
+    /* not installed */
+  }
   if (!installed) return { installed: false, browser: false, version: null, serverless: SERVERLESS, source: null, label: 'none' };
   const spec = await browserSpec().catch(() => null);
-  return { installed, browser: Boolean(spec), version, serverless: SERVERLESS, source: spec?.kind || null, label: describeBrowser(spec),
-    systemBrowser: SERVERLESS ? null : systemBrowser()?.label || null };
+  return {
+    installed,
+    browser: Boolean(spec),
+    version,
+    serverless: SERVERLESS,
+    source: spec?.kind || null,
+    label: describeBrowser(spec),
+    systemBrowser: SERVERLESS ? null : systemBrowser()?.label || null,
+  };
 }
 
 /** Streams `npx playwright install chromium` output lines to onLine. */
 export function installBrowser(onLine) {
-  if (SERVERLESS) return Promise.reject(Object.assign(new Error('Test automation needs a regular server: serverless hosting (like Vercel) can’t install or run a browser. Run TicketForge on your own computer to use it.'), { status: 400 }));
+  if (SERVERLESS)
+    return Promise.reject(
+      Object.assign(
+        new Error(
+          'Test automation needs a regular server: serverless hosting (like Vercel) can’t install or run a browser. Run TicketForge on your own computer to use it.',
+        ),
+        { status: 400 },
+      ),
+    );
   return new Promise((resolve, reject) => {
     const cli = path.join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js');
     const child = spawn(/*turbopackIgnore: true*/ process.execPath, [cli, 'install', 'chromium'], { cwd: ROOT });
-    const pipe = (d) => String(d).split(/\r?\n/).filter(Boolean).forEach((l) => onLine(l));
+    const pipe = (d) =>
+      String(d)
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .forEach((l) => onLine(l));
     child.stdout.on('data', pipe);
     child.stderr.on('data', pipe);
     child.on('error', reject);
@@ -65,19 +88,45 @@ export function installBrowser(onLine) {
 /** A compact description of the open page so the AI can pick real selectors. */
 async function describe(page, maxEls = 350, maxText = 5000) {
   const title = await page.title().catch(() => '');
-  const elements = await page.locator('a, button, input, select, textarea, label, h1, h2, h3, [role], [data-testid], [aria-label]').evaluateAll((els, max) => els.slice(0, max).map((el) => {
-    const r = el.getBoundingClientRect();
-    if (!r.width && !r.height) return null;
-    const attrs = ['id', 'name', 'type', 'placeholder', 'role', 'aria-label', 'data-testid', 'data-action', 'href']
-      .map((a) => (el.getAttribute(a) ? `${a}="${el.getAttribute(a).slice(0, 60)}"` : null)).filter(Boolean).join(' ');
-    const text = el.type === 'password' ? '' : (el.innerText || el.value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
-    return `<${el.tagName.toLowerCase()}${attrs ? ` ${attrs}` : ''}>${text}`;
-  }).filter(Boolean), maxEls).catch(() => []);
-  const text = (await page.locator('body').innerText().catch(() => '')).replace(/\n{3,}/g, '\n\n').slice(0, maxText);
+  const elements = await page
+    .locator('a, button, input, select, textarea, label, h1, h2, h3, [role], [data-testid], [aria-label]')
+    .evaluateAll(
+      (els, max) =>
+        els
+          .slice(0, max)
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            if (!r.width && !r.height) return null;
+            const attrs = ['id', 'name', 'type', 'placeholder', 'role', 'aria-label', 'data-testid', 'data-action', 'href']
+              .map((a) => (el.getAttribute(a) ? `${a}="${el.getAttribute(a).slice(0, 60)}"` : null))
+              .filter(Boolean)
+              .join(' ');
+            const text = el.type === 'password' ? '' : (el.innerText || el.value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+            return `<${el.tagName.toLowerCase()}${attrs ? ` ${attrs}` : ''}>${text}`;
+          })
+          .filter(Boolean),
+      maxEls,
+    )
+    .catch(() => []);
+  const text = (
+    await page
+      .locator('body')
+      .innerText()
+      .catch(() => '')
+  )
+    .replace(/\n{3,}/g, '\n\n')
+    .slice(0, maxText);
   return { url: page.url(), path: pathOf(page.url()), title, elements: elements.join('\n'), text };
 }
 const settle = (page) => page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
-const pathOf = (u) => { try { const x = new URL(u); return `${x.pathname}${x.hash.startsWith('#/') ? x.hash : ''}`; } catch { return u; } };
+const pathOf = (u) => {
+  try {
+    const x = new URL(u);
+    return `${x.pathname}${x.hash.startsWith('#/') ? x.hash : ''}`;
+  } catch {
+    return u;
+  }
+};
 /**
  * The hosted service (SaaS) runs test browsers on its own servers: the app under test must be on the public internet,
  * not a private or internal address (which would reach the server's own network). Self-hosted, anything goes.
@@ -85,10 +134,19 @@ const pathOf = (u) => { try { const x = new URL(u); return `${x.pathname}${x.has
 export async function assertPublicTarget(url) {
   if (!isSaas() || !url) return;
   let u;
-  try { u = new URL(url); } catch { throw Object.assign(new Error('Enter the full address of the app to test, like https://staging.example.com.'), { status: 400 }); }
+  try {
+    u = new URL(url);
+  } catch {
+    throw Object.assign(new Error('Enter the full address of the app to test, like https://staging.example.com.'), { status: 400 });
+  }
   if (!/^https?:$/.test(u.protocol)) throw Object.assign(new Error('The app to test must use http:// or https://.'), { status: 400 });
   if (await isPrivateHost(u.hostname)) {
-    throw Object.assign(new Error(`${u.host} is a private or internal address. On the hosted service, test an app that's reachable on the internet, or run tests on GitHub Actions.`), { status: 400 });
+    throw Object.assign(
+      new Error(
+        `${u.host} is a private or internal address. On the hosted service, test an app that's reachable on the internet, or run tests on GitHub Actions.`,
+      ),
+      { status: 400 },
+    );
   }
 }
 
@@ -97,8 +155,16 @@ async function withBrowser(baseUrl, fn) {
   const { chromium, expect } = await import('@playwright/test');
   const spec = await browserSpec();
   let browser;
-  try { browser = await launch(chromium, spec); }
-  catch (e) { throw Object.assign(new Error(`Couldn’t start the test browser (${describeBrowser(spec)}): ${explainConnectError(hideEndpoint(String(e.message || e).split('\n')[0], spec), spec)}`), { status: 502 }); }
+  try {
+    browser = await launch(chromium, spec);
+  } catch (e) {
+    throw Object.assign(
+      new Error(
+        `Couldn’t start the test browser (${describeBrowser(spec)}): ${explainConnectError(hideEndpoint(String(e.message || e).split('\n')[0], spec), spec)}`,
+      ),
+      { status: 502 },
+    );
+  }
   try {
     const context = await browser.newContext({ baseURL: baseUrl, viewport: { width: 1280, height: 800 } });
     absoluteNavigation(context, baseUrl);
@@ -134,8 +200,13 @@ export async function snapshotApp({ baseUrl, app = {}, role }: any) {
     const notes: any[] = [];
     const who = loginRole(app, role);
     if (who) {
-      try { await makeApp(page, expect, app).loginAs(who.name); notes.push(`Signed in as ${who.name}.`); }
-      catch (e) { notes.push(`Signing in as ${who.name} failed: ${maskSecrets(e.message.split('\n')[0], app)}`); await page.goto('/').catch(() => {}); }
+      try {
+        await makeApp(page, expect, app).loginAs(who.name);
+        notes.push(`Signed in as ${who.name}.`);
+      } catch (e) {
+        notes.push(`Signing in as ${who.name} failed: ${maskSecrets(e.message.split('\n')[0], app)}`);
+        await page.goto('/').catch(() => {});
+      }
     } else {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
     }
@@ -148,7 +219,9 @@ export async function snapshotApp({ baseUrl, app = {}, role }: any) {
         await page.goto(p.path, { waitUntil: 'domcontentloaded', timeout: 15000 });
         await settle(page);
         pages.push({ name: p.name, ...(await describe(page, 60, 500)) });
-      } catch (e) { pages.push({ name: p.name, path: p.path, error: e.message.split('\n')[0] }); }
+      } catch (e) {
+        pages.push({ name: p.name, path: p.path, error: e.message.split('\n')[0] });
+      }
     }
     return { ...start, signedInAs: who?.name || null, notes, pages };
   });
@@ -181,10 +254,30 @@ export async function testLogin({ baseUrl, app = {}, role }: any) {
       await helper.loginAs(r.name);
       await settle(page);
       await page.screenshot({ path: path.join(RUN_DIR, file), timeout: 5000 }).catch(() => {});
-      return { ok: true, url: page.url(), title: await page.title().catch(() => ''), screenshot: `/runs/${file}`, notes: notes(), loginPath: helper.loginPath };
+      return {
+        ok: true,
+        url: page.url(),
+        title: await page.title().catch(() => ''),
+        screenshot: `/runs/${file}`,
+        notes: notes(),
+        loginPath: helper.loginPath,
+      };
     } catch (e) {
       await page.screenshot({ path: path.join(RUN_DIR, file), timeout: 5000 }).catch(() => {});
-      return { ok: false, error: maskSecrets(String(e.message || e).split('\n').slice(0, 3).join(' '), app), url: page.url(), screenshot: `/runs/${file}`, notes: notes(), loginPath: helper.loginPath };
+      return {
+        ok: false,
+        error: maskSecrets(
+          String(e.message || e)
+            .split('\n')
+            .slice(0, 3)
+            .join(' '),
+          app,
+        ),
+        url: page.url(),
+        screenshot: `/runs/${file}`,
+        notes: notes(),
+        loginPath: helper.loginPath,
+      };
     }
   });
 }
@@ -223,21 +316,30 @@ export async function discoverPages({ baseUrl, app = {}, role, max = 30 }: any) 
         const info = await page.evaluate(() => ({
           title: document.title,
           h1: (document.querySelector('h1')?.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 60),
-          links: [...document.querySelectorAll('a[href]')].map((a: any) => ({ href: a.href, text: (a.innerText || a.getAttribute('aria-label') || a.title || '').trim().replace(/\s+/g, ' ').slice(0, 60) })),
+          links: [...document.querySelectorAll('a[href]')].map((a: any) => ({
+            href: a.href,
+            text: (a.innerText || a.getAttribute('aria-label') || a.title || '').trim().replace(/\s+/g, ' ').slice(0, 60),
+          })),
         }));
         const name = (via && via.length <= 40 ? via : '') || info.h1 || info.title || here;
         found.push({ name, path: here, title: info.title });
         if (depth >= 2) continue;
         for (const l of info.links) {
           let u;
-          try { u = new URL(l.href); } catch { continue; }
+          try {
+            u = new URL(l.href);
+          } catch {
+            continue;
+          }
           if (u.origin !== origin) continue;
           if (LOGOUT_RE.test(l.text) || LOGOUT_RE.test(u.pathname) || SKIP.test(l.text) || SKIP.test(u.pathname)) continue;
           if (/\.(pdf|zip|png|jpe?g|gif|svg|csv|xlsx?|docx?|txt)$/i.test(u.pathname)) continue;
           const next = `${u.pathname}${u.hash.startsWith('#/') ? u.hash : ''}`;
           if (!seen.has(next)) queue.push({ path: next, depth: depth + 1, via: l.text });
         }
-      } catch { /* skip pages that don't load */ }
+      } catch {
+        /* skip pages that don't load */
+      }
     }
     // Distinct names, so app.goto('Name') is unambiguous.
     const names: Map<any, any> = new Map();
@@ -252,24 +354,41 @@ export async function discoverPages({ baseUrl, app = {}, role, max = 30 }: any) 
 
 /** The App setup as the AI sees it: names, paths and descriptions, never credentials. */
 function appMapText(app: any, snapshot) {
-  const pages = app.pages || [], roles = app.roles || [];
+  const pages = app.pages || [],
+    roles = app.roles || [];
   const lines: any[] = [];
   if (pages.length) {
-    lines.push('Pages (open with await app.goto("<name>"); app.url("<name>") returns the path). Dynamic segments like :id need values:',
-      'await app.goto("<name>", { id: 42 }). Get real ids by first opening the list page and reading a link or row when possible.');
+    lines.push(
+      'Pages (open with await app.goto("<name>"); app.url("<name>") returns the path). Dynamic segments like :id need values:',
+      'await app.goto("<name>", { id: 42 }). Get real ids by first opening the list page and reading a link or row when possible.',
+    );
     for (const p of pages) lines.push(`- "${p.name}" → ${p.path}${p.description ? `: ${p.description}` : ''}`);
-  } else lines.push('No pages are set up yet: navigate with page.goto(\'/path\') and the links you see.');
+  } else lines.push("No pages are set up yet: navigate with page.goto('/path') and the links you see.");
   if (roles.length) {
-    lines.push('', 'User roles (sign in with await app.loginAs("<role>"); it handles the login form, single sign-on, MFA codes and saved sessions):');
-    const how = (r) => (r.signIn === 'session' ? (r.session ? 'saved session' : 'saved session — none saved yet') : r.signIn === 'sso' ? `single sign-on${r.ssoButton ? ` via “${r.ssoButton}”` : ''}` : 'login form')
-      + (r.totp ? ', MFA code filled automatically' : '');
+    lines.push(
+      '',
+      'User roles (sign in with await app.loginAs("<role>"); it handles the login form, single sign-on, MFA codes and saved sessions):',
+    );
+    const how = (r) =>
+      (r.signIn === 'session'
+        ? r.session
+          ? 'saved session'
+          : 'saved session — none saved yet'
+        : r.signIn === 'sso'
+          ? `single sign-on${r.ssoButton ? ` via “${r.ssoButton}”` : ''}`
+          : 'login form') + (r.totp ? ', MFA code filled automatically' : '');
     const ready = (r) => (r.signIn === 'session' ? Boolean(r.session) : Boolean(r.username && r.password));
-    for (const r of roles) lines.push(`- "${r.name}"${r.description ? `: ${r.description}` : ''} (${how(r)})${ready(r) ? '' : ' (no credentials saved yet)'}`);
+    for (const r of roles)
+      lines.push(`- "${r.name}"${r.description ? `: ${r.description}` : ''} (${how(r)})${ready(r) ? '' : ' (no credentials saved yet)'}`);
     lines.push(`Login form: ${app.login?.path || 'found automatically'} (app.loginAs handles it).`);
   } else lines.push('', 'No user roles are set up: the app may not need signing in.');
-  if (app.db?.name) lines.push('', `Database: await app.db.query(sql, params) runs a read-only SQL query on ${app.db.name} (${app.db.engineLabel || 'PostgreSQL'}; placeholders are written ${app.db.placeholder || '$1'}, ${app.db.placeholder === '@p1' ? '@p2' : app.db.placeholder === '?' ? '?' : '$2'}…) and returns the rows, e.g.`,
-    `  const [row] = await app.db.query('select status from orders where id = ${app.db.placeholder || '$1'}', [orderId]); expect(row?.status).toBe('paid');`,
-    'Use it after the UI steps when the expected result is about saved data, with the exact names from the DATABASE SCHEMA. Never write data with it.');
+  if (app.db?.name)
+    lines.push(
+      '',
+      `Database: await app.db.query(sql, params) runs a read-only SQL query on ${app.db.name} (${app.db.engineLabel || 'PostgreSQL'}; placeholders are written ${app.db.placeholder || '$1'}, ${app.db.placeholder === '@p1' ? '@p2' : app.db.placeholder === '?' ? '?' : '$2'}…) and returns the rows, e.g.`,
+      `  const [row] = await app.db.query('select status from orders where id = ${app.db.placeholder || '$1'}', [orderId]); expect(row?.status).toBe('paid');`,
+      'Use it after the UI steps when the expected result is about saved data, with the exact names from the DATABASE SCHEMA. Never write data with it.',
+    );
   if (app.notes) lines.push('', `Notes from the team: ${app.notes}`);
   if (snapshot?.notes?.length) lines.push('', `While taking the snapshot: ${snapshot.notes.join(' ')}`);
   return lines.join('\n');
@@ -305,9 +424,13 @@ export const SCRIPT_BASE = () => SCRIPT_SYSTEM;
 
 export async function generateScripts({ ticket, tests, project, baseUrl, snapshot, ai, app = {}, notes = '' }: any) {
   const roleName = (id) => (app.roles || []).find((r) => r.id === id)?.name || undefined;
-  const pageShots = (snapshot.pages || []).map((p) => (p.error
-    ? `### Page "${p.name}" (${p.path}): couldn't open it (${p.error})`
-    : `### Page "${p.name}" (${p.path}, title "${p.title}")\n${p.elements}\nText: ${p.text.replace(/\s+/g, ' ').slice(0, 400)}`)).join('\n\n');
+  const pageShots = (snapshot.pages || [])
+    .map((p) =>
+      p.error
+        ? `### Page "${p.name}" (${p.path}): couldn't open it (${p.error})`
+        : `### Page "${p.name}" (${p.path}, title "${p.title}")\n${p.elements}\nText: ${p.text.replace(/\s+/g, ' ').slice(0, 400)}`,
+    )
+    .join('\n\n');
   const prompt = `Application under test: ${project?.name || ''}
 Base URL: ${baseUrl}
 Project summary: ${project?.summary || ''}
@@ -328,13 +451,36 @@ Visible text:
 ${snapshot.text}
 ${pageShots ? `\nOther pages from the app map:\n${pageShots}\n` : ''}
 Test cases to automate:
-${JSON.stringify(tests.map((t, i) => ({ index: i, title: t.title, runAs: roleName(t.roleId), preconditions: t.preconditions, steps: t.steps, expected: t.expected })), null, 2)}
+${JSON.stringify(
+  tests.map((t, i) => ({
+    index: i,
+    title: t.title,
+    runAs: roleName(t.roleId),
+    preconditions: t.preconditions,
+    steps: t.steps,
+    expected: t.expected,
+  })),
+  null,
+  2,
+)}
 
 ${notes ? `\n${notes}\nUse these answers when writing the scripts.\n` : ''}
 Return JSON: { "scripts": [ { "index": 0, "code": "await app.loginAs('…');\\n..." } ] }`;
   const rules = await getRules();
-  const res = await askJson({ ...ai, task: 'automation', reasoning: rules.reasoning, system: automationSystem(rules, await getGuide()) + await agentInstructions('feature-verification') + contextBlock(project), prompt, brain: { projectId: project?.id, issues: [ticket], max: 4000 } });
-  return (res.scripts || []).map((s) => ({ index: Number(s.index), code: String(s.code || '').replace(/^```(?:js|javascript)?\s*|```\s*$/g, '').trim() }));
+  const res = await askJson({
+    ...ai,
+    task: 'automation',
+    reasoning: rules.reasoning,
+    system: automationSystem(rules, await getGuide()) + (await agentInstructions('feature-verification')) + contextBlock(project),
+    prompt,
+    brain: { projectId: project?.id, issues: [ticket], max: 4000 },
+  });
+  return (res.scripts || []).map((s) => ({
+    index: Number(s.index),
+    code: String(s.code || '')
+      .replace(/^```(?:js|javascript)?\s*|```\s*$/g, '')
+      .trim(),
+  }));
 }
 
 /** Runs one script in a child process. Returns { status, error, durationMs, screenshot, logs }. */
@@ -353,22 +499,38 @@ export function runScript({ code, baseUrl, tcId, timeoutMs, signal, app, browser
   };
   // Serverless hosting can't reliably start another process: run the script here, in this request.
   if (SERVERLESS) {
-    return runOne(input, { signal }).catch((e) => ({ status: 'Fail', error: String(e?.message || e).slice(0, 2000), durationMs: 0, logs: [], screenshot: null })).then(finish);
+    return runOne(input, { signal })
+      .catch((e) => ({ status: 'Fail', error: String(e?.message || e).slice(0, 2000), durationMs: 0, logs: [], screenshot: null }))
+      .then(finish);
   }
   return new Promise((resolve) => {
     const child = spawn(/*turbopackIgnore: true*/ process.execPath, [RUNNER], { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '', err = '';
+    let out = '',
+      err = '';
     const kill = () => child.kill('SIGKILL');
     const hard = setTimeout(kill, timeoutMs + 20000);
     signal?.addEventListener('abort', kill);
-    child.stdout.on('data', (d) => { out += d; });
-    child.stderr.on('data', (d) => { err += d; });
+    child.stdout.on('data', (d) => {
+      out += d;
+    });
+    child.stderr.on('data', (d) => {
+      err += d;
+    });
     child.on('close', () => {
       clearTimeout(hard);
       signal?.removeEventListener('abort', kill);
       const line = out.trim().split('\n').pop();
       let r;
-      try { r = JSON.parse(line); } catch { r = { status: 'Fail', error: signal?.aborted ? 'Run stopped' : (err || out || 'Runner crashed').slice(-2000), durationMs: 0, logs: [] }; }
+      try {
+        r = JSON.parse(line);
+      } catch {
+        r = {
+          status: 'Fail',
+          error: signal?.aborted ? 'Run stopped' : (err || out || 'Runner crashed').slice(-2000),
+          durationMs: 0,
+          logs: [],
+        };
+      }
       resolve(finish(r));
     });
     child.stdin.end(JSON.stringify(input));
@@ -379,15 +541,34 @@ export function runScript({ code, baseUrl, tcId, timeoutMs, signal, app, browser
  * Full run. items: [{ ticket, tc }] where ticket = { id, key, title, userStory, acceptanceCriteria } and
  * tc = { id, title, steps, expected, preconditions, script }. emit(event) streams progress.
  */
-export async function runAutomation({ items, baseUrl, regenerate, project, ai, emit, signal, app = {}, user, notes = '', heal = false, github = null }: any) {
+export async function runAutomation({
+  items,
+  baseUrl,
+  regenerate,
+  project,
+  ai,
+  emit,
+  signal,
+  app = {},
+  user,
+  notes = '',
+  heal = false,
+  github = null,
+}: any) {
   if (!github) await assertPublicTarget(baseUrl);
   const spec = await browserSpec();
   const rs = runSettings(app.run);
-  emit({ type: 'phase', message: `${github ? `Runs on GitHub Actions (${github.repo} @ ${github.ref})` : `Test browser: ${describeBrowser(spec)}`} · ${rs.device}, ${rs.locale}, ${rs.timezoneId} · ${rs.testTimeoutSec}s per test${rs.retries ? `, ${rs.retries} retr${rs.retries === 1 ? 'y' : 'ies'}` : ''}` });
+  emit({
+    type: 'phase',
+    message: `${github ? `Runs on GitHub Actions (${github.repo} @ ${github.ref})` : `Test browser: ${describeBrowser(spec)}`} · ${rs.device}, ${rs.locale}, ${rs.timezoneId} · ${rs.testTimeoutSec}s per test${rs.retries ? `, ${rs.retries} retr${rs.retries === 1 ? 'y' : 'ies'}` : ''}`,
+  });
   const needScripts = items.filter((it) => regenerate || !it.tc.script?.trim());
   if (needScripts.length) {
     const firstRole = needScripts.map((it) => (app.roles || []).find((r) => r.id === it.tc.roleId)?.name).find(Boolean);
-    emit({ type: 'phase', message: `Opening ${baseUrl} to learn ${app.pages?.length ? `its ${app.pages.length > 6 ? 'first 6' : app.pages.length} page${app.pages.length > 1 ? 's' : ''}` : 'the page'}…` });
+    emit({
+      type: 'phase',
+      message: `Opening ${baseUrl} to learn ${app.pages?.length ? `its ${app.pages.length > 6 ? 'first 6' : app.pages.length} page${app.pages.length > 1 ? 's' : ''}` : 'the page'}…`,
+    });
     let snapshot = null;
     try {
       if (github && !spec) throw Object.assign(new Error('no local browser'), { noBrowser: true });
@@ -395,8 +576,24 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
     } catch (e) {
       // On GitHub Actions without a browser here: write the scripts from the steps and the App setup (less exact).
       if (github) {
-        snapshot = { title: '', path: '', url: baseUrl, elements: '(not available: this server has no browser; the tests run on GitHub Actions. Use role- and label-based locators from the test steps.)', text: '', notes: [] };
-        emit({ type: 'phase', level: 'warn', message: e.noBrowser ? 'No browser on this server to look at the app: the scripts are written from the test steps and App setup.' : `Couldn’t open ${baseUrl} here (${String(e.message || e).split('\n')[0].slice(0, 160)}); the scripts are written from the test steps and App setup.` });
+        snapshot = {
+          title: '',
+          path: '',
+          url: baseUrl,
+          elements:
+            '(not available: this server has no browser; the tests run on GitHub Actions. Use role- and label-based locators from the test steps.)',
+          text: '',
+          notes: [],
+        };
+        emit({
+          type: 'phase',
+          level: 'warn',
+          message: e.noBrowser
+            ? 'No browser on this server to look at the app: the scripts are written from the test steps and App setup.'
+            : `Couldn’t open ${baseUrl} here (${String(e.message || e)
+                .split('\n')[0]
+                .slice(0, 160)}); the scripts are written from the test steps and App setup.`,
+        });
       } else {
         // Without a look at the app no scripts can be written: those tests fail with the reason; the others still run.
         const why = `Could not open ${baseUrl} to write the scripts: ${hideEndpoint(maskSecrets(String(e.message || e).split('\n')[0], app), spec)}`;
@@ -418,10 +615,22 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
         const { ticket, list } = jobs.shift();
         emit({ type: 'phase', message: `AI is writing ${list.length} script${list.length > 1 ? 's' : ''} for ${ticket.key}…` });
         try {
-          const scripts = await generateScripts({ ticket, tests: list.map((x) => x.tc), project, baseUrl, snapshot, app, notes, ai: { ...ai, signal, onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }) } });
+          const scripts = await generateScripts({
+            ticket,
+            tests: list.map((x) => x.tc),
+            project,
+            baseUrl,
+            snapshot,
+            app,
+            notes,
+            ai: { ...ai, signal, onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }) },
+          });
           for (const s of scripts) {
             const it = list[s.index];
-            if (it && s.code) { it.tc.script = s.code; emit({ type: 'script', ticketId: ticket.id, tcId: it.tc.id, code: s.code }); }
+            if (it && s.code) {
+              it.tc.script = s.code;
+              emit({ type: 'script', ticketId: ticket.id, tcId: it.tc.id, code: s.code });
+            }
           }
         } catch (e) {
           if (signal?.aborted) return;
@@ -437,7 +646,18 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
   for (const it of items) {
     if (signal?.aborted) return;
     if (!it.tc.script?.trim()) {
-      emit({ type: 'result', ticketId: it.ticket.id, tcId: it.tc.id, result: { status: 'Fail', error: it.noScriptReason || 'No automation script: the AI couldn’t write one (see the run log).', durationMs: 0, at: new Date().toISOString(), logs: [] } });
+      emit({
+        type: 'result',
+        ticketId: it.ticket.id,
+        tcId: it.tc.id,
+        result: {
+          status: 'Fail',
+          error: it.noScriptReason || 'No automation script: the AI couldn’t write one (see the run log).',
+          durationMs: 0,
+          at: new Date().toISOString(),
+          logs: [],
+        },
+      });
       continue;
     }
     emit({ type: 'start', ticketId: it.ticket.id, tcId: it.tc.id });
@@ -446,7 +666,13 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
     let attempt = 1;
     while (result.status !== 'Pass' && attempt <= rs.retries && !signal?.aborted && !/No automation script/.test(result.error || '')) {
       attempt++;
-      emit({ type: 'phase', level: 'warn', message: `${it.ticket.key}: “${String(it.tc.title || '').slice(0, 80)}” failed (${String(result.error || '').split('\n')[0].slice(0, 120)}). Retrying (${attempt - 1} of ${rs.retries})…` });
+      emit({
+        type: 'phase',
+        level: 'warn',
+        message: `${it.ticket.key}: “${String(it.tc.title || '').slice(0, 80)}” failed (${String(result.error || '')
+          .split('\n')[0]
+          .slice(0, 120)}). Retrying (${attempt - 1} of ${rs.retries})…`,
+      });
       if (result.localShot) fs.rm(result.localShot, { force: true }, () => {});
       result = await runScript({ code: it.tc.script, baseUrl, tcId: it.tc.id, signal, app, browser: spec });
     }
@@ -455,12 +681,26 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
     if (heal && healable(result) && !signal?.aborted) {
       emit({ type: 'phase', message: `${it.ticket.key}: Self-healing agent is checking “${String(it.tc.title || '').slice(0, 70)}”…` });
       try {
-        const h = await healScript({ ticket: it.ticket, tc: it.tc, result, baseUrl, project, ai: { ...ai, signal, onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }) } });
+        const h = await healScript({
+          ticket: it.ticket,
+          tc: it.tc,
+          result,
+          baseUrl,
+          project,
+          ai: { ...ai, signal, onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }) },
+        });
         if (h.healable) {
           const again = await runScript({ code: h.code, baseUrl, tcId: it.tc.id, signal, app, browser: spec });
           if (again.status === 'Pass') {
             if (result.localShot) fs.rm(result.localShot, { force: true }, () => {});
-            again.healed = { reason: h.reason, previous: it.tc.script, at: new Date().toISOString(), error: String(result.error || '').split('\n')[0].slice(0, 300) };
+            again.healed = {
+              reason: h.reason,
+              previous: it.tc.script,
+              at: new Date().toISOString(),
+              error: String(result.error || '')
+                .split('\n')[0]
+                .slice(0, 300),
+            };
             again.attempts = attempt + 1;
             it.tc.script = h.code;
             emit({ type: 'script', ticketId: it.ticket.id, tcId: it.tc.id, code: h.code, healed: true });
@@ -469,21 +709,40 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
           } else {
             if (again.localShot) fs.rm(again.localShot, { force: true }, () => {});
             result.healAttempt = { reason: h.reason, failed: true };
-            emit({ type: 'phase', level: 'warn', message: `${it.ticket.key}: the healed script still failed, so the original failure stands.` });
+            emit({
+              type: 'phase',
+              level: 'warn',
+              message: `${it.ticket.key}: the healed script still failed, so the original failure stands.`,
+            });
           }
         } else {
           result.healAttempt = { reason: h.reason, notHealable: true };
           emit({ type: 'phase', message: `${it.ticket.key}: not a script problem, left failing (${h.reason})` });
         }
-      } catch (e) { if (!signal?.aborted) emit({ type: 'phase', level: 'warn', message: `Self-healing couldn’t check ${it.ticket.key}: ${e.message}` }); }
+      } catch (e) {
+        if (!signal?.aborted) emit({ type: 'phase', level: 'warn', message: `Self-healing couldn’t check ${it.ticket.key}: ${e.message}` });
+      }
     }
-    if (result.status === 'Pass' && attempt > 1) { result.flaky = true; emit({ type: 'phase', level: 'warn', message: `${it.ticket.key}: passed on attempt ${attempt} — flaky, worth a look.` }); }
+    if (result.status === 'Pass' && attempt > 1) {
+      result.flaky = true;
+      emit({ type: 'phase', level: 'warn', message: `${it.ticket.key}: passed on attempt ${attempt} — flaky, worth a look.` });
+    }
     // Failures: keep the screenshot in the database. Passes: nothing to keep.
     const local = result.localShot;
     delete result.localShot;
     if (result.status !== 'Pass' && project?.id && local) {
-      try { result.screenshot = await saveFailureShot({ file: local, projectId: project.id, issueId: it.ticket.id, tcId: it.tc.id, error: result.error, user }); }
-      catch (e) { emit({ type: 'phase', level: 'warn', message: `Couldn’t save the screenshot: ${e.message}` }); }
+      try {
+        result.screenshot = await saveFailureShot({
+          file: local,
+          projectId: project.id,
+          issueId: it.ticket.id,
+          tcId: it.tc.id,
+          error: result.error,
+          user,
+        });
+      } catch (e) {
+        emit({ type: 'phase', level: 'warn', message: `Couldn’t save the screenshot: ${e.message}` });
+      }
     } else if (result.status === 'Pass' && local) {
       fs.rm(local, { force: true }, () => {});
       result.screenshot = null;
@@ -501,14 +760,47 @@ export async function runAutomation({ items, baseUrl, regenerate, project, ai, e
 async function runOnGitHub({ items, baseUrl, project, emit, signal, app, user, rs, github }: any) {
   const ready = items.filter((it) => it.tc.script?.trim());
   for (const it of items) {
-    if (!it.tc.script?.trim()) emit({ type: 'result', ticketId: it.ticket.id, tcId: it.tc.id, result: { status: 'Fail', error: it.noScriptReason || 'No automation script: the AI couldn’t write one (see the run log).', durationMs: 0, at: new Date().toISOString(), logs: [] } });
+    if (!it.tc.script?.trim())
+      emit({
+        type: 'result',
+        ticketId: it.ticket.id,
+        tcId: it.tc.id,
+        result: {
+          status: 'Fail',
+          error: it.noScriptReason || 'No automation script: the AI couldn’t write one (see the run log).',
+          durationMs: 0,
+          at: new Date().toISOString(),
+          logs: [],
+        },
+      });
   }
   if (!ready.length || signal?.aborted) return;
-  const tests = ready.map((it) => ({ tcId: it.tc.id, ticketId: it.ticket.id, code: it.tc.script, label: `${it.ticket.key} ${String(it.tc.title || '').slice(0, 90)}` }));
+  const tests = ready.map((it) => ({
+    tcId: it.tc.id,
+    ticketId: it.ticket.id,
+    code: it.tc.script,
+    label: `${it.ticket.key} ${String(it.tc.title || '').slice(0, 90)}`,
+  }));
   emit({ type: 'phase', message: `Sending ${tests.length} test${tests.length === 1 ? '' : 's'} to GitHub Actions (${github.repo})…` });
-  const runs = await dispatchRuns({ repo: github.repo, ref: github.ref, token: github.token, key: github.key, baseUrl, app, retries: rs.retries, timeoutMs: rs.testTimeoutSec * 1000, tests });
+  const runs = await dispatchRuns({
+    repo: github.repo,
+    ref: github.ref,
+    token: github.token,
+    key: github.key,
+    baseUrl,
+    app,
+    retries: rs.retries,
+    timeoutMs: rs.testTimeoutSec * 1000,
+    tests,
+  });
   for (const it of ready) emit({ type: 'start', ticketId: it.ticket.id, tcId: it.tc.id, queued: true });
-  emit({ type: 'phase', message: runs.length > 1 ? `Started ${runs.length} GitHub Actions runs (the tests were split to fit GitHub’s size limit).` : 'Started the GitHub Actions run. It takes about a minute to start the browser container.' });
+  emit({
+    type: 'phase',
+    message:
+      runs.length > 1
+        ? `Started ${runs.length} GitHub Actions runs (the tests were split to fit GitHub’s size limit).`
+        : 'Started the GitHub Actions run. It takes about a minute to start the browser container.',
+  });
   await followGitHubRuns({ runs, github, project, user, emit, signal, items: ready, baseUrl });
 }
 
@@ -520,35 +812,113 @@ export async function followGitHubRuns({ runs, github, project, user, emit, sign
   while (left.size && !signal?.aborted) {
     for (const run of runs.filter((r) => left.has(r.runId))) {
       let st;
-      try { st = await checkRun({ repo: github.repo, token: github.token, key: github.key, run }); }
-      catch (e) { st = { state: 'error', message: e.message }; }
-      const note = st.state === 'queued' ? 'Waiting for a GitHub runner…' : st.state === 'in_progress' ? 'Running on GitHub Actions…' : st.state === 'waiting' ? 'GitHub is starting the run…' : '';
-      if (note && said.get(run.runId) !== note) { said.set(run.runId, note); emit({ type: 'phase', message: `${note}${st.url ? ` ${st.url}` : ''}`, url: st.url }); }
-      if (st.state === 'error') { emit({ type: 'phase', level: 'warn', message: `Couldn’t check the GitHub run: ${st.message}` }); continue; }
+      try {
+        st = await checkRun({ repo: github.repo, token: github.token, key: github.key, run });
+      } catch (e) {
+        st = { state: 'error', message: e.message };
+      }
+      const note =
+        st.state === 'queued'
+          ? 'Waiting for a GitHub runner…'
+          : st.state === 'in_progress'
+            ? 'Running on GitHub Actions…'
+            : st.state === 'waiting'
+              ? 'GitHub is starting the run…'
+              : '';
+      if (note && said.get(run.runId) !== note) {
+        said.set(run.runId, note);
+        emit({ type: 'phase', message: `${note}${st.url ? ` ${st.url}` : ''}`, url: st.url });
+      }
+      if (st.state === 'error') {
+        emit({ type: 'phase', level: 'warn', message: `Couldn’t check the GitHub run: ${st.message}` });
+        continue;
+      }
       if (st.state === 'failed') {
         left.delete(run.runId);
         emit({ type: 'phase', level: 'err', message: st.message, url: st.url });
-        for (const tcId of run.tcIds) { const it: any = byTc.get(tcId); emit({ type: 'result', ticketId: it?.ticket.id || github.tickets?.[tcId], tcId, result: { status: 'Fail', error: `GitHub Actions: ${st.message}`, durationMs: 0, at: new Date().toISOString(), logs: [], runner: 'github', runUrl: st.url } }); }
+        for (const tcId of run.tcIds) {
+          const it: any = byTc.get(tcId);
+          emit({
+            type: 'result',
+            ticketId: it?.ticket.id || github.tickets?.[tcId],
+            tcId,
+            result: {
+              status: 'Fail',
+              error: `GitHub Actions: ${st.message}`,
+              durationMs: 0,
+              at: new Date().toISOString(),
+              logs: [],
+              runner: 'github',
+              runUrl: st.url,
+            },
+          });
+        }
         continue;
       }
       if (st.state !== 'done') continue;
       left.delete(run.runId);
       for (const r of st.results) {
-        const result = { status: r.status, error: r.error || '', durationMs: r.durationMs || 0, logs: r.logs || [], page: r.page, attempts: r.attempts || 1, flaky: Boolean(r.flaky), at: new Date().toISOString(), runner: 'github', runUrl: st.url, screenshot: null };
+        const result = {
+          status: r.status,
+          error: r.error || '',
+          durationMs: r.durationMs || 0,
+          logs: r.logs || [],
+          page: r.page,
+          attempts: r.attempts || 1,
+          flaky: Boolean(r.flaky),
+          at: new Date().toISOString(),
+          runner: 'github',
+          runUrl: st.url,
+          screenshot: null,
+        };
         if (r.status !== 'Pass' && r.shot && project?.id) {
           const file = path.join(RUN_DIR, `${runPrefix()}${r.tcId}-gh-${Date.now()}.jpg`);
-          try { fs.writeFileSync(file, Buffer.from(r.shot, 'base64')); result.screenshot = await saveFailureShot({ file, projectId: project.id, issueId: r.ticketId, tcId: r.tcId, error: r.error, user }); }
-          catch (e) { emit({ type: 'phase', level: 'warn', message: `Couldn’t save the screenshot: ${e.message}` }); }
+          try {
+            fs.writeFileSync(file, Buffer.from(r.shot, 'base64'));
+            result.screenshot = await saveFailureShot({
+              file,
+              projectId: project.id,
+              issueId: r.ticketId,
+              tcId: r.tcId,
+              error: r.error,
+              user,
+            });
+          } catch (e) {
+            emit({ type: 'phase', level: 'warn', message: `Couldn’t save the screenshot: ${e.message}` });
+          }
         }
-        if (result.flaky) emit({ type: 'phase', level: 'warn', message: `${byTc.get(r.tcId)?.ticket.key || ''}: passed on attempt ${result.attempts} — flaky, worth a look.` });
+        if (result.flaky)
+          emit({
+            type: 'phase',
+            level: 'warn',
+            message: `${byTc.get(r.tcId)?.ticket.key || ''}: passed on attempt ${result.attempts} — flaky, worth a look.`,
+          });
         emit({ type: 'result', ticketId: r.ticketId, tcId: r.tcId, result });
       }
-      emit({ type: 'phase', level: 'pass', message: `GitHub Actions finished: ${st.results.filter((x) => x.status === 'Pass').length} of ${st.results.length} passed.`, url: st.url });
+      emit({
+        type: 'phase',
+        level: 'pass',
+        message: `GitHub Actions finished: ${st.results.filter((x) => x.status === 'Pass').length} of ${st.results.length} passed.`,
+        url: st.url,
+      });
     }
     if (!left.size || signal?.aborted) break;
     if (github.deadline && Date.now() > github.deadline) {
-      emit({ type: 'pending', github: { repo: github.repo, baseUrl, runs: runs.filter((r) => left.has(r.runId)), tickets: Object.fromEntries(items.map((it) => [it.tc.id, it.ticket.id])) } });
-      emit({ type: 'phase', level: 'warn', message: 'Still running on GitHub Actions. TicketForge collects the results when it finishes (keep this page open, or press “Collect results” on Test automation later).' });
+      emit({
+        type: 'pending',
+        github: {
+          repo: github.repo,
+          baseUrl,
+          runs: runs.filter((r) => left.has(r.runId)),
+          tickets: Object.fromEntries(items.map((it) => [it.tc.id, it.ticket.id])),
+        },
+      });
+      emit({
+        type: 'phase',
+        level: 'warn',
+        message:
+          'Still running on GitHub Actions. TicketForge collects the results when it finishes (keep this page open, or press “Collect results” on Test automation later).',
+      });
       return;
     }
     await new Promise((res) => setTimeout(res, 5000));

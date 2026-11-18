@@ -5,7 +5,13 @@ import fs from 'node:fs';
 import { currentContext, SERVERLESS } from './db';
 import { getPrefs } from './prefs';
 
-const exists = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+const exists = (p: string) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
 
 /** This person's own setup for a project: { frontend?: { path, source }, backend?: {…} }. */
 export async function myLocal(projectId: string, userId = currentContext().user?.id) {

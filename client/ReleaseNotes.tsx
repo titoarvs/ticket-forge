@@ -12,11 +12,23 @@ export function ReleaseNotesList({ releases }: { releases: Notes[] }) {
       {!releases.length && <p>No releases yet.</p>}
       {releases.map((r) => (
         <section key={r.version} className="rn-release" aria-labelledby={`v-${r.version}`}>
-          <h2 id={`v-${r.version}`}>Version {r.version} <time className="muted small" dateTime={r.date}>{dateLabel(r.date)}</time></h2>
-          {r.features.length
-            ? <ul>{r.features.map((f, i) => <li key={`${i}-${f}`}>{f}</li>)}</ul>
-            : <p className="muted">No new features in this release.</p>}
-        </section>))}
+          <h2 id={`v-${r.version}`}>
+            Version {r.version}{' '}
+            <time className="muted small" dateTime={r.date}>
+              {dateLabel(r.date)}
+            </time>
+          </h2>
+          {r.features.length ? (
+            <ul>
+              {r.features.map((f, i) => (
+                <li key={`${i}-${f}`}>{f}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">No new features in this release.</p>
+          )}
+        </section>
+      ))}
     </article>
   );
 }

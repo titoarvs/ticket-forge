@@ -18,5 +18,8 @@ export const PUT = api(async (req) => {
   const u = await platformOwner();
   hosted();
   const b = await body(req);
-  return { gateway: await saveGateway(String(b.provider || ''), { active: b.active === true, secretKey: b.secretKey }, u), gateways: await listGateways() };
+  return {
+    gateway: await saveGateway(String(b.provider || ''), { active: b.active === true, secretKey: b.secretKey }, u),
+    gateways: await listGateways(),
+  };
 });

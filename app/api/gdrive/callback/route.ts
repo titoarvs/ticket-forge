@@ -8,9 +8,16 @@ export const GET = api(async (req) => {
   if (!user.is_owner) throw new HttpError(403, 'Only the Super Admin can connect Google Drive.');
   const u = new URL(req.url);
   const back = (q: string) => Response.redirect(`${appUrl(req)}/admin/gdrive?${q}`, 303);
-  if (u.searchParams.get('error')) return back(`gdrive=${encodeURIComponent(u.searchParams.get('error') === 'access_denied' ? 'denied' : 'failed')}`);
+  if (u.searchParams.get('error'))
+    return back(`gdrive=${encodeURIComponent(u.searchParams.get('error') === 'access_denied' ? 'denied' : 'failed')}`);
   try {
-    await completeConnect(user, { code: u.searchParams.get('code') || '', state: u.searchParams.get('state') || '' }, `${appUrl(req)}/api/gdrive/callback`);
+    await completeConnect(
+      user,
+      { code: u.searchParams.get('code') || '', state: u.searchParams.get('state') || '' },
+      `${appUrl(req)}/api/gdrive/callback`,
+    );
     return back('gdrive=connected');
-  } catch (e: any) { return back(`gdrive=failed&message=${encodeURIComponent(String(e.message || '').slice(0, 200))}`); }
+  } catch (e: any) {
+    return back(`gdrive=failed&message=${encodeURIComponent(String(e.message || '').slice(0, 200))}`);
+  }
 });

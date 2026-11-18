@@ -21,23 +21,37 @@ const G = globalThis as any;
 
 /** How many times a failed save is retried before the document is marked failed. Still to be confirmed with the team. */
 const MAX_RETRIES = Math.max(1, Number(process.env.TICKETFORGE_GDRIVE_MAX_RETRIES) || 5);
-const BASE_DELAY = 30 * 1000, MAX_DELAY = 60 * 60 * 1000, TICK = 15 * 1000;
+const BASE_DELAY = 30 * 1000,
+  MAX_DELAY = 60 * 60 * 1000,
+  TICK = 15 * 1000;
 /** Wait before retry number n (1, 2, 3…): 30 s, 1 min, 2 min, 4 min… up to 1 hour. */
 const backoffMs = (n: number) => Math.min(MAX_DELAY, BASE_DELAY * 2 ** Math.max(0, n - 1));
 
 const FAILED_MESSAGE = 'This document couldn’t be saved to Google Drive. Contact the Super Admin.';
 
-const creds = () => ({ clientId: process.env.TICKETFORGE_GDRIVE_CLIENT_ID || '', clientSecret: process.env.TICKETFORGE_GDRIVE_CLIENT_SECRET || '' });
+const creds = () => ({
+  clientId: process.env.TICKETFORGE_GDRIVE_CLIENT_ID || '',
+  clientSecret: process.env.TICKETFORGE_GDRIVE_CLIENT_SECRET || '',
+});
 
 // ---------------------------------------------------------------- the connection (one per workspace)
 // { accessEnc, refreshEnc, expiresAt, account: { email, name }, folder: { id, name, selectedAt, selectedBy }, connectedAt, connectedBy }
 async function readConn(): Promise<any> {
   let v = await getMeta(wsKey(KEY));
-  if (typeof v === 'string') { try { v = JSON.parse(v); } catch { v = null; } }
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      v = null;
+    }
+  }
   return v?.refreshEnc ? v : null;
 }
 async function writeConn(v: any) {
-  if (!v) { await deleteMeta(wsKey(KEY)); return; }
+  if (!v) {
+    await deleteMeta(wsKey(KEY));
+    return;
+  }
   await setMeta(wsKey(KEY), v);
 }
 
@@ -46,9 +60,14 @@ export async function status() {
   const c = await readConn();
   const { clientId, clientSecret } = creds();
   return {
-    enabled: !(await isLocked('gdrive')), configured: Boolean(clientId && clientSecret),
-    connected: Boolean(c), account: c?.account || null, connectedAt: c?.connectedAt || null, connectedBy: c?.connectedBy || null,
-    folder: c?.folder ? { id: c.folder.id, name: c.folder.name } : null, maxRetries: MAX_RETRIES,
+    enabled: !(await isLocked('gdrive')),
+    configured: Boolean(clientId && clientSecret),
+    connected: Boolean(c),
+    account: c?.account || null,
+    connectedAt: c?.connectedAt || null,
+    connectedBy: c?.connectedBy || null,
+    folder: c?.folder ? { id: c.folder.id, name: c.folder.name } : null,
+    maxRetries: MAX_RETRIES,
   };
 }
 
@@ -59,21 +78,43 @@ const PENDING: Map<string, any> = G.__tfGdrivePending;
 /** The Google consent page to send the owner to. `redirectUri` is this server's /api/gdrive/callback. */
 export function authorizeUrl(user: any, redirectUri: string) {
   const { clientId, clientSecret } = creds();
-  if (!clientId || !clientSecret) throw err('Google Drive isn’t set up on this server yet. Set TICKETFORGE_GDRIVE_CLIENT_ID and TICKETFORGE_GDRIVE_CLIENT_SECRET.', 409);
+  if (!clientId || !clientSecret)
+    throw err('Google Drive isn’t set up on this server yet. Set TICKETFORGE_GDRIVE_CLIENT_ID and TICKETFORGE_GDRIVE_CLIENT_SECRET.', 409);
   for (const [k, p] of PENDING) if (p.expiresAt < Date.now()) PENDING.delete(k);
   const state = crypto.randomBytes(16).toString('hex');
   PENDING.set(state, { userId: user.id, ws: currentWs(), expiresAt: Date.now() + 10 * 60 * 1000 });
-  const p = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'code', scope: SCOPE, access_type: 'offline', prompt: 'consent', state });
+  const p = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: SCOPE,
+    access_type: 'offline',
+    prompt: 'consent',
+    state,
+  });
   return `https://accounts.google.com/o/oauth2/v2/auth?${p}`;
 }
 
 async function tokenRequest(params: Record<string, string>) {
   const { clientId, clientSecret } = creds();
   let res: Response;
-  try { res = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...params }) }); }
-  catch { throw err('Couldn’t reach Google to sign in.', 503); }
+  try {
+    res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...params }),
+    });
+  } catch {
+    throw err('Couldn’t reach Google to sign in.', 503);
+  }
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) throw err(data.error === 'invalid_grant' ? 'Google rejected the saved sign-in. Connect Google Drive again.' : `Google didn’t sign in (${data.error_description || data.error || res.status}).`, data.error === 'invalid_grant' ? 409 : 502);
+  if (!res.ok || !data.access_token)
+    throw err(
+      data.error === 'invalid_grant'
+        ? 'Google rejected the saved sign-in. Connect Google Drive again.'
+        : `Google didn’t sign in (${data.error_description || data.error || res.status}).`,
+      data.error === 'invalid_grant' ? 409 : 502,
+    );
   return data;
 }
 
@@ -84,13 +125,24 @@ export async function completeConnect(user: any, { code, state }: { code: string
   if (!p || p.userId !== user.id || p.expiresAt < Date.now()) throw err('The Google sign-in expired. Start the connection again.');
   if (!code) throw err('Google didn’t send a sign-in code.');
   const t = await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: redirectUri });
-  if (!t.refresh_token) throw err('Google didn’t allow ongoing access. Remove TicketForge from your Google account’s third-party access and connect again.');
-  const draft: any = { accessEnc: encrypt(t.access_token), refreshEnc: encrypt(t.refresh_token), expiresAt: Date.now() + (Number(t.expires_in) || 3600) * 1000 };
+  if (!t.refresh_token)
+    throw err('Google didn’t allow ongoing access. Remove TicketForge from your Google account’s third-party access and connect again.');
+  const draft: any = {
+    accessEnc: encrypt(t.access_token),
+    refreshEnc: encrypt(t.refresh_token),
+    expiresAt: Date.now() + (Number(t.expires_in) || 3600) * 1000,
+  };
   const about = await driveJson(draft, `${API}/about?fields=user(displayName,emailAddress)`, {}, false);
   const prev = await readConn();
   const account = { email: about.user?.emailAddress || '', name: about.user?.displayName || '' };
   // The same account connecting again keeps its folder; another account starts without one.
-  await writeConn({ ...draft, account, folder: prev?.account?.email === account.email ? prev.folder || null : null, connectedAt: new Date().toISOString(), connectedBy: user.name || null });
+  await writeConn({
+    ...draft,
+    account,
+    folder: prev?.account?.email === account.email ? prev.folder || null : null,
+    connectedAt: new Date().toISOString(),
+    connectedBy: user.name || null,
+  });
   return status();
 }
 
@@ -110,8 +162,11 @@ async function accessToken(c: any, force = false) {
 async function driveFetch(c: any, url: string, init: any = {}, refresh = true): Promise<Response> {
   const go = async (force: boolean) => {
     const token = await accessToken(c, force);
-    try { return await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } }); }
-    catch { throw err('Couldn’t reach Google Drive.', 503); }
+    try {
+      return await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
+    } catch {
+      throw err('Couldn’t reach Google Drive.', 503);
+    }
   };
   let res = await go(false);
   if (res.status === 401 && refresh) res = await go(true);
@@ -139,11 +194,20 @@ export async function selectFolder(user: any, input: any) {
   const id = parseFolderId(input);
   if (!id) throw err('Paste the link of a Google Drive folder (or its ID).');
   let meta: any;
-  try { meta = await driveJson(c, `${API}/files/${encodeURIComponent(id)}?fields=id,name,mimeType&supportsAllDrives=true`); }
-  catch (e: any) { throw err(e.status === 404 ? 'Couldn’t open that folder. Check the link, and that the connected Google account can open it.' : e.message, e.status === 404 ? 404 : 502); }
+  try {
+    meta = await driveJson(c, `${API}/files/${encodeURIComponent(id)}?fields=id,name,mimeType&supportsAllDrives=true`);
+  } catch (e: any) {
+    throw err(
+      e.status === 404 ? 'Couldn’t open that folder. Check the link, and that the connected Google account can open it.' : e.message,
+      e.status === 404 ? 404 : 502,
+    );
+  }
   if (meta.mimeType !== FOLDER) throw err('That link isn’t a folder. Choose a Google Drive folder.');
   const cur = await readConn();
-  await writeConn({ ...cur, folder: { id: meta.id, name: meta.name, selectedAt: new Date().toISOString(), selectedBy: user.name || null } });
+  await writeConn({
+    ...cur,
+    folder: { id: meta.id, name: meta.name, selectedAt: new Date().toISOString(), selectedBy: user.name || null },
+  });
   return status();
 }
 
@@ -152,14 +216,29 @@ export async function listFolder() {
   const c = await readConn();
   if (!c?.folder) throw err('Select a Google Drive folder first.', 409);
   const query = encodeURIComponent(`'${c.folder.id}' in parents and trashed = false`);
-  const d = await driveJson(c, `${API}/files?q=${query}&orderBy=createdTime%20desc&pageSize=25&fields=files(id,name,mimeType,createdTime,webViewLink)&supportsAllDrives=true&includeItemsFromAllDrives=true`);
-  return (d.files || []).map((f: any) => ({ id: f.id, name: f.name, mime: f.mimeType, createdAt: f.createdTime, url: f.webViewLink || '' }));
+  const d = await driveJson(
+    c,
+    `${API}/files?q=${query}&orderBy=createdTime%20desc&pageSize=25&fields=files(id,name,mimeType,createdTime,webViewLink)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+  );
+  return (d.files || []).map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    mime: f.mimeType,
+    createdAt: f.createdTime,
+    url: f.webViewLink || '',
+  }));
 }
 
 /** Disconnects: the tokens are forgotten (and revoked at Google). Documents already in Drive stay where they are. */
 export async function disconnect() {
   const c = await readConn();
-  if (c) { try { await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(decrypt(c.refreshEnc))}`, { method: 'POST' }); } catch { /* forgotten anyway */ } }
+  if (c) {
+    try {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(decrypt(c.refreshEnc))}`, { method: 'POST' });
+    } catch {
+      /* forgotten anyway */
+    }
+  }
   await writeConn(null);
   return status();
 }
@@ -175,10 +254,17 @@ export async function destination() {
 async function upload(c: any, { name, mime, data }: { name: string; mime: string; data: Buffer }) {
   const b = `tf${crypto.randomBytes(12).toString('hex')}`;
   const body = Buffer.concat([
-    Buffer.from(`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [c.folder.id] })}\r\n--${b}\r\nContent-Type: ${mime || 'application/octet-stream'}\r\n\r\n`),
-    data, Buffer.from(`\r\n--${b}--`),
+    Buffer.from(
+      `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [c.folder.id] })}\r\n--${b}\r\nContent-Type: ${mime || 'application/octet-stream'}\r\n\r\n`,
+    ),
+    data,
+    Buffer.from(`\r\n--${b}--`),
   ]);
-  return driveJson(c, 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name', { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${b}` }, body });
+  return driveJson(c, 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${b}` },
+    body,
+  });
 }
 
 type Doc = { projectId: string; epicId: string; kind: string; docKey?: string };
@@ -196,13 +282,24 @@ async function attempt(d: Doc): Promise<string> {
     const c = await readConn();
     if (!c?.folder) throw err('Google Drive isn’t connected or has no folder selected.', 409);
     const f = await upload(c, { name: row.name, mime: row.mime, data: Buffer.from(row.data) });
-    await q(`update drive_docs set state = 'saved', drive_file_id = $5, data = null, next_attempt_at = null, last_error = '', updated_at = now() where ${where}`, [...ids(d), f.id]);
+    await q(
+      `update drive_docs set state = 'saved', drive_file_id = $5, data = null, next_attempt_at = null, last_error = '', updated_at = now() where ${where}`,
+      [...ids(d), f.id],
+    );
     return 'saved';
   } catch (e: any) {
     const failures = row.attempts + 1; // the first try plus the retries so far
     const give = failures > MAX_RETRIES;
-    await q(`update drive_docs set state = $5, attempts = $6, next_attempt_at = $7, last_error = $8, data = case when $5 = 'failed' then null else data end, updated_at = now() where ${where}`,
-      [...ids(d), give ? 'failed' : 'queued', failures, give ? null : new Date(Date.now() + backoffMs(failures)).toISOString(), String(e.message || e).slice(0, 300)]);
+    await q(
+      `update drive_docs set state = $5, attempts = $6, next_attempt_at = $7, last_error = $8, data = case when $5 = 'failed' then null else data end, updated_at = now() where ${where}`,
+      [
+        ...ids(d),
+        give ? 'failed' : 'queued',
+        failures,
+        give ? null : new Date(Date.now() + backoffMs(failures)).toISOString(),
+        String(e.message || e).slice(0, 300),
+      ],
+    );
     if (give) console.error(`Google Drive: gave up saving "${row.name}" after ${MAX_RETRIES} retries: ${e.message}`);
     return give ? 'failed' : 'queued';
   }
@@ -212,30 +309,77 @@ async function attempt(d: Doc): Promise<string> {
  * Saves a document to the Drive folder. It is recorded as queued first, so it is never lost, and tried once right away;
  * if that fails it stays queued for the background retries. Never throws for a Drive problem. Returns the state.
  */
-export async function saveDocument({ projectId, epicId, kind, docKey = '', name, mime, data, user }: Doc & { name: string; mime: string; data: Buffer; user?: any }) {
+export async function saveDocument({
+  projectId,
+  epicId,
+  kind,
+  docKey = '',
+  name,
+  mime,
+  data,
+  user,
+}: Doc & { name: string; mime: string; data: Buffer; user?: any }) {
   // Not due for a minute, so the background retry doesn't pick it up while this first try runs.
-  await q(`insert into drive_docs (project_id, epic_id, kind, doc_key, name, mime, state, attempts, next_attempt_at, last_error, drive_file_id, data, created_by, updated_at)
+  await q(
+    `insert into drive_docs (project_id, epic_id, kind, doc_key, name, mime, state, attempts, next_attempt_at, last_error, drive_file_id, data, created_by, updated_at)
     values ($1,$2,$3,$4,$5,$6,'queued',0,$7,'','',$8,$9,now())
     on conflict (project_id, epic_id, kind, doc_key) do update set name = excluded.name, mime = excluded.mime, state = 'queued', attempts = 0,
       next_attempt_at = excluded.next_attempt_at, last_error = '', drive_file_id = '', data = excluded.data, created_by = excluded.created_by, updated_at = now()`,
-  [projectId, epicId, kind, docKey, String(name).slice(0, 200), mime, new Date(Date.now() + 60 * 1000).toISOString(), data, user?.name || null]);
+    [
+      projectId,
+      epicId,
+      kind,
+      docKey,
+      String(name).slice(0, 200),
+      mime,
+      new Date(Date.now() + 60 * 1000).toISOString(),
+      data,
+      user?.name || null,
+    ],
+  );
   startWorker();
   return attempt({ projectId, epicId, kind, docKey });
 }
 
 /** A document that couldn't even be prepared (nothing to retry): shown as failed. */
-export async function markFailed({ projectId, epicId, kind, docKey = '', name, error, user }: Doc & { name: string; error: string; user?: any }) {
-  await q(`insert into drive_docs (project_id, epic_id, kind, doc_key, name, state, attempts, last_error, created_by, updated_at) values ($1,$2,$3,$4,$5,'failed',$6,$7,$8,now())
+export async function markFailed({
+  projectId,
+  epicId,
+  kind,
+  docKey = '',
+  name,
+  error,
+  user,
+}: Doc & { name: string; error: string; user?: any }) {
+  await q(
+    `insert into drive_docs (project_id, epic_id, kind, doc_key, name, state, attempts, last_error, created_by, updated_at) values ($1,$2,$3,$4,$5,'failed',$6,$7,$8,now())
     on conflict (project_id, epic_id, kind, doc_key) do update set name = excluded.name, state = 'failed', attempts = $6, next_attempt_at = null, last_error = excluded.last_error, drive_file_id = '', data = null, updated_at = now()`,
-  [projectId, epicId, kind, docKey, String(name).slice(0, 200), MAX_RETRIES + 1, String(error).slice(0, 300), user?.name || null]);
+    [projectId, epicId, kind, docKey, String(name).slice(0, 200), MAX_RETRIES + 1, String(error).slice(0, 300), user?.name || null],
+  );
 }
 
 /** The save state of each document of an epic: [{ kind, key, name, state: 'saved' | 'queued' | 'failed', retries, maxRetries, message }]. */
 export async function documentStates(projectId: string, epicId: string, user: any = null) {
-  const rows = (await q('select kind, doc_key, name, state, attempts, last_error, updated_at from drive_docs where project_id = $1 and epic_id = $2 order by updated_at desc', [projectId, epicId])).rows;
+  const rows = (
+    await q(
+      'select kind, doc_key, name, state, attempts, last_error, updated_at from drive_docs where project_id = $1 and epic_id = $2 order by updated_at desc',
+      [projectId, epicId],
+    )
+  ).rows;
   return rows.map((r: any) => ({
-    kind: r.kind, key: r.doc_key, name: r.name, state: r.state, retries: Math.max(0, r.attempts - 1), maxRetries: MAX_RETRIES, at: r.updated_at,
-    message: r.state === 'failed' ? FAILED_MESSAGE : r.state === 'queued' ? 'Google Drive couldn’t be reached. TicketForge keeps trying in the background.' : '',
+    kind: r.kind,
+    key: r.doc_key,
+    name: r.name,
+    state: r.state,
+    retries: Math.max(0, r.attempts - 1),
+    maxRetries: MAX_RETRIES,
+    at: r.updated_at,
+    message:
+      r.state === 'failed'
+        ? FAILED_MESSAGE
+        : r.state === 'queued'
+          ? 'Google Drive couldn’t be reached. TicketForge keeps trying in the background.'
+          : '',
     ...(user?.is_owner && r.last_error ? { error: r.last_error } : {}), // the reason is for the Super Admin only
   }));
 }
@@ -247,7 +391,11 @@ export async function retryDue() {
   G.__tfGdriveBusy = true;
   let n = 0;
   try {
-    const due = (await qs(`select project_id, epic_id, kind, doc_key from drive_docs where state = 'queued' and next_attempt_at <= now() order by next_attempt_at limit 20`)).rows;
+    const due = (
+      await qs(
+        `select project_id, epic_id, kind, doc_key from drive_docs where state = 'queued' and next_attempt_at <= now() order by next_attempt_at limit 20`,
+      )
+    ).rows;
     for (const r of due) {
       const ws = await projectWorkspace(r.project_id);
       if (!ws) continue;
@@ -257,13 +405,17 @@ export async function retryDue() {
         n++;
       });
     }
-  } finally { G.__tfGdriveBusy = false; }
+  } finally {
+    G.__tfGdriveBusy = false;
+  }
   return n;
 }
 
 /** Starts the timer that retries queued documents (once per server process). */
 export function startWorker() {
   if (G.__tfGdriveTimer) return;
-  G.__tfGdriveTimer = setInterval(() => { retryDue().catch((e: Error) => console.error('Google Drive retry:', e.message)); }, TICK);
+  G.__tfGdriveTimer = setInterval(() => {
+    retryDue().catch((e: Error) => console.error('Google Drive retry:', e.message));
+  }, TICK);
   G.__tfGdriveTimer.unref?.();
 }

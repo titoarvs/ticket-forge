@@ -12,7 +12,14 @@ export const POST = api(async (req) => {
   const project = await store.getProject(String(b.projectId));
   const ai = aiOpts(b);
   return ndjson(req, async (send, signal) => {
-    const out = await testsForIssues({ project, ticketIds: b.ticketIds.slice(0, 500), answers: b.answers, ai, signal, onBatch: (x: any) => send({ type: 'batch', ...x }) });
+    const out = await testsForIssues({
+      project,
+      ticketIds: b.ticketIds.slice(0, 500),
+      answers: b.answers,
+      ai,
+      signal,
+      onBatch: (x: any) => send({ type: 'batch', ...x }),
+    });
     send({ type: 'done', ...out });
   });
 });

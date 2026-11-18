@@ -15,6 +15,12 @@ export async function gatewayRow(provider): Promise<any> {
 /** The gateway's secret key (decrypted), or '' when none is saved and the environment has none. Server only. */
 export async function secretFor(provider) {
   const saved = (await gatewayRow(provider))?.credentials?.secretKey;
-  if (saved) { try { return decrypt(saved); } catch { /* saved with another key: fall back */ } }
+  if (saved) {
+    try {
+      return decrypt(saved);
+    } catch {
+      /* saved with another key: fall back */
+    }
+  }
   return process.env[ENV[provider]] || '';
 }

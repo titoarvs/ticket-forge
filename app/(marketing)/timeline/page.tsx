@@ -6,4 +6,6 @@ export const metadata: Metadata = {
   description: 'How TicketForge grew, day by day: every feature, from documents-to-backlog to AI agents that write code.',
 };
 
-export default function Page() { return <ProductTimeline />; }
+export default function Page() {
+  return <ProductTimeline />;
+}

@@ -1,4 +1,4 @@
-import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
+import { api, perm, body, HttpError } from '@/lib/server/http';
 import * as store from '@/lib/store';
 import { toCsvTickets, toCsvTestCases, toCsvJira, toXlsx, toDocx, toPdf, toHtml, slug } from '@/lib/exporters';
 import { assignKeys } from '@/lib/model';
@@ -22,5 +22,7 @@ export const POST = api(async (req, p) => {
   if (b?.id) await store.requireProject(user, b.id);
   const project = assignKeys(b);
   const out = await ex.fn(project);
-  return new Response(out, { headers: { 'Content-Type': ex.type, 'Content-Disposition': `attachment; filename="${slug(project.name)}.${ex.ext}"` } });
+  return new Response(out, {
+    headers: { 'Content-Type': ex.type, 'Content-Disposition': `attachment; filename="${slug(project.name)}.${ex.ext}"` },
+  });
 });

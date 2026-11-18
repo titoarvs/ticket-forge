@@ -71,11 +71,21 @@ ${text}
 
 /** New work for an existing project: knows its epics and issues so it reuses epics and doesn't repeat issues. */
 export function featurePrompt({ text, sourceName, project, options = {} }: any) {
-  const epics = (project.epics || []).map((e) => `- "${e.title}"${e.description ? `: ${String(e.description).slice(0, 160)}` : ''}`).join('\n') || '- (none yet)';
+  const epics =
+    (project.epics || []).map((e) => `- "${e.title}"${e.description ? `: ${String(e.description).slice(0, 160)}` : ''}`).join('\n') ||
+    '- (none yet)';
   const byEpic = new Map((project.epics || []).map((e) => [e.id, e.title]));
-  const issues = (project.tickets || []).filter((t) => t.type !== 'Sub-task').slice(0, 200)
-    .map((t) => `- ${t.key || ''} ${t.title}${byEpic.get(t.epicId) ? ` [${byEpic.get(t.epicId)}]` : ''}`).join('\n') || '- (none yet)';
-  const granularity = { coarse: 'Prefer fewer, larger tickets (still sprint-sized).', balanced: 'Use a balanced granularity.', fine: 'Prefer many small, very focused tickets.' }[options.granularity || 'balanced'];
+  const issues =
+    (project.tickets || [])
+      .filter((t) => t.type !== 'Sub-task')
+      .slice(0, 200)
+      .map((t) => `- ${t.key || ''} ${t.title}${byEpic.get(t.epicId) ? ` [${byEpic.get(t.epicId)}]` : ''}`)
+      .join('\n') || '- (none yet)';
+  const granularity = {
+    coarse: 'Prefer fewer, larger tickets (still sprint-sized).',
+    balanced: 'Use a balanced granularity.',
+    fine: 'Prefer many small, very focused tickets.',
+  }[options.granularity || 'balanced'];
   return `This project already exists. Plan the NEW work described below and add it to the project.
 
 Project: ${project.name || ''}
@@ -167,7 +177,12 @@ export function newTicketPrompt({ epic, project, idea, answers = '' }: any) {
   return `Project: ${project?.name || ''}
 Project summary: ${project?.summary || ''}
 Epic: ${epic?.title || 'none'} - ${epic?.description || ''}
-Existing tickets in this epic: ${(project?.tickets || []).filter((t) => t.epicId === epic?.id).map((t) => t.title).join('; ') || 'none'}
+Existing tickets in this epic: ${
+    (project?.tickets || [])
+      .filter((t) => t.epicId === epic?.id)
+      .map((t) => t.title)
+      .join('; ') || 'none'
+  }
 
 Write one new ticket for this idea: "${idea}". Include acceptance criteria and test cases.
 ${answers ? `\n${answers}\nUse these answers; they take priority over assumptions.\n` : ''}
@@ -176,7 +191,12 @@ ${TICKET_SHAPE.replace(/\n}$/, `,\n  "testCases": [ ${TEST_CASE_SHAPE} ]\n}`)}`;
 }
 
 export function regroupPrompt({ project, instruction }: any) {
-  const tickets = project.tickets.map((t) => ({ id: t.id, title: t.title, userStory: t.userStory, currentEpic: project.epics.find((e) => e.id === t.epicId)?.title }));
+  const tickets = project.tickets.map((t) => ({
+    id: t.id,
+    title: t.title,
+    userStory: t.userStory,
+    currentEpic: project.epics.find((e) => e.id === t.epicId)?.title,
+  }));
   return `${project.description ? `Project description: ${project.description}\n` : ''}Project summary: ${project.summary || ''}
 ${instruction ? `User instruction: ${instruction}\n` : ''}
 Re-organise these tickets into a clean set of epics that segregate the work by business capability.
@@ -193,9 +213,24 @@ Return JSON: { "epics": [ { "title": "...", "description": "...", "ticketIds": [
 // The issue fields the AI reads; everything else (history, comments, links, pull requests, people, scripts, run
 // results…) never changes the answer, so it isn't sent (fewer tokens on every ticket action).
 import { referencesBlock } from './references';
-const ISSUE_FIELDS =['title', 'type', 'priority', 'storyPoints', 'status', 'labels', 'layer', 'userStory', 'description', 'acceptanceCriteria', 'dependencies'];
+const ISSUE_FIELDS = [
+  'title',
+  'type',
+  'priority',
+  'storyPoints',
+  'status',
+  'labels',
+  'layer',
+  'userStory',
+  'description',
+  'acceptanceCriteria',
+  'dependencies',
+];
 const TEST_FIELDS = ['title', 'type', 'priority', 'preconditions', 'steps', 'expected', 'acRef'];
-const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o?.[k] !== undefined && o[k] !== '' && !(Array.isArray(o[k]) && !o[k].length)).map((k) => [k, o[k]]));
+const pick = (o, keys) =>
+  Object.fromEntries(
+    keys.filter((k) => o?.[k] !== undefined && o[k] !== '' && !(Array.isArray(o[k]) && !o[k].length)).map((k) => [k, o[k]]),
+  );
 /** An issue as the AI needs it for one action: tests and split see only test titles, ac none, enhance the tests without scripts. */
 export function ticketFor(action, t) {
   const out = pick(t, ISSUE_FIELDS);

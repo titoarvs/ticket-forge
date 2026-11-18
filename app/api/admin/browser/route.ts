@@ -35,7 +35,10 @@ export const DELETE = api(async () => {
 export const POST = api(async (req) => {
   await perm('users.manage');
   const b = await body(req);
-  if (b.url) { const spec = remoteSpec(b); return { ...(await tryBrowser(spec)), corrected: spec.corrected }; }
+  if (b.url) {
+    const spec = remoteSpec(b);
+    return { ...(await tryBrowser(spec)), corrected: spec.corrected };
+  }
   const { browserSpec } = await import('@/lib/automation');
   return tryBrowser(await browserSpec());
 });
@@ -56,8 +59,15 @@ async function tryBrowser(spec: any) {
       const page = await (await browser.newContext()).newPage();
       await page.goto('about:blank');
       return { ok: true, browser: describeBrowser(spec), version: browser.version(), ms: Date.now() - started };
-    } finally { await browser.close().catch(() => {}); }
+    } finally {
+      await browser.close().catch(() => {});
+    }
   } catch (e: any) {
-    return { ok: false, browser: describeBrowser(spec), error: explainConnectError(hideEndpoint(String(e?.message || e).split('\n')[0], spec), spec), ms: Date.now() - started };
+    return {
+      ok: false,
+      browser: describeBrowser(spec),
+      error: explainConnectError(hideEndpoint(String(e?.message || e).split('\n')[0], spec), spec),
+      ms: Date.now() - started,
+    };
   }
 }

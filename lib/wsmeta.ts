@@ -10,11 +10,20 @@ export const wsKey = (key, ws = currentWs()) => (!ws || ws === DEFAULT_WS ? key 
  * own copy, so one company's cached settings never answer for another.
  */
 export function wsCache(name: string, init: () => any = () => ({ v: undefined, at: 0 })) {
-  const all = globalThis[name] ??= new Map();
+  const all = (globalThis[name] ??= new Map());
   const cur = () => {
     const ws = currentWs() || DEFAULT_WS;
     if (!all.has(ws)) all.set(ws, init());
     return all.get(ws);
   };
-  return new Proxy({}, { get: (_, k) => cur()[k], set: (_, k, v) => { cur()[k] = v; return true; } });
+  return new Proxy(
+    {},
+    {
+      get: (_, k) => cur()[k],
+      set: (_, k, v) => {
+        cur()[k] = v;
+        return true;
+      },
+    },
+  );
 }

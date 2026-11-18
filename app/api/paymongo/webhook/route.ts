@@ -7,10 +7,17 @@ import { verifySignature, handleEvent } from '@/lib/paymongo';
 // with 400 before anything is read or changed.
 export async function POST(req: Request) {
   const raw = await req.text();
-  try { verifySignature(raw, req.headers.get('paymongo-signature')); }
-  catch (e: any) { return Response.json({ error: e.message }, { status: e.status || 400 }); }
+  try {
+    verifySignature(raw, req.headers.get('paymongo-signature'));
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: e.status || 400 });
+  }
   let ev: any;
-  try { ev = JSON.parse(raw); } catch { return Response.json({ error: 'Bad JSON' }, { status: 400 }); }
+  try {
+    ev = JSON.parse(raw);
+  } catch {
+    return Response.json({ error: 'Bad JSON' }, { status: 400 });
+  }
   try {
     await ready();
     const r = await asSystem(() => handleEvent(ev));

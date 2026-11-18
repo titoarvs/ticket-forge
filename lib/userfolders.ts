@@ -14,7 +14,9 @@ const REPO = /^[\w.-]{1,100}\/[\w.-]{1,100}$/;
 
 const wsOf = (user) => String(user?.workspace_id || currentWs() || DEFAULT_WS);
 const slugOf = (repo) => {
-  const r = String(repo || '').trim().replace(/\.git$/, '');
+  const r = String(repo || '')
+    .trim()
+    .replace(/\.git$/, '');
   if (!REPO.test(r) || r.includes('..')) throw new HttpError(400, 'Name the repository as owner/name.');
   return r.replace('/', '__');
 };
@@ -30,25 +32,53 @@ const folderDir = (ws, userId, slug) => inside(ws, userId, slug);
 /** Creates (or returns) the signed-in person's folder for a repository. */
 export async function ensureFolder(user, repo) {
   if (!user?.id) throw new HttpError(401, 'Sign in to continue.');
-  const ws = wsOf(user), slug = slugOf(repo);
+  const ws = wsOf(user),
+    slug = slugOf(repo);
   const dir = folderDir(ws, user.id, slug);
   await fs.mkdir(path.join(dir, 'clone'), { recursive: true });
   await fs.mkdir(path.join(dir, 'settings'), { recursive: true });
   const metaFile = path.join(dir, 'folder.json');
   let meta;
-  try { meta = JSON.parse(await fs.readFile(metaFile, 'utf8')); } catch {
-    meta = { userId: user.id, userName: user.name || '', email: user.email || '', workspaceId: ws, repo: String(repo).trim(), createdAt: new Date().toISOString() };
+  try {
+    meta = JSON.parse(await fs.readFile(metaFile, 'utf8'));
+  } catch {
+    meta = {
+      userId: user.id,
+      userName: user.name || '',
+      email: user.email || '',
+      workspaceId: ws,
+      repo: String(repo).trim(),
+      createdAt: new Date().toISOString(),
+    };
     await fs.writeFile(metaFile, JSON.stringify(meta, null, 2), { mode: 0o600 });
   }
   return { id: `${user.id}/${slug}`, ...meta, path: dir, clonePath: path.join(dir, 'clone') };
 }
 
-async function readDirs(dir) { try { return (await fs.readdir(dir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return []; } }
+async function readDirs(dir) {
+  try {
+    return (await fs.readdir(dir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch {
+    return [];
+  }
+}
 async function describe(ws, userId, slug) {
   const dir = folderDir(ws, userId, slug);
   let meta: any = {};
-  try { meta = JSON.parse(await fs.readFile(path.join(dir, 'folder.json'), 'utf8')); } catch { /* folder without a record */ }
-  return { id: `${userId}/${slug}`, userId, userName: meta.userName || '', email: meta.email || '', repo: meta.repo || slug.replace('__', '/'), createdAt: meta.createdAt || null, path: dir };
+  try {
+    meta = JSON.parse(await fs.readFile(path.join(dir, 'folder.json'), 'utf8'));
+  } catch {
+    /* folder without a record */
+  }
+  return {
+    id: `${userId}/${slug}`,
+    userId,
+    userName: meta.userName || '',
+    email: meta.email || '',
+    repo: meta.repo || slug.replace('__', '/'),
+    createdAt: meta.createdAt || null,
+    path: dir,
+  };
 }
 
 /** The signed-in person's own folders only. */
@@ -75,11 +105,18 @@ export async function purgeFolder(user, id) {
   const [uid, slug] = String(id || '').split('/');
   if (!uid || !slug) throw new HttpError(400, 'Choose a folder to purge.');
   const dir = folderDir(wsOf(user), uid, slug);
-  try { await fs.access(dir); } catch { throw new HttpError(404, 'That folder was not found.'); }
+  try {
+    await fs.access(dir);
+  } catch {
+    throw new HttpError(404, 'That folder was not found.');
+  }
   await fs.rm(dir, { recursive: true, force: true });
 }
 
-const kindOf = (kind) => { if (!SETTING_KINDS.includes(kind)) throw new HttpError(400, `Settings must be one of: ${SETTING_KINDS.join(', ')}.`); return kind; };
+const kindOf = (kind) => {
+  if (!SETTING_KINDS.includes(kind)) throw new HttpError(400, `Settings must be one of: ${SETTING_KINDS.join(', ')}.`);
+  return kind;
+};
 /** Writes settings into the signed-in person's own folder only. */
 export async function saveFolderSettings(user, repo, kind, data) {
   const f = await ensureFolder(user, repo);
@@ -91,5 +128,9 @@ export async function saveFolderSettings(user, repo, kind, data) {
 export async function readFolderSettings(user, repo, kind) {
   if (!user?.id) throw new HttpError(401, 'Sign in to continue.');
   const dir = folderDir(wsOf(user), user.id, slugOf(repo));
-  try { return JSON.parse(await fs.readFile(path.join(dir, 'settings', `${kindOf(kind)}.json`), 'utf8')); } catch { return null; }
+  try {
+    return JSON.parse(await fs.readFile(path.join(dir, 'settings', `${kindOf(kind)}.json`), 'utf8'));
+  } catch {
+    return null;
+  }
 }

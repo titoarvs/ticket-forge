@@ -65,10 +65,25 @@ export const theme = createTheme({
       styleOverrides: { select: { minHeight: 20, display: 'flex', alignItems: 'center', gap: 6 } },
     },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
-    MuiPopover: { styleOverrides: { paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', border: '1px solid var(--border)', borderRadius: 8 } } },
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: 'var(--overlay)',
+          boxShadow: 'var(--shadow-overlay)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+        },
+      },
+    },
     MuiAutocomplete: {
       styleOverrides: {
-        paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 14 },
+        paper: {
+          backgroundColor: 'var(--overlay)',
+          boxShadow: 'var(--shadow-overlay)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          fontSize: 14,
+        },
         inputRoot: { padding: '2px 8px !important' },
         input: { padding: '4px 0 !important' },
         option: { gap: 8, minHeight: 32 },
@@ -77,7 +92,10 @@ export const theme = createTheme({
     MuiMenuItem: {
       styleOverrides: {
         root: {
-          fontSize: 14, minHeight: 32, gap: 8, borderLeft: '2px solid transparent',
+          fontSize: 14,
+          minHeight: 32,
+          gap: 8,
+          borderLeft: '2px solid transparent',
           '&:hover': { backgroundColor: 'var(--hover)', borderLeftColor: 'var(--selected-text)' },
           '&.Mui-selected, &.Mui-selected:hover': { backgroundColor: 'var(--selected-bg)', color: 'var(--selected-text)' },
         },

@@ -13,19 +13,28 @@ export const POST = api(async (req, p) => {
   if (!store.has(user, 'project.repo')) throw new HttpError(403, 'Setting up the repository needs the Set up the repository permission.');
   const b = await body(req);
   if (typeof b.localPath === 'string') {
-    if (SERVERLESS || !(currentContext() as any).local) throw new HttpError(400, 'Linking a local repository works only when TicketForge runs on your computer (opened at localhost).');
+    if (SERVERLESS || !(currentContext() as any).local)
+      throw new HttpError(400, 'Linking a local repository works only when TicketForge runs on your computer (opened at localhost).');
     const dir = b.localPath.trim();
     if (!dir || !path.isAbsolute(dir)) throw new HttpError(400, 'That path is invalid: enter the full path of the repository folder.');
-    const isDir = await fs.stat(dir).then((s) => s.isDirectory(), () => false);
+    const isDir = await fs.stat(dir).then(
+      (s) => s.isDirectory(),
+      () => false,
+    );
     if (!isDir) throw new HttpError(400, `That path is invalid: ${dir} does not exist.`);
-    const git = await fs.stat(path.join(dir, '.git')).then(() => true, () => false);
+    const git = await fs.stat(path.join(dir, '.git')).then(
+      () => true,
+      () => false,
+    );
     if (!git) throw new HttpError(400, `That path is invalid: ${dir} is not a git repository (no .git folder).`);
     return { localPath: path.resolve(dir) };
   }
   if (typeof b.githubToken === 'string') {
     const token = b.githubToken.trim();
     if (!token) throw new HttpError(400, 'Enter a GitHub token.');
-    const account = await whoAmI(token).catch((e: any) => { throw new HttpError(400, `Couldn’t connect GitHub: ${e.message}`); });
+    const account = await whoAmI(token).catch((e: any) => {
+      throw new HttpError(400, `Couldn’t connect GitHub: ${e.message}`);
+    });
     return { account };
   }
   throw new HttpError(400, 'Send a localPath or a githubToken.');

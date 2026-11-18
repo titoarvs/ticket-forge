@@ -39,14 +39,23 @@ const bare = {
 };
 const mono = { '& .MuiInputBase-input': { fontFamily: 'var(--mono)', fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre', tabSize: 2 } };
 const filterLook = {
-  width: 'auto', maxWidth: 200, minWidth: 0,
+  width: 'auto',
+  maxWidth: 200,
+  minWidth: 0,
   '& .MuiOutlinedInput-root': { backgroundColor: 'var(--bg-neutral)', fontWeight: 500, color: 'var(--text-subtle)' },
   '& .MuiOutlinedInput-root:hover': { backgroundColor: 'var(--bg-neutral-2)' },
   '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
 };
 const lozLook = {
-  width: 'auto', minWidth: 0,
-  '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': { backgroundColor: 'transparent', color: 'inherit', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' },
+  width: 'auto',
+  minWidth: 0,
+  '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': {
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+  },
   '& .MuiSelect-select': { padding: '0 22px 0 6px !important', minHeight: '20px !important', lineHeight: '20px' },
   '& .MuiSelect-icon': { color: 'inherit', right: 2, fontSize: 18 },
   '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
@@ -60,19 +69,54 @@ const statusLook = (tone: string, color?: string) => {
   const c = color ? { bg: color, fg: readableOn(color) } : STATUS_TONE[tone] || STATUS_TONE.todo;
   return {
     width: 'auto',
-    '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': { backgroundColor: c.bg, color: c.fg, fontWeight: 600, height: 32 },
+    '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': {
+      backgroundColor: c.bg,
+      color: c.fg,
+      fontWeight: 600,
+      height: 32,
+    },
     '& .MuiSelect-icon': { color: c.fg },
     '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
   };
 };
 // "&&" doubles the class so these looks win over the theme's default input styles.
-const look = (p: Any) => [
-  p.ghost && ghost, p.title && titleLook, p.bare && bare, p.mono && mono, p.filter && filterLook, p.loz && lozLook, p.tone && statusLook(p.tone, p.toneColor),
-].filter(Boolean).map((x) => ({ '&&': x }));
+const look = (p: Any) =>
+  [
+    p.ghost && ghost,
+    p.title && titleLook,
+    p.bare && bare,
+    p.mono && mono,
+    p.filter && filterLook,
+    p.loz && lozLook,
+    p.tone && statusLook(p.tone, p.toneColor),
+  ]
+    .filter(Boolean)
+    .map((x) => ({ '&&': x }));
 
 function split(props: Any) {
-  const { ghost: _g, title: _t, bare: _b, mono: _m, filter: _f, loz: _l, tone: _tn, toneColor: _tc, search, min, max, maxLength, readOnly, spellCheck, rows, maxRows,
-    'aria-label': ariaLabel, sx, autoComplete, list: _list, ...rest } = props;
+  const {
+    ghost: _g,
+    title: _t,
+    bare: _b,
+    mono: _m,
+    filter: _f,
+    loz: _l,
+    tone: _tn,
+    toneColor: _tc,
+    search,
+    min,
+    max,
+    maxLength,
+    readOnly,
+    spellCheck,
+    rows,
+    maxRows,
+    'aria-label': ariaLabel,
+    sx,
+    autoComplete,
+    list: _list,
+    ...rest
+  } = props;
   return { rest, search, html: { min, max, maxLength, readOnly, spellCheck, 'aria-label': ariaLabel, autoComplete }, rows, maxRows, sx };
 }
 
@@ -80,11 +124,22 @@ function split(props: Any) {
 export function TF(props: Any) {
   const { rest, search, html, sx } = split(props);
   return (
-    <TextField {...rest} sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+    <TextField
+      {...rest}
+      sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
       slotProps={{
         htmlInput: html,
-        input: search ? { startAdornment: <InputAdornment position="start" sx={{ mr: 0, color: 'var(--text-subtlest)' }}>{ico(I.search)}</InputAdornment> } : undefined,
-      }} />
+        input: search
+          ? {
+              startAdornment: (
+                <InputAdornment position="start" sx={{ mr: 0, color: 'var(--text-subtlest)' }}>
+                  {ico(I.search)}
+                </InputAdornment>
+              ),
+            }
+          : undefined,
+      }}
+    />
   );
 }
 
@@ -92,15 +147,28 @@ export function TF(props: Any) {
 export function TA(props: Any) {
   const { rest, html, rows, maxRows, sx } = split(props);
   return (
-    <TextField {...rest} multiline minRows={rows || (props.title ? 1 : 2)} maxRows={maxRows || 24}
-      sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]} slotProps={{ htmlInput: html }} />
+    <TextField
+      {...rest}
+      multiline
+      minRows={rows || (props.title ? 1 : 2)}
+      maxRows={maxRows || 24}
+      sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      slotProps={{ htmlInput: html }}
+    />
   );
 }
 
 /** The text a menu item shows (for searching). */
-const textOf = (n: Any): string => (typeof n === 'string' || typeof n === 'number' ? String(n)
-  : Array.isArray(n) ? n.map(textOf).join(' ') : isValidElement(n) ? textOf((n.props as Any).children) : '');
-const flatItems = (children: ReactNode): Any[] => Children.toArray(children).flatMap((c: Any) => (isValidElement(c) && c.type === Fragment ? flatItems((c.props as Any).children) : [c]));
+const textOf = (n: Any): string =>
+  typeof n === 'string' || typeof n === 'number'
+    ? String(n)
+    : Array.isArray(n)
+      ? n.map(textOf).join(' ')
+      : isValidElement(n)
+        ? textOf((n.props as Any).children)
+        : '';
+const flatItems = (children: ReactNode): Any[] =>
+  Children.toArray(children).flatMap((c: Any) => (isValidElement(c) && c.type === Fragment ? flatItems((c.props as Any).children) : [c]));
 /** Dropdowns with at least this many choices get a search box at the top of their menu. */
 const SEARCH_MIN = 8;
 
@@ -116,54 +184,103 @@ export function SF({ children, placeholder, className, searchable, ...props }: A
   const { rest, html, sx } = split(own);
   const [q, setQ] = useState('');
   const items = flatItems(children);
-  const choices = items.filter((c) => isValidElement(c) && c.type === MenuItem && (c.props as Any).value !== '' && (c.props as Any).value !== undefined);
+  const choices = items.filter(
+    (c) => isValidElement(c) && c.type === MenuItem && (c.props as Any).value !== '' && (c.props as Any).value !== undefined,
+  );
   const canSearch = searchable ?? choices.length >= SEARCH_MIN;
   const qq = q.trim().toLowerCase();
   // Items that don't match stay in the list (hidden and skipped), so the chosen value still shows in the field.
   const hide = (c: Any) => cloneElement(c, { disabled: true, style: { ...((c.props as Any).style || {}), display: 'none' } });
-  const shown = !canSearch || !qq ? items : items.map((c) => {
-    if (!isValidElement(c)) return c;
-    if (c.type !== MenuItem) return hide(c); // headings and dividers while searching
-    const v = (c.props as Any).value;
-    return `${textOf((c.props as Any).children)} ${typeof v === 'string' ? v : ''}`.toLowerCase().includes(qq) ? c : hide(c);
-  });
+  const shown =
+    !canSearch || !qq
+      ? items
+      : items.map((c) => {
+          if (!isValidElement(c)) return c;
+          if (c.type !== MenuItem) return hide(c); // headings and dividers while searching
+          const v = (c.props as Any).value;
+          return `${textOf((c.props as Any).children)} ${typeof v === 'string' ? v : ''}`.toLowerCase().includes(qq) ? c : hide(c);
+        });
   const matches = qq ? shown.filter((c) => isValidElement(c) && c.type === MenuItem && !(c.props as Any).disabled).length : choices.length;
-  const firstOption = (el: HTMLElement) => [...(el.closest('ul')?.querySelectorAll<HTMLElement>('li[role="option"][tabindex]') || [])].find((li) => li.style.display !== 'none' && li.getAttribute('aria-disabled') !== 'true');
+  const firstOption = (el: HTMLElement) =>
+    [...(el.closest('ul')?.querySelectorAll<HTMLElement>('li[role="option"][tabindex]') || [])].find(
+      (li) => li.style.display !== 'none' && li.getAttribute('aria-disabled') !== 'true',
+    );
   const search = canSearch ? (
     <ListSubheader key="__sf_search" className="sf-search">
       <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onMouseUp={(e) => e.stopPropagation()}>
         <span className="sf-search-ic">{ico(I.search)}</span>
-        <input autoFocus placeholder="Search" aria-label="Search the options" value={q} onChange={(e) => setQ(e.target.value)}
+        <input
+          autoFocus
+          placeholder="Search"
+          aria-label="Search the options"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape' || e.key === 'Tab') return; // the menu closes as usual
             e.stopPropagation(); // typing must not jump to items (the menu's type-ahead)
-            if (e.key === 'ArrowDown') { e.preventDefault(); firstOption(e.currentTarget)?.focus(); }
-            if (e.key === 'Enter') { e.preventDefault(); firstOption(e.currentTarget)?.click(); }
-          }} />
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              firstOption(e.currentTarget)?.focus();
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              firstOption(e.currentTarget)?.click();
+            }
+          }}
+        />
         {qq && <span className="sf-count">{matches || 'No matches'}</span>}
       </div>
     </ListSubheader>
   ) : null;
   return (
-    <TextField select {...rest} className={className} sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+    <TextField
+      select
+      {...rest}
+      className={className}
+      sx={[...look(props), ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
       slotProps={{
         htmlInput: html,
         select: {
           displayEmpty: true,
-          MenuProps: { ...(MenuProps || {}), ...(canSearch && { autoFocus: false }), slotProps: { paper: { sx: { maxHeight: 360 } }, ...(MenuProps?.slotProps || {}) } },
-          renderValue: renderValue || (placeholder ? (v: Any) => (v === '' || v == null ? <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>{placeholder}</span> : undefined) : undefined),
-          ...(multiple !== undefined && { multiple }), ...(open !== undefined && { open }), ...(autoWidth !== undefined && { autoWidth }),
-          onOpen: (e: Any) => { setQ(''); onOpen?.(e); },
-          onClose: (e: Any) => { onClose?.(e); setTimeout(() => setQ(''), 200); },
+          MenuProps: {
+            ...(MenuProps || {}),
+            ...(canSearch && { autoFocus: false }),
+            slotProps: { paper: { sx: { maxHeight: 360 } }, ...(MenuProps?.slotProps || {}) },
+          },
+          renderValue:
+            renderValue ||
+            (placeholder
+              ? (v: Any) =>
+                  v === '' || v == null ? (
+                    <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>{placeholder}</span>
+                  ) : undefined
+              : undefined),
+          ...(multiple !== undefined && { multiple }),
+          ...(open !== undefined && { open }),
+          ...(autoWidth !== undefined && { autoWidth }),
+          onOpen: (e: Any) => {
+            setQ('');
+            onOpen?.(e);
+          },
+          onClose: (e: Any) => {
+            onClose?.(e);
+            setTimeout(() => setQ(''), 200);
+          },
         },
-      }}>
+      }}
+    >
       {search}
       {shown}
     </TextField>
   );
 }
 /** Plain string options as MenuItems. */
-export const opts = (list: string[]) => list.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>);
+export const opts = (list: string[]) =>
+  list.map((x) => (
+    <MenuItem key={x} value={x}>
+      {x}
+    </MenuItem>
+  ));
 
 /** Checkbox (MUI). Pass `label` to render it with a label. */
 export function CB({ label, className: _c, ...props }: Any) {
@@ -176,29 +293,84 @@ export const RB = ({ label, ...props }: Any) => <FormControlLabel control={<Radi
 /** Date input (MUI X DatePicker) working with "YYYY-MM-DD" strings. */
 export function DateF({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
-    <DatePicker value={value ? dayjs(value) : null} disabled={disabled} format="D MMM YYYY"
+    <DatePicker
+      value={value ? dayjs(value) : null}
+      disabled={disabled}
+      format="D MMM YYYY"
       onChange={(d: Any) => onChange(d && d.isValid() ? d.format('YYYY-MM-DD') : '')}
-      slotProps={{ textField: { size: 'small', fullWidth: true } as Any }} />
+      slotProps={{ textField: { size: 'small', fullWidth: true } as Any }}
+    />
   );
 }
 
 /** Free-text people picker with suggestions (MUI Autocomplete). onChange receives the name. */
-export function PeopleF({ value, onChange, onCommit, options, placeholder, disabled, autoFocus, ghost: isGhost = false, avatars = true }: {
-  value: string; onChange: (v: string) => void; onCommit?: (v: string) => void; options: string[]; placeholder?: string; disabled?: boolean; autoFocus?: boolean; ghost?: boolean; avatars?: boolean;
+export function PeopleF({
+  value,
+  onChange,
+  onCommit,
+  options,
+  placeholder,
+  disabled,
+  autoFocus,
+  ghost: isGhost = false,
+  avatars = true,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit?: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  ghost?: boolean;
+  avatars?: boolean;
 }) {
   return (
-    <Autocomplete freeSolo fullWidth disableClearable={false} sx={{ flex: 1, minWidth: 0 }} options={options} value={value || ''} inputValue={value || ''} disabled={disabled}
-      onInputChange={(_e, v, reason) => { if (reason !== 'reset' || v) onChange(v); }}
-      onChange={(_e, v: Any) => { onChange(v || ''); onCommit?.(v || ''); }}
+    <Autocomplete
+      freeSolo
+      fullWidth
+      disableClearable={false}
+      sx={{ flex: 1, minWidth: 0 }}
+      options={options}
+      value={value || ''}
+      inputValue={value || ''}
+      disabled={disabled}
+      onInputChange={(_e, v, reason) => {
+        if (reason !== 'reset' || v) onChange(v);
+      }}
+      onChange={(_e, v: Any) => {
+        onChange(v || '');
+        onCommit?.(v || '');
+      }}
       onBlur={() => onCommit?.(value)}
       renderOption={(props: Any, option: string) => {
         const { key, ...p } = props;
-        if (!avatars) return <li key={key} {...p}>{option}</li>;
-        return <li key={key} {...p}><span className="avatar" style={{ background: hashColor(option), width: 20, height: 20, fontSize: 9 }}>{initials(option)}</span>{option}</li>;
+        if (!avatars)
+          return (
+            <li key={key} {...p}>
+              {option}
+            </li>
+          );
+        return (
+          <li key={key} {...p}>
+            <span className="avatar" style={{ background: hashColor(option), width: 20, height: 20, fontSize: 9 }}>
+              {initials(option)}
+            </span>
+            {option}
+          </li>
+        );
       }}
-      renderInput={(params) => <TextField {...params} placeholder={placeholder} autoFocus={autoFocus} sx={isGhost ? { '&&': ghost } : undefined} />} />
+      renderInput={(params) => (
+        <TextField {...params} placeholder={placeholder} autoFocus={autoFocus} sx={isGhost ? { '&&': ghost } : undefined} />
+      )}
+    />
   );
 }
 
 /** Small icon + label used inside MenuItems for issue types. */
-export const TypeLabel = ({ type, children }: { type: string; children?: ReactNode }) => <>{ico(typeIcon(type))}{children ?? type}</>;
+export const TypeLabel = ({ type, children }: { type: string; children?: ReactNode }) => (
+  <>
+    {ico(typeIcon(type))}
+    {children ?? type}
+  </>
+);

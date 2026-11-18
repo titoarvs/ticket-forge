@@ -17,9 +17,11 @@ export const RELEASES: Release[] = [
 /** Every release with its feature titles (major and minor), newest release first. */
 export function releaseNotes(releases: Release[] = RELEASES, entries: { date: string; title: string }[] = TIMELINE): ReleaseNotes[] {
   const sorted = [...releases].sort((a, b) => a.date.localeCompare(b.date));
-  return sorted.map((r, i) => {
-    const from = sorted[i - 1]?.date ?? '';
-    const features = entries.filter((e) => e.date > from && e.date <= r.date).map((e) => e.title);
-    return { ...r, features };
-  }).reverse();
+  return sorted
+    .map((r, i) => {
+      const from = sorted[i - 1]?.date ?? '';
+      const features = entries.filter((e) => e.date > from && e.date <= r.date).map((e) => e.title);
+      return { ...r, features };
+    })
+    .reverse();
 }

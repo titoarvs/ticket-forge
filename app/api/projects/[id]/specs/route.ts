@@ -10,7 +10,11 @@ export const GET = api(async (req, p) => {
   const user = await authed();
   store.requireAccess(user, p.id);
   const epicId = new URL(req.url).searchParams.get('epicId') || '';
-  return { ...(await store.listSpecs(p.id, epicId)), canEdit: store.has(user, 'issue.edit'), canGenerate: store.has(user, 'ai.use') && store.has(user, 'issue.edit') };
+  return {
+    ...(await store.listSpecs(p.id, epicId)),
+    canEdit: store.has(user, 'issue.edit'),
+    canGenerate: store.has(user, 'ai.use') && store.has(user, 'issue.edit'),
+  };
 });
 
 // Generate coding specs: one prompt per ticket of the epic, saved as drafts (an earlier spec of the same ticket is replaced).

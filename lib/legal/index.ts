@@ -14,4 +14,5 @@ export const LEGAL: Record<LegalDoc, { version: string; material: boolean; title
 };
 /** The documents people accept (at sign-up, invite, setup, and again when a material version changes). */
 export const ACCEPTED_DOCS = DOCS as LegalDoc[];
-export const currentVersions = () => Object.fromEntries(ACCEPTED_DOCS.map((d) => [d, LEGAL[d].version])) as Record<'terms' | 'privacy', string>;
+export const currentVersions = () =>
+  Object.fromEntries(ACCEPTED_DOCS.map((d) => [d, LEGAL[d].version])) as Record<'terms' | 'privacy', string>;

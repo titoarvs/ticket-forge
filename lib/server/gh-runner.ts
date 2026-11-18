@@ -11,6 +11,13 @@ export async function githubRunner(projectId: string | undefined, { deadlineMs =
   const cfg = p?.automation?.github || {};
   if (!cfg.repo) throw new HttpError(400, 'Set up GitHub Actions in Test automation → Settings first.');
   const [token, key] = await Promise.all([getProjectSecret(projectId, 'githubToken'), getProjectSecret(projectId, 'ghRunnerKey')]);
-  if (!key) throw new HttpError(400, 'GitHub Actions isn’t set up for this project yet (no run key). Run the setup in Test automation → Settings.');
-  return { repo: String(cfg.repo), ref: String(cfg.ref || 'main'), token: token || '', key, deadline: deadlineMs ? Date.now() + deadlineMs : 0 };
+  if (!key)
+    throw new HttpError(400, 'GitHub Actions isn’t set up for this project yet (no run key). Run the setup in Test automation → Settings.');
+  return {
+    repo: String(cfg.repo),
+    ref: String(cfg.ref || 'main'),
+    token: token || '',
+    key,
+    deadline: deadlineMs ? Date.now() + deadlineMs : 0,
+  };
 }

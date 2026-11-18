@@ -1,9 +1,22 @@
 import { api, perm, body, HttpError, aiOpts } from '@/lib/server/http';
-import { publicAgents, saveAgentSettings, saveCustomAgent, removeCustomAgent, generateAgentMd, parseAgentMd, getAgentSettings, builtInAsMd, AGENTS } from '@/lib/agents';
+import {
+  publicAgents,
+  saveAgentSettings,
+  saveCustomAgent,
+  removeCustomAgent,
+  generateAgentMd,
+  parseAgentMd,
+  getAgentSettings,
+  builtInAsMd,
+  AGENTS,
+} from '@/lib/agents';
 
 // Administration → Agents: what each TicketForge agent does, the administrator's settings for it (on/off, Claude model,
 // effort, extra instructions), and custom agents defined as Markdown (written by AI from a description, or pasted).
-export const GET = api(async () => { await perm('users.manage'); return publicAgents(); });
+export const GET = api(async () => {
+  await perm('users.manage');
+  return publicAgents();
+});
 export const PUT = api(async (req) => {
   const user = await perm('users.manage');
   const b = await body(req);
@@ -28,9 +41,15 @@ export const POST = api(async (req) => {
     await saveAgentSettings(user, undefined, undefined, { removed });
     return publicAgents();
   }
-  if (b.action === 'roles') { await saveAgentSettings(user, undefined, undefined, { roles: b.roles || {} }); return publicAgents(); }
+  if (b.action === 'roles') {
+    await saveAgentSettings(user, undefined, undefined, { roles: b.roles || {} });
+    return publicAgents();
+  }
   if (b.action === 'copy') return { md: builtInAsMd(String(b.id || '')) };
-  if (b.action === 'save') { const id = await saveCustomAgent(user, { id: b.id ? String(b.id) : undefined, md: String(b.md || '') }); return { id, ...(await publicAgents()) }; }
+  if (b.action === 'save') {
+    const id = await saveCustomAgent(user, { id: b.id ? String(b.id) : undefined, md: String(b.md || '') });
+    return { id, ...(await publicAgents()) };
+  }
   throw new HttpError(400, 'Unknown action.');
 });
 export const DELETE = api(async (req) => {

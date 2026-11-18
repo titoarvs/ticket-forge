@@ -50,7 +50,13 @@ export function buildProject(raw, { key, sourceName, sourceText }: any) {
   const epics: any[] = [];
   const tickets: any[] = [];
   (raw.epics || []).forEach((e, i) => {
-    const epic = { id: uid(), key: '', title: str(e.title) || `Epic ${i + 1}`, description: str(e.description), color: EPIC_COLORS[i % EPIC_COLORS.length] };
+    const epic = {
+      id: uid(),
+      key: '',
+      title: str(e.title) || `Epic ${i + 1}`,
+      description: str(e.description),
+      color: EPIC_COLORS[i % EPIC_COLORS.length],
+    };
     epics.push(epic);
     (e.tickets || []).forEach((t) => tickets.push(normTicket(t, epic.id)));
   });
@@ -72,8 +78,17 @@ export function buildProject(raw, { key, sourceName, sourceText }: any) {
 }
 
 function deriveKey(name) {
-  const words = str(name).replace(/[^a-z0-9 ]/gi, ' ').split(/\s+/).filter(Boolean);
-  const k = words.length > 1 ? words.slice(0, 4).map((w) => w[0]).join('') : (words[0] || 'PRJ').slice(0, 4);
+  const words = str(name)
+    .replace(/[^a-z0-9 ]/gi, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  const k =
+    words.length > 1
+      ? words
+          .slice(0, 4)
+          .map((w) => w[0])
+          .join('')
+      : (words[0] || 'PRJ').slice(0, 4);
   return k.toUpperCase() || 'PRJ';
 }
 
@@ -81,10 +96,22 @@ function deriveKey(name) {
 export function assignKeys(p) {
   const used = new Set(p.tickets.map((t) => t.key).filter(Boolean));
   let n = 0;
-  const next = () => { do { n += 1; } while (used.has(`${p.key}-${n}`)); used.add(`${p.key}-${n}`); return `${p.key}-${n}`; };
-  p.epics.forEach((e, i) => { if (!e.key) e.key = `${p.key}-E${i + 1}`; if (!e.color) e.color = EPIC_COLORS[i % EPIC_COLORS.length]; });
+  const next = () => {
+    do {
+      n += 1;
+    } while (used.has(`${p.key}-${n}`));
+    used.add(`${p.key}-${n}`);
+    return `${p.key}-${n}`;
+  };
+  p.epics.forEach((e, i) => {
+    if (!e.key) e.key = `${p.key}-E${i + 1}`;
+    if (!e.color) e.color = EPIC_COLORS[i % EPIC_COLORS.length];
+  });
   for (const e of p.epics) for (const t of p.tickets.filter((x) => x.epicId === e.id)) if (!t.key) t.key = next();
   for (const t of p.tickets) if (!t.key) t.key = next();
-  for (const t of p.tickets) t.testCases.forEach((tc, i) => { tc.key = `TC-${t.key}-${String(i + 1).padStart(2, '0')}`; });
+  for (const t of p.tickets)
+    t.testCases.forEach((tc, i) => {
+      tc.key = `TC-${t.key}-${String(i + 1).padStart(2, '0')}`;
+    });
   return p;
 }

@@ -14,9 +14,16 @@ export async function trimEmbeddedFonts(zip) {
   for (const id of ids) {
     const rel = rels.match(new RegExp(`<Relationship\\b[^>]*Id="${id}"[^>]*/>`));
     const target = rel && (rel[0].match(/Target="([^"]+)"/) || [])[1];
-    const stillUsed = target && [...xml.matchAll(/<w:embed(?:Regular|Italic)\b[^>]*r:id="([^"]+)"/g)].some((m) => (rels.match(new RegExp(`Id="${m[1]}"[^>]*Target="${target}"|Target="${target}"[^>]*Id="${m[1]}"`))));
+    const stillUsed =
+      target &&
+      [...xml.matchAll(/<w:embed(?:Regular|Italic)\b[^>]*r:id="([^"]+)"/g)].some((m) =>
+        rels.match(new RegExp(`Id="${m[1]}"[^>]*Target="${target}"|Target="${target}"[^>]*Id="${m[1]}"`)),
+      );
     if (rel) rels = rels.replace(rel[0], '');
-    if (target && !stillUsed) { zip.remove(`word/${target.replace(/^\.?\//, '')}`); removed++; }
+    if (target && !stillUsed) {
+      zip.remove(`word/${target.replace(/^\.?\//, '')}`);
+      removed++;
+    }
   }
   xml = xml.replace(/<w:embed(?:Bold|BoldItalic)\b[^>]*\/>/g, '');
   zip.file('word/fontTable.xml', xml);

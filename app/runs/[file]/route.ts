@@ -12,5 +12,7 @@ export const GET = api(async (_req, p) => {
   if (mine ? !name.startsWith(mine) : name.includes('--')) throw new HttpError(404, 'Not found');
   const buf = await fs.readFile(path.join(RUN_DIR, name)).catch(() => null);
   if (!buf) throw new HttpError(404, 'Not found');
-  return new Response(buf, { headers: { 'Content-Type': name.endsWith('.jpg') ? 'image/jpeg' : 'image/png', 'Cache-Control': 'private, max-age=3600' } });
+  return new Response(buf, {
+    headers: { 'Content-Type': name.endsWith('.jpg') ? 'image/jpeg' : 'image/png', 'Cache-Control': 'private, max-age=3600' },
+  });
 });

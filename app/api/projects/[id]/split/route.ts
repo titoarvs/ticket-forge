@@ -13,7 +13,13 @@ export const POST = api(async (req, p) => {
   if (!ids.length) throw new HttpError(400, 'Pick the issues to split.');
   const project = await store.getProject(p.id);
   return ndjson(req, async (send, signal) => {
-    const out = await splitIssues({ project, ticketIds: ids, instruction: String(b.instruction || '').slice(0, 2000), ai: { ...aiOpts(b), signal }, emit: send });
+    const out = await splitIssues({
+      project,
+      ticketIds: ids,
+      instruction: String(b.instruction || '').slice(0, 2000),
+      ai: { ...aiOpts(b), signal },
+      emit: send,
+    });
     send({ type: 'done', ...out });
   });
 });

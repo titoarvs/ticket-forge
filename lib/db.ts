@@ -9,12 +9,22 @@ import { databaseUrl, checkConnectionString, hostOf, endpointOf, pgConfig, conne
 // Paths are resolved from the project folder (where you run `npm start`), so they also work when bundled by Next.js.
 export const ROOT = process.env.TICKETFORGE_ROOT || process.cwd();
 /** Serverless hosting (Vercel, AWS Lambda, Netlify): read-only app folder, no long-running processes. */
-export const SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY || ROOT.startsWith('/var/task'));
+export const SERVERLESS = Boolean(
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY || ROOT.startsWith('/var/task'),
+);
 // On serverless only the temporary folder is writable, and it doesn't last between requests.
-export const DATA_DIR = process.env.TICKETFORGE_DATA ? path.resolve(process.env.TICKETFORGE_DATA)
-  : SERVERLESS ? path.join(os.tmpdir(), 'ticketforge') : path.join(ROOT, 'data');
+export const DATA_DIR = process.env.TICKETFORGE_DATA
+  ? path.resolve(process.env.TICKETFORGE_DATA)
+  : SERVERLESS
+    ? path.join(os.tmpdir(), 'ticketforge')
+    : path.join(ROOT, 'data');
 
-const G = globalThis.__ticketforgeDb ??= { impl: null, info: { kind: null, label: '', rls: null }, als: new AsyncLocalStorage(), owner: false };
+const G = (globalThis.__ticketforgeDb ??= {
+  impl: null,
+  info: { kind: null, label: '', rls: null },
+  als: new AsyncLocalStorage(),
+  owner: false,
+});
 G.als ??= new AsyncLocalStorage();
 export const dbInfo = G.info;
 
@@ -24,25 +34,40 @@ export const dbInfo = G.info;
 // run in "system" context. Scripts and migrations run as the table owner.
 export const APP_ROLE = 'ticketforge_app';
 /** extra: other request facts, e.g. { local } = the app was opened on this computer. */
-export const asUser = (userId, fn, user, extra: any = {}) => G.als.run({ ...extra, userId: userId || '', user, ws: extra.ws ?? user?.workspace_id ?? null }, fn);
+export const asUser = (userId, fn, user, extra: any = {}) =>
+  G.als.run({ ...extra, userId: userId || '', user, ws: extra.ws ?? user?.workspace_id ?? null }, fn);
 /** System context keeps the request's workspace, so work done for a request stays inside that company's data. */
 export const asSystem = (fn) => G.als.run({ system: true, ws: currentWs() }, fn);
 /** System context for one workspace (sign-up, invites, background jobs that know their workspace). */
 export const asWorkspace = (ws, fn) => G.als.run({ system: true, ws: ws || null }, fn);
 export const currentContext = () => G.als.getStore() || {};
 /** The workspace (company) the current request works in, or null outside one. */
-export function currentWs() { const c = G.als.getStore() || {}; return c.ws ?? c.user?.workspace_id ?? null; }
+export function currentWs() {
+  const c = G.als.getStore() || {};
+  return c.ws ?? c.user?.workspace_id ?? null;
+}
 /** The workspace every install starts with; data from before workspaces existed belongs to it. */
 export const DEFAULT_WS = 'default';
-export const useOwner = (on = true) => { G.owner = on; };
+export const useOwner = (on = true) => {
+  G.owner = on;
+};
 const rlsActive = () => dbInfo.kind === 'postgres' && Boolean(dbInfo.rls?.appRole) && !G.owner && process.env.TICKETFORGE_RLS !== 'off';
 // Every statement runs inside a transaction that first sets the role and user *for that transaction only*
 // (set_config(..., true)). Nothing is left on the connection, so this stays correct behind connection
 // poolers in session or transaction mode (Supabase Supavisor on 5432 or 6543, PgBouncer). Owner mode sets
 // the role back to the connecting user, in case a shared connection still carries one.
 function beginSql(client) {
-  let role = 'none', uid = '', sys = '', ws = '';
-  if (rlsActive()) { const c = currentContext(); role = APP_ROLE; uid = c.userId || ''; sys = c.system ? 'on' : ''; ws = currentWs() || ''; }
+  let role = 'none',
+    uid = '',
+    sys = '',
+    ws = '';
+  if (rlsActive()) {
+    const c = currentContext();
+    role = APP_ROLE;
+    uid = c.userId || '';
+    sys = c.system ? 'on' : '';
+    ws = currentWs() || '';
+  }
   const lit = (v) => client.escapeLiteral(String(v));
   // app.writer = 2: this version records issue and section versions itself (see SYNC_TRIGGERS).
   return `begin; select set_config('role', ${lit(role)}, true), set_config('app.user_id', ${lit(uid)}, true), set_config('app.system', ${lit(sys)}, true), set_config('app.workspace_id', ${lit(ws)}, true), set_config('app.writer', '2', true)`;
@@ -55,7 +80,10 @@ export const authGen = () => G.authGen || 0;
 // time don't, so thousands of people signing in don't keep emptying everyone's cached sign-in.
 const AUTH_WRITE = /^\s*(update|delete\s+from)\s+(users|roles|sessions|workspace_members|workspaces)\b/i;
 const AUTH_SKIP = /^\s*update\s+users\s+set\s+last_login_at\s*=\s*now\(\)\s+where\s+id\s*=\s*\$1\s*$/i;
-const noteWrite = (sql) => { const s = String(sql); if (AUTH_WRITE.test(s) && !AUTH_SKIP.test(s)) G.authGen = (G.authGen || 0) + 1; };
+const noteWrite = (sql) => {
+  const s = String(sql);
+  if (AUTH_WRITE.test(s) && !AUTH_SKIP.test(s)) G.authGen = (G.authGen || 0) + 1;
+};
 
 // Speed: a database far away (Supabase over the internet) costs a round trip per message. Instead of sending
 // "begin + settings", then the statement, then "commit" (3 round trips), the values are written into the
@@ -71,8 +99,14 @@ function inline(client, sql, params) {
     return client.escapeLiteral(String(v));
   });
 }
-const trimSql = (sql) => String(sql).trim().replace(/;+\s*$/, '');
-const userPart = (res) => { const r = Array.isArray(res) ? res.slice(2) : [res]; return r.length === 1 ? r[0] : r; };
+const trimSql = (sql) =>
+  String(sql)
+    .trim()
+    .replace(/;+\s*$/, '');
+const userPart = (res) => {
+  const r = Array.isArray(res) ? res.slice(2) : [res];
+  return r.length === 1 ? r[0] : r;
+};
 const hasBuffer = (params) => (params || []).some((v) => Buffer.isBuffer(v));
 
 // ---------------------------------------------------------------- cutover fence (moving to another PostgreSQL host)
@@ -83,19 +117,35 @@ const hasBuffer = (params) => (params || []).some((v) => Buffer.isBuffer(v));
 // retryable 503 before running them, so nothing is written to a host that was already copied. The browser retries
 // those (client/core.ts) and the load balancer sends the retry to a server on the new host. See docs/postgres-host-migration.md.
 export const CUTOVER_KEY = 'db_cutover';
-export const FENCE_POLL_MS = (process.env.TICKETFORGE_CUTOVER_POLL_MS ?? '') === '' ? 1000 : Math.max(0, Number(process.env.TICKETFORGE_CUTOVER_POLL_MS) || 0);
+export const FENCE_POLL_MS =
+  (process.env.TICKETFORGE_CUTOVER_POLL_MS ?? '') === '' ? 1000 : Math.max(0, Number(process.env.TICKETFORGE_CUTOVER_POLL_MS) || 0);
 const HOLD_MAX_MS = Number(process.env.TICKETFORGE_CUTOVER_HOLD_MS) || 30000;
 const FENCE = (G.fence ??= { state: 'open', checkedAt: 0, probe: null });
-const movedError = (state) => Object.assign(
-  new Error(state === 'moved' ? 'The database has moved to a new host. Retry this request.' : 'The database is being moved to a new host and did not finish in time. Retry this request.'),
-  { status: 503, extra: { code: 'db-moved', retry: true } });
+const movedError = (state) =>
+  Object.assign(
+    new Error(
+      state === 'moved'
+        ? 'The database has moved to a new host. Retry this request.'
+        : 'The database is being moved to a new host and did not finish in time. Retry this request.',
+    ),
+    { status: 503, extra: { code: 'db-moved', retry: true } },
+  );
 /** Reads the fence at most once per poll interval per server (one small query). Failures keep the last known state. */
 function refreshFence(pool) {
   if (Date.now() - FENCE.checkedAt < FENCE_POLL_MS) return FENCE.probe;
-  FENCE.probe ??= pool.query('select value from app_meta where key = $1', [CUTOVER_KEY])
-    .then((r) => { const st = r.rows[0]?.value?.state; FENCE.state = st === 'hold' || st === 'moved' ? st : 'open'; })
-    .catch(() => { /* app_meta not there yet (first start): nothing to wait for */ })
-    .finally(() => { FENCE.checkedAt = Date.now(); FENCE.probe = null; });
+  FENCE.probe ??= pool
+    .query('select value from app_meta where key = $1', [CUTOVER_KEY])
+    .then((r) => {
+      const st = r.rows[0]?.value?.state;
+      FENCE.state = st === 'hold' || st === 'moved' ? st : 'open';
+    })
+    .catch(() => {
+      /* app_meta not there yet (first start): nothing to wait for */
+    })
+    .finally(() => {
+      FENCE.checkedAt = Date.now();
+      FENCE.probe = null;
+    });
   return FENCE.probe;
 }
 /** Called before a write starts (never in the middle of a transaction, so a held request holds no locks). */
@@ -110,7 +160,10 @@ async function writeGate(pool) {
   }
 }
 /** A statement that may change data (anything but a plain select), so the fence applies to it. */
-const isWrite = (sql) => { const s = String(sql); return !/^\s*(select|show|explain)\b/i.test(s) || /\b(insert|update|delete|nextval|setval)\b|\bfor\s+update\b/i.test(s); };
+const isWrite = (sql) => {
+  const s = String(sql);
+  return !/^\s*(select|show|explain)\b/i.test(s) || /\b(insert|update|delete|nextval|setval)\b|\bfor\s+update\b/i.test(s);
+};
 
 /** One statement in its own transaction, in a single round trip. */
 async function once(pool, sql, params) {
@@ -122,8 +175,12 @@ async function once(pool, sql, params) {
     noteWrite(sql);
     const r = Array.isArray(res) ? res.slice(0, -1) : res; // drop the commit result
     return userPart(r);
-  } catch (e) { await client.query('rollback').catch(() => {}); throw e; }
-  finally { client.release(); }
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 /** A transaction: the settings ride along with the first statement, saving a round trip. write: false for a plain read. */
 async function inTx(pool, fn, write = true) {
@@ -133,9 +190,22 @@ async function inTx(pool, fn, write = true) {
   // array: rows as arrays of values (what the Drizzle ORM driver needs: joins can repeat a column name).
   const query = async (sql, params, { array = false }: any = {}) => {
     let out;
-    if (array) { if (!started) { started = true; await client.query(beginSql(client)); } out = await client.query({ text: sql, values: params, rowMode: 'array' }); }
-    else if (!started && !hasBuffer(params)) { started = true; out = userPart(await client.query(`${beginSql(client)};\n${trimSql(inline(client, sql, params))}`)); }
-    else { if (!started) { started = true; await client.query(beginSql(client)); } out = await client.query(sql, params); }
+    if (array) {
+      if (!started) {
+        started = true;
+        await client.query(beginSql(client));
+      }
+      out = await client.query({ text: sql, values: params, rowMode: 'array' });
+    } else if (!started && !hasBuffer(params)) {
+      started = true;
+      out = userPart(await client.query(`${beginSql(client)};\n${trimSql(inline(client, sql, params))}`));
+    } else {
+      if (!started) {
+        started = true;
+        await client.query(beginSql(client));
+      }
+      out = await client.query(sql, params);
+    }
     noteWrite(sql);
     return out;
   };
@@ -143,12 +213,17 @@ async function inTx(pool, fn, write = true) {
     const out = await fn(query);
     if (started) await client.query('commit');
     return out;
-  } catch (e) { if (started) await client.query('rollback').catch(() => {}); throw e; }
-  finally { client.release(); }
+  } catch (e) {
+    if (started) await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
-const POOL_HINT = 'The database host limits how many connections it accepts (poolers often allow few in session mode), and every '
-  + 'running copy of TicketForge (and every db:push or db:migrate-host) uses some. Stop copies you don\'t need, lower PG_POOL_MAX '
-  + '(default 5), or point DATABASE_URL at the host\'s transaction-mode pooler, which TicketForge supports.';
+const POOL_HINT =
+  'The database host limits how many connections it accepts (poolers often allow few in session mode), and every ' +
+  "running copy of TicketForge (and every db:push or db:migrate-host) uses some. Stop copies you don't need, lower PG_POOL_MAX " +
+  "(default 5), or point DATABASE_URL at the host's transaction-mode pooler, which TicketForge supports.";
 const explain = (e) => {
   if (/EMAXCONNSESSION|max clients reached/i.test(e?.message || '')) e.message = `${e.message}. ${POOL_HINT}`;
   return e;
@@ -156,19 +231,23 @@ const explain = (e) => {
 
 /** Turns the first connection failure into a message that says what to fix, instead of a bare network error code. */
 export function connectionFailure(e: any, host: string) {
-  const why = ({
-    ECONNREFUSED: 'the connection was refused. Check that PostgreSQL is running and the host and port are right.',
-    ENOTFOUND: 'the host name was not found. Check the host in DATABASE_URL.',
-    EAI_AGAIN: 'the host name could not be looked up (DNS). Check the host in DATABASE_URL and the network.',
-    ETIMEDOUT: 'the connection timed out. Check the host, the port and any firewall.',
-    ENETUNREACH: 'the network cannot reach the host. If the host only has an IPv6 address, use the IPv4 or pooler address your database provider gives you.',
-    EHOSTUNREACH: 'the network cannot reach the host. If the host only has an IPv6 address, use the IPv4 or pooler address your database provider gives you.',
-    ECONNRESET: 'the connection was closed by the server. Check the port and the SSL setting (PGSSL).',
-    '28P01': 'the database rejected the password. Check it (and URL-encode special characters such as @ # / as %40 %23 %2F).',
-    '28000': 'the database rejected this user. Check the user name and that it may connect from here.',
-    '3D000': 'the database named in DATABASE_URL does not exist.',
-  } as Record<string, string>)[e?.code]
-    || (/does not support SSL/i.test(e?.message || '') ? 'the server does not use SSL. Set PGSSL=disable.' : '');
+  const why =
+    (
+      {
+        ECONNREFUSED: 'the connection was refused. Check that PostgreSQL is running and the host and port are right.',
+        ENOTFOUND: 'the host name was not found. Check the host in DATABASE_URL.',
+        EAI_AGAIN: 'the host name could not be looked up (DNS). Check the host in DATABASE_URL and the network.',
+        ETIMEDOUT: 'the connection timed out. Check the host, the port and any firewall.',
+        ENETUNREACH:
+          'the network cannot reach the host. If the host only has an IPv6 address, use the IPv4 or pooler address your database provider gives you.',
+        EHOSTUNREACH:
+          'the network cannot reach the host. If the host only has an IPv6 address, use the IPv4 or pooler address your database provider gives you.',
+        ECONNRESET: 'the connection was closed by the server. Check the port and the SSL setting (PGSSL).',
+        '28P01': 'the database rejected the password. Check it (and URL-encode special characters such as @ # / as %40 %23 %2F).',
+        '28000': 'the database rejected this user. Check the user name and that it may connect from here.',
+        '3D000': 'the database named in DATABASE_URL does not exist.',
+      } as Record<string, string>
+    )[e?.code] || (/does not support SSL/i.test(e?.message || '') ? 'the server does not use SSL. Set PGSSL=disable.' : '');
   if (!why) return explain(e);
   const err: any = new Error(`Can't connect to the database at ${host || 'DATABASE_URL'}: ${why}`);
   err.code = e.code;
@@ -185,11 +264,18 @@ export async function probe(pool, host: string) {
   const first = pool.query('select 1');
   first.catch(() => {}); // when the timeout wins, a late failure must not crash the process
   try {
-    await Promise.race([first, new Promise((_, no) => { timer = setTimeout(() => no(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })), connectTimeoutMs()); })]);
+    await Promise.race([
+      first,
+      new Promise((_, no) => {
+        timer = setTimeout(() => no(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })), connectTimeoutMs());
+      }),
+    ]);
   } catch (e) {
     pool.end().catch(() => {});
     throw connectionFailure(e, host);
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function connect() {
@@ -197,7 +283,11 @@ async function connect() {
   if (url) {
     checkConnectionString(url);
     const { default: pg } = await import('pg');
-    try { prepareValue = (await import('pg/lib/utils.js')).default.prepareValue; } catch { /* keep identity */ }
+    try {
+      prepareValue = (await import('pg/lib/utils.js')).default.prepareValue;
+    } catch {
+      /* keep identity */
+    }
     const host = hostOf(url);
     const pool = new pg.Pool({ ...pgConfig(url), idleTimeoutMillis: 10000 });
     pool.on('error', (e) => console.error('Postgres pool error:', e.message));
@@ -205,9 +295,29 @@ async function connect() {
     dbInfo.kind = 'postgres';
     dbInfo.label = `PostgreSQL (${host})`;
     return {
-      query: (sql, params) => { const t0 = SQL_LOG && performance.now(); return once(pool, sql, params).then((r) => { if (SQL_LOG) console.log(`[sql] ${(performance.now() - t0).toFixed(1)}ms ${String(sql).replace(/\s+/g, ' ').slice(0, 90)}`); return r; }).catch((e) => { throw explain(e); }); },
+      query: (sql, params) => {
+        const t0 = SQL_LOG && performance.now();
+        return once(pool, sql, params)
+          .then((r) => {
+            if (SQL_LOG) console.log(`[sql] ${(performance.now() - t0).toFixed(1)}ms ${String(sql).replace(/\s+/g, ' ').slice(0, 90)}`);
+            return r;
+          })
+          .catch((e) => {
+            throw explain(e);
+          });
+      },
       rows: (sql, params) => inTx(pool, (query) => query(sql, params, { array: true }), isWrite(sql)),
-      tx: (fn) => { const t0 = SQL_LOG && performance.now(); return inTx(pool, (query) => fn({ query })).then((r) => { if (SQL_LOG) console.log(`[sql] ${(performance.now() - t0).toFixed(1)}ms transaction`); return r; }).catch((e) => { throw explain(e); }); },
+      tx: (fn) => {
+        const t0 = SQL_LOG && performance.now();
+        return inTx(pool, (query) => fn({ query }))
+          .then((r) => {
+            if (SQL_LOG) console.log(`[sql] ${(performance.now() - t0).toFixed(1)}ms transaction`);
+            return r;
+          })
+          .catch((e) => {
+            throw explain(e);
+          });
+      },
       close: () => pool.end(),
     };
   }
@@ -218,14 +328,34 @@ async function connect() {
   await db.waitReady;
   await db.query("select set_config('app.writer', '2', false)"); // one connection, this app only (see SYNC_TRIGGERS)
   dbInfo.kind = 'local';
-  dbInfo.label = SERVERLESS ? 'Temporary local database (erased often on serverless hosting: set DATABASE_URL)' : 'Local database (data/db)';
+  dbInfo.label = SERVERLESS
+    ? 'Temporary local database (erased often on serverless hosting: set DATABASE_URL)'
+    : 'Local database (data/db)';
   let chain: any = Promise.resolve();
   return {
-    query: (sql, params) => db.query(sql, params).then((r) => { noteWrite(sql); return r; }),
-    rows: (sql, params) => db.query(sql, params, { rowMode: 'array' }).then((r) => { noteWrite(sql); return r; }),
+    query: (sql, params) =>
+      db.query(sql, params).then((r) => {
+        noteWrite(sql);
+        return r;
+      }),
+    rows: (sql, params) =>
+      db.query(sql, params, { rowMode: 'array' }).then((r) => {
+        noteWrite(sql);
+        return r;
+      }),
     // PGlite is single-connection: serialise transactions.
     tx(fn) {
-      const run = chain.then(() => db.transaction((t) => fn({ query: (s, p) => t.query(s, p).then((r) => { noteWrite(s); return r; }) })));
+      const run = chain.then(() =>
+        db.transaction((t) =>
+          fn({
+            query: (s, p) =>
+              t.query(s, p).then((r) => {
+                noteWrite(s);
+                return r;
+              }),
+          }),
+        ),
+      );
       chain = run.catch(() => {});
       return run;
     },
@@ -239,9 +369,17 @@ const fits = (impl) => impl && ['query', 'rows', 'tx', 'close'].every((k) => typ
 export async function db() {
   if (G.impl) {
     const cur = await G.impl.catch(() => null);
-    if (cur && !fits(cur)) { G.impl = null; Promise.resolve().then(() => cur.close?.()).catch(() => {}); }
+    if (cur && !fits(cur)) {
+      G.impl = null;
+      Promise.resolve()
+        .then(() => cur.close?.())
+        .catch(() => {});
+    }
   }
-  G.impl ??= connect().catch((e) => { G.impl = null; throw e; });
+  G.impl ??= connect().catch((e) => {
+    G.impl = null;
+    throw e;
+  });
   return G.impl;
 }
 export const q = async (sql, params?) => (await db()).query(sql, params);
@@ -721,7 +859,11 @@ const SYNC_TRIGGERS = [
  */
 const SETUP_LOCK = 'select pg_advisory_xact_lock(7413201)';
 /** Changes whenever SCHEMA does, so a running server migrates again after new tables are added. */
-export const SCHEMA_VERSION = (() => { let h = 0; for (const c of SCHEMA + SYNC_TRIGGERS.join(';')) h = (h * 31 + c.charCodeAt(0)) | 0; return String(h); })();
+export const SCHEMA_VERSION = (() => {
+  let h = 0;
+  for (const c of SCHEMA + SYNC_TRIGGERS.join(';')) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return String(h);
+})();
 
 export async function migrate() {
   const d = await db();
@@ -732,13 +874,25 @@ export async function migrate() {
     // Postgres takes the whole schema in one message (one round trip; matters on every cold start of a
     // serverless deploy). The local database runs it statement by statement.
     if (dbInfo.kind === 'postgres') await d.query(`${SETUP_LOCK};\n${SCHEMA}`);
-    else for (const stmt of SCHEMA.split(';').map((s) => s.trim()).filter(Boolean)) await d.query(stmt);
+    else
+      for (const stmt of SCHEMA.split(';')
+        .map((s) => s.trim())
+        .filter(Boolean))
+        await d.query(stmt);
     // Helps older servers sharing the database stay in sync; never a reason to stop the app from starting.
-    try { await d.tx(async (t) => { if (dbInfo.kind === 'postgres') await t.query(SETUP_LOCK); for (const stmt of SYNC_TRIGGERS) await t.query(stmt); }); }
-    catch (e) { console.warn(`Sync triggers not updated (the app works without them): ${e.message}`); }
+    try {
+      await d.tx(async (t) => {
+        if (dbInfo.kind === 'postgres') await t.query(SETUP_LOCK);
+        for (const stmt of SYNC_TRIGGERS) await t.query(stmt);
+      });
+    } catch (e) {
+      console.warn(`Sync triggers not updated (the app works without them): ${e.message}`);
+    }
     await runMigrations(d);
     if (dbInfo.kind === 'postgres') await setupRls(d);
-  } finally { G.owner = wasOwner; }
+  } finally {
+    G.owner = wasOwner;
+  }
 }
 
 /**
@@ -747,23 +901,26 @@ export async function migrate() {
  * the 'default' workspace with the role, project access and owner flag they had, so nothing changes for them.
  */
 const MIGRATIONS = [
-  { id: 'ws-1', sql: [
-    `do $$ begin
+  {
+    id: 'ws-1',
+    sql: [
+      `do $$ begin
        if exists (select 1 from pg_constraint where conname = 'roles_pkey' and conrelid = 'roles'::regclass
                   and array_length(conkey, 1) = 1) then
          alter table roles drop constraint roles_pkey cascade;
          alter table roles add primary key (workspace_id, id);
        end if;
      end $$`,
-    `insert into workspaces (id, name, owner_id)
+      `insert into workspaces (id, name, owner_id)
        select 'default', 'My workspace', (select id from users order by is_owner desc, created_at limit 1)
        where exists (select 1 from users)
        on conflict (id) do nothing`,
-    `insert into workspace_members (workspace_id, user_id, role_id, project_access, is_owner, status, created_at)
+      `insert into workspace_members (workspace_id, user_id, role_id, project_access, is_owner, status, created_at)
        select 'default', u.id, u.role_id, u.project_access, u.is_owner, u.status, u.created_at from users u
        where exists (select 1 from workspaces where id = 'default')
        on conflict (workspace_id, user_id) do nothing`,
-  ] },
+    ],
+  },
 ];
 async function runMigrations(d) {
   const done = new Set((await d.query('select id from schema_migrations')).rows.map((r) => r.id));
@@ -781,19 +938,73 @@ async function runMigrations(d) {
 
 /** Fails early with a fix when the database user can't create TicketForge's tables. */
 async function checkPrivileges(d) {
-  const r = (await d.query(`select current_user u, has_schema_privilege(current_user, 'public', 'CREATE') can_create,
-    (select count(*)::int from pg_tables where schemaname = 'public' and tablename = any($1)) existing`, [TABLES])).rows[0];
+  const r = (
+    await d.query(
+      `select current_user u, has_schema_privilege(current_user, 'public', 'CREATE') can_create,
+    (select count(*)::int from pg_tables where schemaname = 'public' and tablename = any($1)) existing`,
+      [TABLES],
+    )
+  ).rows[0];
   if (r.can_create) return;
   const who = r.u.replace(/"/g, '""');
-  throw new Error(`permission denied for schema public: the database user "${r.u}" in DATABASE_URL can't create tables there `
-    + `(${r.existing} of ${TABLES.length} TicketForge tables exist). Since PostgreSQL 15 only the database owner can, by default. Fix it as `
-    + `the database owner or a superuser, e.g. psql "<admin connection>" -c 'ALTER DATABASE <db> OWNER TO "${who}"' `
-    + `or -c 'GRANT CREATE ON SCHEMA public TO "${who}"'. On Supabase, connect as the postgres user (postgres.<project-ref> on the pooler).`);
+  throw new Error(
+    `permission denied for schema public: the database user "${r.u}" in DATABASE_URL can't create tables there ` +
+      `(${r.existing} of ${TABLES.length} TicketForge tables exist). Since PostgreSQL 15 only the database owner can, by default. Fix it as ` +
+      `the database owner or a superuser, e.g. psql "<admin connection>" -c 'ALTER DATABASE <db> OWNER TO "${who}"' ` +
+      `or -c 'GRANT CREATE ON SCHEMA public TO "${who}"'. On Supabase, connect as the postgres user (postgres.<project-ref> on the pooler).`,
+  );
 }
 
 // ---------------------------------------------------------------- RLS setup (PostgreSQL / Supabase)
-export const TABLES = ['roles', 'users', 'sessions', 'invites', 'password_resets', 'projects', 'issues', 'issue_tombstones', 'activity', 'issue_versions', 'app_meta', 'ai_cache', 'ai_usage', 'notifications', 'screenshots', 'files', 'doc_templates', 'code_jobs', 'user_ai', 'legal_acceptances', 'signup_requests', 'user_prefs', 'workspaces', 'workspace_members', 'schema_migrations', 'billing_events', 'payment_gateways', 'billing_plans', 'usage_counters', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs'];
-const FUNCS = ['tf_uid()', 'tf_system()', 'tf_ws()', 'tf_can(text)', 'tf_can_delete_project(text)', 'tf_access(text)', 'tf_all_access()', 'tf_access_list()', 'tf_ws_projects()', 'tf_coworkers()', 'tf_my_workspaces()'];
+export const TABLES = [
+  'roles',
+  'users',
+  'sessions',
+  'invites',
+  'password_resets',
+  'projects',
+  'issues',
+  'issue_tombstones',
+  'activity',
+  'issue_versions',
+  'app_meta',
+  'ai_cache',
+  'ai_usage',
+  'notifications',
+  'screenshots',
+  'files',
+  'doc_templates',
+  'code_jobs',
+  'user_ai',
+  'legal_acceptances',
+  'signup_requests',
+  'user_prefs',
+  'workspaces',
+  'workspace_members',
+  'schema_migrations',
+  'billing_events',
+  'payment_gateways',
+  'billing_plans',
+  'usage_counters',
+  'brain_notes',
+  'brain_state',
+  'coding_specs',
+  'spec_changes',
+  'drive_docs',
+];
+const FUNCS = [
+  'tf_uid()',
+  'tf_system()',
+  'tf_ws()',
+  'tf_can(text)',
+  'tf_can_delete_project(text)',
+  'tf_access(text)',
+  'tf_all_access()',
+  'tf_access_list()',
+  'tf_ws_projects()',
+  'tf_coworkers()',
+  'tf_my_workspaces()',
+];
 
 const LOCKDOWN_SQL = `
 ${TABLES.map((t) => `alter table ${t} enable row level security`).join(';\n')};
@@ -938,9 +1149,16 @@ create policy tf_delete on notifications for delete to ${APP_ROLE} using (tf_sys
  */
 async function setupRls(d) {
   const info = { enabled: false, appRole: null, tables: TABLES.length, error: null };
-  if (process.env.TICKETFORGE_RLS === 'off') { info.error = 'Disabled with TICKETFORGE_RLS=off'; dbInfo.rls = info; return; }
+  if (process.env.TICKETFORGE_RLS === 'off') {
+    info.error = 'Disabled with TICKETFORGE_RLS=off';
+    dbInfo.rls = info;
+    return;
+  }
   try {
-    await d.tx(async (t) => { await t.query(SETUP_LOCK); await t.query(LOCKDOWN_SQL); });
+    await d.tx(async (t) => {
+      await t.query(SETUP_LOCK);
+      await t.query(LOCKDOWN_SQL);
+    });
     info.enabled = true;
   } catch (e) {
     info.error = `Could not enable RLS: ${e.message}`;
@@ -949,7 +1167,10 @@ async function setupRls(d) {
     return;
   }
   try {
-    await d.tx(async (t) => { await t.query(SETUP_LOCK); await t.query(POLICY_SQL); });
+    await d.tx(async (t) => {
+      await t.query(SETUP_LOCK);
+      await t.query(POLICY_SQL);
+    });
     info.appRole = APP_ROLE;
   } catch (e) {
     info.error = `RLS is on, but the per-user policies could not be set up, so the app runs as the table owner: ${e.message}`;

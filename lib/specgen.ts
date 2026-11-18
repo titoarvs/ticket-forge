@@ -7,7 +7,12 @@ import { SERVERLESS, currentContext } from './db';
 import { cleanTouches, specPrompt } from './specs';
 import { schemaBlock } from './dbschema';
 
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+const clip = (s, n) => {
+  const t = String(s ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t.length > n ? `${t.slice(0, n)}…` : t;
+};
 
 /** Is a git remote or repository connected to the project (a folder, a GitHub repository or a cloned URL)? */
 export const hasRemote = (project) => Boolean(project?.dev?.localPath || project?.dev?.repo || project?.dev?.source?.url);
@@ -16,7 +21,11 @@ export const hasRemote = (project) => Boolean(project?.dev?.localPath || project
 async function repoFiles(project) {
   const dir = project.dev?.localPath;
   if (!dir || SERVERLESS || !currentContext().local) return [];
-  try { return (await localReader(dir).list()).slice(0, 4000); } catch { return []; }
+  try {
+    return (await localReader(dir).list()).slice(0, 4000);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -32,7 +41,10 @@ export async function generateSpecs({ project, epic, ai = {} }: any) {
   const touches: Map<any, any> = new Map();
   for (let i = 0; i < tickets.length; i += 20) {
     const batch = tickets.slice(i, i + 20);
-    const res = await askJson({ ...ai, task: 'repo', reasoning: 'fast',
+    const res = await askJson({
+      ...ai,
+      task: 'repo',
+      reasoning: 'fast',
       system: `You are a senior engineer planning work that several developers will code in parallel, one ticket each. For every ticket
 say which repository files it will change or create, and which modules (a folder or logical area such as "lib/store" or "client/Versions") they belong to.
 Use real paths from the file list when one is given, otherwise follow the repository profile's structure and naming. Be specific:
@@ -43,13 +55,33 @@ When a ticket needs a table or column the database schema doesn't have, include 
 Feature (epic): ${epic.key || ''} ${epic.title}${epic.description ? ` — ${clip(epic.description, 800)}` : ''}
 ${profile ? `\nRepository profile:\n${profile.slice(0, 6000)}\n` : ''}${files.length ? `\nRepository files:\n${files.join('\n')}\n` : ''}
 Tickets:
-${batch.map((t) => `- ${t.key} [${t.type}${t.layer ? `, ${t.layer}` : ''}] ${t.title}${t.userStory ? ` | ${clip(t.userStory, 200)}` : ''}${t.description ? ` | ${clip(t.description, 400)}` : ''}${t.acceptanceCriteria?.length ? ` | AC: ${t.acceptanceCriteria.slice(0, 8).map((a) => clip(a, 160)).join(' / ')}` : ''}`).join('\n')}` });
+${batch
+  .map(
+    (t) =>
+      `- ${t.key} [${t.type}${t.layer ? `, ${t.layer}` : ''}] ${t.title}${t.userStory ? ` | ${clip(t.userStory, 200)}` : ''}${t.description ? ` | ${clip(t.description, 400)}` : ''}${
+        t.acceptanceCriteria?.length
+          ? ` | AC: ${t.acceptanceCriteria
+              .slice(0, 8)
+              .map((a) => clip(a, 160))
+              .join(' / ')}`
+          : ''
+      }`,
+  )
+  .join('\n')}`,
+    });
     for (const it of res.items || []) touches.set(String(it.key), cleanTouches(it));
   }
   return tickets.map((t) => {
     const { files: f, modules } = touches.get(String(t.key)) || { files: [], modules: [] };
     const subtasks = project.tickets.filter((x) => x.parentId === t.id);
-    return { ticketId: t.id, ticketKey: t.key || '', title: t.title, criteria: (t.acceptanceCriteria || []).filter(Boolean).map(String), files: f, modules,
-      prompt: specPrompt({ project, epic, ticket: t, subtasks, files: f, modules }) };
+    return {
+      ticketId: t.id,
+      ticketKey: t.key || '',
+      title: t.title,
+      criteria: (t.acceptanceCriteria || []).filter(Boolean).map(String),
+      files: f,
+      modules,
+      prompt: specPrompt({ project, epic, ticket: t, subtasks, files: f, modules }),
+    };
   });
 }

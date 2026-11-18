@@ -19,26 +19,38 @@ export const GET = api(async (req, p) => {
   const sp = new URL(req.url).searchParams;
   if (sp.get('view') === 'html' && /wordprocessingml/.test(f.mime)) {
     const html = await docxPage(f.data, f.name);
-    return new Response(html, { headers: {
-      'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, max-age=3600',
-      // No scripts, no outside requests: only inline styles and embedded images.
-      'Content-Security-Policy': "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox allow-same-origin allow-popups allow-modals",
-      'X-Content-Type-Options': 'nosniff',
-    } });
+    return new Response(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'private, max-age=3600',
+        // No scripts, no outside requests: only inline styles and embedded images.
+        'Content-Security-Policy':
+          "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox allow-same-origin allow-popups allow-modals",
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   }
   // Images, PDFs and videos may show in the browser; anything else always downloads. Non-PDF files also get a
   // sandbox policy, so nothing in them can run as part of the app.
   const inline = !sp.get('download') && showsInline(f.mime);
-  return new Response(f.data, { headers: {
-    'Content-Type': f.mime, 'Content-Length': String(f.bytes), 'Cache-Control': 'private, max-age=3600',
-    'Content-Disposition': disposition(inline ? 'inline' : 'attachment', f.name), 'X-Content-Type-Options': 'nosniff',
-    ...(f.mime !== 'application/pdf' && { 'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'" }),
-  } });
+  return new Response(f.data, {
+    headers: {
+      'Content-Type': f.mime,
+      'Content-Length': String(f.bytes),
+      'Cache-Control': 'private, max-age=3600',
+      'Content-Disposition': disposition(inline ? 'inline' : 'attachment', f.name),
+      'X-Content-Type-Options': 'nosniff',
+      ...(f.mime !== 'application/pdf' && {
+        'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'",
+      }),
+    },
+  });
 });
 
 export const DELETE = api(async (_req, p) => {
   const { user, f } = await load(p.id);
-  if (!['issue.create', 'project.settings', 'issue.comment', 'issue.edit'].some((x) => store.has(user, x))) throw new HttpError(403, "You don't have permission to remove files.");
+  if (!['issue.create', 'project.settings', 'issue.comment', 'issue.edit'].some((x) => store.has(user, x)))
+    throw new HttpError(403, "You don't have permission to remove files.");
   await deleteFile(f.id);
   return { ok: true };
 });

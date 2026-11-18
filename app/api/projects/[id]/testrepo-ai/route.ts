@@ -17,7 +17,13 @@ export const POST = api(async (req, p) => {
   const ids = (Array.isArray(b.issueIds) ? b.issueIds : []).map(String).slice(0, 40);
   if (!ids.length) throw new HttpError(400, 'Pick the issues to write tests for.');
   return ndjson(req, async (send, signal) => {
-    const out = await writeRepoTests({ project, issueIds: ids, instruction: String(b.instruction || '').slice(0, 1500), ai: { ...aiOpts(b), signal }, emit: send });
+    const out = await writeRepoTests({
+      project,
+      issueIds: ids,
+      instruction: String(b.instruction || '').slice(0, 1500),
+      ai: { ...aiOpts(b), signal },
+      emit: send,
+    });
     send({ type: 'done', ...out });
   });
 });

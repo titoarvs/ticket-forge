@@ -8,12 +8,12 @@ export const TICKET_TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 export const REASONING = ['fast', 'balanced', 'thorough'];
 
 export const DEFAULT_RULES = {
-  reasoning: 'fast',            // fast: no extended thinking, low effort. Consistent and quick.
+  reasoning: 'fast', // fast: no extended thinking, low effort. Consistent and quick.
   stickToDocument: true,
   tickets: {
     titleMaxWords: 10,
     userStory: true,
-    acFormat: 'gwt',            // gwt: Given/When/Then · checklist: short testable statements
+    acFormat: 'gwt', // gwt: Given/When/Then · checklist: short testable statements
     acMin: 3,
     acMax: 6,
     pointScale: [1, 2, 3, 5, 8, 13],
@@ -42,7 +42,7 @@ export const DEFAULT_RULES = {
   // `standard` names the corporate standard the fields started from (istqb, xray, bdd, browserstack, custom).
   testmgmt: {
     standard: 'xray',
-    format: 'steps',            // steps · gherkin · both (Gherkin for user-facing behaviour, steps for the rest)
+    format: 'steps', // steps · gherkin · both (Gherkin for user-facing behaviour, steps for the rest)
     titleFormat: 'Verify <behaviour> when <condition>',
     perIssue: 4,
     stepsMin: 2,
@@ -60,15 +60,22 @@ export const DEFAULT_RULES = {
 };
 export const TM_FORMATS = ['steps', 'gherkin', 'both'];
 
-const int = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+const int = (v, lo, hi, d) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
+};
 const bool = (v, d) => (typeof v === 'boolean' ? v : d);
 const text = (v, max, d = '') => (typeof v === 'string' ? v.trim().slice(0, max) : d);
 
 /** Fills gaps with defaults and keeps every value in range. */
 export function normalizeRules(r: any = {}) {
-  const D = DEFAULT_RULES, t = r.tickets || {}, s = r.tests || {}, a = r.automation || {};
+  const D = DEFAULT_RULES,
+    t = r.tickets || {},
+    s = r.tests || {},
+    a = r.automation || {};
   const scale = (Array.isArray(t.pointScale) ? t.pointScale : String(t.pointScale ?? '').split(/[\s,]+/))
-    .map(Number).filter((n) => Number.isFinite(n) && n > 0 && n <= 100);
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0 && n <= 100);
   const pointScale: any = scale.length ? [...new Set(scale)].sort((x: any, y: any) => x - y) : D.tickets.pointScale;
   const types = (Array.isArray(t.types) ? t.types : []).filter((x) => TICKET_TYPES.includes(x));
   const acMin = int(t.acMin, 1, 15, D.tickets.acMin);
@@ -82,7 +89,12 @@ export function normalizeRules(r: any = {}) {
       acMin,
       acMax: Math.max(acMin, int(t.acMax, 1, 20, D.tickets.acMax)),
       pointScale,
-      maxPoints: int(t.maxPoints, pointScale[0], pointScale[pointScale.length - 1], Math.min(D.tickets.maxPoints, pointScale[pointScale.length - 1])),
+      maxPoints: int(
+        t.maxPoints,
+        pointScale[0],
+        pointScale[pointScale.length - 1],
+        Math.min(D.tickets.maxPoints, pointScale[pointScale.length - 1]),
+      ),
       types: types.length ? types : D.tickets.types,
       defaultPriority: ['Highest', 'High', 'Medium', 'Low'].includes(t.defaultPriority) ? t.defaultPriority : D.tickets.defaultPriority,
       descriptionSections: text(t.descriptionSections, 200, D.tickets.descriptionSections),
@@ -104,14 +116,16 @@ export function normalizeRules(r: any = {}) {
       oneFlow: bool(a.oneFlow, D.automation.oneFlow),
     },
     testmgmt: (() => {
-      const m = r.testmgmt || {}, T = D.testmgmt;
+      const m = r.testmgmt || {},
+        T = D.testmgmt;
       const stepsMin = int(m.stepsMin, 1, 30, T.stepsMin);
       return {
         standard: ['istqb', 'xray', 'bdd', 'browserstack', 'custom'].includes(m.standard) ? m.standard : T.standard,
         format: TM_FORMATS.includes(m.format) ? m.format : T.format,
         titleFormat: text(m.titleFormat, 120, T.titleFormat),
         perIssue: int(m.perIssue, 1, 20, T.perIssue),
-        stepsMin, stepsMax: Math.max(stepsMin, int(m.stepsMax, 1, 40, T.stepsMax)),
+        stepsMin,
+        stepsMax: Math.max(stepsMin, int(m.stepsMax, 1, 40, T.stepsMax)),
         expectedEveryStep: bool(m.expectedEveryStep, T.expectedEveryStep),
         testData: bool(m.testData, T.testData),
         preconditions: bool(m.preconditions, T.preconditions),
@@ -128,29 +142,39 @@ export function normalizeRules(r: any = {}) {
 
 // ---------------------------------------------------------------- storage
 const KEY = 'generation_rules';
-const G = globalThis;
 const C: any = wsCache('__tfRulesWs', () => ({ v: undefined, at: 0, meta: null }));
 
 /** The rules in force (defaults until an administrator saves some). */
 export async function getRules({ fresh = false }: any = {}) {
   if (!fresh && C.v !== undefined && Date.now() - C.at < 30000) return C.v;
   let saved = null;
-  try { saved = (await getMeta(wsKey(KEY))) || null; } catch { /* database not ready */ }
+  try {
+    saved = (await getMeta(wsKey(KEY))) || null;
+  } catch {
+    /* database not ready */
+  }
   C.v = normalizeRules(saved?.rules || {});
   C.meta = saved ? { updatedBy: saved.updatedBy || null, updatedAt: saved.updatedAt || null } : null;
   C.at = Date.now();
   return C.v;
 }
-export async function rulesMeta() { await getRules(); return C.meta; }
+export async function rulesMeta() {
+  await getRules();
+  return C.meta;
+}
 export async function saveRules(actor, rules) {
   const v = normalizeRules(rules);
   await setMeta(wsKey(KEY), { rules: v, updatedBy: actor?.name || null, updatedAt: new Date().toISOString() });
-  C.v = v; C.meta = { updatedBy: actor?.name || null, updatedAt: new Date().toISOString() }; C.at = Date.now();
+  C.v = v;
+  C.meta = { updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
+  C.at = Date.now();
   return v;
 }
 export async function resetRules() {
   await deleteMeta(wsKey(KEY));
-  C.v = normalizeRules({}); C.meta = null; C.at = Date.now();
+  C.v = normalizeRules({});
+  C.meta = null;
+  C.at = Date.now();
   return C.v;
 }
 
@@ -162,47 +186,78 @@ export function rulesText(r, part) {
   const out: any[] = [];
   if (part === 'tickets') {
     const t = r.tickets;
-    if (r.stickToDocument) out.push('Only include what the document asks for: no extra features, nice-to-haves or speculative tickets. Put anything unclear in openQuestions.');
+    if (r.stickToDocument)
+      out.push(
+        'Only include what the document asks for: no extra features, nice-to-haves or speculative tickets. Put anything unclear in openQuestions.',
+      );
     out.push(`Titles: imperative, at most ${t.titleMaxWords} words (e.g. "Export orders to CSV").`);
     out.push(t.userStory ? 'User story: "As a <role>, I want <goal>, so that <benefit>." on every Story.' : 'Leave userStory empty.');
-    out.push(`Acceptance criteria: ${t.acMin}-${t.acMax} per ticket, ${t.acFormat === 'gwt' ? 'each one "Given …, when …, then …"' : 'each a short, testable statement (no Given/When/Then)'}.`);
+    out.push(
+      `Acceptance criteria: ${t.acMin}-${t.acMax} per ticket, ${t.acFormat === 'gwt' ? 'each one "Given …, when …, then …"' : 'each a short, testable statement (no Given/When/Then)'}.`,
+    );
     out.push(`Story points: only ${t.pointScale.join(', ')}. Anything bigger than ${t.maxPoints} must be split into smaller tickets.`);
     out.push(`Ticket types: only ${list(t.types)}.`);
     out.push(`Priority: ${t.defaultPriority} unless the document clearly says otherwise.`);
-    if (t.descriptionSections) out.push(`Description: short sections in this order: ${t.descriptionSections} (one or two lines each, "Section: text").`);
+    if (t.descriptionSections)
+      out.push(`Description: short sections in this order: ${t.descriptionSections} (one or two lines each, "Section: text").`);
     out.push(t.maxLabels ? `Labels: at most ${t.maxLabels}, lowercase, one word each.` : 'No labels.');
   }
   if (part === 'tests') {
     const s = r.tests;
-    const kinds = [s.positive && 'one positive (happy path)', s.negative && 'one negative (invalid input or not allowed)', s.edge && 'one edge case'].filter(Boolean);
-    out.push(`Exactly ${s.perTicket} test case${s.perTicket === 1 ? '' : 's'} per ticket${kinds.length ? `, including at least ${list(kinds.slice(0, s.perTicket))}` : ''}. Cover every acceptance criterion across them.`);
+    const kinds = [
+      s.positive && 'one positive (happy path)',
+      s.negative && 'one negative (invalid input or not allowed)',
+      s.edge && 'one edge case',
+    ].filter(Boolean);
+    out.push(
+      `Exactly ${s.perTicket} test case${s.perTicket === 1 ? '' : 's'} per ticket${kinds.length ? `, including at least ${list(kinds.slice(0, s.perTicket))}` : ''}. Cover every acceptance criterion across them.`,
+    );
     if (s.titlePrefix) out.push(`Test titles start with "${s.titlePrefix} …" (e.g. "${s.titlePrefix} a cashier can open an order").`);
     out.push(`Steps: one user action per step, imperative ("Click Save"), at most ${s.maxSteps} steps.`);
     out.push('Expected result: one observable outcome the user sees.');
-    out.push(s.preconditions ? 'Always fill preconditions (write "None" if there are none).' : 'Leave preconditions empty unless essential.');
+    out.push(
+      s.preconditions ? 'Always fill preconditions (write "None" if there are none).' : 'Leave preconditions empty unless essential.',
+    );
   }
   if (part === 'automation') {
     const a = r.automation;
-    if (a.roleLocators) out.push('Locators, in this order: getByRole, getByLabel, getByPlaceholder, getByText, getByTestId; CSS only as a last resort.');
+    if (a.roleLocators)
+      out.push('Locators, in this order: getByRole, getByLabel, getByPlaceholder, getByText, getByTestId; CSS only as a last resort.');
     if (a.noHardWaits) out.push('Never use page.waitForTimeout or fixed sleeps; rely on web-first assertions.');
     if (a.testDataPrefix) out.push(`Name any data the test creates "${a.testDataPrefix}-" + Date.now().`);
     if (a.oneFlow) out.push('Script only the flow the test case describes; no extra checks.');
   }
   if (part === 'testmgmt') {
     const m = r.testmgmt;
-    const STD = { istqb: 'ISTQB test-case conventions', xray: 'the Xray for Jira test format', bdd: 'BDD / Cucumber (Gherkin) practice', browserstack: 'BrowserStack Test Management conventions', custom: 'the company standard below' };
+    const STD = {
+      istqb: 'ISTQB test-case conventions',
+      xray: 'the Xray for Jira test format',
+      bdd: 'BDD / Cucumber (Gherkin) practice',
+      browserstack: 'BrowserStack Test Management conventions',
+      custom: 'the company standard below',
+    };
     out.push(`Write repository tests to ${STD[m.standard] || STD.custom}.`);
-    out.push(m.format === 'gherkin' ? `Format: every test is a Gherkin scenario (type "Cucumber"): Scenario, Given, When, Then (And/But allowed), ${m.gherkinStyle === 'declarative' ? 'declarative business language, no UI clicks' : 'imperative steps naming the UI actions'}.`
-      : m.format === 'both' ? `Format: user-facing behaviour as Gherkin scenarios (type "Cucumber", ${m.gherkinStyle} style); technical, API or data checks as step tables (type "Manual").`
-      : 'Format: step tables (type "Manual"): each step has an action, test data and an expected result.');
+    out.push(
+      m.format === 'gherkin'
+        ? `Format: every test is a Gherkin scenario (type "Cucumber"): Scenario, Given, When, Then (And/But allowed), ${m.gherkinStyle === 'declarative' ? 'declarative business language, no UI clicks' : 'imperative steps naming the UI actions'}.`
+        : m.format === 'both'
+          ? `Format: user-facing behaviour as Gherkin scenarios (type "Cucumber", ${m.gherkinStyle} style); technical, API or data checks as step tables (type "Manual").`
+          : 'Format: step tables (type "Manual"): each step has an action, test data and an expected result.',
+    );
     if (m.titleFormat) out.push(`Titles follow the pattern "${m.titleFormat}".`);
     if (m.format !== 'gherkin') {
       out.push(`Steps: ${m.stepsMin}-${m.stepsMax} per test, one action each, imperative.`);
       out.push(m.expectedEveryStep ? 'Every step has its own expected result.' : 'Only the final step needs an expected result.');
-      out.push(m.testData ? 'Put concrete test data (values, accounts, amounts) in the Data column, never inside the action.' : 'Leave the Data column empty unless a value is essential.');
+      out.push(
+        m.testData
+          ? 'Put concrete test data (values, accounts, amounts) in the Data column, never inside the action.'
+          : 'Leave the Data column empty unless a value is essential.',
+      );
     }
     out.push(m.preconditions ? 'Always state preconditions (the state before the test).' : 'Preconditions only when essential.');
-    out.push(`Write about ${m.perIssue} tests per issue: the main flow, then negative and edge cases, covering every acceptance criterion.`);
+    out.push(
+      `Write about ${m.perIssue} tests per issue: the main flow, then negative and edge cases, covering every acceptance criterion.`,
+    );
     if (m.priorityRule) out.push(`Priority: ${m.priorityRule}`);
     if (m.labels) out.push(`Labels: only from this list: ${m.labels}.`);
     if (m.custom) out.push(`Company rules: ${m.custom}`);
@@ -228,12 +283,15 @@ const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** Story points on the scale, allowed types, default priority, labels, test-case count and titles. */
 export function applyTicketRules(t, r) {
-  const R = r.tickets, S = r.tests;
+  const R = r.tickets;
   const out = { ...t };
   if (Number.isFinite(out.storyPoints) && out.storyPoints > 0) out.storyPoints = nearest(out.storyPoints, R.pointScale);
   if (out.type !== 'Sub-task' && !R.types.includes(out.type)) out.type = R.types.includes('Story') ? 'Story' : R.types[0];
   if (!out.priority) out.priority = R.defaultPriority;
-  out.labels = (out.labels || []).map((l) => String(l).toLowerCase().replace(/\s+/g, '-')).filter(Boolean).slice(0, R.maxLabels);
+  out.labels = (out.labels || [])
+    .map((l) => String(l).toLowerCase().replace(/\s+/g, '-'))
+    .filter(Boolean)
+    .slice(0, R.maxLabels);
   if (Array.isArray(out.testCases)) out.testCases = out.testCases.map((tc) => applyTestRules(tc, r));
   return out;
 }
@@ -258,23 +316,43 @@ const cleanApply = (a: any = {}) => ({ tickets: a.tickets !== false, tests: a.te
 export async function getGuide({ fresh = false }: any = {}) {
   if (!fresh && GC.v !== undefined && Date.now() - GC.at < 30000) return GC.v;
   let v = null;
-  try { v = (await getMeta(wsKey(GUIDE_KEY))) || null; } catch { /* database not ready */ }
+  try {
+    v = (await getMeta(wsKey(GUIDE_KEY))) || null;
+  } catch {
+    /* database not ready */
+  }
   GC.v = v?.text ? { ...v, applyTo: cleanApply(v.applyTo), chars: v.text.length } : null;
   GC.at = Date.now();
   return GC.v;
 }
 export async function saveGuide(actor, { text, name, applyTo }: any) {
-  const t = String(text || '').replace(/\r\n/g, '\n').trim();
+  const t = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
   if (!t) throw Object.assign(new Error('The guide is empty.'), { status: 400 });
-  if (t.length > GUIDE_MAX) throw Object.assign(new Error(`The guide is too long (${t.length.toLocaleString()} characters; the limit is ${GUIDE_MAX.toLocaleString()}). Shorten it so the AI can use all of it.`), { status: 400 });
-  const v = { text: t, name: String(name || 'generation-guide.md').slice(0, 120), applyTo: cleanApply(applyTo), updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
+  if (t.length > GUIDE_MAX)
+    throw Object.assign(
+      new Error(
+        `The guide is too long (${t.length.toLocaleString()} characters; the limit is ${GUIDE_MAX.toLocaleString()}). Shorten it so the AI can use all of it.`,
+      ),
+      { status: 400 },
+    );
+  const v = {
+    text: t,
+    name: String(name || 'generation-guide.md').slice(0, 120),
+    applyTo: cleanApply(applyTo),
+    updatedBy: actor?.name || null,
+    updatedAt: new Date().toISOString(),
+  };
   await setMeta(wsKey(GUIDE_KEY), v);
-  GC.v = { ...v, chars: t.length }; GC.at = Date.now();
+  GC.v = { ...v, chars: t.length };
+  GC.at = Date.now();
   return GC.v;
 }
 export async function clearGuide() {
   await deleteMeta(wsKey(GUIDE_KEY));
-  GC.v = null; GC.at = Date.now();
+  GC.v = null;
+  GC.at = Date.now();
 }
 /** The guide as AI context, when it applies to any of `parts` ('tickets' | 'tests' | 'automation'). */
 export function guideBlock(guide, parts) {

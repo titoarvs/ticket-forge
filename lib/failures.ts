@@ -5,7 +5,10 @@
 import { askJson } from './claude';
 import { contextBlock } from './appcontext';
 
-const clip = (s, n) => { const t = String(s ?? '').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+const clip = (s, n) => {
+  const t = String(s ?? '').trim();
+  return t.length > n ? `${t.slice(0, n)}…` : t;
+};
 export const CATEGORIES = {
   'app-bug': 'Product bug',
   'test-script': 'Test script',
@@ -24,7 +27,9 @@ Be specific and concrete: quote the failing locator or assertion, name the page 
 Never invent facts that aren't in the evidence; when unsure, say what to check. Plain, short sentences. Return JSON only.`;
 
 function evidence({ ticket, tc, result }: any) {
-  const steps = Array.isArray(tc.steps) ? tc.steps.map((s, i) => `${i + 1}. ${typeof s === 'string' ? s : s?.action || ''}`).join('\n') : String(tc.steps || '');
+  const steps = Array.isArray(tc.steps)
+    ? tc.steps.map((s, i) => `${i + 1}. ${typeof s === 'string' ? s : s?.action || ''}`).join('\n')
+    : String(tc.steps || '');
   return `Issue ${ticket.key}: ${ticket.title}
 Acceptance criteria:
 ${(ticket.acceptanceCriteria || []).map((a, i) => `AC${i + 1}. ${clip(a, 240)}`).join('\n') || '(none)'}
@@ -41,18 +46,36 @@ ${clip(tc.script, 3500) || '(no script)'}
 Error (${result.attempts > 1 ? `failed ${result.attempts} attempts` : 'first attempt'}, after ${Math.round((result.durationMs || 0) / 100) / 10}s):
 ${clip(result.error, 2500)}
 ${result.page ? `\nPage when it failed: ${result.page.url} (title "${clip(result.page.title, 120)}")\nVisible text:\n${clip(result.page.text, 1200)}` : ''}
-${result.logs?.length ? `\nBrowser log (console, page errors, failed requests, 5xx):\n${result.logs.slice(-25).map((l) => `- ${clip(l, 240)}`).join('\n')}` : ''}`;
+${
+  result.logs?.length
+    ? `\nBrowser log (console, page errors, failed requests, 5xx):\n${result.logs
+        .slice(-25)
+        .map((l) => `- ${clip(l, 240)}`)
+        .join('\n')}`
+    : ''
+}`;
 }
 
 function clean(a) {
   const category = CATEGORIES[a?.category] ? a.category : 'needs-info';
-  const list = (v, n) => (Array.isArray(v) ? v : []).map((x) => clip(x, 400)).filter(Boolean).slice(0, n);
+  const list = (v, n) =>
+    (Array.isArray(v) ? v : [])
+      .map((x) => clip(x, 400))
+      .filter(Boolean)
+      .slice(0, n);
   return {
-    category, label: CATEGORIES[category], owner: ['developer', 'qa', 'devops'].includes(a?.owner) ? a.owner : OWNER[category],
+    category,
+    label: CATEGORIES[category],
+    owner: ['developer', 'qa', 'devops'].includes(a?.owner) ? a.owner : OWNER[category],
     confidence: ['high', 'medium', 'low'].includes(a?.confidence) ? a.confidence : 'medium',
-    summary: clip(a?.summary, 300), failedStep: clip(a?.failedStep, 300), cause: clip(a?.cause, 900),
-    expected: clip(a?.expected, 400), actual: clip(a?.actual, 400),
-    evidence: list(a?.evidence, 5), fix: clip(a?.fix, 900), nextSteps: list(a?.nextSteps, 5),
+    summary: clip(a?.summary, 300),
+    failedStep: clip(a?.failedStep, 300),
+    cause: clip(a?.cause, 900),
+    expected: clip(a?.expected, 400),
+    actual: clip(a?.actual, 400),
+    evidence: list(a?.evidence, 5),
+    fix: clip(a?.fix, 900),
+    nextSteps: list(a?.nextSteps, 5),
     scriptFix: clip(a?.scriptFix, 1500),
   };
 }
@@ -87,7 +110,13 @@ Return JSON: { "analyses": [ {
   "nextSteps": ["short, concrete actions in order"]
 } ] }`;
   try {
-    const res = await askJson({ ...ai, task: 'failure', reasoning: 'fast', system: SYSTEM + contextBlock(project, { short: true }), prompt });
+    const res = await askJson({
+      ...ai,
+      task: 'failure',
+      reasoning: 'fast',
+      system: SYSTEM + contextBlock(project, { short: true }),
+      prompt,
+    });
     for (const a of res.analyses || []) {
       const f = todo[Number(a.index)];
       if (f) out.set(f.tc.id, clean(a));
@@ -112,5 +141,7 @@ export function analysisText(a) {
     a.evidence.length && `  Evidence: ${a.evidence.join(' · ')}`,
     a.fix && `  Fix: ${a.fix}`,
     a.nextSteps.length && `  Next: ${a.nextSteps.map((s, i) => `${i + 1}) ${s}`).join(' ')}`,
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }

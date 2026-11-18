@@ -28,7 +28,11 @@ export const POST = api(async (req, p) => {
   let reader;
   if (b.kind === 'folder') {
     // Reading folders is only for the computer TicketForge runs on, opened there (localhost).
-    if (SERVERLESS || !(currentContext() as any).local) throw new HttpError(400, 'Folders can only be scanned when TicketForge runs on your own computer and is opened at localhost. Use a GitHub repository instead.');
+    if (SERVERLESS || !(currentContext() as any).local)
+      throw new HttpError(
+        400,
+        'Folders can only be scanned when TicketForge runs on your own computer and is opened at localhost. Use a GitHub repository instead.',
+      );
     reader = localReader(location);
   } else {
     reader = await githubReader(location, { branch: String(b.branch || '').trim(), token: await getProjectSecret(p.id, 'githubToken') });

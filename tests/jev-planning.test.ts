@@ -7,17 +7,50 @@ import { orderTickets, orderHints, planOrder, issuesFor, hardDeps } from '../lib
 import { applyOrder } from '../lib/reorder';
 import { planParallel, busyFromJobs, parallelHints, checkParallel } from '../lib/parallel';
 
-const T = (key: string, extra: any = {}) => ({ id: key.toLowerCase(), key, title: `Issue ${key}`, type: 'Story', status: 'To Do', priority: 'Medium', storyPoints: 3, links: [], ...extra });
+const T = (key: string, extra: any = {}) => ({
+  id: key.toLowerCase(),
+  key,
+  title: `Issue ${key}`,
+  type: 'Story',
+  status: 'To Do',
+  priority: 'Medium',
+  storyPoints: 3,
+  links: [],
+  ...extra,
+});
 const blockedBy = (key: string) => ({ type: 'is blocked by', targetId: key.toLowerCase() });
 const keys = (order: any[]) => order.map((o) => o.key);
-const project = (tickets: any[], extra: any = {}) => ({ id: 'p1', name: 'Shop', workflow: [{ name: 'To Do', category: 'todo' }, { name: 'Done', category: 'done' }], tickets, ...extra });
+const project = (tickets: any[], extra: any = {}) => ({
+  id: 'p1',
+  name: 'Shop',
+  workflow: [
+    { name: 'To Do', category: 'todo' },
+    { name: 'Done', category: 'done' },
+  ],
+  tickets,
+  ...extra,
+});
 
 // Stand-ins for Jev and the AI.
 const off = { jevOn: async () => false, jevMin: async () => 0.6 };
-const failingAi = async () => { throw new Error('no AI configured'); };
+const failingAi = async () => {
+  throw new Error('no AI configured');
+};
 const jevWith = (answers: Record<string, any>, seen: any[] = []) => ({
-  jevOn: async () => true, jevMin: async () => 0.6,
-  jevDecide: (async (req: any) => { seen.push(req); return { answers: Object.fromEntries(Object.keys(req.questions).filter((k) => answers[k]).map((k) => [k, answers[k]])), model: 'stand-in', usage: null }; }) as any,
+  jevOn: async () => true,
+  jevMin: async () => 0.6,
+  jevDecide: (async (req: any) => {
+    seen.push(req);
+    return {
+      answers: Object.fromEntries(
+        Object.keys(req.questions)
+          .filter((k) => answers[k])
+          .map((k) => [k, answers[k]]),
+      ),
+      model: 'stand-in',
+      usage: null,
+    };
+  }) as any,
 });
 
 // ---------------------------------------------------------------- development order: the rules
@@ -51,7 +84,12 @@ test('among free issues: priority, then what others need, backend before fronten
 });
 
 test('an issue many others wait on goes first', () => {
-  const tickets = [T('A-1', { priority: 'High' }), T('A-2'), T('A-3', { links: [blockedBy('A-2')] }), T('A-4', { links: [blockedBy('A-3')] })];
+  const tickets = [
+    T('A-1', { priority: 'High' }),
+    T('A-2'),
+    T('A-3', { links: [blockedBy('A-2')] }),
+    T('A-4', { links: [blockedBy('A-3')] }),
+  ];
   const { order } = orderTickets(tickets);
   assert.equal(order[0].key, 'A-2');
   assert.match(order[0].reason, /A-3 needs it first/);
@@ -62,7 +100,10 @@ test('links that block each other are reported, and every issue is still ordered
   const { order, loops } = orderTickets(tickets);
   assert.equal(order.length, 3);
   assert.equal(new Set(keys(order)).size, 3);
-  assert.deepEqual(loops.map((l) => [...l].sort()), [['A-1', 'A-2']]);
+  assert.deepEqual(
+    loops.map((l) => [...l].sort()),
+    [['A-1', 'A-2']],
+  );
   assert.ok(order.some((o) => /block each other/i.test(o.reason)));
 });
 
@@ -93,11 +134,25 @@ test('hints add prerequisites and urgency, but never override links or make a lo
 });
 
 test('epic and sprint scopes: top-level open issues, done ones apart, sub-tasks with their parent', () => {
-  const p = project([T('A-1', { epicId: 'e1', sprintId: 's1' }), T('A-2', { epicId: 'e1', status: 'Done' }), T('A-3', { epicId: 'e1', parentId: 'a-1', sprintId: 's1' }), T('A-4', { epicId: 'e2', sprintId: 's1' })]);
+  const p = project([
+    T('A-1', { epicId: 'e1', sprintId: 's1' }),
+    T('A-2', { epicId: 'e1', status: 'Done' }),
+    T('A-3', { epicId: 'e1', parentId: 'a-1', sprintId: 's1' }),
+    T('A-4', { epicId: 'e2', sprintId: 's1' }),
+  ]);
   const epic = issuesFor(p, { epicId: 'e1' });
-  assert.deepEqual(epic.open.map((t) => t.key), ['A-1']);
-  assert.deepEqual(epic.done.map((t) => t.key), ['A-2']);
-  assert.deepEqual(issuesFor(p, { sprintId: 's1' }).open.map((t) => t.key), ['A-1', 'A-4']);
+  assert.deepEqual(
+    epic.open.map((t) => t.key),
+    ['A-1'],
+  );
+  assert.deepEqual(
+    epic.done.map((t) => t.key),
+    ['A-2'],
+  );
+  assert.deepEqual(
+    issuesFor(p, { sprintId: 's1' }).open.map((t) => t.key),
+    ['A-1', 'A-4'],
+  );
 });
 
 test('applying the order moves only those issues, within the places they hold', () => {
@@ -111,18 +166,33 @@ test('applying the order moves only those issues, within the places they hold', 
 test('Jev on: one pick-one and one 0-9 question per issue, confident answers used', async () => {
   const tickets = [T('A-1'), T('A-2'), T('A-3')];
   const seen: any[] = [];
-  const use = { ...jevWith({
-    'A-1.needs': { choice: 'A-3', confidence: 0.9 }, 'A-1.early': { score: 5, confidence: 0.8 },
-    'A-2.needs': { choice: 'none', confidence: 0.9 }, 'A-2.early': { score: 1, confidence: 0.9 },
-    'A-3.needs': { choice: 'none', confidence: 0.95 }, 'A-3.early': { score: 8, confidence: 0.9 },
-  }, seen), askJson: async () => { throw new Error('the AI should not be asked'); } };
+  const use = {
+    ...jevWith(
+      {
+        'A-1.needs': { choice: 'A-3', confidence: 0.9 },
+        'A-1.early': { score: 5, confidence: 0.8 },
+        'A-2.needs': { choice: 'none', confidence: 0.9 },
+        'A-2.early': { score: 1, confidence: 0.9 },
+        'A-3.needs': { choice: 'none', confidence: 0.95 },
+        'A-3.early': { score: 8, confidence: 0.9 },
+      },
+      seen,
+    ),
+    askJson: async () => {
+      throw new Error('the AI should not be asked');
+    },
+  };
   const r = await planOrder({ project: project(tickets), ticketIds: tickets.map((t) => t.id), use });
   assert.equal(r.engine, 'jev');
   assert.equal(r.byJev, 3);
   assert.deepEqual(keys(r.order), ['A-3', 'A-1', 'A-2']);
   assert.equal(seen.length, 1);
   assert.equal(seen[0].questions['A-1.needs'].type, 'choice');
-  assert.ok('none' in seen[0].questions['A-1.needs'].criteria && 'A-2' in seen[0].questions['A-1.needs'].criteria && !('A-1' in seen[0].questions['A-1.needs'].criteria));
+  assert.ok(
+    'none' in seen[0].questions['A-1.needs'].criteria &&
+      'A-2' in seen[0].questions['A-1.needs'].criteria &&
+      !('A-1' in seen[0].questions['A-1.needs'].criteria),
+  );
   assert.equal(seen[0].questions['A-1.early'].type, 'score');
   assert.match(r.summary, /Jev decided 3/);
 });
@@ -130,10 +200,18 @@ test('Jev on: one pick-one and one 0-9 question per issue, confident answers use
 test('Jev unsure about an issue: that one goes to the AI', async () => {
   const tickets = [T('A-1'), T('A-2')];
   let asked = '';
-  const use = { ...jevWith({
-    'A-1.needs': { choice: 'none', confidence: 0.9 }, 'A-1.early': { score: 5, confidence: 0.9 },
-    'A-2.needs': { choice: 'A-1', confidence: 0.4 }, 'A-2.early': { score: 5, confidence: 0.9 },
-  }), askJson: async (o: any) => { asked = o.prompt; return { items: [{ key: 'A-2', needsFirst: [], urgency: 9, why: 'foundation' }] }; } };
+  const use = {
+    ...jevWith({
+      'A-1.needs': { choice: 'none', confidence: 0.9 },
+      'A-1.early': { score: 5, confidence: 0.9 },
+      'A-2.needs': { choice: 'A-1', confidence: 0.4 },
+      'A-2.early': { score: 5, confidence: 0.9 },
+    }),
+    askJson: async (o: any) => {
+      asked = o.prompt;
+      return { items: [{ key: 'A-2', needsFirst: [], urgency: 9, why: 'foundation' }] };
+    },
+  };
   const r = await orderHints({ project: project(tickets), tickets, use });
   assert.equal(r.engine, 'jev+ai');
   assert.equal(r.hints['a-1'].source, 'jev');
@@ -143,8 +221,19 @@ test('Jev unsure about an issue: that one goes to the AI', async () => {
 
 test('Jev unreachable: the AI answers', async () => {
   const tickets = [T('A-1'), T('A-2')];
-  const use = { jevOn: async () => true, jevMin: async () => 0.6, jevDecide: (async () => { throw new Error('Couldn’t reach Jev'); }) as any,
-    askJson: async () => ({ items: [{ key: 'A-1', needsFirst: ['A-2'], urgency: 4 }, { key: 'A-2', needsFirst: [], urgency: 6 }] }) };
+  const use = {
+    jevOn: async () => true,
+    jevMin: async () => 0.6,
+    jevDecide: (async () => {
+      throw new Error('Couldn’t reach Jev');
+    }) as any,
+    askJson: async () => ({
+      items: [
+        { key: 'A-1', needsFirst: ['A-2'], urgency: 4 },
+        { key: 'A-2', needsFirst: [], urgency: 6 },
+      ],
+    }),
+  };
   const r = await planOrder({ project: project(tickets), ticketIds: ['a-1', 'a-2'], use });
   assert.equal(r.engine, 'ai');
   assert.deepEqual(keys(r.order), ['A-2', 'A-1']);
@@ -158,24 +247,47 @@ test('Jev off and the AI failing: the rules decide', async () => {
   assert.deepEqual(keys(r.order), ['A-2', 'A-1']);
   assert.match(r.note, /no AI configured/);
   // Rules only (Use Jev / AI hints off) asks nobody.
-  const r2 = await planOrder({ project: project(tickets), ticketIds: ['a-1', 'a-2'], smart: false, use: { jevOn: async () => { throw new Error('asked'); } } });
+  const r2 = await planOrder({
+    project: project(tickets),
+    ticketIds: ['a-1', 'a-2'],
+    smart: false,
+    use: {
+      jevOn: async () => {
+        throw new Error('asked');
+      },
+    },
+  });
   assert.equal(r2.engine, 'rules');
 });
 
 test('nothing to order is a clear 400', async () => {
-  await assert.rejects(planOrder({ project: project([T('A-1', { epicId: 'e1', status: 'Done' })]), epicId: 'e1', smart: false }), (e: any) => e.status === 400 && /done/.test(e.message));
+  await assert.rejects(
+    planOrder({ project: project([T('A-1', { epicId: 'e1', status: 'Done' })]), epicId: 'e1', smart: false }),
+    (e: any) => e.status === 400 && /done/.test(e.message),
+  );
 });
 
 // ---------------------------------------------------------------- coding several issues at once
 
-const spec = (key: string, files: string[], modules: string[] = [], epicId = 'e1') => ({ ticketId: key.toLowerCase(), key, title: key, epicId, status: 'draft', files: files.map((path) => ({ path, action: 'modify' })), modules });
+const spec = (key: string, files: string[], modules: string[] = [], epicId = 'e1') => ({
+  ticketId: key.toLowerCase(),
+  key,
+  title: key,
+  epicId,
+  status: 'draft',
+  files: files.map((path) => ({ path, action: 'modify' })),
+  modules,
+});
 
 test('issues touching the same file go to different rounds; the rest run together', () => {
   const tickets = [T('A-1'), T('A-2'), T('A-3')];
   const specs = [spec('A-1', ['lib/store.ts', 'lib/a.ts']), spec('A-2', ['./LIB/Store.ts']), spec('A-3', ['client/c.tsx'])];
   const r = planParallel({ tickets, specs });
   assert.deepEqual(r.runNow, ['a-1', 'a-3']);
-  assert.deepEqual(r.wait.map((w) => [w.key, w.round, w.after]), [['A-2', 2, ['A-1']]]);
+  assert.deepEqual(
+    r.wait.map((w) => [w.key, w.round, w.after]),
+    [['A-2', 2, ['A-1']]],
+  );
   assert.equal(r.conflicts[0].kind, 'file');
   assert.deepEqual(r.conflicts[0].keys, ['A-1', 'A-2']);
 });
@@ -198,9 +310,15 @@ test('module-only overlaps conflict, unless judged separate files', () => {
 test('a blocked issue waits for its blocker; a running job holds back issues sharing its files', () => {
   const tickets = [T('A-1'), T('A-2', { links: [blockedBy('A-1')] }), T('A-3')];
   const specs = [spec('A-1', ['a.ts']), spec('A-2', ['b.ts']), spec('A-3', ['shared.ts']), spec('X-1', ['shared.ts'])];
-  const jobs = [{ ticketId: 'x-1', ticketKey: 'X-1', status: 'running', side: 'frontend', files: [] }, { ticketId: 'z-1', ticketKey: 'Z-1', status: 'merged', files: [{ path: 'a.ts' }] }];
+  const jobs = [
+    { ticketId: 'x-1', ticketKey: 'X-1', status: 'running', side: 'frontend', files: [] },
+    { ticketId: 'z-1', ticketKey: 'Z-1', status: 'merged', files: [{ path: 'a.ts' }] },
+  ];
   const busy = busyFromJobs(jobs, specs, new Set(tickets.map((t) => t.id)));
-  assert.deepEqual(busy.map((b) => b.key), ['X-1']); // merged code doesn't count
+  assert.deepEqual(
+    busy.map((b) => b.key),
+    ['X-1'],
+  ); // merged code doesn't count
   const r = planParallel({ tickets, specs, busy });
   assert.deepEqual(r.runNow, ['a-1']);
   assert.deepEqual(r.wait.map((w) => w.key).sort(), ['A-2', 'A-3']);
@@ -209,7 +327,11 @@ test('a blocked issue waits for its blocker; a running job holds back issues sha
 });
 
 test('unmerged finished code counts with its changed files', () => {
-  const busy = busyFromJobs([{ ticketId: 'x-2', ticketKey: 'X-2', status: 'review', files: [{ path: 'lib/store.ts' }] }], [], new Set(['a-1']));
+  const busy = busyFromJobs(
+    [{ ticketId: 'x-2', ticketKey: 'X-2', status: 'review', files: [{ path: 'lib/store.ts' }] }],
+    [],
+    new Set(['a-1']),
+  );
   const r = planParallel({ tickets: [T('A-1')], specs: [spec('A-1', ['lib/store.ts'])], busy });
   assert.deepEqual(r.runNow, []);
   assert.match(r.wait[0].why, /X-2 has code not merged yet/);
@@ -219,38 +341,69 @@ test('Jev: likely conflicts for issues without a spec, and harmless module overl
   const tickets = [T('A-1'), T('A-2'), T('A-3')];
   const specs = [spec('A-1', ['lib/a.ts'], ['lib/store']), spec('A-2', ['lib/b.ts'], ['lib/store'])];
   const seen: any[] = [];
-  const use = { ...jevWith({ 'A-3.overlaps': { choice: 'A-1', confidence: 0.85 }, pair0: { noul: 0.1, confidence: 0.9 } }, seen), askJson: async () => { throw new Error('the AI should not be asked'); } };
+  const use = {
+    ...jevWith({ 'A-3.overlaps': { choice: 'A-1', confidence: 0.85 }, pair0: { noul: 0.1, confidence: 0.9 } }, seen),
+    askJson: async () => {
+      throw new Error('the AI should not be asked');
+    },
+  };
   const h = await parallelHints({ project: project(tickets), tickets, specs, use });
   assert.equal(h.engine, 'jev');
   assert.equal(seen[0].questions.pair0.type, 'noul');
   assert.equal(seen[0].questions['A-3.overlaps'].type, 'choice');
-  assert.deepEqual(h.likely.map((l) => [l.a, l.b]), [['a-3', 'a-1']]);
+  assert.deepEqual(
+    h.likely.map((l) => [l.a, l.b]),
+    [['a-3', 'a-1']],
+  );
   assert.ok(h.cleared.has('A-1|A-2|lib/store'));
   const plan = planParallel({ tickets, specs, likely: h.likely as any, cleared: h.cleared });
   assert.deepEqual(plan.runNow, ['a-1', 'a-2']);
-  assert.deepEqual(plan.wait.map((w) => w.key), ['A-3']);
+  assert.deepEqual(
+    plan.wait.map((w) => w.key),
+    ['A-3'],
+  );
 });
 
 test('Jev unsure: the AI decides; both failing: the rules (shared module = conflict, no spec = unchecked)', async () => {
   const tickets = [T('A-1'), T('A-2'), T('A-3')];
   const specs = [spec('A-1', ['lib/a.ts'], ['lib/store']), spec('A-2', ['lib/b.ts'], ['lib/store'])];
-  const unsure = { ...jevWith({ 'A-3.overlaps': { choice: 'A-1', confidence: 0.3 }, pair0: { noul: 0.5, confidence: 0.5 } }),
-    askJson: async () => ({ likely: [{ a: 'A-3', b: 'A-2', why: 'same checkout form' }], modules: [{ pair: 0, same: false }] }) };
+  const unsure = {
+    ...jevWith({ 'A-3.overlaps': { choice: 'A-1', confidence: 0.3 }, pair0: { noul: 0.5, confidence: 0.5 } }),
+    askJson: async () => ({ likely: [{ a: 'A-3', b: 'A-2', why: 'same checkout form' }], modules: [{ pair: 0, same: false }] }),
+  };
   const h = await parallelHints({ project: project(tickets), tickets, specs, use: unsure });
   assert.equal(h.engine, 'ai');
-  assert.deepEqual(h.likely.map((l) => [l.a, l.b, l.source]), [['a-3', 'a-2', 'ai']]);
+  assert.deepEqual(
+    h.likely.map((l) => [l.a, l.b, l.source]),
+    [['a-3', 'a-2', 'ai']],
+  );
   assert.ok(h.cleared.has('A-1|A-2|lib/store'));
-  const rules = await checkParallel({ project: project(tickets), ticketIds: tickets.map((t) => t.id), specs, jobs: [], use: { ...off, askJson: failingAi } });
+  const rules = await checkParallel({
+    project: project(tickets),
+    ticketIds: tickets.map((t) => t.id),
+    specs,
+    jobs: [],
+    use: { ...off, askJson: failingAi },
+  });
   assert.equal(rules.engine, 'rules');
   assert.deepEqual(rules.noSpec, ['A-3']);
   assert.deepEqual(rules.runNow, ['a-1', 'a-3']);
-  assert.deepEqual(rules.wait.map((w) => w.key), ['A-2']);
+  assert.deepEqual(
+    rules.wait.map((w) => w.key),
+    ['A-2'],
+  );
   assert.match(rules.summary, /2 of 3 can be coded together now/);
 });
 
 test('an issue already being coded is reported and not planned again', async () => {
   const tickets = [T('A-1'), T('A-2')];
-  const r = await checkParallel({ project: project(tickets), ticketIds: ['a-1', 'a-2'], specs: [], jobs: [{ ticketId: 'a-1', ticketKey: 'A-1', status: 'running' }], smart: false });
+  const r = await checkParallel({
+    project: project(tickets),
+    ticketIds: ['a-1', 'a-2'],
+    specs: [],
+    jobs: [{ ticketId: 'a-1', ticketKey: 'A-1', status: 'running' }],
+    smart: false,
+  });
   assert.deepEqual(r.alreadyRunning, ['A-1']);
   assert.deepEqual(r.runNow, ['a-2']);
 });

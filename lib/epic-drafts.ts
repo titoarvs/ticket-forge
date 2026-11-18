@@ -17,7 +17,8 @@ export async function notifyDraft(projectId: string, epicId: string, event: stri
   if (!DRAFT_EVENTS.includes(event)) throw new HttpError(400, 'The event must be saved or published.');
   const project = await getProject(projectId);
   const epic = (project.epics || []).find((e: any) => e.id === String(epicId));
-  if (!epic || !epic.aiOriginal) throw new HttpError(404, 'That epic isn’t an AI draft in this project (save first if you just created it).');
+  if (!epic || !epic.aiOriginal)
+    throw new HttpError(404, 'That epic isn’t an AI draft in this project (save first if you just created it).');
   if (event === 'saved' && !epic.draft) throw new HttpError(409, 'That epic is already published.');
   if (event === 'published') {
     if (epic.draft) throw new HttpError(409, 'That draft isn’t published yet.');
@@ -30,7 +31,14 @@ export async function notifyDraft(projectId: string, epicId: string, event: stri
     ? `${user?.name || 'Someone'} saved ${epic.key} as a draft in ${project.name}. Review and publish it when it’s ready.`
     : `${user?.name || 'Someone'} published the draft ${epic.key} in ${project.name} as an epic.`;
   for (const userId of ids) {
-    await notify({ userId, projectId, kind: saved ? 'epic-draft-saved' : 'epic-published', title, body: text, link: `/p/${projectId}/epics?epic=${encodeURIComponent(epic.id)}` });
+    await notify({
+      userId,
+      projectId,
+      kind: saved ? 'epic-draft-saved' : 'epic-published',
+      title,
+      body: text,
+      link: `/p/${projectId}/epics?epic=${encodeURIComponent(epic.id)}`,
+    });
   }
   return { notified: ids.length };
 }

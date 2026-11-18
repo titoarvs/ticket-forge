@@ -12,9 +12,12 @@ G.__tfPlanUsage ??= { data: null, at: 0, pending: null, error: null };
 const C = G.__tfPlanUsage;
 const FRESH_MS = 60_000;
 
-const keychain = () => new Promise((resolve) => {
-  execFile('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { timeout: 5000 }, (err, out) => resolve(err ? '' : String(out || '').trim()));
-});
+const keychain = () =>
+  new Promise((resolve) => {
+    execFile('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { timeout: 5000 }, (err, out) =>
+      resolve(err ? '' : String(out || '').trim()),
+    );
+  });
 
 /** Claude Code's OAuth sign-in: { accessToken, expiresAt } or null. */
 async function credentials() {
@@ -22,21 +25,29 @@ async function credentials() {
   if (process.platform === 'darwin') raw = await keychain();
   if (!raw) {
     const dir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-    try { raw = fs.readFileSync(path.join(dir, '.credentials.json'), 'utf8'); } catch { /* not signed in here */ }
+    try {
+      raw = fs.readFileSync(path.join(dir, '.credentials.json'), 'utf8');
+    } catch {
+      /* not signed in here */
+    }
   }
   try {
     const o = JSON.parse(raw)?.claudeAiOauth;
     return o?.accessToken ? { accessToken: o.accessToken, expiresAt: Number(o.expiresAt) || 0 } : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-const limit = (x) => (x && typeof x.utilization === 'number' ? { pct: Math.max(0, Math.min(100, x.utilization)), resetsAt: x.resets_at || null } : null);
+const limit = (x) =>
+  x && typeof x.utilization === 'number' ? { pct: Math.max(0, Math.min(100, x.utilization)), resetsAt: x.resets_at || null } : null;
 
 async function fetchUsage() {
   const cred = await credentials();
   if (!cred) return { error: 'Sign in to Claude Code to see your plan limits.' };
   // Claude Code refreshes an expired sign-in the next time it runs; until then keep the last numbers.
-  if (cred.expiresAt && cred.expiresAt < Date.now()) return { error: 'Claude Code’s sign-in needs a refresh (it renews the next time Claude runs).' };
+  if (cred.expiresAt && cred.expiresAt < Date.now())
+    return { error: 'Claude Code’s sign-in needs a refresh (it renews the next time Claude runs).' };
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 6000);
   try {
@@ -44,12 +55,27 @@ async function fetchUsage() {
       headers: { Authorization: `Bearer ${cred.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20', 'Content-Type': 'application/json' },
       signal: ctl.signal,
     });
-    if (!r.ok) return { error: r.status === 401 ? 'Claude Code’s sign-in expired. Run Claude once to renew it.' : `Couldn’t read your plan limits (HTTP ${r.status}).` };
+    if (!r.ok)
+      return {
+        error:
+          r.status === 401
+            ? 'Claude Code’s sign-in expired. Run Claude once to renew it.'
+            : `Couldn’t read your plan limits (HTTP ${r.status}).`,
+      };
     const j = await r.json();
-    return { data: { fiveHour: limit(j.five_hour), weekly: limit(j.seven_day), weeklyOpus: limit(j.seven_day_opus), weeklySonnet: limit(j.seven_day_sonnet) } };
+    return {
+      data: {
+        fiveHour: limit(j.five_hour),
+        weekly: limit(j.seven_day),
+        weeklyOpus: limit(j.seven_day_opus),
+        weeklySonnet: limit(j.seven_day_sonnet),
+      },
+    };
   } catch (e) {
     return { error: e?.name === 'AbortError' ? 'Anthropic didn’t answer in time.' : 'Couldn’t reach Anthropic to read your plan limits.' };
-  } finally { clearTimeout(t); }
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 /** Refresh now (one request at a time). */
@@ -57,9 +83,14 @@ function refresh() {
   C.pending ??= (async () => {
     try {
       const r = await fetchUsage();
-      if (r.data) { C.data = r.data; C.error = null; } else C.error = r.error;
+      if (r.data) {
+        C.data = r.data;
+        C.error = null;
+      } else C.error = r.error;
       C.at = Date.now();
-    } finally { C.pending = null; }
+    } finally {
+      C.pending = null;
+    }
   })();
   return C.pending;
 }

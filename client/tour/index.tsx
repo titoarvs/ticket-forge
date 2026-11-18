@@ -25,7 +25,9 @@ const visible = (sel: string) => {
 function StepBody({ title, text, n, total }: { title: string; text: string; n: number; total: number }) {
   return (
     <div className="tour-step">
-      <span className="tour-count">Step {n} of {total}</span>
+      <span className="tour-count">
+        Step {n} of {total}
+      </span>
       <h3>{title}</h3>
       <p>{text}</p>
     </div>
@@ -38,11 +40,13 @@ export function startTour(id: TourId): boolean {
   const def = TOURS[id];
   const shown = def.steps.filter((s) => (!s.perm || can(s.perm)) && visible(`[data-tour="${s.target}"]`));
   if (!shown.length) return false;
-  ctl.setSteps(shown.map((s, i): StepType => ({
-    selector: `[data-tour="${s.target}"]`,
-    ...(s.position ? { position: s.position } : {}),
-    content: <StepBody title={s.title} text={s.text} n={i + 1} total={shown.length} />,
-  })));
+  ctl.setSteps(
+    shown.map((s, i): StepType => ({
+      selector: `[data-tour="${s.target}"]`,
+      ...(s.position ? { position: s.position } : {}),
+      content: <StepBody title={s.title} text={s.text} n={i + 1} total={shown.length} />,
+    })),
+  );
   activeId = id;
   ctl.setCurrentStep(0);
   ctl.setIsOpen(true);
@@ -55,15 +59,26 @@ export function startTourHere(): boolean {
   return startTour(id) || (id !== 'home' && startTour('home'));
 }
 
-function prefs(): Any { return S.auth?.prefs || { tours: {}, toursOff: false }; }
+function prefs(): Any {
+  return S.auth?.prefs || { tours: {}, toursOff: false };
+}
 async function markDone(id: TourId) {
   const p = prefs();
   if (S.auth) S.auth.prefs = { ...p, tours: { ...(p.tours || {}), [id]: new Date().toISOString() } };
-  try { await api('/api/me/prefs', { method: 'PUT', body: { tourDone: id } }); } catch { /* best effort: it may show once more */ }
+  try {
+    await api('/api/me/prefs', { method: 'PUT', body: { tourDone: id } });
+  } catch {
+    /* best effort: it may show once more */
+  }
 }
 /** Show every tour again from the start (account menu). */
 export async function resetTours() {
-  try { const p = await api('/api/me/prefs', { method: 'PUT', body: { tourReset: true } }); if (S.auth) S.auth.prefs = p; } catch { /* ignore */ }
+  try {
+    const p = await api('/api/me/prefs', { method: 'PUT', body: { tourReset: true } });
+    if (S.auth) S.auth.prefs = p;
+  } catch {
+    /* ignore */
+  }
   startedThisVisit.clear();
 }
 
@@ -92,13 +107,21 @@ export function useAutoTour(id: TourId, when = true) {
 function Bridge() {
   const t = useTour();
   const pathname = usePathname();
-  useEffect(() => { ctl = t as unknown as Ctl; });
+  useEffect(() => {
+    ctl = t as unknown as Ctl;
+  });
   // A tour belongs to its page: leaving the page ends it.
-  useEffect(() => { if (ctl?.isOpen) ctl.setIsOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (ctl?.isOpen) ctl.setIsOpen(false);
+  }, [pathname]);
   return null;
 }
 
-const btn = (cls: string, label: string, onClick: () => void) => <button type="button" className={`btn sm ${cls}`} onClick={onClick}>{label}</button>;
+const btn = (cls: string, label: string, onClick: () => void) => (
+  <button type="button" className={`btn sm ${cls}`} onClick={onClick}>
+    {label}
+  </button>
+);
 
 export function TourHost({ children }: { children: ReactNode }) {
   return (
@@ -110,21 +133,38 @@ export function TourHost({ children }: { children: ReactNode }) {
       showDots={false}
       scrollSmooth
       onClickMask={({ setIsOpen }) => setIsOpen(false)}
-      beforeClose={() => { if (activeId) { const id = activeId; activeId = null; markDone(id); } }}
+      beforeClose={() => {
+        if (activeId) {
+          const id = activeId;
+          activeId = null;
+          markDone(id);
+        }
+      }}
       accessibilityOptions={{ ariaLabelledBy: 'tour', closeButtonAriaLabel: 'Close the tour', showNavigationScreenReaders: false }}
       styles={{
-        popover: (base) => ({ ...base, background: 'var(--bg-raised, var(--bg))', color: 'var(--text)', borderRadius: 12, boxShadow: 'var(--shadow-overlay, 0 12px 32px rgba(9,30,66,.25))', padding: '20px 20px 14px', maxWidth: 340, border: '1px solid var(--border)' }),
+        popover: (base) => ({
+          ...base,
+          background: 'var(--bg-raised, var(--bg))',
+          color: 'var(--text)',
+          borderRadius: 12,
+          boxShadow: 'var(--shadow-overlay, 0 12px 32px rgba(9,30,66,.25))',
+          padding: '20px 20px 14px',
+          maxWidth: 340,
+          border: '1px solid var(--border)',
+        }),
         maskWrapper: (base) => ({ ...base, color: 'rgba(9, 30, 66, 0.5)', opacity: 1 }),
         maskArea: (base) => ({ ...base, rx: 8 }),
         close: (base) => ({ ...base, top: 14, right: 14, width: 10, height: 10, color: 'var(--text-subtle)' }),
         controls: (base) => ({ ...base, marginTop: 16, justifyContent: 'space-between' }),
       }}
-      prevButton={({ currentStep, setCurrentStep, setIsOpen }) => currentStep === 0
-        ? btn('subtle', 'Skip tour', () => setIsOpen(false))
-        : btn('subtle', 'Back', () => setCurrentStep((s) => s - 1))}
-      nextButton={({ currentStep, stepsLength, setCurrentStep, setIsOpen }) => currentStep >= stepsLength - 1
-        ? btn('primary', 'Done', () => setIsOpen(false))
-        : btn('primary', 'Next', () => setCurrentStep((s) => s + 1))}
+      prevButton={({ currentStep, setCurrentStep, setIsOpen }) =>
+        currentStep === 0 ? btn('subtle', 'Skip tour', () => setIsOpen(false)) : btn('subtle', 'Back', () => setCurrentStep((s) => s - 1))
+      }
+      nextButton={({ currentStep, stepsLength, setCurrentStep, setIsOpen }) =>
+        currentStep >= stepsLength - 1
+          ? btn('primary', 'Done', () => setIsOpen(false))
+          : btn('primary', 'Next', () => setCurrentStep((s) => s + 1))
+      }
     >
       <Bridge />
       {children}

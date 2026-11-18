@@ -7,4 +7,6 @@ export const metadata: Metadata = {
   description: 'Every feature delivered in each version of TicketForge.',
 };
 
-export default function Page() { return <ReleaseNotesList releases={releaseNotes()} />; }
+export default function Page() {
+  return <ReleaseNotesList releases={releaseNotes()} />;
+}

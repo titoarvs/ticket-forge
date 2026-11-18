@@ -16,10 +16,13 @@ import * as schema from './schema/index';
 import * as relations from './relations';
 import { qrows } from './db';
 
-export const orm = drizzle(async (sql, params) => {
-  const r: any = await qrows(sql, params as any[]);
-  return { rows: r.rows };
-}, { schema: { ...schema, ...relations } });
+export const orm = drizzle(
+  async (sql, params) => {
+    const r: any = await qrows(sql, params as any[]);
+    return { rows: r.rows };
+  },
+  { schema: { ...schema, ...relations } },
+);
 
 export * from './schema/index';
 export { sql, eq, ne, and, or, not, inArray, notInArray, isNull, isNotNull, gt, gte, lt, lte, like, ilike, desc, asc } from 'drizzle-orm';

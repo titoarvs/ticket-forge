@@ -7,10 +7,14 @@ import { platformAdminEmails } from '@/lib/platform';
 // of the default workspace, or a platform admin (PLATFORM_ADMIN_EMAILS). Owners of other workspaces don't.
 async function runsThePlatform() {
   const u: any = await ownerOnly();
-  if (u.workspace_id !== DEFAULT_WS && !platformAdminEmails().includes(String(u.email).toLowerCase())) throw new HttpError(403, 'Only the people who run this TicketForge can see sign-up requests.');
+  if (u.workspace_id !== DEFAULT_WS && !platformAdminEmails().includes(String(u.email).toLowerCase()))
+    throw new HttpError(403, 'Only the people who run this TicketForge can see sign-up requests.');
   return u;
 }
-export const GET = api(async () => { await runsThePlatform(); return { requests: await auth.listSignupRequests() }; });
+export const GET = api(async () => {
+  await runsThePlatform();
+  return { requests: await auth.listSignupRequests() };
+});
 export const PUT = api(async (req) => {
   await runsThePlatform();
   const b = await body(req);

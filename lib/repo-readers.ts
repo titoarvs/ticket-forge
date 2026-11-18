@@ -21,8 +21,16 @@ export async function repoReaders(project: any) {
   const sides = [project.devBackend?.enabled ? mine.devBackend : null, mine.dev].filter(Boolean);
   const out: any[] = [];
   for (const dev of sides) {
-    if (local && dev.localPath) { try { out.push(localReader(dev.localPath)); continue; } catch { /* folder gone: try GitHub */ } }
-    if (dev.repo && (!dev.provider || dev.provider === 'GitHub')) out.push(await githubReader(dev.repo, { branch: dev.baseBranch || '', token: await getProjectSecret(project.id, 'githubToken') }));
+    if (local && dev.localPath) {
+      try {
+        out.push(localReader(dev.localPath));
+        continue;
+      } catch {
+        /* folder gone: try GitHub */
+      }
+    }
+    if (dev.repo && (!dev.provider || dev.provider === 'GitHub'))
+      out.push(await githubReader(dev.repo, { branch: dev.baseBranch || '', token: await getProjectSecret(project.id, 'githubToken') }));
   }
   if (!out.length) throw fail('No repository is set up for this project. Connect one in Project settings → Code & GitHub.');
   return out;

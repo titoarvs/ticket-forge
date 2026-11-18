@@ -20,11 +20,21 @@ async function store(projectId, v) {
  */
 export async function credentialStatus(projectId) {
   const v = await load(projectId);
-  return Object.fromEntries(Object.entries<any>(v.roles).map(([id, r]: any) => [id, {
-    hasPassword: Boolean(r.passEnc), hasTotp: Boolean(r.totpEnc), hasSession: Boolean(r.sessionEnc),
-    sessionAt: r.sessionAt || null, sessionBy: r.sessionBy || null, sessionExpires: r.sessionExpires || null,
-    updatedAt: r.updatedAt || null, updatedBy: r.updatedBy || null,
-  }]));
+  return Object.fromEntries(
+    Object.entries<any>(v.roles).map(([id, r]: any) => [
+      id,
+      {
+        hasPassword: Boolean(r.passEnc),
+        hasTotp: Boolean(r.totpEnc),
+        hasSession: Boolean(r.sessionEnc),
+        sessionAt: r.sessionAt || null,
+        sessionBy: r.sessionBy || null,
+        sessionExpires: r.sessionExpires || null,
+        updatedAt: r.updatedAt || null,
+        updatedBy: r.updatedBy || null,
+      },
+    ]),
+  );
 }
 
 // A role's secrets: its password, its authenticator (TOTP) secret and a saved signed-in session, each encrypted.
@@ -37,8 +47,16 @@ export async function setRoleSecret(projectId, roleId, field, value, actor, extr
   const cur = { ...(v.roles[roleId] || {}) };
   const val = String(value ?? '');
   if (val) Object.assign(cur, { [k]: encrypt(val), updatedAt: new Date().toISOString(), updatedBy: actor?.name || null }, extra);
-  else { delete cur[k]; if (field === 'session') { delete cur.sessionAt; delete cur.sessionBy; delete cur.sessionExpires; } }
-  if (cur.passEnc || cur.totpEnc || cur.sessionEnc) v.roles[roleId] = cur; else delete v.roles[roleId];
+  else {
+    delete cur[k];
+    if (field === 'session') {
+      delete cur.sessionAt;
+      delete cur.sessionBy;
+      delete cur.sessionExpires;
+    }
+  }
+  if (cur.passEnc || cur.totpEnc || cur.sessionEnc) v.roles[roleId] = cur;
+  else delete v.roles[roleId];
   await store(projectId, v);
 }
 export const setRolePassword = (projectId, roleId, password, actor) => setRoleSecret(projectId, roleId, 'password', password, actor);
@@ -59,23 +77,55 @@ export async function deleteProjectSecrets(projectId) {
  */
 export async function appWithSecrets(projectId, app: any = {}) {
   const v = projectId ? await load(projectId) : { roles: {} };
-  const open = (enc) => { if (!enc) return ''; try { return decrypt(enc); } catch { return ''; } };
-  const roles = (app.roles || []).map((r) => {
-    const sec = v.roles[r.id] || {};
-    let session = null;
-    if (sec.sessionEnc) { try { session = JSON.parse(open(sec.sessionEnc) || 'null'); } catch { session = null; } }
-    return { id: r.id, name: String(r.name || '').trim(), description: r.description || '', username: String(r.username || '').trim(),
-      signIn: ['sso', 'session'].includes(r.signIn) ? r.signIn : 'form', ssoButton: String(r.ssoButton || '').trim(),
-      password: open(sec.passEnc), totp: open(sec.totpEnc), session };
-  }).filter((r) => r.name);
-  const pages = (app.pages || []).map((p) => ({ id: p.id, name: String(p.name || '').trim(), path: normPath(p.path), description: p.description || '' })).filter((p) => p.name);
+  const open = (enc) => {
+    if (!enc) return '';
+    try {
+      return decrypt(enc);
+    } catch {
+      return '';
+    }
+  };
+  const roles = (app.roles || [])
+    .map((r) => {
+      const sec = v.roles[r.id] || {};
+      let session = null;
+      if (sec.sessionEnc) {
+        try {
+          session = JSON.parse(open(sec.sessionEnc) || 'null');
+        } catch {
+          session = null;
+        }
+      }
+      return {
+        id: r.id,
+        name: String(r.name || '').trim(),
+        description: r.description || '',
+        username: String(r.username || '').trim(),
+        signIn: ['sso', 'session'].includes(r.signIn) ? r.signIn : 'form',
+        ssoButton: String(r.ssoButton || '').trim(),
+        password: open(sec.passEnc),
+        totp: open(sec.totpEnc),
+        session,
+      };
+    })
+    .filter((r) => r.name);
+  const pages = (app.pages || [])
+    .map((p) => ({ id: p.id, name: String(p.name || '').trim(), path: normPath(p.path), description: p.description || '' }))
+    .filter((p) => p.name);
   return { pages, roles, login: app.login || {}, notes: app.notes || '' };
 }
 /** "orders" → "/orders"; full URLs keep only path, query and hash. */
 export function normPath(p) {
   const s = String(p || '').trim();
   if (!s) return '/';
-  if (/^https?:\/\//i.test(s)) { try { const u = new URL(s); return `${u.pathname}${u.search}${u.hash}` || '/'; } catch { return s; } }
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      return `${u.pathname}${u.search}${u.hash}` || '/';
+    } catch {
+      return s;
+    }
+  }
   return s.startsWith('/') || s.startsWith('#') ? s : `/${s}`;
 }
 
@@ -90,7 +140,11 @@ export async function setProjectSecret(projectId, name, value, actor) {
 export async function getProjectSecret(projectId, name) {
   const e = (await load(projectId)).extra?.[name];
   if (!e?.enc) return '';
-  try { return decrypt(e.enc); } catch { return ''; }
+  try {
+    return decrypt(e.enc);
+  } catch {
+    return '';
+  }
 }
 export async function hasProjectSecret(projectId, name) {
   return Boolean((await load(projectId)).extra?.[name]?.enc);

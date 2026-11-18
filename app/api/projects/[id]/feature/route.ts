@@ -11,7 +11,14 @@ export const POST = api(async (req, p) => {
   if (!text || String(text).trim().length < 15) throw new HttpError(400, 'Describe the feature in a sentence or two, or add a document.');
   const project = await store.getProject(p.id);
   return ndjson(req, async (send, signal) => {
-    const result = await extendProject({ project, text: String(text), sourceName, signal, options: { ...options, ...aiOpts(options) }, emit: (e: any) => send({ type: 'progress', ...e }) } as any);
+    const result = await extendProject({
+      project,
+      text: String(text),
+      sourceName,
+      signal,
+      options: { ...options, ...aiOpts(options) },
+      emit: (e: any) => send({ type: 'progress', ...e }),
+    } as any);
     send({ type: 'done', result });
   });
 });

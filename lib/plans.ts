@@ -3,15 +3,44 @@
 // with a member's own Claude subscription (My AI), don't count toward `aiCalls`: only the platform's AI does.
 // A plan with `archived: true` stays in force for workspaces already on it, but is no longer offered for new purchases.
 export const PLANS = {
-  free: { id: 'free', name: 'Free', blurb: 'Try TicketForge with a small team.', price: { month: 0, year: 0 }, archived: false,
+  free: {
+    id: 'free',
+    name: 'Free',
+    blurb: 'Try TicketForge with a small team.',
+    price: { month: 0, year: 0 },
+    archived: false,
     limits: { projects: 2, members: 3, aiCalls: 100, codeJobs: 0, storageMb: 200, dbConnections: 1, schemaReads: 20 },
-    features: ['2 projects, 3 members', '100 AI actions a month', 'Backlog, board, timeline, test cases', 'Bring your own AI keys or Claude subscription'] },
-  pro: { id: 'pro', name: 'Pro', blurb: 'For teams shipping every week.', price: { month: 19, year: 190 }, archived: false,
+    features: [
+      '2 projects, 3 members',
+      '100 AI actions a month',
+      'Backlog, board, timeline, test cases',
+      'Bring your own AI keys or Claude subscription',
+    ],
+  },
+  pro: {
+    id: 'pro',
+    name: 'Pro',
+    blurb: 'For teams shipping every week.',
+    price: { month: 19, year: 190 },
+    archived: false,
     limits: { projects: 25, members: 10, aiCalls: 2000, codeJobs: 50, storageMb: 5000, dbConnections: 5, schemaReads: 300 },
-    features: ['25 projects, 10 members', '2,000 AI actions a month', '50 AI code jobs a month', 'Test automation and GitHub Actions'] },
-  team: { id: 'team', name: 'Team', blurb: 'For larger teams and many projects.', price: { month: 49, year: 490 }, archived: false,
+    features: ['25 projects, 10 members', '2,000 AI actions a month', '50 AI code jobs a month', 'Test automation and GitHub Actions'],
+  },
+  team: {
+    id: 'team',
+    name: 'Team',
+    blurb: 'For larger teams and many projects.',
+    price: { month: 49, year: 490 },
+    archived: false,
     limits: { projects: null, members: 50, aiCalls: 10000, codeJobs: 300, storageMb: 50000, dbConnections: 10, schemaReads: 2000 },
-    features: ['Unlimited projects, 50 members', '10,000 AI actions a month', '300 AI code jobs a month', 'Review panels and CodeRabbit', 'Priority support'] },
+    features: [
+      'Unlimited projects, 50 members',
+      '10,000 AI actions a month',
+      '300 AI code jobs a month',
+      'Review panels and CodeRabbit',
+      'Priority support',
+    ],
+  },
 };
 export const PLAN_ORDER = ['free', 'pro', 'team'];
 export const TRIAL_DAYS = 14;
@@ -42,13 +71,16 @@ export function limitList(plan) {
 
 /** Checks plan data before it is saved: every limit is known, has a numeric value (null = unlimited) and a unit. Throws on the first problem. */
 export function validatePlan(plan) {
-  const bad = (m) => { throw new Error(`Plan ${plan?.id || '?'}: ${m}`); };
+  const bad = (m) => {
+    throw new Error(`Plan ${plan?.id || '?'}: ${m}`);
+  };
   if (!plan || !plan.id || !plan.name) bad('needs an id and a name.');
   for (const [key, value] of Object.entries<any>(plan.limits || {})) {
     const d = LIMIT_DEFS[key];
     if (!d) bad(`unknown limit "${key}".`);
     if (!LIMIT_UNITS.includes(d.unit)) bad(`limit "${key}" needs a unit (${LIMIT_UNITS.join(', ')}).`);
-    if (value !== null && !(typeof value === 'number' && Number.isFinite(value) && value >= 0)) bad(`limit "${key}" must be a number of ${d.unit} (0 or more), or null for no limit.`);
+    if (value !== null && !(typeof value === 'number' && Number.isFinite(value) && value >= 0))
+      bad(`limit "${key}" must be a number of ${d.unit} (0 or more), or null for no limit.`);
   }
   return plan;
 }
@@ -61,13 +93,16 @@ export const publicPlan = (plan) => ({ ...plan, limitList: limitList(plan) });
  * workspaces already on one keep it (limits.js still reads them from PLANS).
  */
 export function listPlans({ forPurchase = false }: any = {}) {
-  return PLAN_ORDER.map((id) => PLANS[id]).filter((p) => !(forPurchase && p.archived)).map(publicPlan);
+  return PLAN_ORDER.map((id) => PLANS[id])
+    .filter((p) => !(forPurchase && p.archived))
+    .map(publicPlan);
 }
 /** Whether a plan can be chosen for a new purchase: it exists, is paid and isn't archived. */
 export const purchasable = (id) => Boolean(PLANS[id] && id !== 'free' && !PLANS[id].archived);
 
 /** Stripe price id for a plan and interval (month | year), from STRIPE_PRICE_PRO_MONTH etc. */
-export const priceIdFor = (plan, interval = 'month') => process.env[`STRIPE_PRICE_${String(plan).toUpperCase()}_${interval === 'year' ? 'YEAR' : 'MONTH'}`] || '';
+export const priceIdFor = (plan, interval = 'month') =>
+  process.env[`STRIPE_PRICE_${String(plan).toUpperCase()}_${interval === 'year' ? 'YEAR' : 'MONTH'}`] || '';
 /** The plan a Stripe price id belongs to. */
 export function planForPrice(priceId) {
   for (const p of PLAN_ORDER) for (const i of ['month', 'year']) if (priceId && priceIdFor(p, i) === priceId) return p;

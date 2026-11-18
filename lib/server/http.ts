@@ -5,7 +5,7 @@ import * as auth from '@/lib/auth';
 import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION, DEFAULT_WS } from '@/lib/db';
 import * as store from '@/lib/store';
 import { isLocalHost } from '@/lib/claude';
-import { isSaas, scrubSharedTokens, platformAdminEmails, requestIsLocal } from '@/lib/platform';
+import { scrubSharedTokens, platformAdminEmails, requestIsLocal } from '@/lib/platform';
 import { lockStatus } from '@/lib/limits';
 import { startWorker as startDriveWorker } from '@/lib/gdrive';
 
@@ -13,7 +13,10 @@ const G = globalThis as any;
 
 /** Creates tables, seeds roles and imports legacy JSON projects — once per server process, and again when the schema changes. */
 export function ready(): Promise<void> {
-  if (G.__tfReadyFor !== SCHEMA_VERSION) { G.__tfReady = null; G.__tfReadyFor = SCHEMA_VERSION; }
+  if (G.__tfReadyFor !== SCHEMA_VERSION) {
+    G.__tfReady = null;
+    G.__tfReadyFor = SCHEMA_VERSION;
+  }
   G.__tfReady ??= (async () => {
     scrubSharedTokens();
     await migrate();
@@ -21,7 +24,10 @@ export function ready(): Promise<void> {
     const n = await asSystem(() => store.importJsonProjects());
     if (n) console.log(`Imported ${n} project(s) from data/projects`);
     startDriveWorker(); // retries documents that couldn't be saved to Google Drive
-  })().catch((e: Error) => { G.__tfReady = null; throw e; });
+  })().catch((e: Error) => {
+    G.__tfReady = null;
+    throw e;
+  });
   return G.__tfReady;
 }
 
@@ -46,7 +52,8 @@ export async function ownerOnly() {
   return u;
 }
 /** Whether this user may set up payment gateways and plans: the owner of the default workspace, or a platform admin (PLATFORM_ADMIN_EMAILS). */
-export const runsThePlatform = (u: any) => Boolean(u?.is_owner && (u.workspace_id === DEFAULT_WS || platformAdminEmails().includes(String(u.email).toLowerCase())));
+export const runsThePlatform = (u: any) =>
+  Boolean(u?.is_owner && (u.workspace_id === DEFAULT_WS || platformAdminEmails().includes(String(u.email).toLowerCase())));
 /** Only the owner who runs this TicketForge: payment gateways and plans (Administration → Billing). */
 export async function platformOwner() {
   const u: any = await authed();
@@ -63,7 +70,13 @@ export async function startSession(userId: string, ws: string | null = null) {
   const h = await headers();
   const s = await auth.createSession(userId, h.get('user-agent') || '', ws);
   const jar = await cookies();
-  jar.set(auth.SESSION_COOKIE, s.token, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: s.maxAge, secure: /^https:/.test(process.env.APP_URL || '') });
+  jar.set(auth.SESSION_COOKIE, s.token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: s.maxAge,
+    secure: /^https:/.test(process.env.APP_URL || ''),
+  });
 }
 export async function endSession() {
   const jar = await cookies();
@@ -82,7 +95,12 @@ export const aiOpts = (b: any) => {
   if (!c.projectId && typeof pid === 'string' && /^[\w-]{1,64}$/.test(pid)) c.projectId = pid;
   return aiOptsOf(b);
 };
-const aiOptsOf = (b: any) => ({ provider: b?.provider || undefined, model: b?.model || undefined, run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined, fresh: b?.fresh === true || b?.regenerate === true || undefined });
+const aiOptsOf = (b: any) => ({
+  provider: b?.provider || undefined,
+  model: b?.model || undefined,
+  run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined,
+  fresh: b?.fresh === true || b?.regenerate === true || undefined,
+});
 
 /** API routes that still work while the workspace is locked, so the owner can sign in, see the plans and pay. */
 const LOCK_EXEMPT = /^\/api\/(auth|billing|plans|features|status)(\/|$)/;
@@ -112,17 +130,25 @@ export function api(fn: Handler) {
         const w = await store.projectWorkspace(projectId);
         if (w && w !== user.workspace_id) throw new HttpError(404, 'Project not found');
       }
-      const out = await asUser(user?.id, async () => {
-        // A trial that ended without a payment locks the workspace: everything but sign-in and billing refuses until it is paid.
-        if (user && !LOCK_EXEMPT.test(new URL(req.url).pathname)) {
-          const lock = await lockStatus(user.workspace_id);
-          if (lock.locked) throw Object.assign(new HttpError(402, `Your ${lock.plan.name} trial has ended. Pay to keep using this workspace.`), { extra: { code: 'locked', plan: lock.plan.id } });
-        }
-        // Feature flags: a feature the workspace owner locked refuses its API routes for everyone in that workspace.
-        const locked = await lockedFeatureFor(new URL(req.url).pathname);
-        if (locked) throw new HttpError(423, lockedMessage(locked));
-        return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
-      }, user, { local, projectId, runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local' });
+      const out = await asUser(
+        user?.id,
+        async () => {
+          // A trial that ended without a payment locks the workspace: everything but sign-in and billing refuses until it is paid.
+          if (user && !LOCK_EXEMPT.test(new URL(req.url).pathname)) {
+            const lock = await lockStatus(user.workspace_id);
+            if (lock.locked)
+              throw Object.assign(new HttpError(402, `Your ${lock.plan.name} trial has ended. Pay to keep using this workspace.`), {
+                extra: { code: 'locked', plan: lock.plan.id },
+              });
+          }
+          // Feature flags: a feature the workspace owner locked refuses its API routes for everyone in that workspace.
+          const locked = await lockedFeatureFor(new URL(req.url).pathname);
+          if (locked) throw new HttpError(423, lockedMessage(locked));
+          return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
+        },
+        user,
+        { local, projectId, runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local' },
+      );
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (err) {
       // Drizzle wraps database errors as "Failed query: <sql> params: …", which hides what PostgreSQL said
@@ -142,15 +168,43 @@ export function ndjson(req: Request, run: (send: (o: any) => void, signal: Abort
   const stream = new ReadableStream({
     async start(controller) {
       let open = true;
-      const send = (o: any) => { if (open) { try { controller.enqueue(enc.encode(`${JSON.stringify(o)}\n`)); } catch { open = false; } } };
+      const send = (o: any) => {
+        if (open) {
+          try {
+            controller.enqueue(enc.encode(`${JSON.stringify(o)}\n`));
+          } catch {
+            open = false;
+          }
+        }
+      };
       const ping = setInterval(() => send({ type: 'ping' }), 15000);
-      try { await run(send, ctrl.signal); }
-      catch (e) { if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) }); }
-      finally { clearInterval(ping); open = false; try { controller.close(); } catch { /* closed */ } }
+      try {
+        await run(send, ctrl.signal);
+      } catch (e) {
+        if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) });
+      } finally {
+        clearInterval(ping);
+        open = false;
+        try {
+          controller.close();
+        } catch {
+          /* closed */
+        }
+      }
     },
-    cancel() { ctrl.abort(); },
+    cancel() {
+      ctrl.abort();
+    },
   });
-  return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' } });
+  return new Response(stream, {
+    headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' },
+  });
 }
 
-export async function body(req: Request) { try { return await req.json(); } catch { return {}; } }
+export async function body(req: Request) {
+  try {
+    return await req.json();
+  } catch {
+    return {};
+  }
+}

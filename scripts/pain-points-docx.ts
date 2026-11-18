@@ -8,6 +8,9 @@ const dir = path.join(import.meta.dirname, '..', 'docs');
 const src = path.join(dir, 'scrum-pain-points.md');
 const out = path.join(dir, 'scrum-pain-points.docx');
 
-const buf = await markdownToDocx(fs.readFileSync(src, 'utf8'), { title: 'Scrum team pain points in the building phase, and how Ticket Forge may help', creator: 'TicketForge' });
+const buf = await markdownToDocx(fs.readFileSync(src, 'utf8'), {
+  title: 'Scrum team pain points in the building phase, and how Ticket Forge may help',
+  creator: 'TicketForge',
+});
 fs.writeFileSync(out, buf);
 console.log(`Wrote ${path.relative(process.cwd(), out)} (${buf.length} bytes)`);

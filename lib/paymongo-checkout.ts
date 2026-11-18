@@ -47,7 +47,14 @@ export async function startCheckout({ ws, plan, interval, method, appUrl }: any)
   if (hasPaidPlan(w)) throw err('This workspace already has a paid plan.', 409);
   const back = (result) => `${appUrl}/checkout/return?result=${result}&plan=${q.plan.id}&interval=${q.interval}`;
   const s = await paymongo('POST', 'checkout_sessions', {
-    line_items: [{ name: `${PLANS[q.plan.id].name} plan (${q.interval === 'year' ? 'yearly' : 'monthly'})`, amount: Math.round(q.amount * 100), currency: CHECKOUT_CURRENCY, quantity: 1 }],
+    line_items: [
+      {
+        name: `${PLANS[q.plan.id].name} plan (${q.interval === 'year' ? 'yearly' : 'monthly'})`,
+        amount: Math.round(q.amount * 100),
+        currency: CHECKOUT_CURRENCY,
+        quantity: 1,
+      },
+    ],
     payment_method_types: [step.method],
     description: `TicketForge ${PLANS[q.plan.id].name} plan`,
     reference_number: ws,
@@ -63,8 +70,9 @@ export async function startCheckout({ ws, plan, interval, method, appUrl }: any)
   return { url };
 }
 
-const isPaid = (s) => (s?.attributes?.payments || []).some((p) => p?.attributes?.status === 'paid')
-  || s?.attributes?.payment_intent?.attributes?.status === 'succeeded';
+const isPaid = (s) =>
+  (s?.attributes?.payments || []).some((p) => p?.attributes?.status === 'paid') ||
+  s?.attributes?.payment_intent?.attributes?.status === 'succeeded';
 
 const planInfo = (id) => (PLANS[id] ? { id, name: PLANS[id].name } : null);
 
@@ -78,24 +86,44 @@ export async function checkoutResult({ ws, result, plan, interval }: any) {
   const w = await workspaceRow(ws);
   if (result === 'cancelled') {
     await qs('update workspaces set paymongo_checkout_id = null where id = $1', [ws]);
-    return { status: 'cancelled', ...retry, current: planInfo(hasPaidPlan(w) ? w.plan : 'free'), message: 'Checkout cancelled. No subscription was created and you haven’t been charged.' };
+    return {
+      status: 'cancelled',
+      ...retry,
+      current: planInfo(hasPaidPlan(w) ? w.plan : 'free'),
+      message: 'Checkout cancelled. No subscription was created and you haven’t been charged.',
+    };
   }
   if (result !== 'success') return { status: 'failed', ...retry, message: 'The payment didn’t go through. You haven’t been charged.' };
   if (!w.paymongo_checkout_id) {
     // Opened again after it was already handled: show the plan in force.
-    if (hasPaidPlan(w)) return { status: 'success', plan: planInfo(w.plan), interval: w.billing_interval, message: `You’re on the ${PLANS[w.plan].name} plan.` };
+    if (hasPaidPlan(w))
+      return {
+        status: 'success',
+        plan: planInfo(w.plan),
+        interval: w.billing_interval,
+        message: `You’re on the ${PLANS[w.plan].name} plan.`,
+      };
     return { status: 'failed', ...retry, message: 'We couldn’t find this checkout. You haven’t been charged.' };
   }
   let s;
-  try { s = await paymongo('GET', `checkout_sessions/${encodeURIComponent(w.paymongo_checkout_id)}`); }
-  catch (e) { return { status: 'failed', ...retry, message: `We couldn’t confirm the payment (${e.message}). If you were charged, contact support.` }; }
+  try {
+    s = await paymongo('GET', `checkout_sessions/${encodeURIComponent(w.paymongo_checkout_id)}`);
+  } catch (e) {
+    return { status: 'failed', ...retry, message: `We couldn’t confirm the payment (${e.message}). If you were charged, contact support.` };
+  }
   if (!isPaid(s)) return { status: 'failed', ...retry, message: 'The payment wasn’t completed. You haven’t been charged.' };
   const meta = s.attributes?.metadata || {};
-  const id = meta.plan, per = meta.interval === 'year' ? 'year' : 'month';
-  if (meta.workspace_id !== ws || !PLANS[id] || id === 'free') return { status: 'failed', ...retry, message: 'This payment doesn’t match your workspace. Contact support.' };
+  const id = meta.plan,
+    per = meta.interval === 'year' ? 'year' : 'month';
+  if (meta.workspace_id !== ws || !PLANS[id] || id === 'free')
+    return { status: 'failed', ...retry, message: 'This payment doesn’t match your workspace. Contact support.' };
   const end = new Date();
-  if (per === 'year') end.setFullYear(end.getFullYear() + 1); else end.setMonth(end.getMonth() + 1);
-  await qs(`update workspaces set plan = $2, subscription_status = 'active', billing_interval = $3, current_period_end = $4,
-      cancel_at_period_end = false, paymongo_checkout_id = null where id = $1`, [ws, id, per, end]);
+  if (per === 'year') end.setFullYear(end.getFullYear() + 1);
+  else end.setMonth(end.getMonth() + 1);
+  await qs(
+    `update workspaces set plan = $2, subscription_status = 'active', billing_interval = $3, current_period_end = $4,
+      cancel_at_period_end = false, paymongo_checkout_id = null where id = $1`,
+    [ws, id, per, end],
+  );
   return { status: 'success', plan: planInfo(id), interval: per, message: `Payment received. You’re now on the ${PLANS[id].name} plan.` };
 }

@@ -12,10 +12,22 @@ export const INTERVALS = ['month', 'year'];
 /** Subscription states that count as an active subscriber (the same ones limits.js keeps the plan for). */
 const SUBSCRIBED = ['active', 'trialing', 'past_due'];
 
-const row = (r) => r && ({
-  id: r.id, version: r.version, name: r.name, blurb: r.blurb, price: Number(r.price), currency: r.currency, interval: r.interval,
-  isFree: r.is_free, trialDays: r.trial_days, limits: r.limits || {}, features: r.features || [], position: r.position, archived: r.archived,
-});
+const row = (r) =>
+  r && {
+    id: r.id,
+    version: r.version,
+    name: r.name,
+    blurb: r.blurb,
+    price: Number(r.price),
+    currency: r.currency,
+    interval: r.interval,
+    isFree: r.is_free,
+    trialDays: r.trial_days,
+    limits: r.limits || {},
+    features: r.features || [],
+    position: r.position,
+    archived: r.archived,
+  };
 /** A plan as the API returns it: its details plus its limits as a list with units (see publicPlan in plans.js). */
 const out = (p, extra: any = {}) => ({ ...publicPlan(p), ...extra });
 
@@ -23,21 +35,40 @@ const out = (p, extra: any = {}) => ({ ...publicPlan(p), ...extra });
 let seeded = false;
 async function ensureSeeded() {
   if (seeded) return;
-  if ((await qs('select 1 from billing_plans limit 1')).rows[0]) { seeded = true; return; }
+  if ((await qs('select 1 from billing_plans limit 1')).rows[0]) {
+    seeded = true;
+    return;
+  }
   const cur = CURRENCIES.includes(CURRENCY) ? CURRENCY : 'USD';
   for (const [i, id] of PLAN_ORDER.entries()) {
     const p = PLANS[id];
-    await qs(`insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, position, archived)
+    await qs(
+      `insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, position, archived)
       values ($1, 1, $2, $3, $4, $5, 'month', $6, $7, $8, $9, $10, $11) on conflict (id, version) do nothing`,
-    [id, p.name, p.blurb, p.price.month, cur, id === 'free', id === 'free' ? 0 : TRIAL_DAYS, JSON.stringify(p.limits), JSON.stringify(p.features), i, Boolean(p.archived)]);
+      [
+        id,
+        p.name,
+        p.blurb,
+        p.price.month,
+        cur,
+        id === 'free',
+        id === 'free' ? 0 : TRIAL_DAYS,
+        JSON.stringify(p.limits),
+        JSON.stringify(p.features),
+        i,
+        Boolean(p.archived),
+      ],
+    );
   }
 }
 
 /** How many workspaces are subscribed to each plan, by version: { [id]: { [version]: n } }. A free plan counts everyone on it. */
 async function subscriberCounts() {
-  const r = (await qs(`select plan, coalesce(plan_version, 1) as version, count(*)::int as n from workspaces
+  const r = (
+    await qs(`select plan, coalesce(plan_version, 1) as version, count(*)::int as n from workspaces
     where plan = 'free' or coalesce(subscription_status, '') in (${SUBSCRIBED.map((s) => `'${s}'`).join(', ')})
-    group by plan, coalesce(plan_version, 1)`)).rows;
+    group by plan, coalesce(plan_version, 1)`)
+  ).rows;
   const by: any = {};
   for (const x of r) (by[x.plan] ??= {})[x.version] = x.n;
   return by;
@@ -75,7 +106,10 @@ function clean(input, base: any = {}) {
     v.name = String(input.name ?? '').trim();
     if (!v.name || v.name.length > 60) throw err('Give the plan a name (up to 60 characters).');
   }
-  if ('blurb' in input) v.blurb = String(input.blurb ?? '').trim().slice(0, 200);
+  if ('blurb' in input)
+    v.blurb = String(input.blurb ?? '')
+      .trim()
+      .slice(0, 200);
   if ('isFree' in input) v.isFree = Boolean(input.isFree);
   if ('currency' in input) {
     v.currency = String(input.currency ?? '').toUpperCase();
@@ -91,35 +125,70 @@ function clean(input, base: any = {}) {
   }
   if ('trialDays' in input) {
     v.trialDays = Number(input.trialDays ?? 0);
-    if (!Number.isInteger(v.trialDays) || v.trialDays < 0 || v.trialDays > 365) throw err('Trial days must be a whole number from 0 to 365.');
+    if (!Number.isInteger(v.trialDays) || v.trialDays < 0 || v.trialDays > 365)
+      throw err('Trial days must be a whole number from 0 to 365.');
   }
   if ('archived' in input) v.archived = Boolean(input.archived);
   if ('features' in input) {
     if (!Array.isArray(input.features)) throw err('Features must be a list.');
-    v.features = input.features.map((f) => String(f).trim()).filter(Boolean).slice(0, 12);
+    v.features = input.features
+      .map((f) => String(f).trim())
+      .filter(Boolean)
+      .slice(0, 12);
   }
   if ('limits' in input) {
-    try { validatePlan({ id: 'x', name: 'x', limits: input.limits }); } catch (e) { throw err(e.message.replace(/^Plan x: /, '')); }
+    try {
+      validatePlan({ id: 'x', name: 'x', limits: input.limits });
+    } catch (e) {
+      throw err(e.message.replace(/^Plan x: /, ''));
+    }
     v.limits = input.limits;
   }
-  if (v.isFree) { v.price = 0; v.trialDays = 0; }
-  else if (!(v.price > 0)) throw err('A paid plan needs a price above 0. Tick “Free plan” for a free one.');
+  if (v.isFree) {
+    v.price = 0;
+    v.trialDays = 0;
+  } else if (!(v.price > 0)) throw err('A paid plan needs a price above 0. Tick “Free plan” for a free one.');
   return v;
 }
 
-const slug = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'plan';
+const slug = (s) =>
+  String(s)
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 30) || 'plan';
 
 /** Creates a plan (version 1). Returns it. */
 export async function createPlan(input, actor) {
   await ensureSeeded();
-  const v = clean({ name: '', blurb: '', isFree: false, price: 0, currency: 'USD', interval: 'month', trialDays: 0, features: [], ...input }, {});
+  const v = clean(
+    { name: '', blurb: '', isFree: false, price: 0, currency: 'USD', interval: 'month', trialDays: 0, features: [], ...input },
+    {},
+  );
   v.limits ??= (v.isFree ? PLANS.free : PLANS.pro).limits; // the owner can edit limits later; start from the default tier
-  let id = slug(v.name), n = 1;
+  let id = slug(v.name),
+    n = 1;
   while ((await qs('select 1 from billing_plans where id = $1 limit 1', [id])).rows[0]) id = `${slug(v.name).slice(0, 26)}-${++n}`;
   const pos = (await qs('select coalesce(max(position), -1) + 1 as n from billing_plans')).rows[0].n;
-  await qs(`insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, position, archived, created_by)
+  await qs(
+    `insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, position, archived, created_by)
     values ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, $12)`,
-  [id, v.name, v.blurb, v.price, v.currency, v.interval, v.isFree, v.trialDays, JSON.stringify(v.limits), JSON.stringify(v.features), pos, actor?.name || null]);
+    [
+      id,
+      v.name,
+      v.blurb,
+      v.price,
+      v.currency,
+      v.interval,
+      v.isFree,
+      v.trialDays,
+      JSON.stringify(v.limits),
+      JSON.stringify(v.features),
+      pos,
+      actor?.name || null,
+    ],
+  );
   return out(await getPlanVersion(id), { subscribers: 0, versions: 1 });
 }
 
@@ -138,16 +207,37 @@ export async function updatePlan(id, input, actor) {
   const termsChanged = TERMS.some((k) => next[k] !== cur[k]);
   const by = await subscriberCounts();
   const subscribers: any = total(by, cur.id);
-  const args = [cur.id, next.name, next.blurb, next.price, next.currency, next.interval, next.isFree, next.trialDays, JSON.stringify(next.limits), JSON.stringify(next.features), next.archived];
+  const args = [
+    cur.id,
+    next.name,
+    next.blurb,
+    next.price,
+    next.currency,
+    next.interval,
+    next.isFree,
+    next.trialDays,
+    JSON.stringify(next.limits),
+    JSON.stringify(next.features),
+    next.archived,
+  ];
   let version = cur.version;
   if (termsChanged && subscribers > 0) {
     version = cur.version + 1;
-    await qs(`insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, archived, position, created_by)
-      values ($1, $12, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $14)`, [...args, version, cur.position, actor?.name || null]);
+    await qs(
+      `insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, archived, position, created_by)
+      values ($1, $12, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $14)`,
+      [...args, version, cur.position, actor?.name || null],
+    );
   } else {
-    await qs(`update billing_plans set name = $2, blurb = $3, price = $4, currency = $5, interval = $6, is_free = $7, trial_days = $8,
-      limits = $9, features = $10, archived = $11 where id = $1 and version = $12`, [...args, cur.version]);
+    await qs(
+      `update billing_plans set name = $2, blurb = $3, price = $4, currency = $5, interval = $6, is_free = $7, trial_days = $8,
+      limits = $9, features = $10, archived = $11 where id = $1 and version = $12`,
+      [...args, cur.version],
+    );
   }
   const versions = (await qs('select count(*)::int n from billing_plans where id = $1', [cur.id])).rows[0].n;
-  return { newVersion: version !== cur.version, plan: out(await getPlanVersion(cur.id, version), { subscribers: total(by, cur.id), versions }) };
+  return {
+    newVersion: version !== cur.version,
+    plan: out(await getPlanVersion(cur.id, version), { subscribers: total(by, cur.id), versions }),
+  };
 }

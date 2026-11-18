@@ -17,19 +17,41 @@ export const databaseUrl = (env: DbEnv = process.env) => (env.DATABASE_URL || en
 /** The connection string must be a postgres:// or postgresql:// address; anything else stops the app with a clear message. */
 export function checkConnectionString(url: string, name = 'DATABASE_URL') {
   let u: URL | null;
-  try { u = new URL(url); } catch { u = null; }
+  try {
+    u = new URL(url);
+  } catch {
+    u = null;
+  }
   if (!u || !/^postgres(ql)?:$/.test(u.protocol) || !u.hostname) {
-    throw new Error(`${name} is not a valid PostgreSQL connection string. Use the form postgresql://user:password@host:5432/database `
-      + '(URL-encode special characters in the password, such as @ # / as %40 %23 %2F)'
-      + (name === 'DATABASE_URL' ? ', or remove DATABASE_URL to use the built-in local database.' : '.'));
+    throw new Error(
+      `${name} is not a valid PostgreSQL connection string. Use the form postgresql://user:password@host:5432/database ` +
+        '(URL-encode special characters in the password, such as @ # / as %40 %23 %2F)' +
+        (name === 'DATABASE_URL' ? ', or remove DATABASE_URL to use the built-in local database.' : '.'),
+    );
   }
 }
 
 /** The host name of a connection string (never the user or password), for messages and logs. */
-export function hostOf(url: string) { try { return new URL(url).hostname; } catch { return ''; } }
-const portOf = (url: string) => { try { return new URL(url).port; } catch { return ''; } };
+export function hostOf(url: string) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+const portOf = (url: string) => {
+  try {
+    return new URL(url).port;
+  } catch {
+    return '';
+  }
+};
 /** "host:port" for messages. */
-export const endpointOf = (url: string) => { const h = hostOf(url); const p = portOf(url); return h ? (p ? `${h}:${p}` : h) : ''; };
+export const endpointOf = (url: string) => {
+  const h = hostOf(url);
+  const p = portOf(url);
+  return h ? (p ? `${h}:${p}` : h) : '';
+};
 
 /** Whether this host is the computer the app runs on (SSL is not used there). */
 export const isLocalHost = (host: string) => /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(host);
@@ -44,7 +66,11 @@ export function sslFor(url: string, env: DbEnv = process.env): PgSsl {
   if (mode) return { rejectUnauthorized: false }; // "require" or anything else asks for plain encryption
   if (isLocalHost(hostOf(url))) return false;
   let sslmode = '';
-  try { sslmode = (new URL(url).searchParams.get('sslmode') || '').toLowerCase(); } catch { /* checked elsewhere */ }
+  try {
+    sslmode = (new URL(url).searchParams.get('sslmode') || '').toLowerCase();
+  } catch {
+    /* checked elsewhere */
+  }
   if (sslmode === 'disable') return false;
   if (sslmode === 'verify-full' || sslmode === 'verify-ca') return { rejectUnauthorized: true };
   return { rejectUnauthorized: false };
@@ -56,10 +82,15 @@ export function withoutSslParams(url: string) {
     const u = new URL(url);
     for (const k of ['sslmode', 'ssl', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat']) u.searchParams.delete(k);
     return u.toString();
-  } catch { return url; }
+  } catch {
+    return url;
+  }
 }
 
-const positive = (v: string | undefined, fallback: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback; };
+const positive = (v: string | undefined, fallback: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+};
 
 /** Everything node-postgres needs to connect, from a connection string and the environment. */
 export function pgConfig(url: string, env: DbEnv = process.env) {

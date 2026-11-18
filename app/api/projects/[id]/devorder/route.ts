@@ -11,6 +11,12 @@ export const POST = api(async (req, p) => {
   const smart = b.smart !== false;
   const user = smart ? await perm('ai.use') : await perm();
   store.requireAccess(user, p.id);
-  return planOrder({ project: await store.getProject(p.id), epicId: b.epicId ? String(b.epicId) : '', sprintId: b.sprintId ? String(b.sprintId) : '',
-    ticketIds: Array.isArray(b.ticketIds) ? b.ticketIds.map(String).slice(0, 200) : undefined, ai: aiOpts(b), smart });
+  return planOrder({
+    project: await store.getProject(p.id),
+    epicId: b.epicId ? String(b.epicId) : '',
+    sprintId: b.sprintId ? String(b.sprintId) : '',
+    ticketIds: Array.isArray(b.ticketIds) ? b.ticketIds.map(String).slice(0, 200) : undefined,
+    ai: aiOpts(b),
+    smart,
+  });
 });

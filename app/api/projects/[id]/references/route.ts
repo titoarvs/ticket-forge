@@ -23,8 +23,11 @@ export const POST = api(async (req, p) => {
   if (file.size > maxBytes()) throw new HttpError(413, sizeMessage());
   const data = Buffer.from(await file.arrayBuffer());
   let meta;
-  try { meta = await saveFile({ projectId: p.id, name: file.name, data, user, purpose: 'reference' }); }
-  catch (e: any) { throw new HttpError(e.status || 500, e.message); }
+  try {
+    meta = await saveFile({ projectId: p.id, name: file.name, data, user, purpose: 'reference' });
+  } catch (e: any) {
+    throw new HttpError(e.status || 500, e.message);
+  }
   const found = await extractReference(data, meta.name);
   return { ...meta, ...found, at: new Date().toISOString() };
 });

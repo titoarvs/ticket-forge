@@ -19,5 +19,11 @@ export const POST = api(async (req) => {
   const u: any = await authed();
   ownerCheckout(u);
   const b = await body(req);
-  return startPlanCheckout({ ws: u.workspace_id, user: u, planId: String(b.plan || ''), gateway: String(b.gateway || ''), appUrl: appUrl(req) });
+  return startPlanCheckout({
+    ws: u.workspace_id,
+    user: u,
+    planId: String(b.plan || ''),
+    gateway: String(b.gateway || ''),
+    appUrl: appUrl(req),
+  });
 });

@@ -16,7 +16,11 @@ function draft(b: any) {
   if (apiKey.length > 1000) throw new HttpError(400, 'That API key is too long.');
   if (baseUrl) {
     let u: URL;
-    try { u = new URL(baseUrl); } catch { throw new HttpError(400, 'The endpoint must be a full URL, like https://api.example.com/v1'); }
+    try {
+      u = new URL(baseUrl);
+    } catch {
+      throw new HttpError(400, 'The endpoint must be a full URL, like https://api.example.com/v1');
+    }
     if (!/^https?:$/.test(u.protocol)) throw new HttpError(400, 'The endpoint must start with https:// (or http:// for a local server).');
   }
   return { id: b?.id ? String(b.id) : undefined, provider, model, baseUrl, apiKey };
@@ -35,9 +39,18 @@ export const POST = api(async (req) => {
   const b = await body(req);
   const target = b.draft ? { draft: draft(b.draft) } : b.id ? { id: String(b.id) } : undefined;
   if (b.action === 'models') return { models: await listModels(target) };
-  if (b.action === 'reset') { clearCooldown(b.id ? String(b.id) : undefined); return status(); }
-  if (b.action === 'usage-reset') { clearAiUsage(); return status(); }
-  if (b.action === 'cache-clear') { await cacheClear(); return status(); }
+  if (b.action === 'reset') {
+    clearCooldown(b.id ? String(b.id) : undefined);
+    return status();
+  }
+  if (b.action === 'usage-reset') {
+    clearAiUsage();
+    return status();
+  }
+  if (b.action === 'cache-clear') {
+    await cacheClear();
+    return status();
+  }
   return testConnection(target);
 });
 
@@ -58,7 +71,21 @@ export const PATCH = api(async (req) => {
   if (Array.isArray(b.order)) await reorderAiProviders(user, b.order.map(String));
   if ('routing' in b) await setAiRouting(user, b.routing && typeof b.routing === 'object' ? b.routing : null);
   if (Array.isArray(b.configs)) await setAiConfigs(user, b.configs);
-  if (b.id || typeof b.accountFallback === 'boolean' || b.localEngine || typeof b.copilotModel === 'string' || typeof b.copilotBackup === 'boolean') await setAiOptions(user, { id: b.id ? String(b.id) : undefined, enabled: b.enabled, accountFallback: b.accountFallback, localEngine: b.localEngine, copilotModel: b.copilotModel, copilotBackup: b.copilotBackup });
+  if (
+    b.id ||
+    typeof b.accountFallback === 'boolean' ||
+    b.localEngine ||
+    typeof b.copilotModel === 'string' ||
+    typeof b.copilotBackup === 'boolean'
+  )
+    await setAiOptions(user, {
+      id: b.id ? String(b.id) : undefined,
+      enabled: b.enabled,
+      accountFallback: b.accountFallback,
+      localEngine: b.localEngine,
+      copilotModel: b.copilotModel,
+      copilotBackup: b.copilotBackup,
+    });
   return status();
 });
 

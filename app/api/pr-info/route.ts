@@ -9,6 +9,13 @@ export const GET = api(async (req) => {
   const sp = new URL(req.url).searchParams;
   const projectId = sp.get('projectId');
   let gitlabToken = '';
-  if (projectId) { await store.requireProject(user, projectId); gitlabToken = await getProjectSecret(projectId, 'gitlabToken'); }
-  try { return await prInfo(sp.get('url'), { gitlabToken }); } catch (e: any) { throw new HttpError(400, e.message); }
+  if (projectId) {
+    await store.requireProject(user, projectId);
+    gitlabToken = await getProjectSecret(projectId, 'gitlabToken');
+  }
+  try {
+    return await prInfo(sp.get('url'), { gitlabToken });
+  } catch (e: any) {
+    throw new HttpError(400, e.message);
+  }
 });

@@ -12,4 +12,5 @@ export const listDriveFiles = (): Promise<Any> => api('/api/gdrive/files');
 /** Disconnects Google Drive. */
 export const disconnectDrive = (): Promise<Any> => api('/api/gdrive', { method: 'DELETE' });
 /** The save state (saved, queued, failed) of each document of an epic. */
-export const getDocumentStates = (pid: Any, epicId: string): Promise<Any> => api(`/api/projects/${encodeURIComponent(pid)}/gdrive?epicId=${encodeURIComponent(epicId)}`);
+export const getDocumentStates = (pid: Any, epicId: string): Promise<Any> =>
+  api(`/api/projects/${encodeURIComponent(pid)}/gdrive?epicId=${encodeURIComponent(epicId)}`);

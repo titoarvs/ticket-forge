@@ -21,11 +21,11 @@ export const driveDocs = pgTable("drive_docs", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 }, (table) => [
-  index("drive_docs_queue").using("btree", table.state.asc().nullsLast().op("text_ops"), table.nextAttemptAt.asc().nullsLast().op("timestamptz_ops")),
+  index("drive_docs_queue").using("btree", table.state.asc().nullsLast().op("text_ops"), table.nextAttemptAt.asc().nullsLast().op("text_ops")),
   foreignKey({
       columns: [table.projectId],
       foreignColumns: [projects.id],
       name: "drive_docs_project_id_fkey"
     }).onDelete("cascade"),
-  primaryKey({ columns: [table.projectId, table.epicId, table.kind, table.docKey], name: "drive_docs_pkey"}),
+  primaryKey({ columns: [table.docKey, table.epicId, table.kind, table.projectId], name: "drive_docs_pkey"}),
 ]);

@@ -3,7 +3,10 @@ import { publicFlags, setFlags } from '@/lib/features';
 
 // Feature flags (Administration → Features). Everyone signed in can read which features are locked (the app hides
 // them); only the owner can lock or unlock: PUT { changes: { [featureId]: { locked: boolean, note?: string } } }.
-export const GET = api(async () => { await authed(); return publicFlags(); });
+export const GET = api(async () => {
+  await authed();
+  return publicFlags();
+});
 
 export const PUT = api(async (req) => {
   const user: any = await authed();

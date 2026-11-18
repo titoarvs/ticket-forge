@@ -13,6 +13,9 @@ export const POST = api(async (_req, p) => {
   const saved = await savedSetup(p.id);
   if (!/^https?:\/\//i.test(saved.baseUrl)) throw new HttpError(400, 'Set the application URL first.');
   if (!(await engineStatus()).browser) throw new HttpError(400, noBrowser());
-  try { return await detectLogin({ baseUrl: saved.baseUrl, app: saved.app }); }
-  catch (e: any) { throw new HttpError(422, String(e.message || e).split('\n')[0]); }
+  try {
+    return await detectLogin({ baseUrl: saved.baseUrl, app: saved.app });
+  } catch (e: any) {
+    throw new HttpError(422, String(e.message || e).split('\n')[0]);
+  }
 });

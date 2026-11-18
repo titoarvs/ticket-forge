@@ -24,7 +24,11 @@ function secretKey() {
     // keeps the key, so saved API keys and payment keys stay readable without re-entering them.
     const raw = process.env.TICKETFORGE_KEY_FROM_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
     let u = null;
-    try { u = new URL(raw); } catch { /* not a URL */ }
+    try {
+      u = new URL(raw);
+    } catch {
+      /* not a URL */
+    }
     material = `db:${u ? `${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}` : raw}`;
   } else {
     const f = path.join(DATA_DIR, 'secret.key');
@@ -54,7 +58,6 @@ export function decrypt(box) {
 // The list is in priority order: TicketForge uses the first available provider and switches down the list
 // when one is rate limited, out of credits or failing.
 const AI = 'ai_settings';
-const G = globalThis;
 const C: any = wsCache('__tfSettingsWs', () => ({ ai: undefined, at: 0 }));
 const TTL = 30000; // other server instances (e.g. on Vercel) pick up changes within 30 seconds
 const newId = () => crypto.randomUUID().slice(0, 8);
@@ -65,7 +68,22 @@ function normalize(v) {
   if (Array.isArray(v.providers)) return { accountFallback: true, ...v };
   if (v.provider) {
     const { provider, model, baseUrl, keyEnc, keyHint, updatedBy, updatedAt } = v;
-    return { providers: [{ id: newId(), provider, model: model || '', baseUrl: baseUrl || '', keyEnc: keyEnc || null, keyHint: keyHint || null, enabled: true }], accountFallback: true, updatedBy, updatedAt };
+    return {
+      providers: [
+        {
+          id: newId(),
+          provider,
+          model: model || '',
+          baseUrl: baseUrl || '',
+          keyEnc: keyEnc || null,
+          keyHint: keyHint || null,
+          enabled: true,
+        },
+      ],
+      accountFallback: true,
+      updatedBy,
+      updatedAt,
+    };
   }
   return { providers: [], accountFallback: true };
 }
@@ -79,14 +97,22 @@ export async function getAiSettings({ fresh = false }: any = {}) {
 async function write(actor, next) {
   const v = { ...next, updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
   await setMeta(wsKey(AI), v);
-  C.ai = v; C.at = Date.now();
+  C.ai = v;
+  C.at = Date.now();
   return v;
 }
-const KEY_LOST = 'The saved API key can’t be read on this server (the database password or TICKETFORGE_SECRET changed). Enter the key again.';
+const KEY_LOST =
+  'The saved API key can’t be read on this server (the database password or TICKETFORGE_SECRET changed). Enter the key again.';
 function withKey(e) {
   let key = '';
   let keyError = null;
-  if (e.keyEnc) { try { key = decrypt(e.keyEnc); } catch { keyError = KEY_LOST; } }
+  if (e.keyEnc) {
+    try {
+      key = decrypt(e.keyEnc);
+    } catch {
+      keyError = KEY_LOST;
+    }
+  }
   return { ...e, key, keyError };
 }
 /** For server use only: the providers in priority order with keys decrypted. */
@@ -96,15 +122,29 @@ export async function aiProvidersWithKeys() {
 }
 /** What admins see: never a key or its encrypted form. */
 export const publicAiSettings = (s) => ({
-  providers: (s?.providers || []).map((e) => ({ id: e.id, provider: e.provider, model: e.model || '', baseUrl: e.baseUrl || '', hasKey: Boolean(e.keyEnc), keyHint: e.keyHint || null, enabled: e.enabled !== false })),
+  providers: (s?.providers || []).map((e) => ({
+    id: e.id,
+    provider: e.provider,
+    model: e.model || '',
+    baseUrl: e.baseUrl || '',
+    hasKey: Boolean(e.keyEnc),
+    keyHint: e.keyHint || null,
+    enabled: e.enabled !== false,
+  })),
   accountFallback: s?.accountFallback !== false,
-  localEngine: s?.localEngine === 'copilot' ? 'copilot' : 'claude', copilotModel: s?.copilotModel || '', copilotBackup: Boolean(s?.copilotBackup),
+  localEngine: s?.localEngine === 'copilot' ? 'copilot' : 'claude',
+  copilotModel: s?.copilotModel || '',
+  copilotBackup: Boolean(s?.copilotBackup),
   routing: normalizeRouting(s?.routing),
   configs: normalizeConfigs(s?.configs),
-  updatedBy: s?.updatedBy || null, updatedAt: s?.updatedAt || null,
+  updatedBy: s?.updatedBy || null,
+  updatedAt: s?.updatedAt || null,
 });
 
-const clean = (u) => String(u || '').trim().replace(/\/+$/, '');
+const clean = (u) =>
+  String(u || '')
+    .trim()
+    .replace(/\/+$/, '');
 /**
  * Adds a provider (no id) or updates one. A blank apiKey keeps the saved key, unless the provider or endpoint
  * changed: then the old key is dropped so it's never sent to a different service.
@@ -116,15 +156,37 @@ export async function saveAiProvider(actor, { id, provider, model, baseUrl, apiK
   if (id && i < 0) throw Object.assign(new Error('That provider was removed. Reload the page.'), { status: 404 });
   const cur = i >= 0 ? list[i] : {};
   const next = {
-    id: cur.id || newId(), provider, model: String(model || '').trim(), baseUrl: clean(baseUrl),
-    keyEnc: cur.keyEnc || null, keyHint: cur.keyHint || null, enabled: enabled ?? cur.enabled ?? true,
+    id: cur.id || newId(),
+    provider,
+    model: String(model || '').trim(),
+    baseUrl: clean(baseUrl),
+    keyEnc: cur.keyEnc || null,
+    keyHint: cur.keyHint || null,
+    enabled: enabled ?? cur.enabled ?? true,
   };
-  if (cur.provider !== provider || clean(cur.baseUrl) !== next.baseUrl) { next.keyEnc = null; next.keyHint = null; }
+  if (cur.provider !== provider || clean(cur.baseUrl) !== next.baseUrl) {
+    next.keyEnc = null;
+    next.keyHint = null;
+  }
   const key = String(apiKey || '').trim();
-  if (provider === 'anthropic' && /^sk-ant-oat/i.test(key)) throw Object.assign(new Error('That’s a Claude subscription token (sk-ant-oat…), not an API key. Choose the “Claude subscription (Claude Code)” provider for it.'), { status: 400 });
-  if (provider === 'claude-sub' && key && !/^sk-ant-oat/i.test(key)) throw Object.assign(new Error('That isn’t a Claude subscription token. Run claude setup-token and paste the sk-ant-oat01-… token it prints.'), { status: 400 });
-  if (key) { next.keyEnc = encrypt(key); next.keyHint = key.slice(-4); }
-  if (i >= 0) list[i] = next; else list.push(next);
+  if (provider === 'anthropic' && /^sk-ant-oat/i.test(key))
+    throw Object.assign(
+      new Error(
+        'That’s a Claude subscription token (sk-ant-oat…), not an API key. Choose the “Claude subscription (Claude Code)” provider for it.',
+      ),
+      { status: 400 },
+    );
+  if (provider === 'claude-sub' && key && !/^sk-ant-oat/i.test(key))
+    throw Object.assign(
+      new Error('That isn’t a Claude subscription token. Run claude setup-token and paste the sk-ant-oat01-… token it prints.'),
+      { status: 400 },
+    );
+  if (key) {
+    next.keyEnc = encrypt(key);
+    next.keyHint = key.slice(-4);
+  }
+  if (i >= 0) list[i] = next;
+  else list.push(next);
   await write(actor, { ...s, providers: list });
   return next;
 }
@@ -171,7 +233,14 @@ export async function savedKeyFor(id, provider, baseUrl) {
 // { urlEnc, protocol: 'playwright' | 'cdp', hint, updatedBy, updatedAt }. The address often holds an access token,
 // so it is stored encrypted and never sent to the browser. TICKETFORGE_BROWSER_WS (and _PROTOCOL) override it.
 const BROWSER = 'browser_settings';
-const hostHint = (url) => { try { const u = new URL(url); return `${u.protocol}//${u.host}${u.pathname === '/' ? '' : u.pathname}`; } catch { return ''; } };
+const hostHint = (url) => {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}${u.pathname === '/' ? '' : u.pathname}`;
+  } catch {
+    return '';
+  }
+};
 
 export async function getRemoteBrowser() {
   const env = String(process.env.TICKETFORGE_BROWSER_WS || '').trim();
@@ -179,7 +248,11 @@ export async function getRemoteBrowser() {
   const saved = await getMeta(wsKey(BROWSER)).catch(() => undefined);
   const v = saved ? (typeof saved === 'string' ? JSON.parse(saved) : saved) : null;
   if (!v?.urlEnc) return null;
-  try { return { url: decrypt(v.urlEnc), protocol: v.protocol === 'cdp' ? 'cdp' : 'playwright', source: 'settings' }; } catch { return null; }
+  try {
+    return { url: decrypt(v.urlEnc), protocol: v.protocol === 'cdp' ? 'cdp' : 'playwright', source: 'settings' };
+  } catch {
+    return null;
+  }
 }
 /** What administrators see: whether one is set, where it points (no token), and how it connects. */
 export async function publicRemoteBrowser() {
@@ -187,17 +260,38 @@ export async function publicRemoteBrowser() {
   if (!r) return null;
   const saved = r.source === 'settings' ? await getMeta(wsKey(BROWSER)) : null;
   const v = saved ? (typeof saved === 'string' ? JSON.parse(saved) : saved) : {};
-  return { set: true, source: r.source, protocol: r.protocol, hint: hostHint(r.url), updatedBy: v.updatedBy || null, updatedAt: v.updatedAt || null };
+  return {
+    set: true,
+    source: r.source,
+    protocol: r.protocol,
+    hint: hostHint(r.url),
+    updatedBy: v.updatedBy || null,
+    updatedAt: v.updatedAt || null,
+  };
 }
 export function checkBrowserUrl(url) {
   let u;
-  try { u = new URL(String(url || '').trim()); } catch { throw Object.assign(new Error('Enter the full address, like wss://chrome.browserless.io/playwright?token=…'), { status: 400 }); }
-  if (!/^(wss?|https?):$/.test(u.protocol)) throw Object.assign(new Error('The address must start with wss:// (or ws://, https:// for a Chrome DevTools endpoint).'), { status: 400 });
+  try {
+    u = new URL(String(url || '').trim());
+  } catch {
+    throw Object.assign(new Error('Enter the full address, like wss://chrome.browserless.io/playwright?token=…'), { status: 400 });
+  }
+  if (!/^(wss?|https?):$/.test(u.protocol))
+    throw Object.assign(new Error('The address must start with wss:// (or ws://, https:// for a Chrome DevTools endpoint).'), {
+      status: 400,
+    });
   return u.toString();
 }
 export async function saveRemoteBrowser(actor, { url, protocol }: any) {
   const clean = checkBrowserUrl(url);
-  const v = { urlEnc: encrypt(clean), protocol: protocol === 'cdp' ? 'cdp' : 'playwright', updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
+  const v = {
+    urlEnc: encrypt(clean),
+    protocol: protocol === 'cdp' ? 'cdp' : 'playwright',
+    updatedBy: actor?.name || null,
+    updatedAt: new Date().toISOString(),
+  };
   await setMeta(wsKey(BROWSER), v);
 }
-export async function clearRemoteBrowser() { await deleteMeta(wsKey(BROWSER)); }
+export async function clearRemoteBrowser() {
+  await deleteMeta(wsKey(BROWSER));
+}

@@ -18,7 +18,9 @@ export function requestIsLocal(isLocalHost: (h: any) => boolean, headers: { get(
   if (!allowLocalInSaas()) return false;
   // The caller must be this computer itself: every address on the way is loopback (Next adds the socket's address to
   // X-Forwarded-For, so a remote visitor who only sends "Host: localhost" or a forged header still shows up with theirs).
-  const hops = [...String(headers.get('x-forwarded-for') || '').split(','), headers.get('x-real-ip') || ''].map((x) => x.trim()).filter(Boolean);
+  const hops = [...String(headers.get('x-forwarded-for') || '').split(','), headers.get('x-real-ip') || '']
+    .map((x) => x.trim())
+    .filter(Boolean);
   if (hops.some((h) => !LOOPBACK.test(h))) return false;
   const host = headers.get('host');
   const fwd = headers.get('x-forwarded-host');
@@ -30,7 +32,11 @@ export function signupMode() {
   if (['closed', 'waitlist', 'open'].includes(m)) return m;
   return isSaas() ? 'open' : 'closed';
 }
-export const platformAdminEmails = () => String(process.env.PLATFORM_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+export const platformAdminEmails = () =>
+  String(process.env.PLATFORM_ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
 export const platformName = () => process.env.PLATFORM_NAME || 'TicketForge';
 export const requireEmailVerification = () => /^(1|true|yes)$/i.test(String(process.env.REQUIRE_EMAIL_VERIFICATION || ''));
 
@@ -42,6 +48,9 @@ export const requireEmailVerification = () => /^(1|true|yes)$/i.test(String(proc
 export function scrubSharedTokens() {
   if (!isSaas()) return;
   for (const k of ['GITHUB_TOKEN', 'GH_TOKEN', 'GITLAB_TOKEN']) {
-    if (process.env[k]) { delete process.env[k]; console.warn(`SaaS mode: ignoring ${k} (each workspace connects its own account).`); }
+    if (process.env[k]) {
+      delete process.env[k];
+      console.warn(`SaaS mode: ignoring ${k} (each workspace connects its own account).`);
+    }
   }
 }

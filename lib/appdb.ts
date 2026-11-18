@@ -23,13 +23,26 @@ type Kind = keyof typeof KINDS;
 type Box = ReturnType<typeof encrypt>;
 type LastTest = { ok: boolean; at: string; by: string | null; version?: string; tables?: number; canWrite?: boolean; error?: string };
 type Env = {
-  id: string; name: string; kind: Kind; engine: Engine; urlEnc: Box;
-  host: string; port: number; database: string; user: string;
-  updatedAt: string; updatedBy: string | null; lastTest?: LastTest | null;
+  id: string;
+  name: string;
+  kind: Kind;
+  engine: Engine;
+  urlEnc: Box;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  updatedAt: string;
+  updatedBy: string | null;
+  lastTest?: LastTest | null;
 };
 
 // What runs before each test run, against the Test database: nothing, a SQL file from the repository, or an npm script.
-export const SETUP_KINDS = { none: 'Nothing', sql: 'Run a SQL file from the repository', npm: 'Run an npm script (on this computer)' } as const;
+export const SETUP_KINDS = {
+  none: 'Nothing',
+  sql: 'Run a SQL file from the repository',
+  npm: 'Run an npm script (on this computer)',
+} as const;
 type Setup = { kind: keyof typeof SETUP_KINDS; value: string; updatedAt?: string; updatedBy?: string | null };
 type Saved = { envs: Env[]; setup?: Setup };
 
@@ -44,7 +57,8 @@ async function load(projectId: string): Promise<Saved> {
   return Array.isArray(v?.envs) ? v : { envs: [] };
 }
 const save = async (projectId: string, v: Saved) => {
-  if (v.envs.length || (v.setup && v.setup.kind !== 'none')) await setMeta(KEY(projectId), v); else await deleteMeta(KEY(projectId));
+  if (v.envs.length || (v.setup && v.setup.kind !== 'none')) await setMeta(KEY(projectId), v);
+  else await deleteMeta(KEY(projectId));
 };
 
 /** What the browser may see: everything but the connection string. */
@@ -57,7 +71,11 @@ async function checkReachable(engine: Engine, host: string) {
   if (!isSaas()) return;
   // A SQLite file would be a file on the hosted service's own disk.
   if (engine === 'sqlite') throw fail(400, 'SQLite files can be connected only when TicketForge runs on your own computer or server.');
-  if (await isPrivateHost(host)) throw fail(400, `${host} is a private or internal address. On the hosted service, connect a database that’s reachable on the internet.`);
+  if (await isPrivateHost(host))
+    throw fail(
+      400,
+      `${host} is a private or internal address. On the hosted service, connect a database that’s reachable on the internet.`,
+    );
 }
 const engineOf = (v: any): Engine => (v && v in ENGINE_LABELS ? v : 'postgres');
 
@@ -70,9 +88,12 @@ export async function saveEnv(projectId: string, input: any, actor: any) {
     if (v.envs.length >= MAX_ENVS) throw fail(400, `A project can have up to ${MAX_ENVS} database connections.`);
     await checkPerProject('dbConnections', v.envs.length);
   }
-  const name = String(input.name ?? cur?.name ?? '').trim().slice(0, 60);
+  const name = String(input.name ?? cur?.name ?? '')
+    .trim()
+    .slice(0, 60);
   if (!name) throw fail(400, 'Give the connection a name, like “Test”.');
-  if (v.envs.some((e) => e.id !== cur?.id && e.name.toLowerCase() === name.toLowerCase())) throw fail(400, `There’s already a connection called “${name}”.`);
+  if (v.envs.some((e) => e.id !== cur?.id && e.name.toLowerCase() === name.toLowerCase()))
+    throw fail(400, `There’s already a connection called “${name}”.`);
   const kind = (input.kind ?? cur?.kind) as Kind;
   if (!(kind in KINDS)) throw fail(400, 'Choose Test, Staging or Production.');
   const engine = (input.engine ?? cur?.engine ?? 'postgres') as Engine;
@@ -80,19 +101,31 @@ export async function saveEnv(projectId: string, input: any, actor: any) {
   const url = String(input.url ?? '').trim();
   if (!url && !cur) throw fail(400, 'Paste the connection string.');
   // A different engine needs a connection string of its own.
-  if (!url && cur && engineOf(cur.engine) !== engine && !(['postgres', 'supabase'].includes(engine) && ['postgres', 'supabase'].includes(engineOf(cur.engine)))) {
-    throw fail(400, `Paste the ${ENGINE_LABELS[engine]} connection string too: the saved one is for ${ENGINE_LABELS[engineOf(cur.engine)]}.`);
+  if (
+    !url &&
+    cur &&
+    engineOf(cur.engine) !== engine &&
+    !(['postgres', 'supabase'].includes(engine) && ['postgres', 'supabase'].includes(engineOf(cur.engine)))
+  ) {
+    throw fail(
+      400,
+      `Paste the ${ENGINE_LABELS[engine]} connection string too: the saved one is for ${ENGINE_LABELS[engineOf(cur.engine)]}.`,
+    );
   }
   if (url.length > 2000) throw fail(400, 'That connection string is too long.');
   const parts = url ? parseDbUrl(engine, url) : null;
   await checkReachable(engine, parts?.host ?? cur!.host);
   const env: Env = {
-    id: cur?.id || crypto.randomUUID().slice(0, 8), name, kind, engine,
+    id: cur?.id || crypto.randomUUID().slice(0, 8),
+    name,
+    kind,
+    engine,
     urlEnc: url ? encrypt(url) : cur!.urlEnc,
     ...(parts || { host: cur!.host, port: cur!.port, database: cur!.database, user: cur!.user }),
-    updatedAt: new Date().toISOString(), updatedBy: actor?.name || null,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor?.name || null,
     // A new address hasn't been tested yet.
-    lastTest: url ? null : cur?.lastTest ?? null,
+    lastTest: url ? null : (cur?.lastTest ?? null),
   };
   v.envs = cur ? v.envs.map((e) => (e.id === cur.id ? env : e)) : [...v.envs, env];
   await save(projectId, v);
@@ -121,23 +154,41 @@ export async function getMine(projectId: string, userId: string) {
 export async function setMine(projectId: string, url: string, actor: any, engineIn = 'postgres') {
   if (!actor?.id) throw fail(401, 'Sign in to continue.');
   const u = String(url || '').trim();
-  if (!u) { await deleteMeta(MINE_KEY(projectId, actor.id)); return null; }
+  if (!u) {
+    await deleteMeta(MINE_KEY(projectId, actor.id));
+    return null;
+  }
   if (u.length > 2000) throw fail(400, 'That connection string is too long.');
   const engine = engineOf(engineIn);
   const parts = parseDbUrl(engine, u);
   await checkReachable(engine, parts.host);
-  const env: Env = { id: MINE, name: 'Your own', kind: 'test', engine, urlEnc: encrypt(u), ...parts, updatedAt: new Date().toISOString(), updatedBy: actor.name || null, lastTest: null };
+  const env: Env = {
+    id: MINE,
+    name: 'Your own',
+    kind: 'test',
+    engine,
+    urlEnc: encrypt(u),
+    ...parts,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor.name || null,
+    lastTest: null,
+  };
   await setMeta(MINE_KEY(projectId, actor.id), env);
   return view(env);
 }
 
 /** A saved connection, or this person's own one for id 'mine'. */
 async function findConn(projectId: string, id: string, userId = ''): Promise<Env | null> {
-  const found = id === MINE ? (userId ? await getMeta(MINE_KEY(projectId, userId)) : null) : (await load(projectId)).envs.find((e) => e.id === id);
+  const found =
+    id === MINE ? (userId ? await getMeta(MINE_KEY(projectId, userId)) : null) : (await load(projectId)).envs.find((e) => e.id === id);
   return found?.urlEnc ? { ...found, engine: engineOf(found.engine) } : null;
 }
 const openUrl = (env: Env) => {
-  try { return decrypt(env.urlEnc); } catch { throw fail(400, `The saved connection string of ${env.name} can’t be read any more (the encryption key changed). Paste it again.`); }
+  try {
+    return decrypt(env.urlEnc);
+  } catch {
+    throw fail(400, `The saved connection string of ${env.name} can’t be read any more (the encryption key changed). Paste it again.`);
+  }
 };
 
 /**
@@ -150,8 +201,16 @@ export async function testDatabase(projectId: string, userId: string, { local = 
   const env = mine || (await load(projectId)).envs.find((e) => e.kind === 'test') || null;
   if (!env) return null;
   const engine = engineOf(env.engine);
-  return { url: openUrl(env), id: env.id, engine, engineLabel: ENGINE_LABELS[engine], placeholder: PLACEHOLDER[engine],
-    name: env.id === MINE ? 'your own database' : `the ${env.name} database`, host: env.host || 'this computer', database: env.database };
+  return {
+    url: openUrl(env),
+    id: env.id,
+    engine,
+    engineLabel: ENGINE_LABELS[engine],
+    placeholder: PLACEHOLDER[engine],
+    name: env.id === MINE ? 'your own database' : `the ${env.name} database`,
+    host: env.host || 'this computer',
+    database: env.database,
+  };
 }
 
 // ---------------------------------------------------------------- before each test run
@@ -164,7 +223,8 @@ export async function saveSetup(projectId: string, input: any, actor: any) {
   const kind = String(input.kind || 'none') as Setup['kind'];
   if (!(kind in SETUP_KINDS)) throw fail(400, 'Choose what runs before each test run.');
   const value = String(input.value || '').trim();
-  if (kind === 'sql' && !/^[\w@./ -]{1,300}\.sql$/i.test(value)) throw fail(400, 'Enter the path of a .sql file in the repository, like db/seed.sql.');
+  if (kind === 'sql' && !/^[\w@./ -]{1,300}\.sql$/i.test(value))
+    throw fail(400, 'Enter the path of a .sql file in the repository, like db/seed.sql.');
   if (kind === 'sql' && value.split('/').includes('..')) throw fail(400, 'Use a path inside the repository.');
   if (kind === 'npm' && !/^[\w:.-]{1,100}$/.test(value)) throw fail(400, 'Enter the name of a script in package.json, like db:reset.');
   const v = await load(projectId);
@@ -192,7 +252,8 @@ function explain(e: any, env: Env) {
     ESOCKET: `the connection to ${where} failed. Check the host, the port and any firewall.`,
   };
   if (why[e?.code]) return `Couldn’t connect: ${why[e.code]}`;
-  if (/timeout|timed out/i.test(e?.message || '')) return `Couldn’t connect: the connection to ${where} timed out. Check the host, the port and any firewall.`;
+  if (/timeout|timed out/i.test(e?.message || ''))
+    return `Couldn’t connect: the connection to ${where} timed out. Check the host, the port and any firewall.`;
   return `Couldn’t connect: ${e?.message || String(e)}`;
 }
 
@@ -200,17 +261,35 @@ function explain(e: any, env: Env) {
  * Opens one of the project's connections (or the person's own, id 'mine') and runs `fn` with it. Read-only unless
  * `write`, which is allowed for Test databases only. Throws a 400 with a plain explanation when it can't connect.
  */
-export async function withClient<T>(projectId: string, id: string, fn: (conn: any, env: ReturnType<typeof view>) => Promise<T>,
-  { timeoutMs = TEST_TIMEOUT_MS, purpose = 'connection test', userId = '', write = false } = {}) {
+export async function withClient<T>(
+  projectId: string,
+  id: string,
+  fn: (conn: any, env: ReturnType<typeof view>) => Promise<T>,
+  { timeoutMs = TEST_TIMEOUT_MS, purpose = 'connection test', userId = '', write = false } = {},
+) {
   const env = await findConn(projectId, id, userId);
-  if (!env) throw fail(404, id === MINE ? 'You haven’t set up your own database for this project.' : 'That connection was removed. Refresh the page.');
-  if (write && env.kind !== 'test') throw fail(400, `${env.name} is a ${KINDS[env.kind]} database: TicketForge only writes to Test databases.`);
+  if (!env)
+    throw fail(
+      404,
+      id === MINE ? 'You haven’t set up your own database for this project.' : 'That connection was removed. Refresh the page.',
+    );
+  if (write && env.kind !== 'test')
+    throw fail(400, `${env.name} is a ${KINDS[env.kind]} database: TicketForge only writes to Test databases.`);
   await checkReachable(env.engine, env.host);
   const url = openUrl(env);
   let conn: any;
-  try { conn = await openDb(env.engine, url, { readOnly: !write, timeoutMs, purpose }); } catch (e: any) { throw fail(400, hideUrl(explain(e, env), url)); }
-  try { return await fn(conn, view(env)); } catch (e: any) { throw e?.status ? e : fail(400, hideUrl(explain(e, env).replace('Couldn’t connect', 'The database refused the request'), url)); }
-  finally { await conn.close(); }
+  try {
+    conn = await openDb(env.engine, url, { readOnly: !write, timeoutMs, purpose });
+  } catch (e: any) {
+    throw fail(400, hideUrl(explain(e, env), url));
+  }
+  try {
+    return await fn(conn, view(env));
+  } catch (e: any) {
+    throw e?.status ? e : fail(400, hideUrl(explain(e, env).replace('Couldn’t connect', 'The database refused the request'), url));
+  } finally {
+    await conn.close();
+  }
 }
 
 /**
@@ -221,7 +300,15 @@ export async function testEnv(projectId: string, id: string, actor: any) {
   const result: LastTest = { ok: false, at: new Date().toISOString(), by: actor?.name || null };
   let env: any = null;
   try {
-    const r = await withClient(projectId, id, async (conn, e) => { env = e; return conn.describe(); }, { userId: actor?.id || '' });
+    const r = await withClient(
+      projectId,
+      id,
+      async (conn, e) => {
+        env = e;
+        return conn.describe();
+      },
+      { userId: actor?.id || '' },
+    );
     Object.assign(result, { ok: true, version: r.version, tables: r.tables, canWrite: r.canWrite });
   } catch (e: any) {
     if (e?.status === 404) throw e;
@@ -235,16 +322,24 @@ export async function testEnv(projectId: string, id: string, actor: any) {
   }
   const latest = await load(projectId);
   const target = latest.envs.find((e) => e.id === id);
-  if (target && (!env || (target.host === env.host && target.updatedAt === env.updatedAt))) { target.lastTest = result; await save(projectId, latest); }
+  if (target && (!env || (target.host === env.host && target.updatedAt === env.updatedAt))) {
+    target.lastTest = result;
+    await save(projectId, latest);
+  }
   return { ...(env || view(target!)), lastTest: result };
 }
 
 /** Reads the app's schema (tables, columns, keys, relations, indexes and enums), never rows. See lib/dbschema.ts. */
 export async function readSchema(projectId: string, envId: string, userId = '') {
-  return withClient(projectId, envId, async (conn, env) => {
-    const { tables, enums } = await conn.schema();
-    return { source: { type: 'database' as const, envId: env.id, name: env.name, kind: env.kind, engine: env.engine }, tables, enums };
-  }, { timeoutMs: 20000, purpose: 'schema read', userId });
+  return withClient(
+    projectId,
+    envId,
+    async (conn, env) => {
+      const { tables, enums } = await conn.schema();
+      return { source: { type: 'database' as const, envId: env.id, name: env.name, kind: env.kind, engine: env.engine }, tables, enums };
+    },
+    { timeoutMs: 20000, purpose: 'schema read', userId },
+  );
 }
 
 /** Runs a SQL file on a Test database in one transaction (the test setup step). */

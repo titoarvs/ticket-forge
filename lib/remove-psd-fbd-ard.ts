@@ -32,20 +32,50 @@ export async function survey(q: Query) {
   const counts: Counts = {};
   const kinds: Record<string, string[]> = {};
   for (const t of ['drive_docs', 'epic_doc_comments', 'epic_doc_reviews', 'epic_doc_versions']) {
-    if (!(await exists(q, t))) { counts[t] = 0; kinds[t] = []; continue; }
+    if (!(await exists(q, t))) {
+      counts[t] = 0;
+      kinds[t] = [];
+      continue;
+    }
     kinds[t] = (await q(`select distinct kind from ${t} order by kind`)).rows.map((r) => r.kind);
     counts[t] = Number((await q(`select count(*)::int as n from ${t} where kind = any($1)`, [KINDS])).rows[0].n);
   }
   counts.files = (await exists(q, 'epic_doc_versions'))
-    ? Number((await q(`select count(*)::int as n from files f where exists (select 1 from epic_doc_versions v
-        where v.kind = any($1) and v.project_id = f.project_id and v.file_id = f.id)`, [KINDS])).rows[0].n) : 0;
-  counts.doc_templates = (await exists(q, 'doc_templates')) ? Number((await q('select count(*)::int as n from doc_templates where key ~ $1', [TEMPLATE_KEY])).rows[0].n) : 0;
-  counts.epics = Number((await q(`select count(*)::int as n from projects p, jsonb_array_elements(coalesce(p.data->'epics', '[]'::jsonb)) e
-    where e ?| $1`, [KINDS])).rows[0].n);
-  counts.brain_notes = (await exists(q, 'brain_notes')) ? Number((await q(`select count(*)::int as n from brain_notes
-    where kind = 'auto' and (type in ('doc', 'decision') or (type = 'question' and tags ? 'open-decision'))`)).rows[0].n) : 0;
-  counts.ai_cache = (await exists(q, 'ai_cache')) ? Number((await q("select count(*)::int as n from ai_cache where task = 'docs'")).rows[0].n) : 0;
-  const done = (await exists(q, 'schema_migrations')) && (await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length > 0;
+    ? Number(
+        (
+          await q(
+            `select count(*)::int as n from files f where exists (select 1 from epic_doc_versions v
+        where v.kind = any($1) and v.project_id = f.project_id and v.file_id = f.id)`,
+            [KINDS],
+          )
+        ).rows[0].n,
+      )
+    : 0;
+  counts.doc_templates = (await exists(q, 'doc_templates'))
+    ? Number((await q('select count(*)::int as n from doc_templates where key ~ $1', [TEMPLATE_KEY])).rows[0].n)
+    : 0;
+  counts.epics = Number(
+    (
+      await q(
+        `select count(*)::int as n from projects p, jsonb_array_elements(coalesce(p.data->'epics', '[]'::jsonb)) e
+    where e ?| $1`,
+        [KINDS],
+      )
+    ).rows[0].n,
+  );
+  counts.brain_notes = (await exists(q, 'brain_notes'))
+    ? Number(
+        (
+          await q(`select count(*)::int as n from brain_notes
+    where kind = 'auto' and (type in ('doc', 'decision') or (type = 'question' and tags ? 'open-decision'))`)
+        ).rows[0].n,
+      )
+    : 0;
+  counts.ai_cache = (await exists(q, 'ai_cache'))
+    ? Number((await q("select count(*)::int as n from ai_cache where task = 'docs'")).rows[0].n)
+    : 0;
+  const done =
+    (await exists(q, 'schema_migrations')) && (await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length > 0;
   return { counts, kinds, done };
 }
 
@@ -59,18 +89,26 @@ export async function removePsdFbdArd(q: Query): Promise<{ skipped: boolean; cou
   if ((await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length) return { skipped: true, counts: {} };
   const counts: Counts = {};
   if (await exists(q, 'drive_docs')) counts.drive_docs = n(await q('delete from drive_docs where kind = any($1)', [KINDS]));
-  if (await exists(q, 'epic_doc_comments')) counts.epic_doc_comments = n(await q('delete from epic_doc_comments where kind = any($1)', [KINDS]));
-  if (await exists(q, 'epic_doc_reviews')) counts.epic_doc_reviews = n(await q('delete from epic_doc_reviews where kind = any($1)', [KINDS]));
+  if (await exists(q, 'epic_doc_comments'))
+    counts.epic_doc_comments = n(await q('delete from epic_doc_comments where kind = any($1)', [KINDS]));
+  if (await exists(q, 'epic_doc_reviews'))
+    counts.epic_doc_reviews = n(await q('delete from epic_doc_reviews where kind = any($1)', [KINDS]));
   if (await exists(q, 'epic_doc_versions')) {
     // The uploaded files first, while the versions still say which ones they are.
-    counts.files = n(await q(`delete from files f using epic_doc_versions v
-      where v.kind = any($1) and v.project_id = f.project_id and v.file_id = f.id`, [KINDS]));
+    counts.files = n(
+      await q(
+        `delete from files f using epic_doc_versions v
+      where v.kind = any($1) and v.project_id = f.project_id and v.file_id = f.id`,
+        [KINDS],
+      ),
+    );
     counts.epic_doc_versions = n(await q('delete from epic_doc_versions where kind = any($1)', [KINDS]));
   }
   if (await exists(q, 'doc_templates')) counts.doc_templates = n(await q('delete from doc_templates where key ~ $1', [TEMPLATE_KEY]));
   // Each epic without its psd, fbd and ard, in the same order. The project gets a new version (and the epics section
   // its revision), so open browsers and running servers read the project again.
-  const projects = await q(`update projects p set
+  const projects = await q(
+    `update projects p set
       data = jsonb_set(p.data, '{epics}', (select coalesce(jsonb_agg(e - 'psd' - 'fbd' - 'ard' order by i), '[]'::jsonb)
         from jsonb_array_elements(p.data->'epics') with ordinality as x(e, i))),
       version = p.version + 1,
@@ -78,11 +116,15 @@ export async function removePsdFbdArd(q: Query): Promise<{ skipped: boolean; cou
       updated_at = now()
     where jsonb_typeof(p.data->'epics') = 'array'
       and exists (select 1 from jsonb_array_elements(p.data->'epics') e where e ?| $1)
-    returning p.id`, [KINDS]);
+    returning p.id`,
+    [KINDS],
+  );
   counts.projects = n(projects);
   if (await exists(q, 'brain_notes')) {
-    counts.brain_notes = n(await q(`delete from brain_notes where kind = 'auto'
-      and (type in ('doc', 'decision') or (type = 'question' and tags ? 'open-decision'))`));
+    counts.brain_notes = n(
+      await q(`delete from brain_notes where kind = 'auto'
+      and (type in ('doc', 'decision') or (type = 'question' and tags ? 'open-decision'))`),
+    );
   }
   if (await exists(q, 'ai_cache')) counts.ai_cache = n(await q("delete from ai_cache where task = 'docs'"));
   await q('insert into schema_migrations (id) values ($1)', [MIGRATION_ID]);
