@@ -565,6 +565,39 @@ const hasLocalChanges = () => Boolean(P() && diff(snapshotOf(P())));
 export function setSaveText(t: string) { S.saveText = t; emit(); }
 export function scheduleSave() { clearTimeout(S.saveTimer); S.saveText = 'Saving…'; S.saveTimer = setTimeout(saveNow, 700); }
 
+// Quick edits (assignee, story points, priority on a card or row) save at once instead of waiting for the delay, and
+// if the save fails the field goes back to what it was. Each edit remembers the value before it (S.rollbacks) until
+// the save that holds it succeeds; `seq` is the change count at the time, so a save only answers for edits up to its own.
+S.rollbacks = [] as { id: string; field: string; prev: Any; updatedAt: string; history: Any[]; seq: number }[];
+/** Sets one field on several issues, saves right away and, if the save fails, restores each previous value. */
+export function editField(list: Any[], field: string, value: Any) {
+  const changed = list.filter((t) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null));
+  if (!changed.length) return Promise.resolve();
+  // The issue as it was (value, update time and history, whose last entry can be edited in place), to put back exactly.
+  const prev = changed.map((t) => { const h = t.history || []; return { id: t.id, prev: t[field], updatedAt: t.updatedAt, history: h.map((x: Any, i: number) => (i === h.length - 1 ? { ...x } : x)) }; });
+  mutate(() => changed.forEach((t) => setField(t, field, value)), { tag: changed.length === 1 ? `t.${field}${changed[0].id}` : '' });
+  for (const r of prev) S.rollbacks.push({ ...r, field, seq: S.mutSeq });
+  return saveNow();
+}
+/** A save up to change `seq` failed: put back the value each edited field had before its first edit in that save. */
+function rollBack(seq: number) {
+  const failed = S.rollbacks.filter((r: Any) => r.seq <= seq);
+  if (!failed.length) return;
+  const undone = new Set<string>();
+  for (const r of failed) {
+    const k = `${r.id}|${r.field}`;
+    if (undone.has(k)) continue; // a later edit of the same field is dropped with it
+    undone.add(k);
+    const t = ticket(r.id);
+    if (t) { t[r.field] = r.prev; t.updatedAt = r.updatedAt; t.history = r.history; }
+  }
+  S.rollbacks = S.rollbacks.filter((r: Any) => !undone.has(`${r.id}|${r.field}`));
+  S.mutSeq += 1; S.dataRev += 1;
+  emit();
+}
+/** A save up to change `seq` went through: those edits are final. */
+const settleEdits = (seq: number) => { S.rollbacks = S.rollbacks.filter((r: Any) => r.seq > seq); };
+
 /** Same clean-up as ensureProject, for one issue arriving from the server. */
 function ensureTicket(t: Any, p: Any) {
   t.comments ??= []; t.history ??= []; t.links ??= []; t.prs ??= []; t.labels ??= []; t.acceptanceCriteria ??= [];
@@ -648,7 +681,7 @@ export async function saveNow() {
   const snap = snapshotOf(p);
   const seq = S.mutSeq;
   const patch = diff(snap);
-  if (!patch) { S.base = snap; S.baseSeq = seq; setSaveText('Saved'); return; }
+  if (!patch) { S.base = snap; S.baseSeq = seq; settleEdits(seq); setSaveText('Saved'); return; }
   S.saving = true;
   const before = p.version;
   let again = false;
@@ -657,6 +690,7 @@ export async function saveNow() {
     if (P() !== p) return;
     S.base = snap;
     S.baseSeq = seq;
+    settleEdits(seq);
     for (const [id, r] of Object.entries(res.revs?.issues || {})) S.revs.issues[id] = r as number;
     for (const [k, r] of Object.entries(res.revs?.meta || {})) S.revs.meta[k] = r as number;
     for (const id of patch.remove) delete S.revs.issues[id];
@@ -681,6 +715,7 @@ export async function saveNow() {
       again = true;
     } else {
       saveTries = 0;
+      if (P() === p) rollBack(seq);
       setSaveText('Save failed');
       toast(`Not saved: ${e.message}`, 'err');
       if (/permission/i.test(e.message)) { S.saving = false; await pullRemote({ force: true }); }

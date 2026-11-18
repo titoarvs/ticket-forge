@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type KeyboardEvent as RKeyboardEvent } from 'react';
 import {
   S, emit, P, ticket, epic, isSub, openSprints, statusNames, allowedStatuses, canMove, sCls, setField, mutate, deleteIssues, peopleNames, me, can,
-  toast, openModal, undo, copyText, PRIORITIES, releases, release, type Any,
+  toast, openModal, undo, copyText, PRIORITIES, releases, release, editField, type Any,
 } from './core';
 import { Ico, I, PriorityIcon, Avatar, Swatch, Confirm } from './ui';
 import { openDrawer, duplicateIssue } from './actions';
@@ -47,10 +47,12 @@ const cellProps = (label: string, kind: PopKind, t: Any) => ({
 function report(ids: string[], what: string) {
   if (ids.length > 1) toast(`${plural(ids.length, 'issue')} ${what}`, 'ok', { action: { label: 'Undo', onClick: undo } });
 }
-function setFieldFor(ids: string[], field: string, value: Any, what: string) {
+/** `now`: save at once and put the old value back if the save fails (assignee, story points and priority). */
+function setFieldFor(ids: string[], field: string, value: Any, what: string, now = false) {
   const list = ids.map(ticket).filter((t: Any) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null));
   if (!list.length) return;
-  mutate(() => list.forEach((t: Any) => setField(t, field, value)), { tag: ids.length === 1 ? `t.${field}${ids[0]}` : '' });
+  if (now) editField(list, field, value);
+  else mutate(() => list.forEach((t: Any) => setField(t, field, value)), { tag: ids.length === 1 ? `t.${field}${ids[0]}` : '' });
   report(list.map((t: Any) => t.id), what);
 }
 export function setStatusFor(ids: string[], to: string) {
@@ -61,9 +63,9 @@ export function setStatusFor(ids: string[], to: string) {
   if (skipped) toast(`${plural(ok.length, 'issue')} moved to ${to}. ${skipped} skipped: the workflow doesn’t allow moving ${skipped === 1 ? 'it' : 'them'} to ${to} from ${skipped === 1 ? 'its' : 'their'} current status.`, 'warn');
   else report(ok.map((t: Any) => t.id), `moved to ${to}`);
 }
-export const assignTo = (ids: string[], name: string) => setFieldFor(ids, 'assignee', name, name ? `assigned to ${name}` : 'unassigned');
-export const setPoints = (ids: string[], v: number | null) => setFieldFor(ids, 'storyPoints', v, v === null ? 'estimate cleared' : `estimated at ${v} points`);
-export const setPriority = (ids: string[], v: string) => setFieldFor(ids, 'priority', v, `set to ${v} priority`);
+export const assignTo = (ids: string[], name: string) => setFieldFor(ids, 'assignee', name, name ? `assigned to ${name}` : 'unassigned', true);
+export const setPoints = (ids: string[], v: number | null) => setFieldFor(ids, 'storyPoints', v, v === null ? 'estimate cleared' : `estimated at ${v} points`, true);
+export const setPriority = (ids: string[], v: string) => setFieldFor(ids, 'priority', v, `set to ${v} priority`, true);
 export const setFlag = (ids: string[], on: boolean) => setFieldFor(ids, 'flagged', on || undefined, on ? 'flagged' : 'unflagged');
 export const setEpic = (ids: string[], epicId: string | null) => setFieldFor(ids.filter((id) => !isSub(ticket(id))), 'epicId', epicId, epicId ? `moved to ${epic(epicId)?.title}` : 'removed from their epic');
 
@@ -178,17 +180,19 @@ function AssigneeList({ ids }: { ids: string[] }) {
 function PointsEditor({ ids }: { ids: string[] }) {
   const one = ids.length === 1 ? ticket(ids[0]) : null;
   const [v, setV] = useState(one?.storyPoints != null ? String(one.storyPoints) : '');
-  const n = v.trim() === '' ? null : Number(v);
-  const bad = n !== null && (!Number.isFinite(n) || n < 0 || n > 999);
+  // Any positive number (a free value, not a fixed scale). A text box, so a wrong entry can be shown and explained.
+  const t = v.trim();
+  const bad = t !== '' && !(/^\d+(\.\d+)?$/.test(t) && Number(t) > 0);
+  const n = t === '' || bad ? null : Number(t);
   const save = (x: number | null) => { closePop(); setPoints(ids, x); };
   return <div className="pop-points">
     <label className="pop-h" htmlFor="pop-sp">Story point estimate{ids.length > 1 ? ` · ${plural(ids.length, 'issue')}` : ''}</label>
     <div className="row" style={{ gap: 6 }}>
-      <input id="pop-sp" className="pop-input" type="number" inputMode="decimal" min={0} max={999} step="any" autoFocus value={v} placeholder="None"
-        onFocus={(e) => e.target.select()} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !bad) { e.preventDefault(); save(n); } }} aria-invalid={bad} />
+      <input id="pop-sp" className="pop-input" type="text" inputMode="decimal" autoComplete="off" autoFocus value={v} placeholder="None"
+        onFocus={(e) => e.target.select()} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (!bad) save(n); } }} aria-invalid={bad} aria-describedby={bad ? 'pop-sp-err' : undefined} />
       <button className="btn sm primary" disabled={bad} onClick={() => save(n)}>Save</button>
     </div>
-    {bad && <p className="pop-note err">Enter a number from 0 to 999.</p>}
+    {bad && <p id="pop-sp-err" className="pop-note err" role="alert">Enter a positive number, for example 13.</p>}
     <div className="sp-quick" role="group" aria-label="Common estimates">{POINTS.map((p) => <button key={p} className={one?.storyPoints === p ? 'on' : ''} onClick={() => save(p)}>{p}</button>)}</div>
     {(one ? one.storyPoints != null : true) && <button className="btn sm subtle" style={{ marginTop: 6 }} onClick={() => save(null)}>Clear estimate</button>}
   </div>;

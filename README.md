@@ -137,7 +137,10 @@ All settings live in `.env` (see `.env.example`):
    - **Board / Active sprint** (Jira-style): one column per workflow status with sticky headers; drag cards to
      change status; swimlanes by epic or assignee (collapsible); collapse columns to a narrow strip; column limits
      (the header turns red when a column has too many issues); **Create issue** at the bottom of a column; days
-     remaining; switch to all issues. On a phone the columns scroll sideways one at a time.
+     remaining; switch to all issues. Change a card's **assignee**, **story points** (any positive number) and
+     **priority** right on the card: it saves at once, and if the save fails the old value comes back with an error
+     message. Changing an assignee or priority sends an in-app notification to the assignee only. On a tablet or
+     phone the board shows one column at a time, with a tab per column, so nothing scrolls sideways.
    - **Epics**: progress bars per epic; create, rename, recolour or delete; **Re-organize with Claude**.
    - **Problem Statement (PSD) per epic**: in the epic panel (or **Write missing PSDs** on the Epics page) the AI
      writes the feature's Problem Statement in your template's sections: At a Glance, Background and Current
@@ -1357,8 +1360,9 @@ The Model routing page shows reused answers and the tokens read from cache.
 ### Backlog: Jira-style actions
 
 Every backlog row works like Jira's: click the field you want to change and pick from a small popup.
-- **Status**, **assignee** (search, *Assign to me*, *Unassigned*), **story points** (type a number or pick 1, 2, 3, 5,
-  8, 13, 21; *Clear estimate*) and **priority**, right on the row. Only the statuses the workflow allows are offered.
+- **Status**, **assignee** (search, *Assign to me*, *Unassigned*), **story points** (type any positive number or pick
+  1, 2, 3, 5, 8, 13, 21; *Clear estimate*) and **priority**, right on the row. Assignee, points and priority save at
+  once and go back to their old value, with an error message, if the save fails. Only the statuses the workflow allows are offered.
 - **"…" or right-click** a row: move it to the top or bottom of the backlog or to a sprint, assign to me, unassign,
   change status, points, priority or epic, add or remove a **flag** (flagged issues are highlighted, as in Jira),
   open, copy the issue link or key, duplicate, delete.

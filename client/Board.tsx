@@ -1,21 +1,35 @@
 'use client';
 // Board (Jira-style): one column per workflow status, with sticky column headers, column limits, collapsible
-// columns, swimlanes by epic or assignee, and quick create. On narrow screens the columns scroll sideways and
-// snap one at a time. With custom transitions, columns an issue can't move to are greyed out while dragging.
-import { memo, useState } from 'react';
+// columns, swimlanes by epic or assignee, and quick create. Assignee, story points and priority can be changed on the
+// card itself (the same popups as the backlog rows; they save at once and go back if the save fails). On tablets and
+// phones the board shows one column at a time with a tab for each, so nothing scrolls sideways. With custom
+// transitions, columns an issue can't move to are greyed out while dragging.
+import { memo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   S, emit, P, epic, isSub, ticket, isBlocked, activeSprint, catOf, wCls, statusColor, statusOf, isDone, can, filtered, filtersActive, saveUi, mutate,
   newTicket, toast, openModal, EMPTY_FILTER, type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, EmptyState } from './ui';
+import { Ico, I, TypeIcon, Avatar, ELoz, EmptyState } from './ui';
 import { openDrawer, CompleteSprintModal } from './actions';
 import { SF, MenuItem } from './fields';
 import { Header, FilterBar, daysLeft, rowDnd, zoneDnd } from './views';
-import { rowContextMenu } from './RowActions';
+import { rowContextMenu, AssigneeCell, PointsCell, PriorityCell } from './RowActions';
 import { CodeChip, codeSig } from './codeStatus';
 
 const COLLAPSED_W = 44;
+
+/** True on tablets and phones (the width where the issue panel becomes an overlay). */
+function useNarrow() {
+  const [n, setN] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia('(max-width: 960px)');
+    const on = () => setN(m.matches);
+    on(); m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return n;
+}
 
 const PRIORITY_TAG: Record<string, [string, string]> = { Highest: ['Urgent', 'pt-urgent'], High: ['High priority', 'pt-high'], Medium: ['Medium', 'pt-medium'], Low: ['Low priority', 'pt-low'] };
 const CAT_COLOR: Record<string, string> = { todo: 'var(--text-subtlest)', inprogress: 'var(--brand)', done: '#22c55e' };
@@ -35,7 +49,7 @@ const Card = memo(function Card({ t, showEpic, zoneKey, active, v, kidsDone, kid
   const color = statusColor(statusOf(t.status)) || CAT_COLOR[cat];
   return (
     <div className={`bcard ${active ? 'active' : ''} ${done ? 'is-done' : ''} ${t.flagged ? 'flagged' : ''}`} style={{ ['--pc' as string]: color }} role="button" tabIndex={0} aria-label={`${t.key} ${t.title}`}
-      onClick={() => openDrawer('issue', t.id)} onContextMenu={(ev) => rowContextMenu(ev, t)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openDrawer('issue', t.id); } }} {...rowDnd(t, zone)}>
+      onClick={() => openDrawer('issue', t.id)} onContextMenu={(ev) => rowContextMenu(ev, t)} onKeyDown={(ev) => { if (ev.target === ev.currentTarget && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openDrawer('issue', t.id); } }} {...rowDnd(t, zone)}>
       <div className="bcard-tags">
         {t.flagged && <span className="ptag pt-blocked" title="Flagged"><Ico svg={I.flag} />Flagged</span>}
         {pt && <span className={`ptag ${pt[1]}`}>{pt[0]}</span>}
@@ -50,15 +64,15 @@ const Card = memo(function Card({ t, showEpic, zoneKey, active, v, kidsDone, kid
         <div className="bcard-bar"><i style={{ width: `${Math.max(pct, 2)}%` }} /></div>
       </div>}
       <div className="foot">
-        <Avatar name={t.assignee} />
+        <AssigneeCell t={t} />
         <TypeIcon type={t.type} /><span className={`key ${done ? 'done' : ''}`}>{t.key}</span>
         <span className="right">
           <CodeChip t={t} />
           {t.prs.length > 0 && <span className="mini" title={`${t.prs.length} pull request${t.prs.length > 1 ? 's' : ''}`}><Ico svg={I.pr} />{t.prs.length}</span>}
           {t.comments?.length > 0 && <span className="mini" title={`${t.comments.length} comment${t.comments.length > 1 ? 's' : ''}`}><Ico svg={I.comment} />{t.comments.length}</span>}
           {tests > 0 && <span className="mini" title={`${passing} of ${tests} test cases passing`}><Ico svg={I.check} />{passing}/{tests}</span>}
-          {t.storyPoints != null && <span className="sp" title="Story points">{t.storyPoints}</span>}
-          <PriorityIcon p={t.priority} />
+          {(t.storyPoints != null || can('issue.edit')) && <PointsCell t={t} />}
+          <PriorityCell t={t} />
         </span>
       </div>
     </div>
@@ -96,9 +110,13 @@ export function Board() {
   const createOk = can('issue.create');
   const group = S.boardGroup;
 
-  // Column widths: collapsed columns are a narrow strip. Phones get one column at a time (see CSS).
-  const cols = wf.map((w) => (collapsed.has(w.id) ? `${COLLAPSED_W}px` : 'minmax(264px, 1fr)')).join(' ');
-  const colsSm = wf.map((w) => (collapsed.has(w.id) ? `${COLLAPSED_W}px` : 'min(84vw, 320px)')).join(' ');
+  // Tablets and phones: one column at a time, picked with the tabs above the board (collapsing doesn't apply there).
+  const narrow = useNarrow();
+  const tab: string = wf.some((w) => w.id === S.boardTab) ? S.boardTab : wf[0]?.id;
+  const shown = narrow ? wf.filter((w) => w.id === tab) : wf;
+  const isCollapsed = (id: string) => !narrow && collapsed.has(id);
+  // Column widths: collapsed columns are a narrow strip.
+  const cols = shown.map((w) => (narrow ? 'minmax(0, 1fr)' : isCollapsed(w.id) ? `${COLLAPSED_W}px` : 'minmax(264px, 1fr)')).join(' ');
 
   const byStatus = (items: Any[]) => { const m = new Map<string, Any[]>(wf.map((w) => [w.name, []])); for (const t of items) m.get(t.status)?.push(t); return m; };
   const all = byStatus(list);
@@ -140,20 +158,24 @@ export function Board() {
       <FilterBar status={false} group={{ value: group, options: [['none', 'None'], ['epic', 'Epic'], ['assignee', 'Assignee']], onChange: (v) => { S.boardGroup = v; saveUi(); emit(); } }} />
       {lanes.length > 1 && <button className="btn subtle sm board-lanes-toggle" onClick={() => { lanes.forEach((l) => (allCollapsed ? S.collapsed.delete(`lane:${l.id}`) : S.collapsed.add(`lane:${l.id}`))); saveUi(); emit(); }}>
         <Ico svg={allCollapsed ? I.expand : I.collapse} />{allCollapsed ? 'Expand all lanes' : 'Collapse all lanes'}</button>}
-      <div className="board-wrap" tabIndex={-1}>
-        <div className="board" style={{ ['--cols' as string]: cols, ['--cols-sm' as string]: colsSm }}>
+      {narrow && wf.length > 1 && <div className="board-tabs" role="tablist" aria-label="Board columns">
+        {wf.map((w) => <button key={w.id} role="tab" aria-selected={w.id === tab} className={`board-tab ${w.id === tab ? 'on' : ''}`} onClick={() => { S.boardTab = w.id; emit(); }}>
+          <span className={`dot-cat ${wCls(w)}`} /><span className="board-tab-name">{w.name}</span><span className="board-tab-n">{all.get(w.name)!.length}</span></button>)}
+      </div>}
+      <div className={`board-wrap ${narrow ? 'narrow' : ''}`} tabIndex={-1}>
+        <div className={`board ${narrow ? 'narrow' : ''}`} style={{ ['--cols' as string]: cols }}>
           {/* Column headers (sticky) */}
-          {wf.map((w) => {
+          {shown.map((w) => {
             const n = all.get(w.name)!.length;
             const over = w.wip && n > w.wip;
-            const c = collapsed.has(w.id);
+            const c = isCollapsed(w.id);
             return <div key={`h-${w.id}`} className={`bcol-h ${c ? 'collapsed' : ''} ${over ? 'over' : ''}`} data-drop-status={w.name} {...zoneDnd({ status: w.name })}>
               {c ? <button className="bcol-strip" onClick={() => toggleCol(w.id)} title={`Expand ${w.name}`} aria-label={`Expand column ${w.name} (${n} issues)`}>
                 <span className={`bcol-n ${over ? 'over' : ''}`}>{n}</span></button> : <>
                 <span className={`dot-cat ${wCls(w)}`} /><span className="bcol-name" title={w.name}>{w.name}</span>
                 <span className={`bcol-count ${over ? 'over' : ''}`} title={w.wip ? `${n} issues · column limit ${w.wip}` : `${n} issues`}>({n}{w.wip ? <span className="muted"> / {w.wip}</span> : null})</span>
                 {w.category === 'done' && <Ico svg={I.check} className="bcol-done" />}
-                <button className="icon-btn bcol-collapse" onClick={() => toggleCol(w.id)} title="Collapse column" aria-label={`Collapse column ${w.name}`}><Ico svg={I.chevron} /></button>
+                {!narrow && <button className="icon-btn bcol-collapse" onClick={() => toggleCol(w.id)} title="Collapse column" aria-label={`Collapse column ${w.name}`}><Ico svg={I.chevron} /></button>}
                 {createOk && lanes.some((l) => !S.collapsed.has(`lane:${l.id}`)) && <button className="icon-btn bcol-add" title={`Create issue in ${w.name}`} aria-label={`Create issue in ${w.name}`}
                   onClick={() => openCreate(w)}><Ico svg={I.plus} /></button>}</>}
             </div>;
@@ -166,10 +188,10 @@ export function Board() {
               l.title && <div key={`lh-${l.id}`} className={`lane-h ${closed ? 'closed' : ''}`}>
                 <button className="lane-toggle" aria-expanded={!closed} onClick={() => { if (closed) S.collapsed.delete(`lane:${l.id}`); else S.collapsed.add(`lane:${l.id}`); saveUi(); emit(); }}>
                   <Ico svg={I.chevron} />{l.title}<span className="muted small">{l.items.length} issue{l.items.length === 1 ? '' : 's'}</span></button></div>,
-              ...(closed ? [] : wf.map((w, wi) => {
+              ...(closed ? [] : shown.map((w, wi) => {
                 const zone = { status: w.name, ...l.zone };
                 const items = m.get(w.name)!;
-                const c = collapsed.has(w.id);
+                const c = isCollapsed(w.id);
                 const zk = JSON.stringify(zone);
                 return <div key={`${l.id}-${w.id}`} className={`bcol ${c ? 'collapsed' : ''} ${wi === 0 ? 'first' : ''} ${li === lanes.length - 1 ? 'last' : ''}`} data-drop-status={w.name} {...zoneDnd(zone)}>
                   {c && <button className="bcol-strip body" onClick={() => toggleCol(w.id)} title={`Expand ${w.name}`} aria-label={`Expand column ${w.name}`}>
