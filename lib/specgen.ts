@@ -5,6 +5,7 @@ import { askJson } from './claude';
 import { localReader } from './codebase';
 import { SERVERLESS, currentContext } from './db';
 import { cleanTouches, specPrompt } from './specs';
+import { schemaBlock } from './dbschema';
 
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 
@@ -36,7 +37,8 @@ export async function generateSpecs({ project, epic, ai = {} }: any) {
 say which repository files it will change or create, and which modules (a folder or logical area such as "lib/store" or "client/Versions") they belong to.
 Use real paths from the file list when one is given, otherwise follow the repository profile's structure and naming. Be specific:
 name the files the ticket really needs, not whole folders, and no more than 12 per ticket. When two tickets need the same file, list it for both.
-Return JSON only: { "items": [ { "key": "PR-1", "files": [ { "path": "lib/store.ts", "action": "modify|create", "why": "short reason" } ], "modules": ["lib/store"] } ] }`,
+Return JSON only: { "items": [ { "key": "PR-1", "files": [ { "path": "lib/store.ts", "action": "modify|create", "why": "short reason" } ], "modules": ["lib/store"] } ] }
+When a ticket needs a table or column the database schema doesn't have, include the migration file it will create.${schemaBlock(project)}`,
       prompt: `Project: ${project.name}
 Feature (epic): ${epic.key || ''} ${epic.title}${epic.description ? ` — ${clip(epic.description, 800)}` : ''}
 ${profile ? `\nRepository profile:\n${profile.slice(0, 6000)}\n` : ''}${files.length ? `\nRepository files:\n${files.join('\n')}\n` : ''}

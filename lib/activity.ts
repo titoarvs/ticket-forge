@@ -21,7 +21,7 @@ const LISTS = {
 };
 const TEST_LISTS = { tests: ['test', (x) => x.title || x.key], plans: ['test plan', (x) => x.name || x.title], executions: ['test execution', (x) => x.name || x.title], folders: ['folder', (x) => x.name] };
 const SETTINGS = { name: 'the project name', key: 'the project key', summary: 'the project summary', description: 'the project description', assumptions: 'the assumptions',
-  openQuestions: 'the open questions', automation: 'the test automation settings', appContext: 'the app context', flowMode: 'the workflow mode', sourceText: 'the source document' };
+  openQuestions: 'the open questions', automation: 'the test automation settings', appContext: 'the app context', dbSchema: 'the database schema', flowMode: 'the workflow mode', sourceText: 'the source document' };
 
 /** Special wording for state changes (start / complete a sprint, release a version, approve a test…). */
 function stateText(noun, label, a, b) {

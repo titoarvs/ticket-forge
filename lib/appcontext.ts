@@ -7,12 +7,19 @@ import { askAI } from './claude';
 import { codeInventory } from './codeinventory';
 import { readRepo, featureDocs } from './reposync';
 import { localReader } from './codebase';
+import { schemaBlock } from './dbschema';
 
 const clip = (s, n) => { const t = String(s ?? '').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 const CONTEXT_MAX = 12000;
 
-/** The block added to system prompts ('' when the project has no app context). Stable text: good for prompt caching. */
+/**
+ * The block added to system prompts: the app context, then the database schema (Project settings → Database), each
+ * left out when the project has none. Stable text: good for prompt caching.
+ */
 export function contextBlock(project, { short = false }: any = {}) {
+  return appContextBlock(project, { short }) + schemaBlock(project, { short });
+}
+function appContextBlock(project, { short = false }: any = {}) {
   let md = String(project?.appContext?.md || '').trim();
   // Light jobs (questions, failure notes, test selection) get the start of the brief only: what the app is, and its
   // users and roles. The rest is ~10k characters they rarely need.

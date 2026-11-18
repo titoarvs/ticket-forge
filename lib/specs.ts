@@ -1,6 +1,7 @@
 // Coding specs: the prompt written for each ticket of an epic, and the overlap check that keeps features coded in
 // parallel from touching the same files or modules. Pure functions (no database, no AI): lib/store.ts saves the specs,
 // lib/specgen.ts asks the AI which files a ticket will touch.
+import { tablesMentioned } from './dbschema';
 
 const OVERLAP_MODES = ['block', 'warn'];
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
@@ -47,6 +48,8 @@ export function cleanTouches(raw) {
  */
 export function specPrompt({ project, epic, ticket, subtasks = [], files = [], modules = [] }: any) {
   const ac = Array.isArray(ticket.acceptanceCriteria) ? ticket.acceptanceCriteria.filter(Boolean) : [];
+  // The tables this ticket talks about, from the project's database schema (Project settings → Database).
+  const tables = tablesMentioned(project, [ticket.title, ticket.userStory, ticket.description, ...ac, ...subtasks.map((t) => t.title), epic?.title].filter(Boolean).join('\n'));
   const lines = [
     `# Coding spec: ${ticket.key || ''} ${ticket.title}`.trim(),
     `Project: ${project.name}${epic ? ` · Feature (epic): ${epic.key || ''} ${epic.title}`.trimEnd() : ''}`,
@@ -55,6 +58,7 @@ export function specPrompt({ project, epic, ticket, subtasks = [], files = [], m
     `## Acceptance criteria\n${ac.length ? ac.map((a, i) => `${i + 1}. ${a}`).join('\n') : 'None written yet: derive them from the description and confirm them before coding.'}`,
     subtasks.length && `## Sub-tasks (part of this ticket)\n${subtasks.map((t) => `- ${t.key || ''} ${t.title}`.trim()).join('\n')}`,
     `## Files and modules expected to change\n${files.length ? files.map((f) => `- ${f.path} (${f.action === 'create' ? 'new' : 'change'})${f.why ? `: ${f.why}` : ''}`).join('\n') : 'No files were predicted: find them in the repository first.'}${modules.length ? `\n\nModules: ${modules.join(', ')}` : ''}`,
+    tables.length && `## Database tables involved\n${tables.join('\n')}\n\nUse these exact table and column names. If the ticket needs a table or column that isn’t listed, add a migration and say so in your summary.`,
     `## Rules\n- Follow the structure, naming, libraries and tests the repository already uses.\n- Stay inside the files and modules above. If you must touch another file, say so in your summary: other tickets of this feature are coded in parallel and may use it.\n- Meet every acceptance criterion and add tests for them.\n- Your changes are reviewed: they are accepted only after a required reviewer approves them.`,
   ];
   return lines.filter(Boolean).join('\n\n');

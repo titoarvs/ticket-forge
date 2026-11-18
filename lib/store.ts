@@ -14,7 +14,7 @@ import { findOverlaps, describeOverlap, specConfig } from './specs';
 const TICKETS = 'tickets';
 const SETTINGS_KEYS = ['name', 'key', 'summary', 'assumptions', 'openQuestions', 'workflow', 'members', 'automation', 'sourceName', 'sourceText'];
 // testRepo: the Xray-style test repository, plans and executions (Test management). Testers and editors may change it.
-const META_PERM = { epics: ['epic.manage'], sprints: ['sprint.manage'], releases: ['sprint.manage', 'project.settings'], sources: ['issue.create', 'project.settings'], testRepo: ['test.run', 'issue.edit'] };
+const META_PERM = { epics: ['epic.manage'], sprints: ['sprint.manage'], releases: ['sprint.manage', 'project.settings'], sources: ['issue.create', 'project.settings'], testRepo: ['test.run', 'issue.edit'], dbSchema: ['project.database'] };
 const SYSTEM_AUTHORS = new Set(['Automation', 'Development', 'Claude']);
 /** A draft epic (saved AI output) can't be published without a title. */
 export const NO_DRAFT_TITLE = 'Give the draft a title before you publish it.';
