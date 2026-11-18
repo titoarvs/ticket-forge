@@ -823,15 +823,23 @@ Set up once per project in **Project settings → Code & GitHub**:
 - **GitHub access**: a token saved for the project (encrypted; fine-grained tokens need Contents and Pull requests
   read/write), `GITHUB_TOKEN` on the server, or your `gh` CLI sign-in.
 
-Then on an issue: **Development → Write code**. It opens the **Code jobs** page in a new tab (the issue stays as it is)
-showing the issue ID, its coding prompt and the linked repository or coding spec (just the ID and prompt when it has
-none). The same goes for an issue picked from an epic's code agent. Every member who can open the issue gets the button.
-**Start writing code** on that card opens the issue's code panel in its project, where the steps below happen (start,
-review, pull request). The Development order dialog's **Write code** and the epic's **Write code for epic** open it directly.
-A project's **Code jobs** page (Development → Code jobs) also has **Start coding**: pick **One ticket** and **Write code**
-(its code panel: start, review, pull request), or pick **A feature (epic)** and **Write code for N issues** (every open
-issue without finished code, through the bulk dialog with the conflict check and rounds), with **Development order** beside it.
-**Code a whole feature…** on the ticket card above leads there.
+Then code is written from the project's **Code jobs** page (Development → Code jobs), in its **Coding** section. The
+issue panel no longer has a Write code button; it shows **View code** once an issue has code.
+- Pick a **feature (epic)** (or all features, or tickets without one). Its tickets are listed with priority, points,
+  acceptance criteria, layer, coding spec (draft or ready, with its files) and coding state (not coded, coding, code
+  ready, PR open, merged), with a progress bar for the feature. Done and already-coded tickets hide unless you tick
+  **Show done tickets**; **Find a ticket** filters the list.
+- **Per ticket**: **Write code** (or **Retry**, **Watch**, **Review**, **View code**) opens the ticket's code panel,
+  where the steps below happen (start, review, pull request).
+- **Per feature**: tick tickets and choose **Write code for N selected**, or **Write code for all N**. It opens the bulk
+  dialog, which first checks for tickets that touch the same code and splits them into rounds (see
+  [Coding several issues at once without conflicts](#coding-several-issues-at-once-without-conflicts)).
+  **Development order** sits beside it.
+- The section can be collapsed, and remembers the feature you picked (this browser only).
+
+The Development order dialog's **Write code** and the epic's **Write code for epic** open the same panels. An issue picked
+from an epic's code agent still opens the Code jobs page in a new tab with its prompt (**Start writing code** there opens
+its code panel; **Code a whole feature…** leads to the Coding section).
 1. TicketForge creates a branch (`tf/pay-12-short-title`) from the base branch in its **own git worktree**, so your
    checkout and uncommitted work are never touched.
 2. Claude Code (your account) implements the issue from its story, acceptance criteria and test cases, plus any

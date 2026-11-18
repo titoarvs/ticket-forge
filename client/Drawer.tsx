@@ -18,7 +18,7 @@ import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
 import { openSpecs } from './Specs';
 import { openDevOrder, canWriteCode, openBulkCode, epicCodeIds } from './DevPlan';
 import { openSplitIssues } from './Split';
-import { codeReady, openCode, openWriteCode, openUpdatePr } from './DevCode';
+import { codeReady, openCode, openUpdatePr } from './DevCode';
 import { PrFindingChips, openPrFindings } from './CodeRabbit';
 import { TestsSection } from './TestRepo';
 import { TF, TA, SF, CB, RB, DateF, PeopleF, MenuItem, opts } from './fields';
@@ -217,8 +217,6 @@ function IssuePanel({ t }: { t: Any }) {
             {(edit || feat('code')) && <div className="tools">
               {/* TF-123: finished code is shown, not rewritten; every member who can open the issue can review and approve it */}
               {feat('code') && codeReady() && finishedCode(t) && <button className="btn sm" onClick={() => openCode(t)} title="Review the code, approve it and merge the pull request"><Ico svg={I.pr} />View code</button>}
-              {/* TF-124: Write code opens Code Jobs in a new tab with this issue; every member who can open the issue gets it */}
-              {feat('code') && <button className="btn sm ai" data-tour="drawer-code" disabled={finishedCode(t)} onClick={() => openWriteCode(t)} title={finishedCode(t) ? 'This issue already has code. Open it with View code; discard it first to write new code.' : 'Opens Code Jobs in a new tab with this issue, its prompt and its linked repository or spec'}><Ico svg={I.sparkle} />Write code</button>}
               {feat('code') && !codeReady() && can('project.settings') && <a className="btn sm subtle" href={`/p/${P().id}/settings`} onClick={() => { S.setTab = 'code'; }} title="Set up the local repository to write code with AI">Set up code with AI</a>}
               {edit && feat('prs') && <button className="btn sm subtle" onClick={() => { S.prForm = true; emit(); }}><Ico svg={I.plus} />Link pull request</button>}</div>}</div>
             {t.prs.map((r: Any) => (
