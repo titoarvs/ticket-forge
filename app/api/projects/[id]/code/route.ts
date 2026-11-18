@@ -4,6 +4,7 @@ import * as store from '@/lib/store';
 import { SERVERLESS, currentContext } from '@/lib/db';
 import { codeRabbitJob, issueContext, apiContract, listJobs, queueInfo, startJob, getJob, jobForTicket, jobsForTicket, backendSummary, jobDiff, followUp, cancelJob, discardJob, openPullRequest, commitLocal, reviewJob, prDraft, pushToPullRequest, reviewComments, describePullRequest, remoteInfo, setUpdateLabel, startPrReview, postReview, compareJob } from '@/lib/devagent';
 import { compareTarget, remoteCompare } from '@/lib/codecompare';
+import { checkParallel } from '@/lib/parallel';
 import { publicAgents, agentForRole, requireRole } from '@/lib/agents';
 import { getProjectSecret } from '@/lib/secrets';
 import { markdownToDocx } from '@/lib/md-docx';
@@ -255,8 +256,24 @@ export const GET = api(async (req, p) => {
     roles: { build: await agentForRole('build'), frontend: await agentForRole('frontend'), backend: await agentForRole('backend'), review: await agentForRole('review') } };
 });
 
+/**
+ * Before code jobs start on several issues: which of them touch the same files or modules (coding specs), collide with
+ * code jobs already running or not merged, or are blocked by another selected issue, split into rounds (lib/parallel.ts).
+ * Works for jobs on this computer and through GitHub alike. Nothing starts here.
+ */
+async function planParallelFor(p: any, b: any) {
+  await userOk(p, b.smart === false ? [] : ['ai.use']);
+  const project: any = await store.getProject(p.id);
+  const ids: string[] = (Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String).slice(0, 50);
+  if (!ids.length) throw new HttpError(400, 'Choose at least one issue.');
+  const [{ specs }, remote] = await Promise.all([store.listSpecs(p.id), remoteJobsForProject(p.id).catch(() => [])]);
+  const jobs = [...(localHere() ? listJobs(p.id) : []), ...remote];
+  return checkParallel({ project, ticketIds: ids, specs, jobs, ai: aiOpts(b), smart: b.smart !== false });
+}
+
 export const POST = api(async (req, p) => {
   const b = await body(req);
+  if (b.action === 'plan-parallel') return planParallelFor(p, b);
   const remote = await remotePost(req, p, b);
   if (remote !== undefined) return remote;
   const own = (id: string) => { const j = getJob(id); if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).'); return j; };

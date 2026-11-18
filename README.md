@@ -441,6 +441,11 @@ small classification calls, **when an owner turns it on** in Administration → 
 
 - **Frontend, backend or both** for each issue (`lib/layers.ts`): one call per 25 issues.
 - **Which automated tests are worth running** (`lib/testselect.ts`): a yes/no per test, ranked, up to the budget.
+- **Development order** (`lib/devorder.ts`): per issue, which other issue it needs first (pick one) and how early to
+  build it (0-9). See [Development order](#development-order).
+- **Coding several issues at once** (`lib/parallel.ts`): for issues without a coding spec, which other selected issue
+  will edit the same code (pick one); for issues that share only a module, whether they edit the same files (yes/no).
+  See [Coding several issues at once without conflicts](#coding-several-issues-at-once-without-conflicts).
 
 Anything Jev isn't sure about (below the confidence you choose, 60% by default), and every call when it is off,
 unreachable, or answers an error, goes to your AI as before, so turning it on never makes these features fail. Setup: paste
@@ -448,6 +453,47 @@ the API key from console.typesafe.ai → Keys (stored encrypted per workspace an
 too), turn it on, and use **Test the connection**. `TICKETFORGE_JEV_URL` points tests at a stand-in server. The titles,
 descriptions and test names being decided are sent to TypeSafe, so check their terms first. Client: `lib/jev.ts`
 (`POST https://api.typesafe.ai/v1/systemone`, `jev-latest`, retries 429/529 twice).
+
+## Development order
+
+**Development order** (an epic's panel, or a sprint's header in the backlog) shows the order to build the open issues in,
+with a short reason per issue, and **Apply to backlog order** moves them into it. Only those issues move, within the
+places they hold in the backlog now, and the change is saved (and undone) like any reorder. How it orders
+(`lib/devorder.ts`):
+
+1. **Links decide first.** An issue that *is blocked by* another listed issue comes after it. Open blockers outside the
+   list push an issue down; links that block each other are named so you can fix them.
+2. **Among the issues free to start**: priority, how many other issues wait on it (directly or not), backend before the
+   screens that use it (when the list has frontend work), smaller story points first, and the current backlog order on ties.
+3. **Hints, with Use Jev / AI hints** (on by default, needs *Use AI*): Jev, when it is on, answers per issue which other
+   issue it needs first and how early to build it; issues it isn't sure about go to your AI in one call; when the AI fails
+   too, the rules above decide alone. A suggested prerequisite never overrides a link and is dropped when it would make
+   a loop. The reason line says where each hint came from ("Jev: builds on it").
+
+**Writing the code from it** (needs *Use AI*, *Edit issues* and Write code with AI set up): each issue in the list has
+**Write code** (or **View code** when its code is finished), which opens that issue's code job right in the app, and
+**Write code for all N** starts the whole epic or sprint at once through the bulk dialog, with the conflict check and rounds
+below. The epic panel also has **Write code for epic** for its open issues that have no finished code yet.
+
+API: `POST /api/projects/:id/devorder` with `{ epicId | sprintId | ticketIds, smart }`. Nothing is saved there.
+
+## Coding several issues at once without conflicts
+
+When you select issues in the backlog and choose **Write code with AI**, the dialog first checks them
+(`lib/parallel.ts`, `POST /api/projects/:id/code` with `action: "plan-parallel"`; nothing starts) and flags:
+
+- **Same file / same module**: their coding specs (Coding specs on the epic) list the same file or module. This is
+  `findOverlaps` from `lib/specs.ts`, with every selected issue compared as one batch, whatever its epic.
+- **Busy**: another issue's code job is running or waiting, or its finished code isn't merged, and touches the same files
+  (its changed files, or its spec while it runs).
+- **Blocked**: an issue is blocked by another selected issue, so it waits for that one's code.
+- **Likely**: an issue has no coding spec, and Jev (or the AI) expects it to edit the same code as another selected issue.
+
+It then splits the issues into rounds, in development order: round 1 can be coded together now, each later round after
+the one before it. **Start the N safe now** starts round 1 only; **Start all** starts everything anyway (the queue still
+runs `TICKETFORGE_CODE_PARALLEL` jobs at once). Module overlaps that Jev or the AI judges to be separate files are shown
+but don't hold an issue back. With Jev off, the AI answers; when the AI fails or *Use AI* is missing, the rules decide
+(a shared module is a conflict, issues without a spec are listed as unchecked).
 
 ## Drizzle ORM
 
@@ -780,6 +826,12 @@ Set up once per project in **Project settings → Code & GitHub**:
 Then on an issue: **Development → Write code**. It opens the **Code jobs** page in a new tab (the issue stays as it is)
 showing the issue ID, its coding prompt and the linked repository or coding spec (just the ID and prompt when it has
 none). The same goes for an issue picked from an epic's code agent. Every member who can open the issue gets the button.
+**Start writing code** on that card opens the issue's code panel in its project, where the steps below happen (start,
+review, pull request). The Development order dialog's **Write code** and the epic's **Write code for epic** open it directly.
+A project's **Code jobs** page (Development → Code jobs) also has **Start coding**: pick **One ticket** and **Write code**
+(its code panel: start, review, pull request), or pick **A feature (epic)** and **Write code for N issues** (every open
+issue without finished code, through the bulk dialog with the conflict check and rounds), with **Development order** beside it.
+**Code a whole feature…** on the ticket card above leads there.
 1. TicketForge creates a branch (`tf/pay-12-short-title`) from the base branch in its **own git worktree**, so your
    checkout and uncommitted work are never touched.
 2. Claude Code (your account) implements the issue from its story, acceptance criteria and test cases, plus any
