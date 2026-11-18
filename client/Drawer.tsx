@@ -15,10 +15,6 @@ import { setFlag } from './RowActions';
 import { epicProgress, ProgBar, setTcStatus, ShotModal } from './views';
 import { epicRange, setEpicDates } from './Timeline';
 import { CommentEditor, CommentBody, RichTextField } from './CommentEditor';
-import { PsdSection } from './Psd';
-import { ApprovalSection } from './EpicIssues';
-import { approvalCheck } from '../lib/approval';
-import { FbdSection, ArdSection } from './Fbd';
 import { openSpecs } from './Specs';
 import { openSplitIssues } from './Split';
 import { codeReady, openCode, openWriteCode, openUpdatePr } from './DevCode';
@@ -492,17 +488,13 @@ function EpicPanel({ e }: { e: Any }) {
       <TA title rows={1} aria-label="Epic name" disabled={!ed} value={e.title} onChange={(ev) => mutate(() => { e.title = ev.target.value.replace(/\n/g, ' '); }, { tag: `e.title${e.id}` })} />
       <div className="dr-actions">
         {can('issue.create') && <button className="btn" onClick={() => openModal(<CreateIssueModal epicId={e.id} />)}><Ico svg={I.plus} />Create issue</button>}
-        {can('issue.create') && can('ai.use') && <button className="btn ai" disabled={feat('docs') && !approvalCheck(e).ok} title={feat('docs') && !approvalCheck(e).ok ? 'Approve the Problem Statement, Feature Brief and Architecture Record first' : ''} onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
+        {can('issue.create') && can('ai.use') && <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}><Ico svg={I.sparkle} />Write issue with Claude</button>}
         {can('issue.create') && can('ai.use') && feat('split') && <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones"><Ico svg={I.subtask} />Split issues</button>}
         <button className="btn" onClick={() => openSpecs(e)} title="One coding prompt per issue, with the files it touches and overlaps between issues"><Ico svg={I.doc} />Coding specs</button>
       </div>
       <div className="sec"><div className="sec-title"><h3>Description</h3></div>
         <TA ghost disabled={!ed} value={e.description} placeholder="Describe the goal of this epic…" onChange={(ev) => mutate(() => { e.description = ev.target.value; }, { tag: `e.desc${e.id}` })} /></div>
       <DraftReference e={e} />
-      {feat('docs') && <><PsdSection epic={e} />
-      <FbdSection epic={e} />
-      <ArdSection epic={e} />
-      <ApprovalSection epic={e} /></>}
       <div className="sec"><div className="sec-title"><h3>Dates</h3>
         {range?.derived && <span className="muted small" style={{ marginLeft: 'auto' }}>Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}</span>}</div>
         <div className="grid2 epic-dates">

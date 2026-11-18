@@ -4,8 +4,8 @@
 // Agents with runner "code" run as real Claude Code agents (`claude -p --agents … --agent <id>`), the same way
 // Claude Code runs custom agents: their prompt is the agent's system prompt, their tool list is enforced by
 // Claude Code. Each run is one agent working on its own (no subagents: delegating made runs much slower and
-// lost the issue's context); a person chains them, e.g. Build, then Review. Agents with runner "document" are the document writers already in
-// TicketForge (Problem Statement, Feature Brief…); runner "guide" agents walk a person through a manual step.
+// lost the issue's context); a person chains them, e.g. Build, then Review. Agents with runner "document" write a document for an epic in
+// TicketForge (the Agent doc); runner "guide" agents walk a person through a manual step.
 //
 // Administrators can turn agents on or off and set their model, effort and extra instructions in
 // Administration → Agents. Overrides are stored in app_meta under "agent_settings".
@@ -50,38 +50,6 @@ Working rules (TicketForge):
 /** The catalog. Order is the order shown in Administration → Agents. */
 export const AGENTS = [
   {
-    id: 'problem-statement', name: 'Problem Statement', icon: '📝', phase: 'Prepare', team: 'Product', workspace: 'documents', step: 'Write Problem Statement', runner: 'generator', use: 'psd',
-    summary: 'Drafts the Problem Statement from the ticket’s What and Why.',
-    does: ['Reads the epic, its issues and the source documents.', 'Writes the background, the problem, who is affected and the business impact.', 'Lists the evidence still needed and marks anything it can’t know as [To confirm].'],
-    inputs: ['Epic and its issues', 'Source documents'], output: 'Problem Statement (.docx from the team template)', where: 'Epic panel → Problem Statement',
-  },
-  {
-    id: 'feature-brief', name: 'Feature Brief', icon: '📄', phase: 'Prepare', team: 'Product', workspace: 'documents', step: 'Write Feature Brief', runner: 'generator', use: 'fbd',
-    summary: 'Writes the Feature Brief from the approved Problem Statement.',
-    does: ['Fills every section of the team’s Feature Brief template.', 'Turns issues into requirements (FR-01…) and Given/When/Then acceptance criteria.', 'Carries the problem and evidence over from the Problem Statement.'],
-    inputs: ['Approved Problem Statement', 'Epic and its issues', 'Feature Brief template'], output: 'Feature Brief (.md / .docx)', where: 'Epic panel → Feature Brief',
-  },
-  {
-    id: 'architecture-record', name: 'Architecture Record', icon: '🏗️', phase: 'Plan', team: 'Coding', workspace: 'readonly', step: 'Write Architecture Design Record', runner: 'code', writes: false,
-    summary: 'Explores the codebase and writes the Architecture Record Design (ARD).',
-    does: ['Maps the modules, data and APIs the feature touches, and fills the team’s ARD template.', 'Records each decision (AD-xx) with the options considered and why one was chosen, plus rollout and rollback levels.', 'Traces the design to the Feature Brief: drivers, acceptance scenarios (AS-xx) and open decisions. Changes no code.'],
-    inputs: ['Feature Brief', 'Problem Statement', 'The repository (read-only)'], output: 'Architecture Record Design (Markdown or .docx)', where: 'Epic panel → Architecture Record Design, or Issue panel → Write code with AI → Architecture Record',
-    model: 'opus', effort: 'high', tools: ['Read', 'Glob', 'Grep', 'LS', 'TodoWrite'],
-    prompt: `You are the Architecture Record agent for TicketForge. You explore a codebase and write the Architecture
-Record Design (ARD) for one feature by filling in the team's ARD template, which you are given. You do not change any files.
-1. Find the code the feature touches: entry points, modules, data models, APIs, UI, configuration, tests. Cite real paths.
-2. Fill every section of the template in order. Keep every heading, its numbering, every table and its columns exactly.
-   Replace each [bracketed prompt] with content for this feature; add rows where needed, drop example rows that don't apply.
-3. Design drivers D1, D2… come from the Feature Brief (sections, KPIs, acceptance scenarios). Decisions are AD-01, AD-02…,
-   each with its own decision record (context, 2–3 options considered, decision, consequences).
-4. Section 3: draw the real data flow as a Mermaid flowchart with the actual components.
-5. Section 10.2: one row per Feature Brief acceptance scenario, with the exact AS ID and title. Section 11: carry the
-   Feature Brief's open decisions with their Q IDs.
-6. Rollback levels: keep only the levels that apply. Sign-Off: keep the roles, leave Name, Signature and Date empty.
-Never invent paths, people, dates or numbers. When something isn't known, write [To confirm: what is needed].
-Your final message is the finished ARD in Markdown only, starting with its level-1 heading.`,
-  },
-  {
     id: 'test-plan', name: 'Test Plan', icon: '✏️', phase: 'Plan', team: 'QA', workspace: 'documents', step: 'Write Test Plan', runner: 'generator', use: 'tests',
     summary: 'Writes the Test Plan: every scenario to test.',
     does: ['Writes positive, negative and edge test cases for each issue.', 'Follows the team’s test-case rules (Administration → Generation).', 'Links each case to the acceptance criterion it proves.'],
@@ -91,7 +59,7 @@ Your final message is the finished ARD in Markdown only, starting with its level
     id: 'working-tickets', name: 'Working Tickets', icon: '🎫', phase: 'Plan', team: 'Product', workspace: 'documents', step: 'Create Working Tickets', runner: 'generator', use: 'tickets',
     summary: 'Splits the feature into sized working tickets.',
     does: ['Breaks the feature into stories, tasks and spikes.', 'Sizes each with story points on the team’s scale.', 'Writes user stories and acceptance criteria for each.'],
-    inputs: ['Feature Brief', 'Source documents'], output: 'Issues in the backlog', where: 'Epic panel → Agents, New project, Add feature',
+    inputs: ['Epic and its description', 'Source documents'], output: 'Issues in the backlog', where: 'Epic panel → Agents, New project, Add feature',
   },
   {
     id: 'build', name: 'Build a Ticket', icon: '🛠️', phase: 'Build', team: 'Coding', workspace: 'worktree', step: 'Build and Verify Feature', runner: 'code', writes: true, default: true,
@@ -172,7 +140,7 @@ ${CODE_RULES}`,
     id: 'backend', name: 'Backend Developer', icon: '🗄️', phase: 'Build', team: 'Coding', workspace: 'worktree', step: 'Build and Verify Feature', runner: 'code', writes: true,
     summary: 'Builds the APIs, data and business rules for a ticket.',
     does: ['Builds endpoints, services, data models and migrations following the project’s patterns.', 'Validates input, checks permissions and handles errors explicitly.', 'Keeps changes backward compatible, or calls out what breaks.', 'Adds unit and integration tests and runs the check command.'],
-    inputs: ['Issue and acceptance criteria', 'Architecture Record, when written', 'The repository'], output: 'A diff to review, then a pull request', where: 'Epic panel → Agents, or Issue panel → Write code with AI',
+    inputs: ['Issue and acceptance criteria', 'The repository'], output: 'A diff to review, then a pull request', where: 'Epic panel → Agents, or Issue panel → Write code with AI',
     model: 'sonnet', effort: 'medium', tools: ['Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep', 'LS', 'TodoWrite'],
     prompt: `You are the Backend Developer agent for TicketForge, a senior backend engineer.
 1. Find the server stack: framework, routing, data access, migrations, auth and permission checks, error handling.

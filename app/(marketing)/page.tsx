@@ -11,7 +11,7 @@ const FEATURES: [string, string, string][] = [
   ['🧭', 'Plan like you do in Jira', 'Backlog with sprints, a board with your own workflow, a timeline of epics, releases and reports, all in one place.'],
   ['✅', 'Test cases and automation', 'Every issue gets test cases. Run them as Playwright tests in a real browser, here or on GitHub Actions, with self-healing scripts.'],
   ['🤖', 'AI agents that write code', 'Agents build an issue in its own branch, follow your repository’s patterns, run your checks, then open a pull request for review.'],
-  ['📝', 'Documents on demand', 'Problem Statements, Feature Briefs and Architecture Records written from your epics, in your team’s templates.'],
+  ['📝', 'Documents on demand', 'Kick Off, Demo, Sign-Off and other epic documents written by agents from your epics and their issues.'],
   ['🔍', 'Reviews you can trust', 'AI code review panels, CodeRabbit findings turned into bugs, and acceptance criteria checked against every change.'],
 ];
 const STEPS: [string, string][] = [

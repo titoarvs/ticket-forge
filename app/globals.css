@@ -1218,36 +1218,7 @@ a.set-stat:hover { background: var(--hover); }
 @keyframes tf-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ico.spin svg { animation: none; } }
 
-/* ---------- Problem Statement (PSD) ---------- */
-.psd-empty { padding: 4px 0; }
-.psd-running { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: var(--radius); background: var(--ai-bg); color: var(--ai); font-size: 13px; }
-.psd-glance { border-left: 3px solid var(--ai); padding: 2px 0 2px 12px; margin-bottom: 8px; }
-.psd-glance p { margin: 0 0 4px; font-size: 13px; }
-.psd-actions { gap: 6px; flex-wrap: wrap; align-items: flex-end; }
-.psd-actions .spacer { flex: 1; }
-.psd-meta { display: flex; flex-direction: column; gap: 2px; }
-.psd-link { color: var(--selected-text); }
-.psd-tpl { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radius); background: var(--bg-sunken); }
-.psd-tpl > .ico { margin-top: 2px; color: var(--text-subtle); }
-.psd-tpl .spacer { flex: 1; }
-.psd-doc { font-size: 14px; line-height: 1.55; }
-.psd-doc h2 { font-size: 17px; font-weight: 600; margin: 22px 0 8px; color: var(--text); }
-.psd-doc h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
-.psd-doc p { margin: 0 0 8px; }
-.psd-doc ul { margin: 0 0 8px; padding-left: 22px; }
-.psd-doc li { margin: 3px 0; }
-.psd-cover { text-align: center; padding: 6px 0 4px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
-.psd-cover h1 { font-size: 26px; font-weight: 500; margin: 0; }
-.psd-cover span { font-size: 11px; letter-spacing: .12em; color: var(--danger); font-weight: 600; }
-.psd-label { font-weight: 600; }
-.psd-callout { border-left: 3px solid var(--selected-text); background: var(--bg-sunken); padding: 8px 12px; border-radius: 0 var(--radius) var(--radius) 0; }
-.psd-tbl-wrap { overflow-x: auto; margin: 4px 0 10px; }
-.psd-tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
-.psd-tbl th { text-align: left; background: #0c2a50; color: #fff; font-weight: 600; padding: 6px 9px; }
-.psd-tbl td { border: 1px solid var(--border); padding: 6px 9px; vertical-align: top; }
-.psd-tbl td ul { margin: 4px 0 0; padding-left: 18px; }
-.psd-status { font-size: 12px; padding: 1px 6px; border-radius: 3px; background: var(--bg-neutral); white-space: nowrap; }
-.psd-status.ok { background: var(--success-bg); color: var(--success); }
+.ai-running { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: var(--radius); background: var(--ai-bg); color: var(--ai); font-size: 13px; }
 
 /* ---------- code with AI ---------- */
 .dev-path { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
@@ -1287,15 +1258,6 @@ a.set-stat:hover { background: var(--hover); }
 .fp-item > .ico { color: var(--text-subtle); }
 .fp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---------- Feature Brief (FBD) ---------- */
-.fbd-doc .md { font-size: 14px; line-height: 1.55; }
-.fbd-doc .md h1, .fbd-doc .md h2, .fbd-doc .md h3 { color: var(--text); }
-.fbd-doc .md-tbl { font-size: 13px; margin: 6px 0 12px; }
-.fbd-doc .md-tbl th { background: #0c2a50; color: #fff; }
-.fbd-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 60vh; }
-.fbd-edit textarea { font: 12.5px/1.55 var(--mono) !important; }
-.fbd-preview { max-height: 64vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px; }
-@media (max-width: 900px) { .fbd-edit { grid-template-columns: 1fr; } }
 
 /* Rich text fields (issue descriptions) */
 .rtf.rtf .ce-content { min-height: 96px; }
@@ -1504,7 +1466,7 @@ a.set-stat:hover { background: var(--hover); }
 @media (max-width: 640px) { #task-tray { right: 16px; bottom: 16px; } #toasts { left: 16px; right: 16px; width: auto; top: 16px; bottom: auto; } #toasts .toast:nth-last-child(n+3) { display: none; } .tray-list { max-height: 34vh; } }
 
 /* In-place "writing…" state on the epic panel */
-.psd-running { flex-direction: column; align-items: stretch !important; gap: 8px !important; }
+.ai-running { flex-direction: column; align-items: stretch !important; gap: 8px !important; }
 .run-line { display: flex; gap: 8px; align-items: center; }
 .run-line .elapsed { margin-left: auto; color: var(--text-subtle); font-size: 12px; }
 .run-hint { color: var(--text-subtle); font-size: 12px; }
@@ -2071,13 +2033,11 @@ tr.xr-step-passed td { background: color-mix(in srgb, var(--success-bg) 40%, tra
 @media (min-width: 901px) and (max-width: 1400px) {
   .ep-tbl td[data-label="Progress"] { width: 120px !important; }
   .ep-tbl td[data-label="Problem Statement"], .ep-tbl td[data-label="Feature Brief"], .ep-tbl td[data-label="Architecture Record"] { white-space: normal !important; }
-  .ep-tbl .psd-link { white-space: nowrap; }
 }
 @media (min-width: 901px) and (max-width: 1400px) {
   .ep-tbl .ep-done { display: none; }
   .view table.tbl.ep-tbl { display: block; max-width: 100%; overflow-x: auto; }
 }
-.ep-tbl.no-docs td[data-label="Problem Statement"], .ep-tbl.no-docs td[data-label="Feature Brief"], .ep-tbl.no-docs td[data-label="Architecture Record"] { display: none !important; }
 
 /* Administration → Features */
 .ff-tools { gap: 8px; }

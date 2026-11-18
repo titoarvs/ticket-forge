@@ -729,7 +729,7 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
         {backend && side === 'frontend' && t.layer === 'both' && !canBoth && !['committed', 'review', 'starting', 'running'].includes(jobs.backend?.status) && <div className="warn-banner" style={{ marginBottom: 8 }}><Ico svg={I.warn} /><span>The backend part isn’t done yet. You can start the frontend now, but it won’t know the final API.</span>
           <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('backend')}>Go to Backend</button></div>}
         {backend && side === 'backend' && <p className="small muted" style={{ marginTop: 0 }}>Runs in <code>{myPath('backend')}</code>{be().repo ? <> · {be().provider === 'GitLab' ? 'merge request on GitLab' : 'pull request on GitHub'} <code>{be().repo}</code></> : ''}.</p>}
-        <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId, side })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{agentId === 'architecture-record' ? 'Write the record' : agentId === 'feature-tests' ? 'Write the tests' : 'Start the agent'}</>}</button>
+        <button className="btn ai" disabled={!!busy} onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId, side })}>{busy ? <><Spinner />Starting…</> : <><Ico svg={I.sparkle} />{agentId === 'feature-tests' ? 'Write the tests' : 'Start the agent'}</>}</button>
       </> : <>
         <div className="cj-head">
           <div className="cj-title">

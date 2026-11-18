@@ -17,7 +17,7 @@ const PRESETS: { key: string; label: string; desc: string; tiers: (t: Any) => st
   { key: 'quality', label: 'Best quality', desc: 'Every task on the High tier. Uses the most.', tiers: () => 'high' },
   { key: 'balanced', label: 'Balanced', desc: 'The defaults: High for tickets, documents and scripts; lighter models for routine work.', tiers: (t) => t.tier },
   { key: 'smart', label: 'Smart savings', desc: 'Documents and scripts on Standard; tickets and tests try Standard first and step up to High only when needed; coding and review stay High.',
-    tiers: (t) => (['docs', 'automation'].includes(t.id) ? 'standard' : t.tier), escalate: true },
+    tiers: (t) => (['automation'].includes(t.id) ? 'standard' : t.tier), escalate: true },
   { key: 'economy', label: 'Economy', desc: 'Light for most work; Standard for tickets, documents, scripts and coding agents.', tiers: (t) => (['tickets', 'docs', 'automation', 'code', 'agent-tests', 'review'].includes(t.id) ? 'standard' : 'light') },
 ];
 

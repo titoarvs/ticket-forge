@@ -17,7 +17,9 @@
     "db:studio": "drizzle-kit studio",
     "docs:overview": "node --import tsx scripts/overview-docx.ts",
     "docs:pain-points": "node --import tsx scripts/pain-points-docx.ts",
-    "docs:problem-statement": "node --import tsx scripts/problem-statement-docx.ts"
+    "docs:problem-statement": "node --import tsx scripts/problem-statement-docx.ts",
+    "db:remove-psd-fbd-ard": "node --env-file-if-exists=.env --import tsx scripts/remove-psd-fbd-ard.ts",
+    "test": "node --import tsx --test tests/*.test.ts"
   },
   "license": "UNLICENSED",
   "private": true,

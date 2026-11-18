@@ -23,8 +23,6 @@ import { RemoteBrowser } from './RemoteBrowser';
 import { GitHubRunner } from './GitHubRunner';
 import { epicRange } from './Timeline';
 import { DraftBadge } from './EpicDrafts';
-import { openFbd, openWriteFbd, downloadFbdDocx, writeMissingFbds, fbdBusy, openDoc, openWriteDoc, downloadDocDocx, docBusy, writeMissingDocs } from './Fbd';
-import { openPsd, openWritePsd, downloadPsd, writeMissingPsds, psdBusy } from './Psd';
 import { ItemText } from './ListEditor';
 import { BulkCodeModal, codeReady } from './DevCode';
 import { CodeReviewReport } from './CodeRabbit';
@@ -402,17 +400,12 @@ export function Backlog() {
 }
 
 // ---------------------------------------------------------------- epics
-/** Every AI action on the Epics page in one menu: planning, then the per-epic documents in workflow order. */
+/** Every AI action on the Epics page in one menu. */
 function EpicsAiMenu() {
   const p = P();
   if (!can('ai.use')) return null;
   const plan = can('issue.create'), manage = can('epic.manage');
   if (!plan && !manage) return null;
-  const missing = (k: string) => p.epics.filter((x: Any) => !x[k]).length;
-  const doc = (k: string, label: string, run: () => void) => {
-    const n = missing(k);
-    return <button disabled={!n} onClick={run}><Ico svg={I.doc} />{label}<small>{n ? `${n} missing` : 'all written'}</small></button>;
-  };
   return (
     <Menu id="epics-ai" button={<button className="btn ai" aria-haspopup="menu" aria-expanded={S.menu === 'epics-ai'} onClick={() => setMenu('epics-ai')}><Ico svg={I.sparkle} />AI actions<Ico svg={I.chevron} /></button>}>
       {plan && <><div className="mh">Plan</div>
@@ -420,10 +413,6 @@ function EpicsAiMenu() {
       {manage && <>
         <button onClick={() => openModal(<RegroupModal />)}><Ico svg={I.sparkle} />Re-organize epics<small>Regroup issues</small></button>
         {plan && feat('split') && <button onClick={() => openSplitIssues()}><Ico svg={I.subtask} />Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small></button>}
-        {p.epics.length > 0 && feat('docs') && <><hr /><div className="mh">Write for epics without one</div>
-          {doc('psd', 'Problem Statements', writeMissingPsds)}
-          {doc('fbd', 'Feature Briefs', writeMissingFbds)}
-          {doc('ard', 'Architecture Records', () => writeMissingDocs('ard'))}</>}
       </>}
     </Menu>
   );
@@ -437,7 +426,7 @@ export function Epics() {
       {can('epic.manage') && <button className="btn primary" onClick={addEpic}><Ico svg={I.plus} />Create epic</button>}
       {feat('timeline') && <Link className="btn" href={`/p/${p.id}/timeline`}><Ico svg={I.calendar} />Timeline</Link>}</>} />
     {p.epics.length ? <>
-      <table className={`tbl ep-tbl ${feat('docs') ? '' : 'no-docs'}`}><thead><tr><th>Epic</th><th>Dates</th>{feat('docs') && <><th>Problem Statement</th><th>Feature Brief</th><th>Architecture Record</th></>}<th>Progress</th><th className="num ep-done">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
+      <table className="tbl ep-tbl"><thead><tr><th>Epic</th><th>Dates</th><th>Progress</th><th className="num ep-done">Done</th><th className="num">Issues</th><th className="num">Story points</th><th className="num">Test cases</th></tr></thead><tbody>
         {p.epics.map((e: Any) => {
           const pr = epicProgress(e);
           return (
@@ -445,18 +434,6 @@ export function Epics() {
               <td className="ep-main"><span className="row" style={{ flexWrap: 'nowrap' }}><TypeIcon type="Epic" /><span className="key">{e.key}</span><Swatch color={e.color} /><b style={{ fontWeight: 500 }}>{e.title}</b>{e.draft && <DraftBadge />}</span>
                 {e.description && <div className="muted small ep-desc" style={{ margin: '2px 0 0 24px', maxWidth: 560, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description}</div>}</td>
               <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Dates">{(() => { const r = epicRange(e); return r ? <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>{fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}</span> : <span className="muted">–</span>; })()}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Problem Statement" onClick={(ev) => ev.stopPropagation()}>{psdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
-                : e.psd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openPsd(e)}>{e.psd.version || 'v1.0'} · {e.psd.status || 'Draft'}</button>
-                  {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Problem Statement for ${e.title}`} onClick={() => downloadPsd(e)}><Ico svg={I.download} /></button>}</span>
-                : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWritePsd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Feature Brief" onClick={(ev) => ev.stopPropagation()}>{fbdBusy(e.id) ? <span className="muted"><Spinner /> Writing…</span>
-                : e.fbd ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openFbd(e)}>{e.fbd.version || 'v1.0'} · {e.fbd.status || 'Draft'}</button>
-                  {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Feature Brief for ${e.title}`} onClick={() => downloadFbdDocx(e)}><Ico svg={I.download} /></button>}</span>
-                : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteFbd(e)}>Write with AI</button> : <span className="muted">–</span>}</td>
-              <td className="small" style={{ whiteSpace: 'nowrap' }} data-label="Architecture Record" onClick={(ev) => ev.stopPropagation()}>{docBusy('ard', e.id) ? <span className="muted"><Spinner /> Writing…</span>
-                : e.ard ? <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><button className="link-btn psd-link" onClick={() => openDoc('ard', e)}>{e.ard.version || 'v1.0'} · {e.ard.status || 'Draft'}</button>
-                  {can('export') && <button className="icon-btn" title="Download .docx" aria-label={`Download the Architecture Record Design for ${e.title}`} onClick={() => downloadDocDocx('ard', e)}><Ico svg={I.download} /></button>}</span>
-                : can('ai.use') && can('epic.manage') ? <button className="link-btn psd-link" onClick={() => openWriteDoc('ard', e)}>Write with AI</button> : <span className="muted">–</span>}</td>
               <td style={{ width: 200 }} data-label="Progress"><ProgBar {...pr} /></td>
               <td className="num ep-done" data-label="Done">{pr.total ? Math.round((pr.done / pr.total) * 100) : 0}%</td>
               <td className="num" data-label="Issues">{pr.total}</td><td className="num" data-label="Story points">{spSum(pr.ts)}</td><td className="num" data-label="Test cases">{pr.ts.reduce((s: number, t: Any) => s + t.testCases.length, 0)}</td>

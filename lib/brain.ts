@@ -1,6 +1,6 @@
 // Project brain: an Obsidian-compatible knowledge vault of Markdown notes linked with [[wikilinks]], so the AI (and the
 // Claude Code agents) always start from the project's context. One note per thing TicketForge knows (the project, its
-// epics, issues, releases, source documents, epic documents, decisions and open questions, the app context and the
+// epics, issues, releases, source documents, open questions, the app context and the
 // repository profile), rebuilt automatically whenever the project changes. People add their own notes too; a refresh
 // never touches those.
 //
@@ -37,35 +37,12 @@ const words = (s) => (String(s || '').toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) 
 // ---------------------------------------------------------------- building the notes from the project
 const catOf = (p, status) => (p.workflow || []).find((w) => w.name === status)?.category || (/done|closed|resolved/i.test(String(status)) ? 'done' : 'todo');
 const isSub = (t) => t?.type === 'Sub-task' || Boolean(t?.parentId);
-const mdSection = (md, re) => {
-  const lines = String(md || '').split('\n');
-  const start = lines.findIndex((l) => /^#{2,4}\s/.test(l) && re.test(l));
-  if (start < 0) return '';
-  const level = lines[start].match(/^#+/)[0].length;
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i++) if (new RegExp(`^#{1,${level}}\\s`).test(lines[i])) { end = i; break; }
-  return lines.slice(start, end).join('\n').trim();
-};
-const rowsOf = (md, re) => String(md || '').split('\n').map((l) => l.match(re)).filter(Boolean).map((m) => m.slice(1).map((c) => String(c).trim()))
-  .filter((r) => !r.some((c) => /^\[.*\]$/.test(c))); // the template's own placeholder rows
-/** The issues whose words overlap the text most (for decisions and questions without explicit links). */
+/** The issues whose words overlap the text most (for open questions). */
 function related(text, issues, n = 6, min = 2) {
   const want = new Set(words(text));
   if (!want.size) return [];
   return issues.map((t) => { const have = new Set(words(`${t.title} ${t.userStory || ''}`)); let s = 0; for (const w of want) if (have.has(w)) s += 1; return { t, s }; })
     .filter((x) => x.s >= min).sort((a, b) => b.s - a.s || String(a.t.key).localeCompare(String(b.t.key), undefined, { numeric: true })).slice(0, n).map((x) => x.t);
-}
-function psdMarkdown(psd) {
-  const g = psd.atAGlance || {};
-  const out = [`## At a glance`, g.problem && `- **Problem**: ${g.problem}`, g.whyItMatters && `- **Why it matters**: ${g.whyItMatters}`, g.whoIsAffected && `- **Who is affected**: ${g.whoIsAffected}`, g.whatIsProposed && `- **What is proposed**: ${g.whatIsProposed}`];
-  if (psd.problemStatement) out.push('', '## Problem statement', psd.problemStatement);
-  if (psd.background?.context) out.push('', '## Background', psd.background.context, ...(psd.background.today || []).map((x) => `- ${x}`));
-  if (psd.gaps?.length) out.push('', `## ${psd.gapsTitle || 'Why this happens today'}`, ...psd.gaps.map((x) => `- **${x.gap}**: ${x.meaning}`));
-  if (psd.affected?.length) out.push('', '## Who is affected', ...psd.affected.map((x) => `- **${x.who}** (${x.relationship}): ${x.how}`));
-  if (psd.business?.length) out.push('', '## Business impact', ...psd.business.map((x) => `- **${x.pain}**: today ${x.today}; ${x.consequence}`));
-  if (psd.costOfInaction?.length) out.push('', '## Cost of inaction', ...psd.costOfInaction.map((x) => `- ${x.lead ? `**${x.lead}** ` : ''}${x.text}`));
-  if (psd.evidence?.length) out.push('', '## Evidence needed', ...psd.evidence.map((x) => `- ${x.evidence}: proves ${x.proves} (${x.status || 'Not collected'})`));
-  return out.filter((x: any) => x !== undefined && x !== false && x !== '').join('\n').replace(/\n(?=## )/g, '\n\n');
 }
 
 /**
@@ -104,30 +81,12 @@ export function buildNotes(p) {
   const eLink = (e) => link('e', e.id, `${e.key || ''} ${e.title || ''}`.trim());
   const rLink = (r) => link('r', r.id, r.name);
   const epicIssues = (e) => top.filter((t) => t.epicId === e.id);
-  const docs = [], decisions = [], questions = [];
+  const questions = [];
   const latest = (list) => list.map((t) => t.updatedAt).filter(Boolean).sort().pop() || null;
 
-  // Epic documents and the decisions / open questions written in them.
-  for (const e of epics) {
-    const k = fileOf.get(`e:${e.id}`);
-    if (e.psd) docs.push({ type: 'doc', file: `${k} Problem Statement`, key: `${k}-PSD`, ref: `${e.id}:psd`, title: `Problem Statement: ${e.title}`, status: e.psd.status || 'Draft', tags: ['psd'], epic: e, updated: e.psd.generatedAt, md: psdMarkdown(e.psd) });
-    if (e.fbd?.markdown) docs.push({ type: 'doc', file: `${k} Feature Brief`, key: `${k}-FBD`, ref: `${e.id}:fbd`, title: `Feature Brief: ${e.title}`, status: e.fbd.status || 'Draft', tags: ['fbd'], epic: e, updated: e.fbd.generatedAt || e.fbd.updatedAt, md: e.fbd.markdown });
-    if (e.ard?.markdown) docs.push({ type: 'doc', file: `${k} Architecture Record`, key: `${k}-ARD`, ref: `${e.id}:ard`, title: `Architecture Record: ${e.title}`, status: e.ard.status || 'Draft', tags: ['ard'], epic: e, updated: e.ard.generatedAt || e.ard.updatedAt, md: e.ard.markdown });
-    for (const [id, title, chosen, status] of rowsOf(e.ard?.markdown, /^\|\s*(AD-\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|/)) {
-      decisions.push({ file: `${k} ${id}`, key: `${k}-${id}`, ref: `${e.id}:${id}`, code: id, title: title || id, chosen, status, epic: e, docFile: `${k} Architecture Record`, section: mdSection(e.ard.markdown, new RegExp(`${id}\\b`)), updated: e.ard.generatedAt || e.ard.updatedAt });
-    }
-    for (const [id, title, owner, due, status] of rowsOf(e.fbd?.markdown, /^\|\s*(Q\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/)) {
-      questions.push({ file: `${k} ${id}`, key: `${k}-${id}`, ref: `${e.id}:${id}`, code: id, title: title || id, owner, due, status: status || 'Open', epic: e, docFile: `${k} Feature Brief`, updated: e.fbd.generatedAt || e.fbd.updatedAt });
-    }
-  }
   (p.openQuestions || []).forEach((text, i) => { const s = typeof text === 'string' ? text : text?.text || text?.question || ''; if (s.trim()) questions.push({ file: `Question ${String(i + 1).padStart(2, '0')}`, key: `${pKey}-Q${i + 1}`, ref: `q:${i}`, title: clip(s, 140), text: s, status: 'Open' }); });
-  const issueText = (t) => `${t.title} ${t.description || ''} ${(t.comments || []).map((c) => c.text || '').join(' ')}`;
-  for (const d of decisions) d.issues = [...new Set([...epicIssues(d.epic).filter((t) => new RegExp(`\\b${d.code}\\b`).test(issueText(t))), ...related(`${d.title} ${d.chosen}`, epicIssues(d.epic), 5)])];
-  for (const x of questions) x.issues = x.epic ? related(x.title, epicIssues(x.epic), 5) : related(x.text || x.title, top, 5);
-  docs.forEach((d) => reserve('d', d.ref, d.file));
-  decisions.forEach((d) => reserve('a', d.ref, d.file));
+  for (const x of questions) x.issues = related(x.text || x.title, top, 5);
   questions.forEach((x) => reserve('q', x.ref, x.file));
-  const decisionsOf = (t) => decisions.filter((d) => d.issues.includes(t));
   const questionsOf = (t) => questions.filter((x) => x.issues.includes(t));
   const releasesOf = (t) => (t.fixVersions || []).map((v) => releases.find((r) => r.id === v)).filter(Boolean);
   const list = (items) => items.map((x) => `- ${x}`).join('\n');
@@ -151,12 +110,6 @@ ${flagged(epics, (e) => `${eLink(e)} (${epicIssues(e).length} issues)`)}
 ## Releases
 ${flagged(releases, (r) => `${rLink(r)} (${r.status || 'unreleased'})`)}
 
-## Documents
-${flagged(docs, (d) => wl(safeName(d.file), d.title))}
-
-## Decisions
-${flagged(decisions, (d) => `${wl(safeName(d.file), `${d.code} ${d.title}`)}${d.status ? ` (${d.status})` : ''}`)}
-
 ## Open questions
 ${flagged(questions, (x) => `${wl(safeName(x.file), x.title)}${x.status ? ` (${x.status})` : ''}`)}
 
@@ -177,7 +130,7 @@ ${String(p.summary || p.description || '').trim() || '(no summary yet)'}
 ${(p.assumptions || []).length ? list(p.assumptions.map((a) => (typeof a === 'string' ? a : a?.text || ''))) : '- (none recorded)'}
 
 ## Open questions
-${flagged(questions.filter((x) => !x.epic), (x) => wl(safeName(x.file), x.title))}
+${flagged(questions, (x) => wl(safeName(x.file), x.title))}
 
 ## Epics
 ${flagged(epics, (e) => eLink(e))}
@@ -192,7 +145,6 @@ See also [[Index]].` });
     const items = epicIssues(e);
     const nDone = items.filter((t) => catOf(p, t.status) === 'done').length;
     const rels = releases.filter((r) => items.some((t) => (t.fixVersions || []).includes(r.id)));
-    const eDocs = docs.filter((d) => d.epic === e);
     add({ type: 'epic', file: fileOf.get(`e:${e.id}`), key: e.key, ref: e.id, title: e.title, status: !items.length ? 'Empty' : nDone === items.length ? 'Done' : nDone ? 'In progress' : 'To do', tags: [], updated: latest(items),
       body: `# ${e.key || ''} ${e.title}
 
@@ -203,7 +155,7 @@ ${String(e.description || '').trim() || '(no description)'}
 ${rels.length ? `- **Releases**: ${rels.map(rLink).join(', ')}\n` : ''}
 ## Issues
 ${flagged(items, (t) => `${tLink(t)} · ${t.status || ''}${t.type ? ` · ${t.type}` : ''}`)}
-${eDocs.length ? `\n## Documents\n${list(eDocs.map((d) => wl(safeName(d.file), d.title)))}\n` : ''}${decisions.some((d) => d.epic === e) ? `\n## Decisions\n${list(decisions.filter((d) => d.epic === e).map((d) => `${wl(safeName(d.file), `${d.code} ${d.title}`)}${d.chosen ? `: ${d.chosen}` : ''}`))}\n` : ''}${questions.some((x) => x.epic === e) ? `\n## Open decisions\n${list(questions.filter((x) => x.epic === e).map((x) => `${wl(safeName(x.file), `${x.code} ${x.title}`)} (${x.status})`))}\n` : ''}` });
+` });
   }
 
   // Issues
@@ -218,7 +170,7 @@ ${eDocs.length ? `\n## Documents\n${list(eDocs.map((d) => wl(safeName(d.file), d
     const sprint = (p.sprints || []).find((s) => s.id === t.sprintId);
     const comments = (t.comments || []).filter((c) => !c.system && String(c.text || '').trim()).slice(-5);
     const tcs = t.testCases || [];
-    const dec = decisionsOf(t), qs = questionsOf(t);
+    const qs = questionsOf(t);
     add({ type: 'issue', file: fileOf.get(`t:${t.id}`), key: t.key, ref: t.id, title: t.title, status: t.status, updated: t.updatedAt,
       tags: [t.type, t.priority && `priority-${t.priority}`, t.layer, ...(t.labels || [])].filter(Boolean),
       body: `# ${t.key || ''} ${t.title}
@@ -226,7 +178,7 @@ ${eDocs.length ? `\n## Documents\n${list(eDocs.map((d) => wl(safeName(d.file), d
 - **Type**: ${t.type || 'Story'}${t.priority ? ` · **Priority**: ${t.priority}` : ''}${t.storyPoints ? ` · **Points**: ${t.storyPoints}` : ''}
 - **Status**: ${t.status || ''}${t.assignee ? ` · **Assignee**: ${t.assignee}` : ''}
 ${e ? `- **Epic**: ${eLink(e)}\n` : ''}${parent ? `- **Parent**: ${tLink(parent)}\n` : ''}${sprint ? `- **Sprint**: ${sprint.name}\n` : ''}${rels.length ? `- **Fix versions**: ${rels.map(rLink).join(', ')}\n` : ''}${t.layer ? `- **Layer**: ${t.layer}\n` : ''}
-${t.userStory ? `## User story\n${t.userStory}\n\n` : ''}${String(t.description || '').trim() ? `## Description\n${String(t.description).trim()}\n\n` : ''}${(t.acceptanceCriteria || []).length ? `## Acceptance criteria\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\n` : ''}${deps.length ? `## Depends on\n${list(deps)}\n\n` : ''}${blockedBy.length ? `## Needed by\n${list(blockedBy.map((x) => tLink(x)))}\n\n` : ''}${links.length ? `## Links\n${list(links)}\n\n` : ''}${subs.length ? `## Sub-tasks\n${list(subs.map((x) => `${tLink(x)} · ${x.status || ''}`))}\n\n` : ''}${dec.length ? `## Decisions\n${list(dec.map((d) => `${wl(safeName(d.file), `${d.code} ${d.title}`)}${d.chosen ? `: ${d.chosen}` : ''}`))}\n\n` : ''}${qs.length ? `## Open questions\n${list(qs.map((x) => wl(safeName(x.file), x.title)))}\n\n` : ''}${tcs.length ? `## Test cases\n${list(tcs.slice(0, 30).map((c) => `${c.title}${c.status && c.status !== 'Not run' ? ` (${c.status})` : ''}`))}\n\n` : ''}${(t.prs || []).length ? `## Pull requests\n${list(t.prs.map((r) => `${r.title || r.url || 'PR'}${r.status ? ` (${r.status})` : ''}${r.url ? ` ${r.url}` : ''}`))}\n\n` : ''}${comments.length ? `## Recent comments\n${list(comments.map((c) => `${c.author || 'Someone'}: ${clip(String(c.text).replace(/\s+/g, ' '), 400)}`))}\n` : ''}` });
+${t.userStory ? `## User story\n${t.userStory}\n\n` : ''}${String(t.description || '').trim() ? `## Description\n${String(t.description).trim()}\n\n` : ''}${(t.acceptanceCriteria || []).length ? `## Acceptance criteria\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\n` : ''}${deps.length ? `## Depends on\n${list(deps)}\n\n` : ''}${blockedBy.length ? `## Needed by\n${list(blockedBy.map((x) => tLink(x)))}\n\n` : ''}${links.length ? `## Links\n${list(links)}\n\n` : ''}${subs.length ? `## Sub-tasks\n${list(subs.map((x) => `${tLink(x)} · ${x.status || ''}`))}\n\n` : ''}${qs.length ? `## Open questions\n${list(qs.map((x) => wl(safeName(x.file), x.title)))}\n\n` : ''}${tcs.length ? `## Test cases\n${list(tcs.slice(0, 30).map((c) => `${c.title}${c.status && c.status !== 'Not run' ? ` (${c.status})` : ''}`))}\n\n` : ''}${(t.prs || []).length ? `## Pull requests\n${list(t.prs.map((r) => `${r.title || r.url || 'PR'}${r.status ? ` (${r.status})` : ''}${r.url ? ` ${r.url}` : ''}`))}\n\n` : ''}${comments.length ? `## Recent comments\n${list(comments.map((c) => `${c.author || 'Someone'}: ${clip(String(c.text).replace(/\s+/g, ' '), 400)}`))}\n` : ''}` });
   }
 
   // Releases
@@ -258,21 +210,12 @@ ${s.addedBy ? `Added by ${s.addedBy}. ` : ''}${sEpics.length ? `Epics from it: $
 ${clip(s.text, 30000) || '(no text)'}` });
   }
 
-  // Documents, decisions, questions
-  for (const d of docs) add({ type: 'doc', file: d.file, key: d.key, ref: d.ref, title: d.title, status: d.status, tags: d.tags, updated: d.updated,
-    body: `# ${d.title}\n\nFor ${eLink(d.epic)}.\n\n${clip(d.md, 40000)}` });
-  for (const d of decisions) add({ type: 'decision', file: d.file, key: d.key, ref: d.ref, title: `${d.code} ${d.title}`, status: d.status, tags: ['architecture'], updated: d.updated,
-    body: `# ${d.code} ${d.title}
+  // Open questions
+  for (const x of questions) add({ type: 'question', file: x.file, key: x.key, ref: x.ref, title: x.title, status: x.status, tags: ['open-question'], updated: x.updated,
+    body: `# ${x.title}
 
-- **Chosen**: ${d.chosen || '(not decided)'}
-- **Status**: ${d.status || 'Proposed'}
-- **Epic**: ${eLink(d.epic)} · from ${wl(safeName(d.docFile), 'its Architecture Record')}
-${d.issues.length ? `\n## Issues it affects\n${list(d.issues.map((t) => tLink(t)))}\n` : ''}${d.section ? `\n${clip(d.section.replace(/^#+\s*/, '## '), 6000)}` : ''}` });
-  for (const x of questions) add({ type: 'question', file: x.file, key: x.key, ref: x.ref, title: x.code ? `${x.code} ${x.title}` : x.title, status: x.status, tags: [x.epic ? 'open-decision' : 'open-question'], updated: x.updated,
-    body: `# ${x.code ? `${x.code} ` : ''}${x.title}
-
-${x.text && x.text !== x.title ? `${x.text}\n\n` : ''}- **Status**: ${x.status || 'Open'}${x.owner ? ` · **Owner**: ${x.owner}` : ''}${x.due ? ` · **Due**: ${x.due}` : ''}
-${x.epic ? `- **Epic**: ${eLink(x.epic)} · from ${wl(safeName(x.docFile), 'its Feature Brief')}\n` : `- **Project**: ${link('p', 'overview', p.name)}\n`}${x.issues.length ? `\n## Issues it may affect\n${list(x.issues.map((t) => tLink(t)))}` : ''}` });
+${x.text && x.text !== x.title ? `${x.text}\n\n` : ''}- **Status**: ${x.status || 'Open'}
+- **Project**: ${link('p', 'overview', p.name)}\n${x.issues.length ? `\n## Issues it may affect\n${list(x.issues.map((t) => tLink(t)))}` : ''}` });
   return notes;
 }
 
@@ -506,7 +449,7 @@ export async function brainContext(projectId, { issueIds = [], epicIds = [], key
     if (n.type === 'issue' && seeds.some((s) => s.type === 'epic') && ++siblings > 12) continue;
     pick.set(n.id, { why: 'linked', depth: 1 });
   }
-  // Hop 2: decisions, questions, documents and people's notes two links away (not every issue of every epic).
+  // Hop 2: questions and people's notes two links away (not every issue of every epic).
   const hop2: Set<any> = new Set();
   for (const [id, x] of [...pick]) if (x.depth === 1) for (const y of near(id)) if (!pick.has(y)) hop2.add(y);
   for (const n of order(hop2)) if (['note', 'decision', 'question', 'doc'].includes(n.type)) pick.set(n.id, { why: 'two links away', depth: 2 });

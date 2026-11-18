@@ -10,7 +10,6 @@ export const AI_TASKS = [
   { id: 'epics', group: 'Planning', label: 'Epics from documents', desc: 'New projects from documents, regrouping epics', tier: 'standard', maxOut: 32000, escalate: true },
   { id: 'tickets', group: 'Planning', label: 'Tickets', desc: 'Enhance, acceptance criteria, new issues', tier: 'high', maxOut: 16000, escalate: true },
   { id: 'split', group: 'Planning', label: 'Splitting issues', desc: 'Split big issues into small ones', tier: 'standard', maxOut: 12000, escalate: true },
-  { id: 'docs', group: 'Documents', label: 'Documents', desc: 'Problem statements, feature briefs, architecture records', tier: 'high', maxOut: 32000 },
   { id: 'agents', group: 'Documents', label: 'Document agents', desc: 'Epic, Kick Off, UX Design Spec, Demo, Sign-Off, Deploy and Release agents', tier: 'standard', maxOut: 16000 },
   { id: 'repo', group: 'Documents', label: 'Repository scan', desc: 'Built features, page tests and changes from your code', tier: 'standard', maxOut: 24000 },
   { id: 'tests', group: 'Testing', label: 'Test cases', desc: 'Test cases on issues and repository tests', tier: 'standard', maxOut: 16000, escalate: true },
@@ -19,7 +18,7 @@ export const AI_TASKS = [
   { id: 'healing', group: 'Testing', label: 'Self-healing', desc: 'Repairing scripts that broke because the page changed', tier: 'standard', maxOut: 8000 },
   { id: 'selection', group: 'Testing', label: 'Test selection', desc: 'Picking the tests worth running for a change', tier: 'light', maxOut: 4000 },
   { id: 'failure', group: 'Testing', label: 'Failure analysis', desc: 'Root cause and fix notes when an automated test fails', tier: 'light', maxOut: 3000 },
-  { id: 'code', group: 'Code', label: 'Coding agents', desc: 'Build a Ticket, Frontend and Backend Developer, Fix a Bug, Architecture Record (Claude Code)', tier: 'high', maxOut: 32000, agent: true },
+  { id: 'code', group: 'Code', label: 'Coding agents', desc: 'Build a Ticket, Frontend and Backend Developer, Fix a Bug (Claude Code)', tier: 'high', maxOut: 32000, agent: true },
   { id: 'agent-tests', group: 'Code', label: 'Test and helper agents', desc: 'Feature Tests, Test Automation, Free Worker (Claude Code)', tier: 'standard', agent: true },
   { id: 'review', group: 'Code', label: 'Code review', desc: 'Review a Pull Request, Review Panel, UI/UX Review, on AI changes and open pull requests', tier: 'high', agent: true },
   { id: 'pr', group: 'Code', label: 'Pull request text', desc: 'PR / MR titles and descriptions', tier: 'light', maxOut: 1500 },
@@ -28,7 +27,7 @@ export const AI_TASKS = [
 const TASK_IDS = new Set(AI_TASKS.map((t) => t.id));
 
 /** Which routing task a Claude Code agent's runs count as. */
-export const AGENT_TASK = { build: 'code', frontend: 'code', backend: 'code', 'bug-fix': 'code', 'architecture-record': 'code',
+export const AGENT_TASK = { build: 'code', frontend: 'code', backend: 'code', 'bug-fix': 'code',
   'feature-tests': 'agent-tests', 'test-automation': 'agent-tests', 'free-worker': 'agent-tests', review: 'review', 'review-panel': 'review', 'ui-review': 'review' };
 
 /** Claude Code aliases: always the newest model of each family your Claude Code knows. */

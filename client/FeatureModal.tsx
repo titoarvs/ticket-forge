@@ -7,10 +7,9 @@ import { S, P, api, toast, closeModal, mutate, readNdjson, can, newTicket, nextE
 import { Modal, Ico, I, Spinner, TypeIcon, EmptyState } from './ui';
 import { TF, TA, SF, CB, MenuItem } from './fields';
 import { useQuestions, QuestionsView } from './Clarify';
-import { FeatureBrainstorm } from './FeatureBrainstorm';
 import { saveEpicDraft } from './EpicDrafts';
 
-type Step = 'input' | 'ask' | 'brainstorm' | 'running' | 'review';
+type Step = 'input' | 'ask' | 'running' | 'review';
 
 export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename: string; text: string }; sourceId?: string } = {}) {
   const p = P();
@@ -21,7 +20,6 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   const [doc, setDoc] = useState<Any>(initialDoc || null);
   const [reading, setReading] = useState(false);
   const [opts, setOpts] = useState({ granularity: 'balanced', includeTests: true, testsPerTicket: std, instructions: '' });
-  const [answers, setAnswers] = useState('');
   const [log, setLog] = useState<Any[]>([]);
   const [chars, setChars] = useState(0);
   const [result, setResult] = useState<Any>(null);
@@ -39,11 +37,27 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
     try { const r = await api('/api/parse', { method: 'POST', body: fd }); setDoc({ filename: r.filename, text: r.text, file: keepsOriginal(file) ? file : null }); }
     catch (e: Any) { toast(e.message, 'err'); } finally { setReading(false); }
   };
-  // Planning starts with a brainstorm (FeatureBrainstorm): the feature is worked through, each epic gets a Problem
-  // Statement, Feature Brief and Architecture Record that are approved, and only then are the issues written from them.
-  const generate = (ans = '') => {
+  const generate = async (answers = '') => {
     if (!source || source.text.length < 15) { toast('Describe the feature in a sentence or two, or add a document.', 'err'); return; }
-    setAnswers(ans); setStep('brainstorm');
+    ctrl.current = new AbortController();
+    setStep('running'); setLog([{ message: `Sending “${source.filename}” to the AI…` }]); setChars(0);
+    const push = (message: string, level?: string) => setLog((l) => [...l.map((x) => ({ ...x, done: true })), { message, level }]);
+    try {
+      const res = await api(`/api/projects/${p.id}/feature`, { method: 'POST', raw: true, signal: ctrl.current.signal, body: aiBody({ text: source.text, sourceName: source.filename, options: { ...opts, instructions: [opts.instructions, answers].filter(Boolean).join('\n\n') } }) });
+      let out: Any = null;
+      await readNdjson(res, (ev) => {
+        if (ev.type === 'progress') { if (ev.progressChars) setChars(ev.progressChars); if (ev.message) { setChars(0); push(ev.message, ev.level); } }
+        else if (ev.type === 'done') out = ev.result;
+        else if (ev.type === 'error') throw new Error(ev.error || ev.message);
+      });
+      if (!out) throw new Error('The AI didn’t return a plan.');
+      setResult(out);
+      setPick(Object.fromEntries(out.tickets.map((t: Any) => [t.id, true])));
+      setStep('review');
+    } catch (e: Any) {
+      if (e.name === 'AbortError') { setStep('input'); toast('Cancelled'); return; }
+      push(`Couldn’t plan the feature: ${e.message}`, 'err');
+    }
   };
 
   // ---------------------------------------------------------------- add the chosen issues
@@ -57,12 +71,7 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
     const created: string[] = [], issueIds: string[] = [], epicIds = new Set<string>();
     const newSourceId = uid();
     mutate((pp) => {
-      if (canEpic) for (const e of newEpics) pp.epics.push({ id: e.id, key: nextEpicKey(), title: e.title, description: e.description, color: COLORS[pp.epics.length % COLORS.length], ...(e.docs?.psd ? { psd: e.docs.psd } : {}), ...(e.docs?.fbd ? { fbd: e.docs.fbd } : {}), ...(e.docs?.ard ? { ard: e.docs.ard } : {}) });
-      // An existing epic gets the documents approved here (the ones it didn't have, or that were written again).
-      if (canEpic) for (const e of result.epics.filter((x: Any) => x.existing && x.docs && chosen.some((t: Any) => t.epicId === x.id))) {
-        const ep = pp.epics.find((x: Any) => x.id === e.id);
-        if (ep) for (const k of ['psd', 'fbd', 'ard']) if (e.docs[k]) ep[k] = e.docs[k];
-      }
+      if (canEpic) for (const e of newEpics) pp.epics.push({ id: e.id, key: nextEpicKey(), title: e.title, description: e.description, color: COLORS[pp.epics.length % COLORS.length] });
       for (const t of chosen) {
         const lostEpic = !canEpic && newEpics.some((e: Any) => e.id === t.epicId);
         const nt = newTicket({
@@ -97,10 +106,6 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   };
 
   // ---------------------------------------------------------------- views
-  if (step === 'brainstorm' && source) {
-    return <FeatureBrainstorm source={source} opts={opts} answers={answers} onBack={() => setStep('input')}
-      onDone={(out) => { setResult(out); setPick(Object.fromEntries(out.tickets.map((t: Any) => [t.id, true]))); setStep('review'); }} />;
-  }
   if (step === 'ask' && source) return <FeatureQuestions text={source.text} instructions={opts.instructions} onBack={() => setStep('input')} onGo={generate} />;
   if (step === 'running') {
     return (
@@ -134,7 +139,6 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
                   onChange={(ev) => setPick({ ...pick, ...Object.fromEntries(items.map((t: Any) => [t.id, ev.target.checked])) })} />
                 <TypeIcon type="Epic" /><b>{e.title}</b>
                 <span className={`loz ${e.existing ? '' : 't-pass'}`}>{e.existing ? 'Existing epic' : 'New epic'}</span>
-                {e.docs && <span className="loz t-pass" title="The Problem Statement, Feature Brief and Architecture Record Design were approved for this epic">Documents approved</span>}
                 <span className="muted small" style={{ marginLeft: 'auto' }}>{items.filter((t: Any) => pick[t.id]).length} of {items.length}</span>
               </label>
               {!e.existing && e.description && <p className="muted small feat-desc">{e.description}</p>}
@@ -167,8 +171,8 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   }
 
   return (
-    <Modal title="Add feature with AI" wide actions={[{ label: 'Cancel' }, { label: '✨ Brainstorm the feature', kind: 'primary', disabled: !source || reading, onClick: () => { if (!source || source.text.length < 15) toast('Describe the feature in a sentence or two, or add a document.', 'err'); else setStep('ask'); } }]}>
-      <p style={{ marginTop: 0 }}>Describe a new feature, or import a document. The AI first brainstorms it with you, then writes a Problem Statement, a Feature Brief and an Architecture Record for each epic that you approve, and only then plans the epics and issues{opts.includeTests ? ' with test cases' : ''} that fit <b>{p.name}</b>: it knows its {p.epics.length} epic{p.epics.length === 1 ? '' : 's'} and {p.tickets.length} issue{p.tickets.length === 1 ? '' : 's'}, adds to existing epics where they fit and doesn’t repeat work. You review everything before it’s added.</p>
+    <Modal title="Add feature with AI" wide actions={[{ label: 'Cancel' }, { label: '✨ Plan the work', kind: 'primary', disabled: !source || reading, onClick: () => { if (!source || source.text.length < 15) toast('Describe the feature in a sentence or two, or add a document.', 'err'); else setStep('ask'); } }]}>
+      <p style={{ marginTop: 0 }}>Describe a new feature, or import a document. The AI plans epics and issues{opts.includeTests ? ' with test cases' : ''} that fit <b>{p.name}</b>: it knows its {p.epics.length} epic{p.epics.length === 1 ? '' : 's'} and {p.tickets.length} issue{p.tickets.length === 1 ? '' : 's'}, adds to existing epics where they fit and doesn’t repeat work. You review everything before it’s added.</p>
       <div className="seg" role="tablist" style={{ marginBottom: 12 }}>
         <button role="tab" aria-selected={mode === 'describe'} className={mode === 'describe' ? 'on' : ''} onClick={() => setMode('describe')}>Describe it</button>
         <button role="tab" aria-selected={mode === 'document'} className={mode === 'document' ? 'on' : ''} onClick={() => setMode('document')}>Import a document</button>

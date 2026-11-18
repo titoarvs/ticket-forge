@@ -1,4 +1,4 @@
-// Markdown (as written for Feature Briefs) to a Word document: headings, paragraphs with bold, italic, code and
+// Markdown (as written for agent documents) to a Word document: headings, paragraphs with bold, italic, code and
 // links, bulleted and numbered lists, and tables with a navy header row.
 const NAVY = '0C2A50';
 
