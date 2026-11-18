@@ -12,6 +12,7 @@
     "db:schema": "node scripts/drizzle-schema.mjs",
     "db:check": "node scripts/drizzle-schema.mjs --check",
     "db:studio": "drizzle-kit studio",
+    "docs:overview": "node --import tsx scripts/overview-docx.ts",
     "legacy": "node --env-file-if-exists=.env --import tsx legacy/server.js"
   },
   "license": "UNLICENSED",
