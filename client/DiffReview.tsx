@@ -196,10 +196,12 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
     }
   };
   // Recalculates for the chosen target; the earlier answer is dropped so a slow one can't replace a newer choice.
+  // (load numbers each request; an answer that isn't the latest one is ignored.)
   useEffect(() => {
+    const s = seq;
     load(target);
     return () => {
-      seq.current++;
+      s.current++;
     };
   }, [job.id, job.finishedAt, job.rounds, target]); // eslint-disable-line react-hooks/exhaustive-deps
   // The panel's own width decides the layout (the same view sits in a dialog, a page and a side panel).

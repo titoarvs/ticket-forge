@@ -157,7 +157,7 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     members.forEach((m, i) => list.push({ ...m, w: PW, h: PH, def: { x: PX, y: top + i * (PH + 44) } }));
     list.push({ id: 'add', kind: 'add', w: PW, h: 64, def: { x: PX, y: top + members.length * (PH + 44) } });
     return { nodes: list, chain: members.map((m) => m.id) as string[] };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    /* eslint-disable react-hooks/exhaustive-deps -- the layout depends on these summaries, not on the objects */
   }, [
     JSON.stringify(tasks.map((t) => [t.id, t.group])),
     tiers.join(),
@@ -166,6 +166,7 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     localMode,
     c.copilot?.available,
   ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
   // The layout is rebuilt only when nodes come or go; what each node shows is read fresh on every render.
   const nodes = baseNodes.map((n) =>
     n.kind === 'provider'

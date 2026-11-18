@@ -137,8 +137,9 @@ function AskModal({ o, resolve, box }: { o: AskOpts; resolve: (v: string | null)
         if (!done.current && S.modal !== box.node) finish(null, false);
       }, 0);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on unmount only
     [],
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+  );
   return (
     <Modal
       title="A few questions first"

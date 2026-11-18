@@ -798,16 +798,14 @@ Return JSON: { "tickets": [ { "feature": 1, "title": "…", "type": "Story|Task|
             return [
               { ...one({}, f.title), existingId: null, existingKey: null, existingStatus: null, alreadyDone: false, existingEpicId: null },
             ];
-          return mine
-            .slice(0, 8)
-            .map((d) => ({
-              ...one(d, d.title),
-              existingId: null,
-              existingKey: null,
-              existingStatus: null,
-              alreadyDone: false,
-              existingEpicId: null,
-            }));
+          return mine.slice(0, 8).map((d) => ({
+            ...one(d, d.title),
+            existingId: null,
+            existingKey: null,
+            existingStatus: null,
+            alreadyDone: false,
+            existingEpicId: null,
+          }));
         }),
       };
       done++;

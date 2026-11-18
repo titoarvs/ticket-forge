@@ -9,6 +9,6 @@ legacy
 drizzle
 coverage
 package-lock.json
-lib/schema.ts
+lib/schema
 lib/relations.ts
 *.md
