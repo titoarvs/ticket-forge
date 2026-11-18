@@ -16,6 +16,8 @@ const SETTINGS_KEYS = ['name', 'key', 'summary', 'assumptions', 'openQuestions',
 // testRepo: the Xray-style test repository, plans and executions (Test management). Testers and editors may change it.
 const META_PERM = { epics: ['epic.manage'], sprints: ['sprint.manage'], releases: ['sprint.manage', 'project.settings'], sources: ['issue.create', 'project.settings'], testRepo: ['test.run', 'issue.edit'] };
 const SYSTEM_AUTHORS = new Set(['Automation', 'Development', 'Claude']);
+/** A draft epic (saved AI output) can't be published without a title. */
+export const NO_DRAFT_TITLE = 'Give the draft a title before you publish it.';
 const gzip = promisify(zlib.gzip);
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
@@ -341,6 +343,11 @@ export async function patchProject(id, patch, user) {
 
     const changedMeta = metaKeys.filter((k) => !same(old[k], meta[k]) || (k === 'name' && meta[k] !== pr.name) || (k === 'key' && meta[k] !== pr.key));
     for (const k of changedMeta) need(META_PERM[k] || ['project.settings']);
+    // Publishing an epic draft (its draft flag removed) needs a title.
+    if (changedMeta.includes('epics')) {
+      const was = new Map((Array.isArray(old.epics) ? old.epics : []).map((e: any) => [e?.id, e]));
+      if ((Array.isArray(meta.epics) ? meta.epics : []).some((e: any) => e && (was.get(e.id) as any)?.draft && !e.draft && !String(e.title || '').trim())) throw new HttpError(400, NO_DRAFT_TITLE);
+    }
     const upserts = (patch.upsert || []).filter((tk) => tk && typeof tk.id === 'string').map((tk) => keepSystemEntries(current.get(tk.id)?.data, tk));
     for (const tk of upserts) ticketNeeds(current.get(tk.id)?.data, tk, user).forEach(need);
     const removes = (patch.remove || []).filter((rid) => current.has(rid));
