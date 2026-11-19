@@ -1,0 +1,609 @@
+'use client';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
+import {
+  useStore,
+  P,
+  store,
+  type Any,
+  can,
+  toast,
+  epic,
+  openModal,
+  mutate,
+  logEvent,
+  ago,
+  setMenu,
+  copyText,
+  S,
+  emit,
+} from '../core';
+import {
+  Swatch,
+  Confirm,
+  Avatar,
+  Ico,
+  I,
+  TypeIcon,
+  LayerChip,
+  Menu,
+  Spinner,
+  EmptyState,
+} from '../ui';
+import { TF, SF, MenuItem } from '../fields';
+import { refreshPr, openDrawer } from '../actions';
+import { codeReady, openUpdatePr } from '../DevCode';
+import Link from 'next/link';
+import { PrFindingChips, openPrFindings } from '../CodeRabbit';
+import {
+  ACTIVE,
+  STALE_MS,
+  flagsOf,
+  time,
+  StatusIcon,
+  ChecksChip,
+  ReviewChip,
+  SizeChip,
+  PrDetails,
+  FOCUS,
+  SORTS,
+} from './PrDetails';
+import { ref, prCls, VERDICT_CLS, ReviewModal, LinkModal } from './ReviewModal';
+
+export function PullRequests() {
+  useStore();
+  const p = P();
+  const [status, setStatus] = useState(() => store.get('tf.pr.status', 'active'));
+  const [focus, setFocus] = useState('');
+  const [q, setQ] = useState('');
+  const [repo, setRepo] = useState('');
+  const [sort, setSort] = useState(() => store.get('tf.pr.sort', 'updated'));
+  const [group, setGroup] = useState(() => store.get('tf.pr.group', 'none'));
+  const [open, setOpen] = useState<string | null>(null);
+  const [busy] = useState('');
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const rows: { t: Any; r: Any }[] = p.tickets.flatMap((t: Any) =>
+    (t.prs || []).map((r: Any) => ({ t, r })),
+  );
+  const edit = can('issue.edit');
+  const ai = can('ai.use') && codeReady();
+  const canAi = (r: Any) =>
+    ACTIVE.includes(r.status) && ['GitHub', 'GitLab'].includes(r.provider) && r.branch;
+  const save = (k: string, v: string) => store.set(`tf.pr.${k}`, v);
+
+  // Opening the page brings open requests up to date (quietly, one at a time) when they were last
+  // read 10+ minutes ago.
+  const stopRef = useRef(false);
+  const refreshList = async (list: { t: Any; r: Any }[], quiet: boolean) => {
+    if (!list.length) return;
+    setProgress({ done: 0, total: list.length });
+    let failed = 0;
+    for (let i = 0; i < list.length && !stopRef.current; i++) {
+      if (!(await refreshPr(list[i].t, list[i].r.id, { quiet: true }))) failed += 1;
+      setProgress({ done: i + 1, total: list.length });
+    }
+    setProgress(null);
+    if (!quiet)
+      toast(
+        failed
+          ? `${list.length - failed} of ${list.length} updated; ${failed} couldn’t be read.`
+          : `${list.length} request${list.length === 1 ? '' : 's'} updated`,
+        failed ? 'warn' : 'ok',
+      );
+  };
+  useEffect(() => {
+    stopRef.current = false;
+    if (edit) {
+      const stale = rows
+        .filter(
+          (x) =>
+            ACTIVE.includes(x.r.status) &&
+            ['GitHub', 'GitLab'].includes(x.r.provider) &&
+            Date.now() - Date.parse(x.r.checkedAt || 0) > STALE_MS,
+        )
+        .slice(0, 12);
+      refreshList(stale, true);
+    }
+    return () => {
+      stopRef.current = true;
+    };
+  }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const count = (s: string) => rows.filter((x) => x.r.status === s).length;
+  const fcount = (k: string) => rows.filter((x) => (flagsOf(x.r) as Any)[k]).length;
+  const repos = [...new Set(rows.map((x) => x.r.repo).filter(Boolean))] as string[];
+  const ql = q.trim().toLowerCase();
+  const shown = rows
+    .filter(
+      ({ t, r }) =>
+        (focus
+          ? (flagsOf(r) as Any)[focus]
+          : status === 'all' ||
+            (status === 'active' ? ACTIVE.includes(r.status) : r.status === status)) &&
+        (!repo || r.repo === repo) &&
+        (!ql ||
+          [r.title, r.branch, r.repo, ref(r), t.key, t.title, r.author, ...(r.labels || [])].some(
+            (v) =>
+              String(v || '')
+                .toLowerCase()
+                .includes(ql),
+          )),
+    )
+    .sort((a, b) =>
+      sort === 'oldest'
+        ? time(a.r).localeCompare(time(b.r))
+        : sort === 'size'
+          ? (b.r.size?.additions || 0) +
+            (b.r.size?.deletions || 0) -
+            ((a.r.size?.additions || 0) + (a.r.size?.deletions || 0))
+          : sort === 'issue'
+            ? a.t.key.localeCompare(b.t.key, undefined, { numeric: true })
+            : time(b.r).localeCompare(time(a.r)),
+    );
+  const groups: { key: string; title: ReactNode; items: { t: Any; r: Any }[] }[] = [];
+  if (group === 'none') groups.push({ key: 'all', title: null, items: shown });
+  else
+    for (const x of shown) {
+      const k =
+        group === 'repo'
+          ? x.r.repo || 'Other'
+          : group === 'status'
+            ? x.r.status
+            : epic(x.t.epicId)?.id || 'none';
+      let g = groups.find((y) => y.key === k);
+      if (!g) {
+        g = {
+          key: k,
+          title:
+            group === 'epic' ? (
+              epic(k) ? (
+                <>
+                  <Swatch color={epic(k).color} />
+                  {epic(k).title}
+                </>
+              ) : (
+                'No epic'
+              )
+            ) : (
+              k
+            ),
+          items: [],
+        };
+        groups.push(g);
+      }
+      g.items.push(x);
+    }
+  const unlink = (t: Any, r: Any) =>
+    openModal(
+      <Confirm
+        title={`Unlink ${r.title}?`}
+        label="Unlink"
+        text={`It stays on ${r.provider || 'its host'}; it's only removed from ${t.key}.`}
+        onYes={() =>
+          mutate(() => {
+            t.prs = t.prs.filter((x: Any) => x.id !== r.id);
+            logEvent(t, `unlinked pull request ${r.title}`);
+          })
+        }
+      />,
+    );
+  const clearAll = () => {
+    setStatus('all');
+    setFocus('');
+    setQ('');
+    setRepo('');
+  };
+
+  const row = ({ t, r }: { t: Any; r: Any }) => {
+    const id = `${t.id}-${r.id}`;
+    const isOpen = open === id;
+    const f = flagsOf(r);
+    return (
+      <div
+        key={id}
+        className={`pr-item s-${String(r.status).toLowerCase()} ${isOpen ? 'open' : ''}`}
+      >
+        <div
+          className="pr-row"
+          role="button"
+          tabIndex={0}
+          aria-expanded={isOpen}
+          onClick={(e) => {
+            if (!(e.target as HTMLElement).closest('a, button')) setOpen(isOpen ? null : id);
+          }}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+              e.preventDefault();
+              setOpen(isOpen ? null : id);
+            }
+          }}
+        >
+          <StatusIcon r={r} />
+          <div className="pr-body">
+            <div className="pr-l1">
+              <a href={r.url} target="_blank" rel="noopener noreferrer" className="pr-title">
+                {r.title}
+              </a>
+              <span className="pr-num">{ref(r)}</span>
+              <span className={`loz ${prCls(r.status)}`}>{r.status}</span>
+              {r.aiReview && (
+                <span
+                  className={`loz ${VERDICT_CLS[r.aiReview.verdict] || ''}`}
+                  title={`${r.aiReview.agent} · ${ago(r.aiReview.at)}${r.aiReview.posted ? ' · posted on the request' : ''}`}
+                >
+                  AI: {r.aiReview.verdict}
+                  {r.aiReview.posted ? ' ✓' : ''}
+                </span>
+              )}
+            </div>
+            <div className="pr-l2 muted small">
+              <span>{r.repo}</span>
+              {r.branch && (
+                <span className="pr-br">
+                  <code>{r.branch}</code> → <code>{r.base || '…'}</code>
+                </span>
+              )}
+              {r.author && (
+                <span className="pr-who">
+                  <Avatar name={r.author} size={16} />
+                  {r.author}
+                </span>
+              )}
+              {r.createdAt && <span>opened {ago(r.createdAt)}</span>}
+              {r.updatedAt && <span>updated {ago(r.updatedAt)}</span>}
+            </div>
+            <div className="pr-l3">
+              <ChecksChip c={r.checks} />
+              <ReviewChip r={r} />
+              <PrFindingChips t={t} r={r} />
+              {f.conflicts && (
+                <span className="pr-chip t-fail">
+                  <Ico svg={I.warn} />
+                  Conflicts
+                </span>
+              )}
+              {f.ready && <span className="pr-chip t-pass">Ready to merge</span>}
+              <SizeChip s={r.size} />
+              {r.comments > 0 && (
+                <span className="pr-meta" title={`${r.comments} comments`}>
+                  <Ico svg={I.comment} />
+                  {r.comments}
+                </span>
+              )}
+              <button
+                type="button"
+                className="pr-issue small"
+                onClick={() => openDrawer('issue', t.id)}
+                title="Open the issue"
+              >
+                <TypeIcon type={t.type} />
+                <span className="key">{t.key}</span>
+                <span className="pr-issue-t">{t.title}</span>
+                {t.layer && <LayerChip layer={t.layer} short />}
+              </button>
+            </div>
+          </div>
+          <div className="pr-acts">
+            {ai && canAi(r) && (
+              <button
+                className="btn sm ai"
+                onClick={() => openModal(<ReviewModal t={t} pr={r} />)}
+                title="A read-only review agent reviews the diff against the issue"
+              >
+                <Ico svg={I.sparkle} />
+                Review
+              </button>
+            )}
+            {['GitHub', 'GitLab'].includes(r.provider) && (
+              <button
+                className="btn sm subtle"
+                onClick={() => openPrFindings(t, r)}
+                title="CodeRabbit's review comments: fix with an agent, file as bugs, or dismiss"
+              >
+                🐇 CodeRabbit
+              </button>
+            )}
+            {ai && edit && canAi(r) && (
+              <button
+                className="btn sm"
+                onClick={() => openUpdatePr(t, r)}
+                title="Change, enhance, address review comments or re-describe it with AI"
+              >
+                Update
+              </button>
+            )}
+            {edit && (
+              <button
+                className="icon-btn"
+                title="Refresh from the host"
+                aria-label="Refresh"
+                disabled={!!busy || !!progress}
+                onClick={() => refreshPr(t, r.id)}
+              >
+                <Ico svg={I.refresh} />
+              </button>
+            )}
+            <a
+              className="icon-btn"
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open on ${r.provider || 'the host'}`}
+              aria-label={`Open on ${r.provider || 'the host'}`}
+            >
+              <Ico svg={I.external} />
+            </a>
+            <Menu
+              id={`pr-${id}`}
+              button={
+                <button
+                  className="icon-btn"
+                  aria-label="More actions"
+                  title="More"
+                  onClick={() => setMenu(`pr-${id}`)}
+                >
+                  <Ico svg={I.more} />
+                </button>
+              }
+            >
+              {r.branch && (
+                <button onClick={() => copyText(r.branch)}>
+                  <Ico svg={I.copy} />
+                  Copy branch name
+                </button>
+              )}
+              <button onClick={() => copyText(r.url)}>
+                <Ico svg={I.link} />
+                Copy link
+              </button>
+              <button onClick={() => openDrawer('issue', t.id)}>
+                <Ico svg={I.expand} />
+                Open {t.key}
+              </button>
+              {edit && (
+                <>
+                  <hr />
+                  <button style={{ color: 'var(--danger)' }} onClick={() => unlink(t, r)}>
+                    <Ico svg={I.trash} />
+                    Unlink from {t.key}
+                  </button>
+                </>
+              )}
+            </Menu>
+            <button
+              className="icon-btn pr-toggle"
+              aria-label={isOpen ? 'Hide details' : 'Show details'}
+              title={isOpen ? 'Hide details' : 'Details'}
+              onClick={() => setOpen(isOpen ? null : id)}
+            >
+              <Ico svg={I.chevron} />
+            </button>
+          </div>
+        </div>
+        {isOpen && <PrDetails t={t} r={r} />}
+      </div>
+    );
+  };
+
+  return (
+    <div className="page">
+      <div className="page-inner">
+        <div className="page-h">
+          <h1>Pull requests</h1>
+          <span className="spacer" />
+          {progress ? (
+            <span className="muted small pr-progress">
+              <Spinner />
+              Updating from GitHub/GitLab… {progress.done} of {progress.total}
+            </span>
+          ) : (
+            edit &&
+            rows.some((x) => ACTIVE.includes(x.r.status)) && (
+              <button
+                className="btn"
+                disabled={!!busy}
+                onClick={() =>
+                  refreshList(
+                    rows.filter((x) => ACTIVE.includes(x.r.status)),
+                    false,
+                  )
+                }
+              >
+                <Ico svg={I.refresh} />
+                Refresh open
+              </button>
+            )
+          )}
+          {ai && (
+            <Link
+              className="btn"
+              href={`/p/${p.id}/codejobs`}
+              title="Every code generation for this project: running, ready for review, shipped"
+            >
+              <Ico svg={I.bot} />
+              Code jobs
+            </Link>
+          )}
+          {edit && (
+            <button className="btn primary" onClick={() => openModal(<LinkModal />)}>
+              <Ico svg={I.plus} />
+              Link pull request
+            </button>
+          )}
+        </div>
+        <p className="muted small" style={{ marginTop: -6 }}>
+          Every pull and merge request linked to this project’s issues, with their checks, reviews
+          and conflicts from GitHub / GitLab.
+          {ai ? (
+            ' Review them with AI, or update them with AI on their own branch.'
+          ) : can('ai.use') && can('project.settings') ? (
+            <>
+              {' '}
+              Set up the local repository in{' '}
+              <a
+                href={`/p/${p.id}/settings`}
+                onClick={() => {
+                  S.setTab = 'code';
+                  emit();
+                }}
+              >
+                Project settings → Code & GitHub
+              </a>{' '}
+              to review and update them with AI.
+            </>
+          ) : (
+            ''
+          )}
+        </p>
+
+        <div className="pr-stats">
+          {[
+            ['active', 'Active', count('Open') + count('Draft')],
+            ['Open', 'Open', count('Open')],
+            ['Draft', 'Draft', count('Draft')],
+            ['Merged', 'Merged', count('Merged')],
+            ['Declined', 'Declined', count('Declined')],
+            ['all', 'All', rows.length],
+          ].map(([k, l, n]) => (
+            <button
+              key={k as string}
+              type="button"
+              className={!focus && status === k ? 'on' : ''}
+              onClick={() => {
+                setFocus('');
+                setStatus(k as string);
+                save('status', k as string);
+              }}
+            >
+              <b>{n as number}</b>
+              <span>{l as string}</span>
+            </button>
+          ))}
+        </div>
+        {rows.some((x) => ACTIVE.includes(x.r.status)) && (
+          <div className="pr-focus" role="group" aria-label="Needs attention">
+            <span className="muted small">Needs attention</span>
+            {FOCUS.map(([k, l, cls]) => {
+              const n = fcount(k);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`pr-chip ${n ? cls : ''} ${focus === k ? 'on' : ''}`}
+                  disabled={!n && focus !== k}
+                  aria-pressed={focus === k}
+                  onClick={() => setFocus(focus === k ? '' : k)}
+                >
+                  {l}
+                  <b>{n}</b>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="row pr-tools">
+          <TF
+            filter
+            search
+            value={q}
+            placeholder="Search title, branch, issue, label…"
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Search pull requests"
+          />
+          {repos.length > 1 && (
+            <SF
+              filter
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              aria-label="Repository"
+            >
+              <MenuItem value="">All repositories</MenuItem>
+              {repos.map((x) => (
+                <MenuItem key={x} value={x}>
+                  {x}
+                </MenuItem>
+              ))}
+            </SF>
+          )}
+          <SF
+            filter
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value);
+              save('sort', e.target.value);
+            }}
+            aria-label="Sort"
+          >
+            {SORTS.map(([k, l]) => (
+              <MenuItem key={k} value={k}>
+                {l}
+              </MenuItem>
+            ))}
+          </SF>
+          <SF
+            filter
+            value={group}
+            onChange={(e) => {
+              setGroup(e.target.value);
+              save('group', e.target.value);
+            }}
+            aria-label="Group by"
+          >
+            <MenuItem value="none">No grouping</MenuItem>
+            <MenuItem value="status">Group by status</MenuItem>
+            <MenuItem value="repo">Group by repository</MenuItem>
+            <MenuItem value="epic">Group by epic</MenuItem>
+          </SF>
+          <span className="spacer" />
+          <span className="muted small">
+            {shown.length} of {rows.length}
+          </span>
+        </div>
+
+        {!rows.length ? (
+          <EmptyState
+            icon={I.pr}
+            title="No pull requests yet"
+            actions={
+              edit ? (
+                <button className="btn primary" onClick={() => openModal(<LinkModal />)}>
+                  <Ico svg={I.plus} />
+                  Link pull request
+                </button>
+              ) : undefined
+            }
+          >
+            <p>
+              Pull requests appear here when a coding agent opens one (Write code with AI on an
+              issue), or when you link one to an issue.
+            </p>
+          </EmptyState>
+        ) : !shown.length ? (
+          <EmptyState
+            compact
+            icon={I.search}
+            tone="neutral"
+            title="No pull requests match"
+            actions={
+              <button className="btn" onClick={clearAll}>
+                Show all
+              </button>
+            }
+          />
+        ) : (
+          groups.map((g) => (
+            <div key={g.key} className="pr-group">
+              {g.title && (
+                <h3 className="pr-group-h">
+                  {g.title}
+                  <span className="count">{g.items.length}</span>
+                </h3>
+              )}
+              <div className="pr-list">{g.items.map(row)}</div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

@@ -72,17 +72,15 @@ export async function saveFile({ projectId, name, data, user, purpose = 'origina
     throw Object.assign(new Error('The file is larger than 20 MB.'), { status: 413 });
   await checkLimit('storageMb', data.length); // the plan's storage (SaaS)
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-  await orm
-    .insert(files)
-    .values({
-      id,
-      projectId,
-      name: String(name).slice(0, 200),
-      mime,
-      bytes: data.length,
-      data,
-      createdBy: user?.name || null,
-    });
+  await orm.insert(files).values({
+    id,
+    projectId,
+    name: String(name).slice(0, 200),
+    mime,
+    bytes: data.length,
+    data,
+    createdBy: user?.name || null,
+  });
   return { id, name: String(name).slice(0, 200), mime, bytes: data.length };
 }
 

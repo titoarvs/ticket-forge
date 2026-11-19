@@ -1,10 +1,9 @@
-// How this TicketForge runs: self-hosted (one company, set up by its owner at /setup, people join
-// by invite) or as a SaaS (anyone signs up and gets their own workspace). Self-hosted is the
-// default and keeps today's behaviour.
-//   TICKETFORGE_MODE selfhost | saas SIGNUP_MODE closed (invite only) | waitlist (people ask for
-//   access) | open (anyone can create an account) PLATFORM_ADMIN_EMAILS comma-separated emails of
-//   the people who run the service (SaaS) PLATFORM_NAME, LEGAL_CONTACT_EMAIL shown on the public
-//   pages and in emails
+// How this TicketForge runs: self-hosted (one company, set up by its owner at /setup, people join by invite) or as
+// a SaaS (anyone signs up and gets their own workspace). Self-hosted is the default and keeps today's behaviour.
+//   TICKETFORGE_MODE   selfhost | saas
+//   SIGNUP_MODE        closed (invite only) | waitlist (people ask for access) | open (anyone can create an account)
+//   PLATFORM_ADMIN_EMAILS  comma-separated emails of the people who run the service (SaaS)
+//   PLATFORM_NAME, LEGAL_CONTACT_EMAIL  shown on the public pages and in emails
 export const isSaas = () => String(process.env.TICKETFORGE_MODE || '').toLowerCase() === 'saas';
 /**
  * Trying the hosted mode on your own computer: TICKETFORGE_ALLOW_LOCAL=1 lets a request opened at

@@ -1,9 +1,8 @@
-// PayMongo Checkout (SaaS, PHP): sends the owner to PayMongo's hosted checkout page to start a paid
-// plan, and handles the way back (paid, cancelled or failed). Talks to PayMongo's REST API directly
-// (no SDK). The plan only changes once PayMongo says the payment is paid: cancelling or failing at
-// PayMongo never creates a subscription.
-//   PAYMONGO_SECRET_KEY sk_test_… / sk_live_… (server only) PAYMONGO_API_BASE only for tests
-//   against a local mock (default https://api.paymongo.com)
+// PayMongo Checkout (SaaS, PHP): sends the owner to PayMongo's hosted checkout page to start a paid plan, and handles
+// the way back (paid, cancelled or failed). Talks to PayMongo's REST API directly (no SDK). The plan only changes once
+// PayMongo says the payment is paid: cancelling or failing at PayMongo never creates a subscription.
+//   PAYMONGO_SECRET_KEY   sk_test_… / sk_live_… (server only)
+//   PAYMONGO_API_BASE     only for tests against a local mock (default https://api.paymongo.com)
 import { qs } from './db';
 import { PLANS } from './plans';
 import { checkoutQuote, paymentStep, CHECKOUT_CURRENCY } from './payment-methods';

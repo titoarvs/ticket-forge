@@ -1,10 +1,9 @@
-// Stripe billing (SaaS): Checkout to subscribe, the Customer Portal to change card, plan or cancel,
-// and the webhook that keeps each workspace's plan in step with its subscription. Talks to Stripe's
-// REST API directly (no SDK).
-//   STRIPE_SECRET_KEY sk_test_… / sk_live_… (server only) STRIPE_WEBHOOK_SECRET whsec_… for
-//   /api/stripe/webhook STRIPE_PRICE_PRO_MONTH, STRIPE_PRICE_PRO_YEAR, STRIPE_PRICE_TEAM_MONTH,
-//   STRIPE_PRICE_TEAM_YEAR price ids STRIPE_API_BASE only for tests against a local mock (default
-//   https://api.stripe.com)
+// Stripe billing (SaaS): Checkout to subscribe, the Customer Portal to change card, plan or cancel, and the webhook
+// that keeps each workspace's plan in step with its subscription. Talks to Stripe's REST API directly (no SDK).
+//   STRIPE_SECRET_KEY        sk_test_… / sk_live_… (server only)
+//   STRIPE_WEBHOOK_SECRET    whsec_… for /api/stripe/webhook
+//   STRIPE_PRICE_PRO_MONTH, STRIPE_PRICE_PRO_YEAR, STRIPE_PRICE_TEAM_MONTH, STRIPE_PRICE_TEAM_YEAR   price ids
+//   STRIPE_API_BASE          only for tests against a local mock (default https://api.stripe.com)
 import crypto from 'node:crypto';
 import { qs } from './db';
 import { PLANS, priceIdFor, planForPrice, purchasable } from './plans';

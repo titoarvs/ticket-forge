@@ -1,8 +1,7 @@
-// PayMongo webhook (SaaS, PHP): a failed payment puts the workspace's subscription "past due" with
-// a grace period (it keeps its paid plan until then, see limits.js), and a payment that then
-// succeeds makes it "active" again.
-//   PAYMONGO_WEBHOOK_SECRET the webhook's secret key (whsk_…) for /api/paymongo/webhook
-//   PAYMENT_GRACE_DAYS days of paid access after a failed payment (default 7, see plans.js)
+// PayMongo webhook (SaaS, PHP): a failed payment puts the workspace's subscription "past due" with a grace period (it
+// keeps its paid plan until then, see limits.js), and a payment that then succeeds makes it "active" again.
+//   PAYMONGO_WEBHOOK_SECRET   the webhook's secret key (whsk_…) for /api/paymongo/webhook
+//   PAYMENT_GRACE_DAYS        days of paid access after a failed payment (default 7, see plans.js)
 import crypto from 'node:crypto';
 import { qs } from './db';
 import { GRACE_DAYS } from './plans';

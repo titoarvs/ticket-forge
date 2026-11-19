@@ -1,10 +1,10 @@
-// Payment gateways (SaaS billing): the owner turns on PayMongo, Xendit and Stripe in Administration
-// → Billing, as many at once as wanted, and the customer picks one of the active ones at checkout.
-// Keys are checked against the gateway before it is saved as active, and stored encrypted (never
-// sent back to the browser). Talks to each gateway's REST API directly (no SDK); the *_API_BASE
-// variables only exist so tests can point at a local mock.
-//   PAYMONGO_API_BASE default https://api.paymongo.com XENDIT_API_BASE default
-//   https://api.xendit.co STRIPE_API_BASE default https://api.stripe.com
+// Payment gateways (SaaS billing): the owner turns on PayMongo, Xendit and Stripe in Administration → Billing, as many
+// at once as wanted, and the customer picks one of the active ones at checkout. Keys are checked against the gateway
+// before it is saved as active, and stored encrypted (never sent back to the browser). Talks to each gateway's REST API
+// directly (no SDK); the *_API_BASE variables only exist so tests can point at a local mock.
+//   PAYMONGO_API_BASE   default https://api.paymongo.com
+//   XENDIT_API_BASE     default https://api.xendit.co
+//   STRIPE_API_BASE     default https://api.stripe.com
 import { asSystem } from './db';
 import { orm, paymentGateways, eq, sql } from './orm';
 import { encrypt } from './settings';

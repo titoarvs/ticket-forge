@@ -1,11 +1,8 @@
-// TF-125: permanently deletes every PSD, FBD and ARD from the database in DATABASE_URL (or the
-// built-in local one).
-// It can't be undone: take a backup of that database first. Run it once per database, Test first,
-// then production.
+// TF-125: permanently deletes every PSD, FBD and ARD from the database in DATABASE_URL (or the built-in local one).
+// It can't be undone: take a backup of that database first. Run it once per database, Test first, then production.
 //
-//   npm run db:remove-psd-fbd-ard shows what would be deleted, and the kind values each table holds
-//   npm run db:remove-psd-fbd-ard -- --confirm deletes it all in one transaction and records the
-//   migration
+//   npm run db:remove-psd-fbd-ard               shows what would be deleted, and the kind values each table holds
+//   npm run db:remove-psd-fbd-ard -- --confirm  deletes it all in one transaction and records the migration
 //
 // What is deleted, and what stays, is listed in lib/remove-psd-fbd-ard.ts.
 import { tx, q, dbInfo, useOwner, db } from '../lib/db';

@@ -1,12 +1,11 @@
-// Database connection settings, read from environment variables only. Nothing here depends on which
-// company hosts PostgreSQL: moving to another host (Supabase, Neon, RDS, your own server...) means
-// changing these variables.
-//   DATABASE_URL (or SUPABASE_DB_URL) postgresql://user:password@host:5432/database PGSSL empty =
-//   encrypted, certificate not checked; "verify" = also check the certificate;
+// Database connection settings, read from environment variables only. Nothing here depends on which company hosts
+// PostgreSQL: moving to another host (Supabase, Neon, RDS, your own server...) means changing these variables.
+//   DATABASE_URL (or SUPABASE_DB_URL)  postgresql://user:password@host:5432/database
+//   PGSSL                              empty = encrypted, certificate not checked; "verify" = also check the certificate;
 //                                      "disable" = no SSL. Empty falls back to ?sslmode= in the URL.
-//   PG_POOL_MAX connections each server keeps open (default 5) PG_CONNECT_TIMEOUT_MS how long
-//   start-up waits for the first connection (default 10000) PG_ACQUIRE_TIMEOUT_MS how long a
-//   request waits for a free pooled connection before a retryable 503
+//   PG_POOL_MAX                        connections each server keeps open (default 5)
+//   PG_CONNECT_TIMEOUT_MS              how long start-up waits for the first connection (default 10000)
+//   PG_ACQUIRE_TIMEOUT_MS              how long a request waits for a free pooled connection before a retryable 503
 //                                      (default 15000), so a traffic spike can't queue requests without end
 
 export type DbEnv = Record<string, string | undefined>;

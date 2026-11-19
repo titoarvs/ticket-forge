@@ -1,8 +1,6 @@
-// Subscription checkout: the payment methods a customer can choose (card, GCash, Maya) and the
-// amount to pay, in PHP.
+// Subscription checkout: the payment methods a customer can choose (card, GCash, Maya) and the amount to pay, in PHP.
 // A method the gateway doesn't support is left out, so it is never offered.
-//   PAYMONGO_PAYMENT_METHODS comma list of the methods the gateway account supports (default:
-//   card,gcash,paymaya)
+//   PAYMONGO_PAYMENT_METHODS   comma list of the methods the gateway account supports (default: card,gcash,paymaya)
 import { PLANS, purchasable } from './plans';
 import { err } from './errors';
 

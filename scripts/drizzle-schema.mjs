@@ -1,11 +1,10 @@
-// Regenerates the Drizzle schema (one file per table in lib/schema/, plus lib/relations.ts) from
-// the tables lib/db.ts creates.
-//   npm run db:schema rewrite the files npm run db:check fail when they are out of date (for CI)
-// lib/db.ts stays the one place tables, row-level security and migrations are defined. This builds
-// a throwaway local database with it, reads the tables back with drizzle-kit, and writes the typed
-// schema. It never touches your own database (data/db or DATABASE_URL). Every table gets its own
-// file (lib/schema/<table-name>.ts) so a table is easy to find and read; lib/schema/index.ts
-// re-exports them all.
+// Regenerates the Drizzle schema (one file per table in lib/schema/, plus lib/relations.ts) from the tables lib/db.ts creates.
+//   npm run db:schema          rewrite the files
+//   npm run db:check           fail when they are out of date (for CI)
+// lib/db.ts stays the one place tables, row-level security and migrations are defined. This builds a throwaway local
+// database with it, reads the tables back with drizzle-kit, and writes the typed schema. It never touches your own
+// database (data/db or DATABASE_URL). Every table gets its own file (lib/schema/<table-name>.ts) so a table is easy to
+// find and read; lib/schema/index.ts re-exports them all.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

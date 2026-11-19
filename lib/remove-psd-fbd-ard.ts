@@ -1,18 +1,18 @@
-// TF-125: permanently removes every Problem Statement (PSD), Feature Brief (FBD) and Architecture
-// Record Design (ARD) from a database, after the features themselves were removed from the app. Run
-// it once per database (Test, then production) with scripts/remove-psd-fbd-ard.ts, after a backup.
-// It can't be undone.
+// TF-125: permanently removes every Problem Statement (PSD), Feature Brief (FBD) and Architecture Record Design (ARD)
+// from a database, after the features themselves were removed from the app. Run it once per database (Test, then
+// production) with scripts/remove-psd-fbd-ard.ts, after a backup. It can't be undone.
 //
 // What it deletes, all in one transaction:
-//   drive_docs the Google Drive save state (and any queued file bytes) of PSD, FBD and ARD
-//   documents epic_doc_comments comments on uploaded PSD, FBD and ARD versions epic_doc_reviews
-//   reviewers' decisions on those versions files the uploaded PSD, FBD and ARD files those versions
-//   point to epic_doc_versions the uploaded versions themselves doc_templates the team (key "psd",
-//   or "ws:<workspace>:psd") and project ("psd:<projectId>") templates, same for fbd and ard
-//   projects.data the psd, fbd and ard documents kept on each epic (the generated ones) brain_notes
-//   the brain's generated notes copied from those documents (types doc and decision, and the
+//   drive_docs             the Google Drive save state (and any queued file bytes) of PSD, FBD and ARD documents
+//   epic_doc_comments      comments on uploaded PSD, FBD and ARD versions
+//   epic_doc_reviews       reviewers' decisions on those versions
+//   files                  the uploaded PSD, FBD and ARD files those versions point to
+//   epic_doc_versions      the uploaded versions themselves
+//   doc_templates          the team (key "psd", or "ws:<workspace>:psd") and project ("psd:<projectId>") templates, same for fbd and ard
+//   projects.data          the psd, fbd and ard documents kept on each epic (the generated ones)
+//   brain_notes            the brain's generated notes copied from those documents (types doc and decision, and the
 //                          open decisions read from Feature Briefs); a refresh rebuilds the rest
-//   ai_cache cached AI answers of the removed "docs" task (they hold document text)
+//   ai_cache               cached AI answers of the removed "docs" task (they hold document text)
 // Agent documents (drive_docs kind 'agent', epic.agentDocs) and everything else stay as they are.
 // The run is recorded in schema_migrations as MIGRATION_ID, and a second run does nothing.
 

@@ -1,25 +1,21 @@
 // Moves TicketForge's data from one PostgreSQL host to another, and proves the copy is complete.
 // Full procedure: docs/postgres-host-migration.md.
 //
-//   SOURCE_DATABASE_URL the host the app uses now (default: DATABASE_URL) TARGET_DATABASE_URL the
-//   host to move to SOURCE_PGSSL / TARGET_PGSSL SSL mode per side (default: PGSSL, then ?sslmode=
-//   of each URL)
+//   SOURCE_DATABASE_URL   the host the app uses now (default: DATABASE_URL)
+//   TARGET_DATABASE_URL   the host to move to
+//   SOURCE_PGSSL / TARGET_PGSSL   SSL mode per side (default: PGSSL, then ?sslmode= of each URL)
 //
-//   npm run db:migrate-host -- copy create the tables on the target and copy every row. Safe while
-//   the app is in use,
+//   npm run db:migrate-host -- copy      create the tables on the target and copy every row. Safe while the app is in use,
 //                                        and repeatable: rows already there are updated only when they differ.
-//   npm run db:migrate-host -- verify compare row counts and checksums of every table (a report is
-//   written) npm run db:migrate-host -- cutover the final step: hold writes on the source, copy the
-//   last changes (and remove rows
+//   npm run db:migrate-host -- verify    compare row counts and checksums of every table (a report is written)
+//   npm run db:migrate-host -- cutover   the final step: hold writes on the source, copy the last changes (and remove rows
 //                                        deleted since), verify, then mark the source "moved". Stops and re-opens the source
 //                                        when anything doesn't match. Add --keep-hold to keep writes on hold until `finish`.
-//   npm run db:migrate-host -- finish mark the source "moved" (after `cutover --keep-hold`) npm run
-//   db:migrate-host -- release re-open the source for writes (abort a cutover, or reuse the old
-//   host later)
+//   npm run db:migrate-host -- finish    mark the source "moved" (after `cutover --keep-hold`)
+//   npm run db:migrate-host -- release   re-open the source for writes (abort a cutover, or reuse the old host later)
 //
-// The source is only ever read, apart from the cutover marker in its app_meta table. Nothing is
-// changed when either connection string is wrong or unreachable: both are checked before the first
-// write.
+// The source is only ever read, apart from the cutover marker in its app_meta table. Nothing is changed when either
+// connection string is wrong or unreachable: both are checked before the first write.
 import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
