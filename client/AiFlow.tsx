@@ -10,5 +10,5 @@
 //  · Drag nodes to arrange them, drag the background to pan, Ctrl/⌘ + scroll or pinch to zoom.
 // Every change is saved straight away through the same settings the other AI sections use.
 
-export type { FlowActions } from './AiFlow/FlowActions';
+export type { FlowActions } from './AiFlow/model';
 export { AiFlow } from './AiFlow/AiFlow';
