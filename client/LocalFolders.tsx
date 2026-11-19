@@ -1,5 +1,6 @@
 'use client';
-// Administration → Local folders: every person's folder per GitHub repository on this machine, with Purge.
+// Administration → Local folders: every person's folder per GitHub repository on this machine, with
+// Purge.
 import { useEffect, useState } from 'react';
 import { toast } from './core';
 import { listLocalFolders, purgeLocalFolder } from './api/admin';
@@ -15,7 +16,12 @@ export function LocalFolders() {
   };
   useEffect(load, []);
   const purge = async (f: any) => {
-    if (!window.confirm(`Purge ${f.userName || f.userId}'s folder for ${f.repo}? Its clone and settings are deleted for good.`)) return;
+    if (
+      !window.confirm(
+        `Purge ${f.userName || f.userId}'s folder for ${f.repo}? Its clone and settings are deleted for good.`,
+      )
+    )
+      return;
     try {
       await purgeLocalFolder(f.id);
       toast('Folder purged');
@@ -34,7 +40,12 @@ export function LocalFolders() {
       </div>
     );
   if (!rows) return <div className="empty">Loading…</div>;
-  if (!rows.length) return <div className="empty">No local folders yet. One is created when someone connects a repository.</div>;
+  if (!rows.length)
+    return (
+      <div className="empty">
+        No local folders yet. One is created when someone connects a repository.
+      </div>
+    );
   return (
     <table className="tbl">
       <thead>

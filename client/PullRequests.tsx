@@ -1,8 +1,9 @@
 'use client';
-// Pull requests: every pull / merge request linked to the project's issues in one place. Each shows what GitHub /
-// GitLab says (checks, reviews, conflicts, size, comments, description) and the AI review; "Needs attention" filters
-// pick out failing checks, requested changes, conflicts, unreviewed and ready-to-merge requests. Rows expand into
-// details. AI actions: Review with AI (read-only) and Update with AI. Open requests refresh by themselves when stale.
+// Pull requests: every pull / merge request linked to the project's issues in one place. Each shows
+// what GitHub / GitLab says (checks, reviews, conflicts, size, comments, description) and the AI
+// review; "Needs attention" filters pick out failing checks, requested changes, conflicts,
+// unreviewed and ready-to-merge requests. Rows expand into details. AI actions: Review with AI
+// (read-only) and Update with AI. Open requests refresh by themselves when stale.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   S,
@@ -24,7 +25,19 @@ import {
   store,
   type Any,
 } from './core';
-import { Ico, I, Modal, Spinner, EmptyState, TypeIcon, LayerChip, Avatar, Swatch, Confirm, Menu } from './ui';
+import {
+  Ico,
+  I,
+  Modal,
+  Spinner,
+  EmptyState,
+  TypeIcon,
+  LayerChip,
+  Avatar,
+  Swatch,
+  Confirm,
+  Menu,
+} from './ui';
 import { TF, TA, SF, MenuItem } from './fields';
 import { openDrawer, linkPr, refreshPr } from './actions';
 import { openCode, openUpdatePr, codeReady } from './DevCode';
@@ -34,7 +47,9 @@ import { PrFindingChips, openPrFindings } from './CodeRabbit';
 import { DiffReview } from './DiffReview';
 
 const prCls = (s: string) =>
-  (({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' }) as Any)[s] || 'pr-open';
+  (({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' }) as Any)[
+    s
+  ] || 'pr-open';
 const ref = (r: Any) => (r.number ? `${r.provider === 'GitLab' ? '!' : '#'}${r.number}` : '');
 const VERDICT_CLS: Record<string, string> = {
   Approve: 't-pass',
@@ -43,17 +58,27 @@ const VERDICT_CLS: Record<string, string> = {
   Reviewed: '',
 };
 
-/** Review an open request with a read-only review agent. The findings open in the code dialog, ready to post. */
+/**
+ * Review an open request with a read-only review agent. The findings open in the code dialog, ready
+ * to post.
+ */
 function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
   const [agent, setAgent] = useState('review');
   const [focus, setFocus] = useState('');
   const [busy, setBusy] = useState(false);
   const noun = pr.provider === 'GitLab' ? 'merge request' : 'pull request';
   const agents = useAgents();
-  const custom = (agents?.agents || []).filter((a: Any) => a.custom && a.runner === 'code' && !a.writes && a.enabled);
+  const custom = (agents?.agents || []).filter(
+    (a: Any) => a.custom && a.runner === 'code' && !a.writes && a.enabled,
+  );
   // Built-in reviewers that were removed (Administration → Agents) give way to the custom ones.
   useEffect(() => {
-    if (agents && agent === 'review' && !(agents.agents || []).some((a: Any) => a.id === 'review' && a.enabled) && custom[0])
+    if (
+      agents &&
+      agent === 'review' &&
+      !(agents.agents || []).some((a: Any) => a.id === 'review' && a.enabled) &&
+      custom[0]
+    )
       setAgent(custom[0].id);
   }, [agents]); // eslint-disable-line react-hooks/exhaustive-deps
   const go = async () => {
@@ -75,23 +100,46 @@ function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
     <Modal
       title={`Review ${ref(pr)} with AI`}
       wide
-      actions={[{ label: 'Cancel' }, { label: busy ? 'Starting…' : 'Start review', kind: 'ai', disabled: busy, onClick: go }]}
+      actions={[
+        { label: 'Cancel' },
+        { label: busy ? 'Starting…' : 'Start review', kind: 'ai', disabled: busy, onClick: go },
+      ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        <b>{pr.title}</b> · {pr.repo} · <code>{pr.branch}</code> → <code>{pr.base}</code>. The reviewer reads the {noun}’s diff and code on
-        its own branch, checks it against {t.key}’s acceptance criteria and writes findings (blocking, should fix, nits). It never changes
-        code. You can post the review on the {noun} afterwards.
+        <b>{pr.title}</b> · {pr.repo} · <code>{pr.branch}</code> → <code>{pr.base}</code>. The
+        reviewer reads the {noun}’s diff and code on its own branch, checks it against {t.key}’s
+        acceptance criteria and writes findings (blocking, should fix, nits). It never changes code.
+        You can post the review on the {noun} afterwards.
       </p>
       <div className="upd-modes" role="radiogroup" aria-label="Reviewer">
         {(
           [
-            ['review', '🔍 Code review', 'Correctness, security, tests and the acceptance criteria.'],
-            ['ui-review', '🧐 UI/UX review', 'Usability, accessibility, states, copy and responsive layout.'],
+            [
+              'review',
+              '🔍 Code review',
+              'Correctness, security, tests and the acceptance criteria.',
+            ],
+            [
+              'ui-review',
+              '🧐 UI/UX review',
+              'Usability, accessibility, states, copy and responsive layout.',
+            ],
           ] as [string, string, string][]
         )
-          .filter(([k]) => !agents || (agents.agents || []).some((a: Any) => a.id === k && a.enabled) || (k === 'review' && !custom.length))
+          .filter(
+            ([k]) =>
+              !agents ||
+              (agents.agents || []).some((a: Any) => a.id === k && a.enabled) ||
+              (k === 'review' && !custom.length),
+          )
           .map(([k, l, d]) => (
-            <button key={k} role="radio" aria-checked={agent === k} className={agent === k ? 'on' : ''} onClick={() => setAgent(k)}>
+            <button
+              key={k}
+              role="radio"
+              aria-checked={agent === k}
+              className={agent === k ? 'on' : ''}
+              onClick={() => setAgent(k)}
+            >
               <b>{l}</b>
               <span className="muted small">{d}</span>
             </button>
@@ -121,7 +169,8 @@ function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
         />
       </label>
       <p className="muted small" style={{ marginBottom: 0 }}>
-        Runs in Claude Code with the model set for <b>Code review</b> in Administration → AI → Model routing.
+        Runs in Claude Code with the model set for <b>Code review</b> in Administration → AI → Model
+        routing.
       </p>
     </Modal>
   );
@@ -145,7 +194,12 @@ function LinkModal() {
       title="Link a pull request"
       actions={[
         { label: 'Cancel' },
-        { label: busy ? 'Looking up…' : 'Link', kind: 'primary', disabled: busy || !t || !url.trim(), onClick: go },
+        {
+          label: busy ? 'Looking up…' : 'Link',
+          kind: 'primary',
+          disabled: busy || !t || !url.trim(),
+          onClick: go,
+        },
       ]}
     >
       <label className="field">
@@ -160,7 +214,12 @@ function LinkModal() {
       </label>
       <label className="field">
         <span>Pull or merge request URL</span>
-        <TF value={url} autoFocus placeholder="https://github.com/org/repo/pull/12" onChange={(e) => setUrl(e.target.value)} />
+        <TF
+          value={url}
+          autoFocus
+          placeholder="https://github.com/org/repo/pull/12"
+          onChange={(e) => setUrl(e.target.value)}
+        />
       </label>
     </Modal>
   );
@@ -170,16 +229,33 @@ function LinkModal() {
 const ACTIVE = ['Open', 'Draft'];
 const STALE_MS = 10 * 60 * 1000;
 const when = (iso?: string) =>
-  iso ? new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+  iso
+    ? new Date(iso).toLocaleString([], {
+        day: 'numeric',
+        month: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '';
 /** What needs attention on a request (from GitHub / GitLab and the AI review). */
 function flagsOf(r: Any) {
   const active = ACTIVE.includes(r.status);
   const failing = active && r.checks?.state === 'failing';
-  const changes = active && (r.review?.state === 'changes' || r.aiReview?.verdict === 'Changes requested');
+  const changes =
+    active && (r.review?.state === 'changes' || r.aiReview?.verdict === 'Changes requested');
   const conflicts = active && r.conflicts === true;
   const approved = r.review?.state === 'approved' || r.aiReview?.verdict === 'Approve';
-  const unreviewed = active && !r.aiReview && (!r.review || r.review.state === 'none' || r.review.state === 'pending');
-  const ready = r.status === 'Open' && approved && !changes && !conflicts && r.checks?.state !== 'failing' && r.checks?.state !== 'pending';
+  const unreviewed =
+    active &&
+    !r.aiReview &&
+    (!r.review || r.review.state === 'none' || r.review.state === 'pending');
+  const ready =
+    r.status === 'Open' &&
+    approved &&
+    !changes &&
+    !conflicts &&
+    r.checks?.state !== 'failing' &&
+    r.checks?.state !== 'pending';
   return { failing, changes, conflicts, unreviewed, ready };
 }
 const FOCUS: [string, string, string][] = [
@@ -207,7 +283,10 @@ function ChecksChip({ c }: { c: Any }) {
         ? ['t-blocked', I.clock, `${c.pending} running`]
         : ['t-pass', I.check, 'Checks pass'];
   return (
-    <span className={`pr-chip ${cls}`} title={`${c.passed} passed · ${c.failed} failed · ${c.pending} running (${c.total} checks)`}>
+    <span
+      className={`pr-chip ${cls}`}
+      title={`${c.passed} passed · ${c.failed} failed · ${c.pending} running (${c.total} checks)`}
+    >
       <Ico svg={icon} />
       {label}
     </span>
@@ -274,7 +353,10 @@ const StatusIcon = ({ r }: { r: Any }) => (
   </span>
 );
 
-/** The AI code job behind a request (when it came from Write code with AI), as a side-by-side diff. Everyone who sees the page sees it. */
+/**
+ * The AI code job behind a request (when it came from Write code with AI), as a side-by-side diff.
+ * Everyone who sees the page sees it.
+ */
 function PrCodeChanges({ t, r }: { t: Any; r: Any }) {
   const [job, setJob] = useState<Any>(null);
   useEffect(() => {
@@ -285,7 +367,8 @@ function PrCodeChanges({ t, r }: { t: Any; r: Any }) {
       (x.branch && x.branch === r.branch);
     api(`/api/projects/${encodeURIComponent(P().id)}/code?ticketId=${encodeURIComponent(t.id)}`)
       .then((d: Any) => {
-        if (live) setJob([d.jobs?.frontend, d.jobs?.backend, d.job].filter(Boolean).find(same) || null);
+        if (live)
+          setJob([d.jobs?.frontend, d.jobs?.backend, d.job].filter(Boolean).find(same) || null);
       })
       .catch(() => {
         if (live) setJob(null);
@@ -298,7 +381,8 @@ function PrCodeChanges({ t, r }: { t: Any; r: Any }) {
   return (
     <section className="pr-d-code">
       <h4>
-        Code changes <span className="muted small">written by {job.agentName || 'an AI agent'}</span>
+        Code changes{' '}
+        <span className="muted small">written by {job.agentName || 'an AI agent'}</span>
       </h4>
       <DiffReview job={job} />
     </section>
@@ -309,7 +393,9 @@ function PrCodeChanges({ t, r }: { t: Any; r: Any }) {
 function PrDetails({ t, r }: { t: Any; r: Any }) {
   const [more, setMore] = useState(false);
   const checks = [...(r.checks?.items || [])].sort(
-    (a: Any, b: Any) => ['failed', 'pending', 'passed'].indexOf(a.state) - ['failed', 'pending', 'passed'].indexOf(b.state),
+    (a: Any, b: Any) =>
+      ['failed', 'pending', 'passed'].indexOf(a.state) -
+      ['failed', 'pending', 'passed'].indexOf(b.state),
   );
   const body = String(r.body || '');
   return (
@@ -326,7 +412,11 @@ function PrDetails({ t, r }: { t: Any; r: Any }) {
             )}
           </>
         ) : (
-          <p className="muted small">{r.fetched === false ? 'Not read from the host yet: refresh to load it.' : 'No description.'}</p>
+          <p className="muted small">
+            {r.fetched === false
+              ? 'Not read from the host yet: refresh to load it.'
+              : 'No description.'}
+          </p>
         )}
         {r.labels?.length > 0 && (
           <div className="pr-labels">
@@ -348,7 +438,9 @@ function PrDetails({ t, r }: { t: Any; r: Any }) {
             <ul className="pr-checks">
               {checks.slice(0, 12).map((c: Any, i: number) => (
                 <li key={i} className={`c-${c.state}`}>
-                  <Ico svg={c.state === 'passed' ? I.check : c.state === 'failed' ? I.close : I.clock} />
+                  <Ico
+                    svg={c.state === 'passed' ? I.check : c.state === 'failed' ? I.close : I.clock}
+                  />
                   {c.url ? (
                     <a href={c.url} target="_blank" rel="noopener noreferrer">
                       {c.name}
@@ -375,18 +467,30 @@ function PrDetails({ t, r }: { t: Any; r: Any }) {
               <li key={u.login}>
                 <Avatar name={u.login} size={20} />
                 {u.login}
-                <span className={`loz ${u.state === 'approved' ? 't-pass' : u.state === 'changes' ? 't-fail' : ''}`}>
-                  {u.state === 'approved' ? 'Approved' : u.state === 'changes' ? 'Changes' : 'Dismissed'}
+                <span
+                  className={`loz ${u.state === 'approved' ? 't-pass' : u.state === 'changes' ? 't-fail' : ''}`}
+                >
+                  {u.state === 'approved'
+                    ? 'Approved'
+                    : u.state === 'changes'
+                      ? 'Changes'
+                      : 'Dismissed'}
                 </span>
               </li>
             ))}
           </ul>
         ) : null}
-        {(r.reviewers || []).length > 0 && <p className="muted small">Waiting for {r.reviewers.join(', ')}</p>}
-        {!r.review?.users?.length && !(r.reviewers || []).length && <p className="muted small">No reviews yet.</p>}
+        {(r.reviewers || []).length > 0 && (
+          <p className="muted small">Waiting for {r.reviewers.join(', ')}</p>
+        )}
+        {!r.review?.users?.length && !(r.reviewers || []).length && (
+          <p className="muted small">No reviews yet.</p>
+        )}
         {r.aiReview && (
           <div className="pr-ai">
-            <span className={`loz ${VERDICT_CLS[r.aiReview.verdict] || ''}`}>AI: {r.aiReview.verdict}</span>
+            <span className={`loz ${VERDICT_CLS[r.aiReview.verdict] || ''}`}>
+              AI: {r.aiReview.verdict}
+            </span>
             <span className="muted small">
               {r.aiReview.agent} · {ago(r.aiReview.at)}
               {r.aiReview.posted ? ' · posted on the request' : ''}
@@ -397,7 +501,12 @@ function PrDetails({ t, r }: { t: Any; r: Any }) {
         {r.branch ? (
           <p className="pr-branch">
             <code>{r.branch}</code> → <code>{r.base || '…'}</code>
-            <button className="icon-btn" title="Copy branch name" aria-label="Copy branch name" onClick={() => copyText(r.branch)}>
+            <button
+              className="icon-btn"
+              title="Copy branch name"
+              aria-label="Copy branch name"
+              onClick={() => copyText(r.branch)}
+            >
               <Ico svg={I.copy} />
             </button>
           </p>
@@ -445,13 +554,17 @@ export function PullRequests() {
   const [open, setOpen] = useState<string | null>(null);
   const [busy] = useState('');
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const rows: { t: Any; r: Any }[] = p.tickets.flatMap((t: Any) => (t.prs || []).map((r: Any) => ({ t, r })));
+  const rows: { t: Any; r: Any }[] = p.tickets.flatMap((t: Any) =>
+    (t.prs || []).map((r: Any) => ({ t, r })),
+  );
   const edit = can('issue.edit');
   const ai = can('ai.use') && codeReady();
-  const canAi = (r: Any) => ACTIVE.includes(r.status) && ['GitHub', 'GitLab'].includes(r.provider) && r.branch;
+  const canAi = (r: Any) =>
+    ACTIVE.includes(r.status) && ['GitHub', 'GitLab'].includes(r.provider) && r.branch;
   const save = (k: string, v: string) => store.set(`tf.pr.${k}`, v);
 
-  // Opening the page brings open requests up to date (quietly, one at a time) when they were last read 10+ minutes ago.
+  // Opening the page brings open requests up to date (quietly, one at a time) when they were last
+  // read 10+ minutes ago.
   const stopRef = useRef(false);
   const refreshList = async (list: { t: Any; r: Any }[], quiet: boolean) => {
     if (!list.length) return;
@@ -497,20 +610,24 @@ export function PullRequests() {
       ({ t, r }) =>
         (focus
           ? (flagsOf(r) as Any)[focus]
-          : status === 'all' || (status === 'active' ? ACTIVE.includes(r.status) : r.status === status)) &&
+          : status === 'all' ||
+            (status === 'active' ? ACTIVE.includes(r.status) : r.status === status)) &&
         (!repo || r.repo === repo) &&
         (!ql ||
-          [r.title, r.branch, r.repo, ref(r), t.key, t.title, r.author, ...(r.labels || [])].some((v) =>
-            String(v || '')
-              .toLowerCase()
-              .includes(ql),
+          [r.title, r.branch, r.repo, ref(r), t.key, t.title, r.author, ...(r.labels || [])].some(
+            (v) =>
+              String(v || '')
+                .toLowerCase()
+                .includes(ql),
           )),
     )
     .sort((a, b) =>
       sort === 'oldest'
         ? time(a.r).localeCompare(time(b.r))
         : sort === 'size'
-          ? (b.r.size?.additions || 0) + (b.r.size?.deletions || 0) - ((a.r.size?.additions || 0) + (a.r.size?.deletions || 0))
+          ? (b.r.size?.additions || 0) +
+            (b.r.size?.deletions || 0) -
+            ((a.r.size?.additions || 0) + (a.r.size?.deletions || 0))
           : sort === 'issue'
             ? a.t.key.localeCompare(b.t.key, undefined, { numeric: true })
             : time(b.r).localeCompare(time(a.r)),
@@ -519,7 +636,12 @@ export function PullRequests() {
   if (group === 'none') groups.push({ key: 'all', title: null, items: shown });
   else
     for (const x of shown) {
-      const k = group === 'repo' ? x.r.repo || 'Other' : group === 'status' ? x.r.status : epic(x.t.epicId)?.id || 'none';
+      const k =
+        group === 'repo'
+          ? x.r.repo || 'Other'
+          : group === 'status'
+            ? x.r.status
+            : epic(x.t.epicId)?.id || 'none';
       let g = groups.find((y) => y.key === k);
       if (!g) {
         g = {
@@ -569,7 +691,10 @@ export function PullRequests() {
     const isOpen = open === id;
     const f = flagsOf(r);
     return (
-      <div key={id} className={`pr-item s-${String(r.status).toLowerCase()} ${isOpen ? 'open' : ''}`}>
+      <div
+        key={id}
+        className={`pr-item s-${String(r.status).toLowerCase()} ${isOpen ? 'open' : ''}`}
+      >
         <div
           className="pr-row"
           role="button"
@@ -637,7 +762,12 @@ export function PullRequests() {
                   {r.comments}
                 </span>
               )}
-              <button type="button" className="pr-issue small" onClick={() => openDrawer('issue', t.id)} title="Open the issue">
+              <button
+                type="button"
+                className="pr-issue small"
+                onClick={() => openDrawer('issue', t.id)}
+                title="Open the issue"
+              >
                 <TypeIcon type={t.type} />
                 <span className="key">{t.key}</span>
                 <span className="pr-issue-t">{t.title}</span>
@@ -698,7 +828,12 @@ export function PullRequests() {
             <Menu
               id={`pr-${id}`}
               button={
-                <button className="icon-btn" aria-label="More actions" title="More" onClick={() => setMenu(`pr-${id}`)}>
+                <button
+                  className="icon-btn"
+                  aria-label="More actions"
+                  title="More"
+                  onClick={() => setMenu(`pr-${id}`)}
+                >
                   <Ico svg={I.more} />
                 </button>
               }
@@ -789,7 +924,8 @@ export function PullRequests() {
           )}
         </div>
         <p className="muted small" style={{ marginTop: -6 }}>
-          Every pull and merge request linked to this project’s issues, with their checks, reviews and conflicts from GitHub / GitLab.
+          Every pull and merge request linked to this project’s issues, with their checks, reviews
+          and conflicts from GitHub / GitLab.
           {ai ? (
             ' Review them with AI, or update them with AI on their own branch.'
           ) : can('ai.use') && can('project.settings') ? (
@@ -868,7 +1004,12 @@ export function PullRequests() {
             aria-label="Search pull requests"
           />
           {repos.length > 1 && (
-            <SF filter value={repo} onChange={(e) => setRepo(e.target.value)} aria-label="Repository">
+            <SF
+              filter
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              aria-label="Repository"
+            >
               <MenuItem value="">All repositories</MenuItem>
               {repos.map((x) => (
                 <MenuItem key={x} value={x}>
@@ -926,7 +1067,8 @@ export function PullRequests() {
             }
           >
             <p>
-              Pull requests appear here when a coding agent opens one (Write code with AI on an issue), or when you link one to an issue.
+              Pull requests appear here when a coding agent opens one (Write code with AI on an
+              issue), or when you link one to an issue.
             </p>
           </EmptyState>
         ) : !shown.length ? (

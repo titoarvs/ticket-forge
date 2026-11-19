@@ -4,7 +4,8 @@ import { splitIssues } from '@/lib/split';
 
 export const maxDuration = 300;
 
-// Proposes smaller issues for many issues at once (Epics page / epic panel). Streams progress. Nothing is saved here.
+// Proposes smaller issues for many issues at once (Epics page / epic panel). Streams progress.
+// Nothing is saved here.
 export const POST = api(async (req, p) => {
   const user = await perm('ai.use', 'issue.create');
   store.requireAccess(user, p.id);

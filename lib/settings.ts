@@ -1,5 +1,6 @@
-// Settings administrators change in the app. Stored in app_meta, which row-level security limits to the
-// server (system context). The AI API key is encrypted (AES-256-GCM) and never sent back to the browser.
+// Settings administrators change in the app. Stored in app_meta, which row-level security limits to
+// the server (system context). The AI API key is encrypted (AES-256-GCM) and never sent back to the
+// browser.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,10 +9,11 @@ import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { normalizeRouting, normalizeConfigs } from './aitasks';
 import { wsKey, wsCache } from './wsmeta';
 
-// ---------------------------------------------------------------- encryption
-// The encryption key comes from TICKETFORGE_SECRET when set. Otherwise it's derived from the database user and
-// password, so every copy of TicketForge that shares the database (your computer, Vercel, any pooler port) can
-// read it (after moving to another host see TICKETFORGE_KEY_FROM_URL below and docs/postgres-host-migration.md).
+// ---------------------------------------------------------------- encryption The encryption key
+// comes from TICKETFORGE_SECRET when set. Otherwise it's derived from the database user and
+// password, so every copy of TicketForge that shares the database (your computer, Vercel, any
+// pooler port) can read it (after moving to another host see TICKETFORGE_KEY_FROM_URL below and
+// docs/postgres-host-migration.md).
 // Without a database URL (the built-in local database) it's a random key kept in data/secret.key.
 let derived = null;
 function secretKey() {
@@ -19,10 +21,18 @@ function secretKey() {
   let material;
   if (process.env.TICKETFORGE_SECRET) {
     material = `secret:${process.env.TICKETFORGE_SECRET}`;
-  } else if (process.env.TICKETFORGE_KEY_FROM_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL) {
-    // After moving to another database host the credentials differ: TICKETFORGE_KEY_FROM_URL (the old connection string)
-    // keeps the key, so saved API keys and payment keys stay readable without re-entering them.
-    const raw = process.env.TICKETFORGE_KEY_FROM_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+  } else if (
+    process.env.TICKETFORGE_KEY_FROM_URL ||
+    process.env.DATABASE_URL ||
+    process.env.SUPABASE_DB_URL
+  ) {
+    // After moving to another database host the credentials differ: TICKETFORGE_KEY_FROM_URL (the
+    // old connection string) keeps the key, so saved API keys and payment keys stay readable
+    // without re-entering them.
+    const raw =
+      process.env.TICKETFORGE_KEY_FROM_URL ||
+      process.env.DATABASE_URL ||
+      process.env.SUPABASE_DB_URL;
     let u = null;
     try {
       u = new URL(raw);
@@ -45,7 +55,12 @@ export function encrypt(text) {
   const iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', secretKey(), iv);
   const data = Buffer.concat([c.update(String(text), 'utf8'), c.final()]);
-  return { v: 1, iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), data: data.toString('base64') };
+  return {
+    v: 1,
+    iv: iv.toString('base64'),
+    tag: c.getAuthTag().toString('base64'),
+    data: data.toString('base64'),
+  };
 }
 export function decrypt(box) {
   const d = crypto.createDecipheriv('aes-256-gcm', secretKey(), Buffer.from(box.iv, 'base64'));
@@ -53,10 +68,10 @@ export function decrypt(box) {
   return Buffer.concat([d.update(Buffer.from(box.data, 'base64')), d.final()]).toString('utf8');
 }
 
-// ---------------------------------------------------------------- AI settings
-// { providers: [{ id, provider, model, baseUrl, keyEnc, keyHint, enabled }], accountFallback, updatedBy, updatedAt }
-// The list is in priority order: TicketForge uses the first available provider and switches down the list
-// when one is rate limited, out of credits or failing.
+// ---------------------------------------------------------------- AI settings { providers: [{ id,
+// provider, model, baseUrl, keyEnc, keyHint, enabled }], accountFallback, updatedBy, updatedAt }
+// The list is in priority order: TicketForge uses the first available provider and switches down
+// the list when one is rate limited, out of credits or failing.
 const AI = 'ai_settings';
 const C: any = wsCache('__tfSettingsWs', () => ({ ai: undefined, at: 0 }));
 const TTL = 30000; // other server instances (e.g. on Vercel) pick up changes within 30 seconds
@@ -146,14 +161,18 @@ const clean = (u) =>
     .trim()
     .replace(/\/+$/, '');
 /**
- * Adds a provider (no id) or updates one. A blank apiKey keeps the saved key, unless the provider or endpoint
- * changed: then the old key is dropped so it's never sent to a different service.
+ * Adds a provider (no id) or updates one. A blank apiKey keeps the saved key, unless the provider
+ * or endpoint changed: then the old key is dropped so it's never sent to a different service.
  */
-export async function saveAiProvider(actor, { id, provider, model, baseUrl, apiKey, enabled }: any) {
+export async function saveAiProvider(
+  actor,
+  { id, provider, model, baseUrl, apiKey, enabled }: any,
+) {
   const s = await getAiSettings({ fresh: true });
   const list = [...s.providers];
   const i = id ? list.findIndex((e) => e.id === id) : -1;
-  if (id && i < 0) throw Object.assign(new Error('That provider was removed. Reload the page.'), { status: 404 });
+  if (id && i < 0)
+    throw Object.assign(new Error('That provider was removed. Reload the page.'), { status: 404 });
   const cur = i >= 0 ? list[i] : {};
   const next = {
     id: cur.id || newId(),
@@ -178,7 +197,9 @@ export async function saveAiProvider(actor, { id, provider, model, baseUrl, apiK
     );
   if (provider === 'claude-sub' && key && !/^sk-ant-oat/i.test(key))
     throw Object.assign(
-      new Error('That isn’t a Claude subscription token. Run claude setup-token and paste the sk-ant-oat01-… token it prints.'),
+      new Error(
+        'That isn’t a Claude subscription token. Run claude setup-token and paste the sk-ant-oat01-… token it prints.',
+      ),
       { status: 400 },
     );
   if (key) {
@@ -201,10 +222,14 @@ export async function reorderAiProviders(actor, ids) {
   const list = [...s.providers].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
   await write(actor, { ...s, providers: list });
 }
-export async function setAiOptions(actor, { enabled, id, accountFallback, localEngine, copilotModel, copilotBackup }: any) {
+export async function setAiOptions(
+  actor,
+  { enabled, id, accountFallback, localEngine, copilotModel, copilotBackup }: any,
+) {
   const s = await getAiSettings({ fresh: true });
   const next = { ...s };
-  if (id && typeof enabled === 'boolean') next.providers = s.providers.map((e) => (e.id === id ? { ...e, enabled } : e));
+  if (id && typeof enabled === 'boolean')
+    next.providers = s.providers.map((e) => (e.id === id ? { ...e, enabled } : e));
   if (typeof accountFallback === 'boolean') next.accountFallback = accountFallback;
   if (localEngine === 'claude' || localEngine === 'copilot') next.localEngine = localEngine;
   if (typeof copilotModel === 'string') next.copilotModel = copilotModel.trim().slice(0, 60);
@@ -221,7 +246,10 @@ export async function setAiConfigs(actor, configs) {
   const s = await getAiSettings({ fresh: true });
   await write(actor, { ...s, configs: normalizeConfigs(configs) });
 }
-/** For testing or listing models before saving: reuse the saved key of entry `id` only for the same provider and endpoint. */
+/**
+ * For testing or listing models before saving: reuse the saved key of entry `id` only for the same
+ * provider and endpoint.
+ */
 export async function savedKeyFor(id, provider, baseUrl) {
   if (!id) return '';
   const e = (await getAiSettings()).providers.find((x) => x.id === id);
@@ -229,9 +257,10 @@ export async function savedKeyFor(id, provider, baseUrl) {
   return withKey(e).key || '';
 }
 
-// ---------------------------------------------------------------- remote test browser
-// { urlEnc, protocol: 'playwright' | 'cdp', hint, updatedBy, updatedAt }. The address often holds an access token,
-// so it is stored encrypted and never sent to the browser. TICKETFORGE_BROWSER_WS (and _PROTOCOL) override it.
+// ---------------------------------------------------------------- remote test browser { urlEnc,
+// protocol: 'playwright' | 'cdp', hint, updatedBy, updatedAt }. The address often holds an access
+// token, so it is stored encrypted and never sent to the browser. TICKETFORGE_BROWSER_WS (and
+// _PROTOCOL) override it.
 const BROWSER = 'browser_settings';
 const hostHint = (url) => {
   try {
@@ -244,12 +273,21 @@ const hostHint = (url) => {
 
 export async function getRemoteBrowser() {
   const env = String(process.env.TICKETFORGE_BROWSER_WS || '').trim();
-  if (env) return { url: env, protocol: process.env.TICKETFORGE_BROWSER_PROTOCOL === 'cdp' ? 'cdp' : 'playwright', source: 'env' };
+  if (env)
+    return {
+      url: env,
+      protocol: process.env.TICKETFORGE_BROWSER_PROTOCOL === 'cdp' ? 'cdp' : 'playwright',
+      source: 'env',
+    };
   const saved = await getMeta(wsKey(BROWSER)).catch(() => undefined);
   const v = saved ? (typeof saved === 'string' ? JSON.parse(saved) : saved) : null;
   if (!v?.urlEnc) return null;
   try {
-    return { url: decrypt(v.urlEnc), protocol: v.protocol === 'cdp' ? 'cdp' : 'playwright', source: 'settings' };
+    return {
+      url: decrypt(v.urlEnc),
+      protocol: v.protocol === 'cdp' ? 'cdp' : 'playwright',
+      source: 'settings',
+    };
   } catch {
     return null;
   }
@@ -274,12 +312,20 @@ export function checkBrowserUrl(url) {
   try {
     u = new URL(String(url || '').trim());
   } catch {
-    throw Object.assign(new Error('Enter the full address, like wss://chrome.browserless.io/playwright?token=…'), { status: 400 });
+    throw Object.assign(
+      new Error('Enter the full address, like wss://chrome.browserless.io/playwright?token=…'),
+      { status: 400 },
+    );
   }
   if (!/^(wss?|https?):$/.test(u.protocol))
-    throw Object.assign(new Error('The address must start with wss:// (or ws://, https:// for a Chrome DevTools endpoint).'), {
-      status: 400,
-    });
+    throw Object.assign(
+      new Error(
+        'The address must start with wss:// (or ws://, https:// for a Chrome DevTools endpoint).',
+      ),
+      {
+        status: 400,
+      },
+    );
   return u.toString();
 }
 export async function saveRemoteBrowser(actor, { url, protocol }: any) {

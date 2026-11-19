@@ -1,8 +1,15 @@
-// Release notes (/release-notes): every deployed version, newest first, each with its features as bullet points.
-// A version with no features says so. Plain server-rendered HTML, readable by everyone, signed in or not.
+// Release notes (/release-notes): every deployed version, newest first, each with its features as
+// bullet points.
+// A version with no features says so. Plain server-rendered HTML, readable by everyone, signed in
+// or not.
 import type { ReleaseNotes as Notes } from '@/lib/release-notes';
 
-const dateLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' });
+const dateLabel = (d: string) =>
+  new Date(`${d}T12:00:00`).toLocaleDateString('en', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
 export function ReleaseNotesList({ releases }: { releases: Notes[] }) {
   return (

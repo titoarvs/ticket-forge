@@ -1,5 +1,6 @@
-// Frontend, backend or both: where an issue's implementation lives, for projects whose backend is a separate
-// repository. The AI reads each issue (and the two repositories' names and conventions) and decides.
+// Frontend, backend or both: where an issue's implementation lives, for projects whose backend is a
+// separate repository. The AI reads each issue (and the two repositories' names and conventions)
+// and decides.
 import { askJson } from './claude';
 import { jevEnabled, jevStatus, jevDecide } from './jev';
 
@@ -11,15 +12,20 @@ const clip = (s, n) => {
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 
-/** Returns { layers: { [ticketId]: 'frontend' | 'backend' | 'both' }, reasons: { [ticketId]: string } }. */
+/**
+ * Returns { layers: { [ticketId]: 'frontend' | 'backend' | 'both' }, reasons: { [ticketId]: string
+ * } }.
+ */
 export async function classifyLayers({ project, onlyMissing = true, ai = {} }: any) {
-  const all = project.tickets.filter((t) => !t.parentId && (!onlyMissing || !LAYERS.includes(t.layer)));
+  const all = project.tickets.filter(
+    (t) => !t.parentId && (!onlyMissing || !LAYERS.includes(t.layer)),
+  );
   const fe = project.dev || {},
     be = project.devBackend || {};
   const layers = {},
     reasons = {};
-  // Jev (Administration → AI → Decisions) answers first, in one quick call per 25 issues; what it isn't sure about, or
-  // can't answer, goes to the AI below.
+  // Jev (Administration → AI → Decisions) answers first, in one quick call per 25 issues; what it
+  // isn't sure about, or can't answer, goes to the AI below.
   let tickets = all,
     byJev = 0;
   if (await jevEnabled().catch(() => false)) {
@@ -42,7 +48,9 @@ export async function classifyLayers({ project, onlyMissing = true, ai = {} }: a
                   title: t.title,
                   userStory: clip(t.userStory, 200),
                   description: clip(t.description, 300),
-                  acceptanceCriteria: (t.acceptanceCriteria || []).slice(0, 4).map((a) => clip(a, 120)),
+                  acceptanceCriteria: (t.acceptanceCriteria || [])
+                    .slice(0, 4)
+                    .map((a) => clip(a, 120)),
                 },
               ]),
             ),

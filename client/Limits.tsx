@@ -1,6 +1,7 @@
 'use client';
-// Administration → Limits: every plan limit with its name, current value, what's used and what's left (and flagged
-// when reached), and GitHub Copilot's limits (or why they're unavailable). Also used by Billing for the same rows.
+// Administration → Limits: every plan limit with its name, current value, what's used and what's
+// left (and flagged when reached), and GitHub Copilot's limits (or why they're unavailable). Also
+// used by Billing for the same rows.
 import { useEffect, useState } from 'react';
 import { api, type Any } from './core';
 import { Ico, I, Spinner, ErrorState } from './ui';
@@ -8,10 +9,17 @@ import { Ico, I, Spinner, ErrorState } from './ui';
 export const num = (n: number, unit: string) =>
   unit === 'mb' ? (n >= 1000 ? `${(n / 1000).toFixed(1)} GB` : `${n} MB`) : n.toLocaleString();
 
-/** One plan limit: name and value, used and remaining, a bar, and "Limit reached" when nothing is left. */
+/**
+ * One plan limit: name and value, used and remaining, a bar, and "Limit reached" when nothing is
+ * left.
+ */
 export function LimitBar({ r }: { r: Any }) {
   const unlimited = r.limit == null;
-  const pct = unlimited ? 0 : r.limit === 0 ? 100 : Math.min(100, Math.round((r.used / r.limit) * 100));
+  const pct = unlimited
+    ? 0
+    : r.limit === 0
+      ? 100
+      : Math.min(100, Math.round((r.used / r.limit) * 100));
   const tone = r.reached ? 'bad' : pct >= 80 ? 'warn' : 'ok';
   return (
     <div className={`bill-usage ${r.reached ? 'reached' : ''}`}>
@@ -28,10 +36,18 @@ export function LimitBar({ r }: { r: Any }) {
         </b>
       </div>
       <div className="muted small">
-        Used {num(r.used, r.unit)} · {unlimited ? 'No limit' : `${num(r.remaining, r.unit)} remaining`}
+        Used {num(r.used, r.unit)} ·{' '}
+        {unlimited ? 'No limit' : `${num(r.remaining, r.unit)} remaining`}
       </div>
       {!unlimited && (
-        <div className="bill-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={r.name}>
+        <div
+          className="bill-bar"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={r.name}
+        >
           <i className={tone} style={{ width: `${pct}%` }} />
         </div>
       )}
@@ -84,7 +100,8 @@ export function LimitsTab() {
           </div>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the hosted service.
+            This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the
+            hosted service.
           </p>
         )}
       </div>
@@ -116,7 +133,8 @@ export function LimitsTab() {
           </div>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            <Ico svg={I.warn} /> Copilot limits are unavailable until Copilot is connected.{cp.reason ? ` ${cp.reason}` : ''}
+            <Ico svg={I.warn} /> Copilot limits are unavailable until Copilot is connected.
+            {cp.reason ? ` ${cp.reason}` : ''}
           </p>
         )}
       </div>

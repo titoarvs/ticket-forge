@@ -245,7 +245,11 @@ const VIEW_SKELETONS: Record<string, () => React.ReactNode> = {
         {range(6).map((i) => (
           <div key={i} className="sk-tl-row">
             <Sk w={w(i, 60)} h={12} style={{ maxWidth: 220 }} />
-            <Sk h={22} r={6} style={{ marginLeft: `${8 + ((i * 9) % 40)}%`, width: `${18 + ((i * 7) % 25)}%` }} />
+            <Sk
+              h={22}
+              r={6}
+              style={{ marginLeft: `${8 + ((i * 9) % 40)}%`, width: `${18 + ((i * 7) % 25)}%` }}
+            />
           </div>
         ))}
       </div>

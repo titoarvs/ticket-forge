@@ -1,6 +1,7 @@
-// Coding specs, AI part: asks which files and modules each ticket of an epic will touch, then writes one coding prompt
-// per ticket (lib/specs.ts). Works with any git remote: when the repository is on this computer its file list is shown
-// to the AI, otherwise the Repository Profile (Project settings → Code & GitHub) is what it goes by.
+// Coding specs, AI part: asks which files and modules each ticket of an epic will touch, then
+// writes one coding prompt per ticket (lib/specs.ts). Works with any git remote: when the
+// repository is on this computer its file list is shown to the AI, otherwise the Repository Profile
+// (Project settings → Code & GitHub) is what it goes by.
 import { askJson } from './claude';
 import { localReader } from './codebase';
 import { SERVERLESS, currentContext } from './db';
@@ -14,8 +15,12 @@ const clip = (s, n) => {
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 
-/** Is a git remote or repository connected to the project (a folder, a GitHub repository or a cloned URL)? */
-export const hasRemote = (project) => Boolean(project?.dev?.localPath || project?.dev?.repo || project?.dev?.source?.url);
+/**
+ * Is a git remote or repository connected to the project (a folder, a GitHub repository or a cloned
+ * URL)?
+ */
+export const hasRemote = (project) =>
+  Boolean(project?.dev?.localPath || project?.dev?.repo || project?.dev?.source?.url);
 
 /** The repository's file names, when it is on this computer (never file contents). */
 async function repoFiles(project) {
@@ -29,13 +34,21 @@ async function repoFiles(project) {
 }
 
 /**
- * One spec per top-level ticket of the epic: { ticketId, ticketKey, title, prompt, criteria, files, modules }.
+ * One spec per top-level ticket of the epic: { ticketId, ticketKey, title, prompt, criteria, files,
+ * modules }.
  * Throws a 400 when no git remote is connected or the epic has no tickets.
  */
 export async function generateSpecs({ project, epic, ai = {} }: any) {
-  if (!hasRemote(project)) throw Object.assign(new Error('Connect a git remote first: Project settings → Code & GitHub.'), { status: 400 });
+  if (!hasRemote(project))
+    throw Object.assign(
+      new Error('Connect a git remote first: Project settings → Code & GitHub.'),
+      { status: 400 },
+    );
   const tickets = project.tickets.filter((t) => t.epicId === epic.id && !t.parentId);
-  if (!tickets.length) throw Object.assign(new Error(`${epic.title} has no issues to write specs for.`), { status: 400 });
+  if (!tickets.length)
+    throw Object.assign(new Error(`${epic.title} has no issues to write specs for.`), {
+      status: 400,
+    });
   const files = await repoFiles(project);
   const profile = String(project.dev?.repoProfile?.markdown || '').trim();
   const touches: Map<any, any> = new Map();

@@ -8,7 +8,8 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
   return (
     <article className="legal">
       <p className="legal-note" role="note">
-        Template: this document has placeholders in [brackets] and must be reviewed by qualified counsel before it is relied on.
+        Template: this document has placeholders in [brackets] and must be reviewed by qualified
+        counsel before it is relied on.
       </p>
       <h1>{d.title}</h1>
       <p className="muted small">Version {d.version} · Effective date: [Effective date]</p>

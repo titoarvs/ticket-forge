@@ -1,7 +1,10 @@
-// Code generation and pull requests for an issue, on a local clone of the project's GitHub repository.
-// Each job works in its own git worktree and branch (your checkout is never touched): a TicketForge agent (lib/agents.ts) runs as a Claude Code agent and
-// implements the issue there, you review the diff in TicketForge, then TicketForge commits, pushes and opens the pull request.
-// Local only: it needs the repository folder, git and Claude Code on the machine running TicketForge.
+// Code generation and pull requests for an issue, on a local clone of the project's GitHub
+// repository.
+// Each job works in its own git worktree and branch (your checkout is never touched): a TicketForge
+// agent (lib/agents.ts) runs as a Claude Code agent and implements the issue there, you review the
+// diff in TicketForge, then TicketForge commits, pushes and opens the pull request.
+// Local only: it needs the repository folder, git and Claude Code on the machine running
+// TicketForge.
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,7 +13,14 @@ import os from 'node:os';
 import { DATA_DIR } from './db';
 import { claudeCodeCommand, askJson, agentModel, noteAgentUsage } from './claude';
 import { reviewWorktree } from './coderabbit';
-import { resolveAgent, claudeAgentsJson, codeAgentIds, ensureAgent, REVIEW_LENSES, requireRole } from './agents';
+import {
+  resolveAgent,
+  claudeAgentsJson,
+  codeAgentIds,
+  ensureAgent,
+  REVIEW_LENSES,
+  requireRole,
+} from './agents';
 import { isSaas } from './platform';
 import { appEnv } from './childenv';
 import { testDatabase } from './appdb';
@@ -60,10 +70,13 @@ const slug = (s) =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'change';
 
-/** Checks a local folder: is it a git repository, which GitHub repo, which default branch, anything uncommitted. */
 /**
- * A typed folder as a real path: ~ is the home folder, and a path that doesn't exist from the root but does inside
- * the home folder (/desktop/Practice → ~/Desktop/Practice) is taken from there.
+ * Checks a local folder: is it a git repository, which GitHub repo, which default branch, anything
+ * uncommitted.
+ */
+/**
+ * A typed folder as a real path: ~ is the home folder, and a path that doesn't exist from the root
+ * but does inside the home folder (/desktop/Practice → ~/Desktop/Practice) is taken from there.
  */
 const real = (p) => {
   try {
@@ -89,29 +102,44 @@ function findFolder(input) {
   for (const part of raw.replace(/^\/+/, '').split('/').filter(Boolean)) {
     const hit =
       fs.existsSync(/*turbopackIgnore: true*/ cur) &&
-      fs.readdirSync(/*turbopackIgnore: true*/ cur).find((n) => n.toLowerCase() === part.toLowerCase());
+      fs
+        .readdirSync(/*turbopackIgnore: true*/ cur)
+        .find((n) => n.toLowerCase() === part.toLowerCase());
     if (!hit) return dir;
     cur = path.join(/*turbopackIgnore: true*/ cur, hit);
   }
   return cur;
 }
 
-/** The folders inside one folder, for picking the repository (names only; files are never listed). */
+/**
+ * The folders inside one folder, for picking the repository (names only; files are never listed).
+ */
 export function listFolders(input) {
   const home = os.homedir();
   const dir = resolveFolder(input || home);
-  if (!fs.existsSync(/*turbopackIgnore: true*/ dir) || !fs.statSync(/*turbopackIgnore: true*/ dir).isDirectory())
+  if (
+    !fs.existsSync(/*turbopackIgnore: true*/ dir) ||
+    !fs.statSync(/*turbopackIgnore: true*/ dir).isDirectory()
+  )
     throw Object.assign(new Error(`There’s no folder at ${dir}.`), { status: 400 });
   let names: any[] = [];
   try {
     names = fs
       .readdirSync(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && !['node_modules', 'Library', '__pycache__'].includes(d.name))
+      .filter(
+        (d) =>
+          d.isDirectory() &&
+          !d.name.startsWith('.') &&
+          !['node_modules', 'Library', '__pycache__'].includes(d.name),
+      )
       .map((d) => d.name);
   } catch {
-    throw Object.assign(new Error(`TicketForge can’t open ${dir} (permission denied).`), { status: 400 });
+    throw Object.assign(new Error(`TicketForge can’t open ${dir} (permission denied).`), {
+      status: 400,
+    });
   }
-  const isGit = (p) => fs.existsSync(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ p, '.git'));
+  const isGit = (p) =>
+    fs.existsSync(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ p, '.git'));
   const entries = names
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
     .slice(0, 500)
@@ -130,25 +158,51 @@ export function listFolders(input) {
   ]
     .filter(([, p]) => fs.existsSync(/*turbopackIgnore: true*/ p))
     .map(([name, p]) => ({ name, path: p }));
-  return { path: dir, parent: path.dirname(dir) !== dir ? path.dirname(dir) : null, git: isGit(dir), entries, places, home };
+  return {
+    path: dir,
+    parent: path.dirname(dir) !== dir ? path.dirname(dir) : null,
+    git: isGit(dir),
+    entries,
+    places,
+    home,
+  };
 }
 
 export async function inspectRepo(localPath) {
   const dir = resolveFolder(localPath);
-  if (!fs.existsSync(/*turbopackIgnore: true*/ dir) || !fs.statSync(/*turbopackIgnore: true*/ dir).isDirectory())
-    throw Object.assign(new Error(`There’s no folder at ${dir} on this computer. Use Browse… to pick it.`), { status: 400 });
+  if (
+    !fs.existsSync(/*turbopackIgnore: true*/ dir) ||
+    !fs.statSync(/*turbopackIgnore: true*/ dir).isDirectory()
+  )
+    throw Object.assign(
+      new Error(`There’s no folder at ${dir} on this computer. Use Browse… to pick it.`),
+      { status: 400 },
+    );
   const top = (
     await git(dir, ['rev-parse', '--show-toplevel']).catch(() => {
-      throw Object.assign(new Error(`${dir} isn’t a git repository. Clone the project’s GitHub repository there first.`), { status: 400 });
+      throw Object.assign(
+        new Error(
+          `${dir} isn’t a git repository. Clone the project’s GitHub repository there first.`,
+        ),
+        { status: 400 },
+      );
     })
   ).trim();
   const remote = (await git(top, ['remote', 'get-url', 'origin']).catch(() => '')).trim();
-  let base = (await git(top, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']).catch(() => ''))
+  let base = (
+    await git(top, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']).catch(
+      () => '',
+    )
+  )
     .trim()
     .replace(/^origin\//, '');
-  if (!base) base = (await git(top, ['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => 'main')).trim();
+  if (!base)
+    base = (await git(top, ['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => 'main')).trim();
   const current = (await git(top, ['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim();
-  const dirty = (await git(top, ['status', '--porcelain']).catch(() => '')).trim().split('\n').filter(Boolean).length;
+  const dirty = (await git(top, ['status', '--porcelain']).catch(() => ''))
+    .trim()
+    .split('\n')
+    .filter(Boolean).length;
   const ri = await remoteInfo(top);
   return {
     path: top,
@@ -168,7 +222,9 @@ export async function githubToken(saved) {
   if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
   if (isSaas()) return ''; // the server's own GitHub CLI sign-in belongs to the operator, not to any workspace
   return new Promise((resolve) =>
-    execFile('gh', ['auth', 'token'], { timeout: 10000 }, (err, out) => resolve(err ? '' : String(out).trim())),
+    execFile('gh', ['auth', 'token'], { timeout: 10000 }, (err, out) =>
+      resolve(err ? '' : String(out).trim()),
+    ),
   );
 }
 
@@ -228,7 +284,11 @@ export function listJobs(projectId) {
 /** The newest job for an issue (so the panel can show it again after a reload). */
 export function jobForTicket(projectId, ticketId, side = null) {
   const all = [...JOBS.values()].filter(
-    (j) => j.projectId === projectId && j.ticketId === ticketId && j.status !== 'discarded' && (!side || (j.side || 'frontend') === side),
+    (j) =>
+      j.projectId === projectId &&
+      j.ticketId === ticketId &&
+      j.status !== 'discarded' &&
+      (!side || (j.side || 'frontend') === side),
   );
   return publicJob(all.sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]);
 }
@@ -240,12 +300,20 @@ export const jobsForTicket = (projectId, ticketId) => ({
 /** The newest backend job's summary for an issue, for the frontend job to build on. */
 export function backendSummary(projectId, ticketId) {
   const j = [...JOBS.values()]
-    .filter((x) => x.projectId === projectId && x.ticketId === ticketId && x.side === 'backend' && x.summary && x.status !== 'discarded')
+    .filter(
+      (x) =>
+        x.projectId === projectId &&
+        x.ticketId === ticketId &&
+        x.side === 'backend' &&
+        x.summary &&
+        x.status !== 'discarded',
+    )
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
   return j ? { summary: j.summary, branch: j.branch, status: j.status } : null;
 }
-// Dependency folders that are installed, not committed. A fresh worktree has none of them, so the check command
-// (tests, lint, type check) can't run and the agent guesses instead of verifying. They are linked from your checkout.
+// Dependency folders that are installed, not committed. A fresh worktree has none of them, so the
+// check command (tests, lint, type check) can't run and the agent guesses instead of verifying.
+// They are linked from your checkout.
 const DEP_DIRS = ['node_modules', 'vendor', '.venv', 'venv'];
 const WORKSPACE_PARENTS = ['packages', 'apps', 'services', 'libs', 'modules'];
 function linkDependencies(j) {
@@ -270,7 +338,9 @@ function linkDependencies(j) {
   for (const parent of WORKSPACE_PARENTS) {
     let subs: any[] = [];
     try {
-      subs = fs.readdirSync(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ j.repoPath, parent));
+      subs = fs.readdirSync(
+        /*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ j.repoPath, parent),
+      );
     } catch {
       continue;
     }
@@ -279,7 +349,9 @@ function linkDependencies(j) {
   j.linked = linked;
   return linked;
 }
-/** The project brain notes for the job (lib/brain.ts), for reading only: never staged or committed. */
+/**
+ * The project brain notes for the job (lib/brain.ts), for reading only: never staged or committed.
+ */
 export const BRAIN_DIR = '.ticketforge/brain';
 function writeBrain(j, files) {
   const names = Object.keys(files || {});
@@ -296,9 +368,10 @@ function writeBrain(j, files) {
   return names.length;
 }
 /**
- * Stages the agent's changes, never the linked dependency folders or the brain notes. Only paths git doesn't already
- * ignore get an exclude: naming an ignored path (a .gitignore with "node_modules" without the trailing slash) makes
- * git add fail with "The following paths are ignored by one of your .gitignore files", which stopped the job.
+ * Stages the agent's changes, never the linked dependency folders or the brain notes. Only paths
+ * git doesn't already ignore get an exclude: naming an ignored path (a .gitignore with
+ * "node_modules" without the trailing slash) makes git add fail with "The following paths are
+ * ignored by one of your .gitignore files", which stopped the job.
  */
 async function stageAll(j) {
   const skip: any[] = [];
@@ -312,7 +385,10 @@ async function stageAll(j) {
   return git(j.dir, ['add', '-A', '--', '.', ...skip.map((p) => `:(exclude)${p}`)]);
 }
 
-/** Claude Code permission rules for the check command: one per part of `a && b; c`, plus read-only git. */
+/**
+ * Claude Code permission rules for the check command: one per part of `a && b; c`, plus read-only
+ * git.
+ */
 export function checkTools(check) {
   const parts = String(check || '')
     .split(/&&|\|\||;|\|/)
@@ -321,7 +397,15 @@ export function checkTools(check) {
     .map((x) => x.replace(/^(\w+=\S*\s+)+/, '')) // FOO=1 npm test → npm test
     .filter((x) => !/^(cd|rm|git|sudo)\b/.test(x));
   const rules = parts.map((x) => `Bash(${x.split(/\s+/).slice(0, 2).join(' ')}:*)`);
-  return [...new Set([...rules, 'Bash(git diff:*)', 'Bash(git status:*)', 'Bash(git log:*)', 'Bash(git show:*)'])];
+  return [
+    ...new Set([
+      ...rules,
+      'Bash(git diff:*)',
+      'Bash(git status:*)',
+      'Bash(git log:*)',
+      'Bash(git show:*)',
+    ]),
+  ];
 }
 
 /** What the agent needs to know about verifying its work, added to every round. */
@@ -366,13 +450,15 @@ const clipText = (x, n) => {
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 /**
- * The feature around an issue, so the agent builds the right thing: the epic, the issue's sub-tasks, and the other
- * issues in the epic (so it doesn't build their parts).
+ * The feature around an issue, so the agent builds the right thing: the epic, the issue's
+ * sub-tasks, and the other issues in the epic (so it doesn't build their parts).
  */
 export function issueContext(project, ticket) {
   const epic = (project.epics || []).find((e) => e.id === ticket.epicId);
   const subtasks = project.tickets.filter((t) => t.parentId === ticket.id);
-  const siblings = epic ? project.tickets.filter((t) => t.epicId === epic.id && !t.parentId && t.id !== ticket.id) : [];
+  const siblings = epic
+    ? project.tickets.filter((t) => t.epicId === epic.id && !t.parentId && t.id !== ticket.id)
+    : [];
   return [
     `PROJECT: ${project.name}${project.description ? ` — ${clipText(project.description, 600)}` : ''}`,
     epic &&
@@ -380,7 +466,10 @@ export function issueContext(project, ticket) {
     subtasks.length &&
       `Sub-tasks of this issue (all part of this job):\n${subtasks
         .slice(0, 30)
-        .map((t) => `- ${t.key || ''} ${t.title}${t.description ? `: ${clipText(t.description, 300)}` : ''}`)
+        .map(
+          (t) =>
+            `- ${t.key || ''} ${t.title}${t.description ? `: ${clipText(t.description, 300)}` : ''}`,
+        )
         .join('\n')}`,
     siblings.length &&
       `Other issues in the same feature (separate jobs: don't build them, but stay compatible with them):\n${siblings
@@ -393,8 +482,9 @@ export function issueContext(project, ticket) {
 }
 
 /**
- * One API contract for an issue built in both repositories at once, so the backend and frontend jobs can run in
- * parallel and still meet: the backend implements exactly this, the frontend calls exactly this. Markdown.
+ * One API contract for an issue built in both repositories at once, so the backend and frontend
+ * jobs can run in parallel and still meet: the backend implements exactly this, the frontend calls
+ * exactly this. Markdown.
  */
 export async function apiContract({ project, ticket, ai = {} }: any) {
   const t = ticket;
@@ -423,7 +513,10 @@ Return {"endpoints":[{"method":"GET|POST|PUT|PATCH|DELETE","path":"/api/...","pu
   ].join('\n');
 }
 
-/** What the issue asks for, as the agent's task. The agent's role and rules are its system prompt (lib/agents.ts). */
+/**
+ * What the issue asks for, as the agent's task. The agent's role and rules are its system prompt
+ * (lib/agents.ts).
+ */
 function prompt(t, agent, extra, round, context = '') {
   const lines = [
     round > 1
@@ -448,7 +541,8 @@ function prompt(t, agent, extra, round, context = '') {
     t.type && `Type: ${t.type}${t.points ? ` · ${t.points} points` : ''}`,
     t.userStory && `User story: ${t.userStory}`,
     t.description && `Description:\n${t.description}`,
-    t.acceptanceCriteria?.length && `Acceptance criteria:\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
+    t.acceptanceCriteria?.length &&
+      `Acceptance criteria:\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
     t.testCases?.length &&
       `Test cases it must pass:\n${t.testCases
         .slice(0, 20)
@@ -461,21 +555,28 @@ function prompt(t, agent, extra, round, context = '') {
 }
 
 /**
- * Runs one TicketForge agent as a Claude Code agent in the job's worktree (`--agents` + `--agent`), streaming its
- * steps into the job log. A follow-up round resumes the same Claude Code session, so the agent keeps its context.
+ * Runs one TicketForge agent as a Claude Code agent in the job's worktree (`--agents` + `--agent`),
+ * streaming its steps into the job log. A follow-up round resumes the same Claude Code session, so
+ * the agent keeps its context.
  * Returns the agent's final message.
  */
 async function runAgent(j, agentId, text, { resume = false }: any = {}) {
   const agent = await resolveAgent(agentId);
-  if (!agent.enabled) throw Object.assign(new Error(`The ${agent.name} agent is turned off in Administration → Agents.`), { status: 400 });
+  if (!agent.enabled)
+    throw Object.assign(
+      new Error(`The ${agent.name} agent is turned off in Administration → Agents.`),
+      { status: 400 },
+    );
   const { bin, env: baseEnv } = await claudeCodeCommand();
-  // The project's Test database (or the person's own), never TicketForge's own database or secrets. Looked up each round,
-  // so the connection string is never kept on the job (which is saved and shown in the app).
+  // The project's Test database (or the person's own), never TicketForge's own database or secrets.
+  // Looked up each round, so the connection string is never kept on the job (which is saved and
+  // shown in the app).
   const db = await testDatabase(j.projectId, j.userId, { local: true }).catch(() => null);
   const env = appEnv(baseEnv, db?.url || '');
   const extra = checkTools(j.dev.checkCommand);
   const agents = await claudeAgentsJson({ notes: j.dev.notes || '', checkTool: extra });
-  if (!agents[agentId]) throw Object.assign(new Error(`The ${agent.name} agent isn’t available.`), { status: 400 });
+  if (!agents[agentId])
+    throw Object.assign(new Error(`The ${agent.name} agent isn’t available.`), { status: 400 });
   const tools = [...agent.tools, ...extra];
   const note = verifyNote(j, agent.writes);
   if (note) text = `${text}\n\n${note}`;
@@ -485,7 +586,8 @@ async function runAgent(j, agentId, text, { resume = false }: any = {}) {
         ? `DATABASE: DATABASE_URL and TEST_DATABASE_URL in your environment point to ${db.name} (${db.engineLabel}: ${db.database} on ${db.host}), a test database for this app. Run migrations, seeds and tests against it when the work needs a database. Never connect to any other database, and never print or write the connection string into files.`
         : 'DATABASE: no test database is set up for this project (Project settings → Database), so DATABASE_URL is not set. Don’t run migrations or tests that need a database; say in your summary what should be run against one.'
     }`;
-  // The Repository Profile (Learn from repository): how this codebase is built, for the first round of a job.
+  // The Repository Profile (Learn from repository): how this codebase is built, for the first round
+  // of a job.
   const profile = String(j.dev.repoProfile?.markdown || '').trim();
   if (profile && !resume)
     text = `${text}\n\nREPOSITORY PROFILE (learned from this repository${j.dev.repoProfile.commit ? ` at ${j.dev.repoProfile.commit}` : ''}; follow its structure, conventions and patterns, and check it against the code when something looks different):\n${profile}`;
@@ -516,7 +618,8 @@ async function runAgent(j, agentId, text, { resume = false }: any = {}) {
   if (agent.effort) args.push('--effort', agent.effort);
   if (resume && j.sessions?.[agentId]) args.push('--resume', j.sessions[agentId]);
   return new Promise((resolve, reject) => {
-    // Its own process group (not on Windows): Stop then ends the agent and everything it started (tests, servers).
+    // Its own process group (not on Windows): Stop then ends the agent and everything it started
+    // (tests, servers).
     const child = spawn(/*turbopackIgnore: true*/ bin, args, {
       cwd: j.dir,
       env,
@@ -561,12 +664,14 @@ async function runAgent(j, agentId, text, { resume = false }: any = {}) {
                 continue;
               }
               say(j, `${sub}${TOOL_VERB[c.name] || c.name} ${what}`.trim(), 'tool');
-            } else if (c.type === 'text' && c.text.trim() && !sub) say(j, c.text.trim().split('\n')[0], 'text');
+            } else if (c.type === 'text' && c.text.trim() && !sub)
+              say(j, c.text.trim().split('\n')[0], 'text');
           }
         } else if (ev.type === 'result') {
           result = ev.result || '';
           if (ev.session_id) j.sessions = { ...(j.sessions || {}), [agentId]: ev.session_id };
-          if (typeof ev.total_cost_usd === 'number') j.costUsd = (j.costUsd || 0) + ev.total_cost_usd;
+          if (typeof ev.total_cost_usd === 'number')
+            j.costUsd = (j.costUsd || 0) + ev.total_cost_usd;
           if (ev.is_error) stderr += ` ${ev.result || ''}`;
         }
       }
@@ -578,10 +683,19 @@ async function runAgent(j, agentId, text, { resume = false }: any = {}) {
     child.on('close', (code) => {
       j.child = null;
       j.children?.delete(child);
-      noteAgentUsage({ task: routed.task, model, ms: Date.now() - started, costUsd: (j.costUsd || 0) - costBefore });
+      noteAgentUsage({
+        task: routed.task,
+        model,
+        ms: Date.now() - started,
+        costUsd: (j.costUsd || 0) - costBefore,
+      });
       if (j.status === 'cancelled') return resolve('');
       if (code !== 0 && !result)
-        return reject(new Error(stderr.trim().split('\n').slice(-2).join(' ') || `Claude Code stopped (code ${code})`));
+        return reject(
+          new Error(
+            stderr.trim().split('\n').slice(-2).join(' ') || `Claude Code stopped (code ${code})`,
+          ),
+        );
       resolve(result.trim());
     });
     child.stdin.end(text);
@@ -602,12 +716,26 @@ async function collectDiff(j) {
 }
 export async function jobDiff(id, file?) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
-  const out: any = await git(j.dir, ['diff', '--cached', '--no-color', ...(file ? ['--', file] : [])]);
-  return out.length > MAX_DIFF ? `${out.slice(0, MAX_DIFF)}\n… (diff cut at ${MAX_DIFF.toLocaleString()} characters)` : out;
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
+  const out: any = await git(j.dir, [
+    'diff',
+    '--cached',
+    '--no-color',
+    ...(file ? ['--', file] : []),
+  ]);
+  return out.length > MAX_DIFF
+    ? `${out.slice(0, MAX_DIFF)}\n… (diff cut at ${MAX_DIFF.toLocaleString()} characters)`
+    : out;
 }
 
-/** A job's output as a git tree: what its worktree holds now, or its branch once the worktree is gone (after the pull request opened). */
+/**
+ * A job's output as a git tree: what its worktree holds now, or its branch once the worktree is
+ * gone (after the pull request opened).
+ */
 async function outputOf(j) {
   if (j.dir && fs.existsSync(/*turbopackIgnore: true*/ j.dir)) {
     await stageAll(j);
@@ -616,12 +744,17 @@ async function outputOf(j) {
   return { tree: j.branch, cwd: j.repoPath, head: j.branch };
 }
 /**
- * The job's output compared with the previous job run, the repository's default branch or the last run before the prior
- * spec (lib/codecompare.ts). Returns { target, label, available, reason, against, diff } with `diff` as a unified diff.
+ * The job's output compared with the previous job run, the repository's default branch or the last
+ * run before the prior spec (lib/codecompare.ts). Returns { target, label, available, reason,
+ * against, diff } with `diff` as a unified diff.
  */
 export async function compareJob(id, target: CompareTarget, specAt = '') {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
   try {
     const cur = await outputOf(j);
     if (target === 'default') {
@@ -631,20 +764,30 @@ export async function compareJob(id, target: CompareTarget, specAt = '') {
         () => def,
       );
       const from = (await git(cur.cwd, ['merge-base', ref, cur.head])).trim();
-      return compareResult(target, { against: def, diff: await git(cur.cwd, ['diff', '--no-color', from, cur.tree]) });
+      return compareResult(target, {
+        against: def,
+        diff: await git(cur.cwd, ['diff', '--no-color', from, cur.tree]),
+      });
     }
     const prev = baseJobFor(j, [...JOBS.values()], target, specAt);
     if (!prev) return compareResult(target, { reason: noBaseReason(target, specAt) });
     const against = `${prev.ticketKey} run of ${String(prev.startedAt).slice(0, 16).replace('T', ' ')} (${prev.branch})`;
-    return compareResult(target, { against, diff: await git(cur.cwd, ['diff', '--no-color', (await outputOf(prev)).tree, cur.tree]) });
+    return compareResult(target, {
+      against,
+      diff: await git(cur.cwd, ['diff', '--no-color', (await outputOf(prev)).tree, cur.tree]),
+    });
   } catch (e: any) {
     return compareResult(target, { reason: `Couldn’t compare these changes: ${e.message}` });
   }
 }
 
-// How many agent rounds run at once on this machine; the rest wait in order (status "queued"). Each round is a
-// Claude Code process, so this keeps a batch of tickets from overloading the computer or the account's rate limits.
-export const MAX_PARALLEL = Math.max(1, Math.min(10, Number(process.env.TICKETFORGE_CODE_PARALLEL) || 3));
+// How many agent rounds run at once on this machine; the rest wait in order (status "queued"). Each
+// round is a Claude Code process, so this keeps a batch of tickets from overloading the computer or
+// the account's rate limits.
+export const MAX_PARALLEL = Math.max(
+  1,
+  Math.min(10, Number(process.env.TICKETFORGE_CODE_PARALLEL) || 3),
+);
 G.__tfDevQueue ??= { running: 0, waiting: [] };
 const Q = G.__tfDevQueue;
 /** Waits for a free slot. Returns false when the job was stopped while it waited. */
@@ -655,7 +798,10 @@ function takeSlot(j) {
     return Promise.resolve(true);
   }
   j.status = 'queued';
-  say(j, `Waiting for a free slot: ${MAX_PARALLEL} agents already running (${Q.waiting.length + 1} in line).`);
+  say(
+    j,
+    `Waiting for a free slot: ${MAX_PARALLEL} agents already running (${Q.waiting.length + 1} in line).`,
+  );
   return new Promise((resolve) => Q.waiting.push({ j, resolve }));
 }
 function releaseSlot() {
@@ -671,7 +817,11 @@ function releaseSlot() {
   Q.running = Math.max(0, Q.running - 1);
 }
 /** The queue as numbers, for the jobs overview. */
-export const queueInfo = () => ({ running: Q.running, waiting: Q.waiting.length, max: MAX_PARALLEL });
+export const queueInfo = () => ({
+  running: Q.running,
+  waiting: Q.waiting.length,
+  max: MAX_PARALLEL,
+});
 
 async function work(j, text, opts: any = {}) {
   j.error = null;
@@ -725,17 +875,24 @@ async function workNow(j, text, { resume = false }: any = {}) {
 
 /** Runs the Review agent on the job's changes (read-only); its findings are kept on the job. */
 /**
- * Runs the Review agent on the job's changes (read-only); its findings are kept on the job. With { panel: true } the
- * Review Panel runs one Review agent per lens (lib/agents.ts REVIEW_LENSES) in parallel.
+ * Runs the Review agent on the job's changes (read-only); its findings are kept on the job. With {
+ * panel: true } the Review Panel runs one Review agent per lens (lib/agents.ts REVIEW_LENSES) in
+ * parallel.
  */
 export async function reviewJob(id, { panel = false, agent = 'review' }: any = {}) {
-  const reviewer = agent === 'ui-review' || /^custom-/.test(agent) ? agent : await requireRole('review');
+  const reviewer =
+    agent === 'ui-review' || /^custom-/.test(agent) ? agent : await requireRole('review');
   const rv = await ensureAgent(reviewer);
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
   if (['running', 'queued', 'starting'].includes(j.status))
     throw Object.assign(new Error('Wait for the current round to finish.'), { status: 409 });
-  if (!j.files?.length) throw Object.assign(new Error('There are no changes to review yet.'), { status: 409 });
+  if (!j.files?.length)
+    throw Object.assign(new Error('There are no changes to review yet.'), { status: 409 });
   if (panel) await ensureAgent('review-panel');
   const before = j.status;
   j.status = 'running';
@@ -754,7 +911,8 @@ export async function reviewJob(id, { panel = false, agent = 'review' }: any = {
       const text = [
         `Review the changes made for issue ${t.key}: ${t.title}.`,
         t.userStory && `User story: ${t.userStory}`,
-        t.acceptanceCriteria?.length && `Acceptance criteria:\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
+        t.acceptanceCriteria?.length &&
+          `Acceptance criteria:\n${t.acceptanceCriteria.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
         `Changed files: ${j.files.map((f) => f.path).join(', ')}`,
         `The diff (staged, uncommitted):\n\`\`\`diff\n${diff.slice(0, 120000)}\n\`\`\``,
         await dbCheck(
@@ -791,7 +949,13 @@ export async function reviewJob(id, { panel = false, agent = 'review' }: any = {
           lenses,
           text: lenses.map((l) => `## ${l.name}\n\n${l.text}`).join('\n\n'),
         };
-      } else entry = { at: new Date().toISOString(), round: j.rounds, agent: rv.name, text: await runAgent(j, reviewer, text) };
+      } else
+        entry = {
+          at: new Date().toISOString(),
+          round: j.rounds,
+          agent: rv.name,
+          text: await runAgent(j, reviewer, text),
+        };
       if (j.status === 'cancelled') {
         j.status = before;
         j.reviewing = false;
@@ -799,7 +963,11 @@ export async function reviewJob(id, { panel = false, agent = 'review' }: any = {
       } // stopping a review keeps the changes
       j.reviews = [...(j.reviews || []), entry];
       j.status = before === 'running' ? 'review' : before;
-      say(j, 'Review finished. Ask the Build agent to fix the findings, or open the pull request.', 'done');
+      say(
+        j,
+        'Review finished. Ask the Build agent to fix the findings, or open the pull request.',
+        'done',
+      );
     } catch (e) {
       j.status = before;
       if (!/cancel/i.test(e.message)) {
@@ -814,7 +982,8 @@ export async function reviewJob(id, { panel = false, agent = 'review' }: any = {
   return publicJob(j);
 }
 
-// git fetch and worktree add in the same repository at the same time can fail on its lock files: one at a time per repo.
+// git fetch and worktree add in the same repository at the same time can fail on its lock files:
+// one at a time per repo.
 G.__tfRepoLocks ??= new Map();
 function withRepoLock(key, fn) {
   const prev = G.__tfRepoLocks.get(key) || Promise.resolve();
@@ -826,18 +995,33 @@ function withRepoLock(key, fn) {
   return run;
 }
 /**
- * CodeRabbit review of the job's changes (read-only, in the background; can take many minutes). The findings are
- * kept on the job as j.cr; the browser saves them on the issue so they last and show in Reports.
+ * CodeRabbit review of the job's changes (read-only, in the background; can take many minutes). The
+ * findings are kept on the job as j.cr; the browser saves them on the issue so they last and show
+ * in Reports.
  */
 export async function codeRabbitJob(id, { apiKey = '' }: any = {}) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
-  if (j.cr?.status === 'running') throw Object.assign(new Error('CodeRabbit is already reviewing these changes.'), { status: 409 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
+  if (j.cr?.status === 'running')
+    throw Object.assign(new Error('CodeRabbit is already reviewing these changes.'), {
+      status: 409,
+    });
   if (['running', 'queued', 'starting'].includes(j.status))
     throw Object.assign(new Error('Wait for the agent to finish first.'), { status: 409 });
-  if (!j.files?.length) throw Object.assign(new Error('There are no changes to review yet.'), { status: 409 });
+  if (!j.files?.length)
+    throw Object.assign(new Error('There are no changes to review yet.'), { status: 409 });
   await stageAll(j);
-  j.cr = { status: 'running', startedAt: new Date().toISOString(), round: j.rounds, findings: [], log: [] };
+  j.cr = {
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    round: j.rounds,
+    findings: [],
+    log: [],
+  };
   say(j, 'CodeRabbit is reviewing the changes (this can take several minutes)…');
   (async () => {
     try {
@@ -857,7 +1041,11 @@ export async function codeRabbitJob(id, { apiKey = '' }: any = {}) {
         finishedAt: new Date().toISOString(),
         findings: r.findings.sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity)),
         complete: r.complete,
-        warning: r.error || (r.complete?.unreviewedFileCount ? `${r.complete.unreviewedFileCount} file(s) weren't reviewed.` : ''),
+        warning:
+          r.error ||
+          (r.complete?.unreviewedFileCount
+            ? `${r.complete.unreviewedFileCount} file(s) weren't reviewed.`
+            : ''),
       };
       const n = (s2) => r.findings.filter((f) => f.severity === s2).length;
       say(
@@ -875,7 +1063,10 @@ export async function codeRabbitJob(id, { apiKey = '' }: any = {}) {
   return publicJob(j);
 }
 
-/** The database check for a review: the diff's migrations against the project's saved schema ('' when there are none). */
+/**
+ * The database check for a review: the diff's migrations against the project's saved schema (''
+ * when there are none).
+ */
 async function dbCheck(projectId: string, diff: string, files: string[]) {
   try {
     const { getProject } = await import('./store');
@@ -885,7 +1076,10 @@ async function dbCheck(projectId: string, diff: string, files: string[]) {
   }
 }
 
-/** Starts a job: a fresh worktree and branch from the base branch, then Claude Code (queued when the machine is busy). */
+/**
+ * Starts a job: a fresh worktree and branch from the base branch, then Claude Code (queued when the
+ * machine is busy).
+ */
 export function startJob(args) {
   return withRepoLock(path.resolve(String(args.dev?.localPath || '')), () => startJobNow(args));
 }
@@ -901,11 +1095,18 @@ async function startJobNow({
   target = null,
   brainFiles = null,
 }: any) {
-  if (!(await codeAgentIds()).includes(agentId)) throw Object.assign(new Error(`“${agentId}” isn’t a code agent.`), { status: 400 });
+  if (!(await codeAgentIds()).includes(agentId))
+    throw Object.assign(new Error(`“${agentId}” isn’t a code agent.`), { status: 400 });
   const agent = await resolveAgent(agentId);
-  if (!agent.enabled) throw Object.assign(new Error(`The ${agent.name} agent is turned off in Administration → Agents.`), { status: 400 });
+  if (!agent.enabled)
+    throw Object.assign(
+      new Error(`The ${agent.name} agent is turned off in Administration → Agents.`),
+      { status: 400 },
+    );
   if (agentId === 'free-worker' && !String(instructions || '').trim())
-    throw Object.assign(new Error('Tell the Free Worker what to do in the instructions.'), { status: 400 });
+    throw Object.assign(new Error('Tell the Free Worker what to do in the instructions.'), {
+      status: 400,
+    });
   const running = [...JOBS.values()].find(
     (x) =>
       x.projectId === projectId &&
@@ -913,11 +1114,17 @@ async function startJobNow({
       (x.side || 'frontend') === side &&
       ['running', 'queued', 'starting'].includes(x.status),
   );
-  if (running) throw Object.assign(new Error(`A code job is already running for this issue's ${side}.`), { status: 409 });
+  if (running)
+    throw Object.assign(new Error(`A code job is already running for this issue's ${side}.`), {
+      status: 409,
+    });
   const repo = await inspectRepo(dev.localPath);
-  // target: an open pull/merge request to update ({ url, number, branch, base, title, provider }) — work on its branch.
+  // target: an open pull/merge request to update ({ url, number, branch, base, title, provider }) —
+  // work on its branch.
   const base = target?.base || dev.baseBranch || repo.defaultBranch;
-  const branch = target?.branch || `${dev.branchPrefix ?? 'tf/'}${String(ticket.key || 'issue').toLowerCase()}-${slug(ticket.title)}`;
+  const branch =
+    target?.branch ||
+    `${dev.branchPrefix ?? 'tf/'}${String(ticket.key || 'issue').toLowerCase()}-${slug(ticket.title)}`;
   const id = crypto.randomUUID().slice(0, 12);
   const dir = path.join(
     /*turbopackIgnore: true*/ WT_ROOT,
@@ -957,17 +1164,25 @@ async function startJobNow({
   JOBS.set(id, j);
   if (target) {
     say(j, `Fetching the pull request branch ${branch} from origin…`);
-    await git(repo.path, ['fetch', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`, base], { timeout: 180000 }).catch(
-      (e) => {
-        JOBS.delete(id);
-        throw Object.assign(new Error(`Couldn’t fetch the branch ${branch} of ${target.url}: ${e.message}`), { status: 400 });
-      },
-    );
-    fs.mkdirSync(/*turbopackIgnore: true*/ path.dirname(dir), { recursive: true });
-    // Read-only agents (reviews) use a detached checkout: the branch may already be checked out in your own folder.
     await git(
       repo.path,
-      agent.writes ? ['worktree', 'add', '-B', branch, dir, `origin/${branch}`] : ['worktree', 'add', '--detach', dir, `origin/${branch}`],
+      ['fetch', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`, base],
+      { timeout: 180000 },
+    ).catch((e) => {
+      JOBS.delete(id);
+      throw Object.assign(
+        new Error(`Couldn’t fetch the branch ${branch} of ${target.url}: ${e.message}`),
+        { status: 400 },
+      );
+    });
+    fs.mkdirSync(/*turbopackIgnore: true*/ path.dirname(dir), { recursive: true });
+    // Read-only agents (reviews) use a detached checkout: the branch may already be checked out in
+    // your own folder.
+    await git(
+      repo.path,
+      agent.writes
+        ? ['worktree', 'add', '-B', branch, dir, `origin/${branch}`]
+        : ['worktree', 'add', '--detach', dir, `origin/${branch}`],
     ).catch((e) => {
       JOBS.delete(id);
       throw /already (used|checked out) by worktree/i.test(e.message)
@@ -980,7 +1195,11 @@ async function startJobNow({
         : e;
     });
     linkDependencies(j);
-    if (writeBrain(j, brainFiles)) say(j, `Added ${j.brain} project brain notes to ${BRAIN_DIR}/ for the agent to read (not committed).`);
+    if (writeBrain(j, brainFiles))
+      say(
+        j,
+        `Added ${j.brain} project brain notes to ${BRAIN_DIR}/ for the agent to read (not committed).`,
+      );
     say(
       j,
       `Checked out ${branch} (the branch of ${target.provider === 'GitLab' ? `!${target.number}` : `#${target.number}`}) in its own worktree. ${agent.writes ? `Changes go to the same ${target.provider === 'GitLab' ? 'merge request' : 'pull request'}.` : 'Read-only: nothing is changed or pushed.'}`,
@@ -1004,20 +1223,33 @@ async function startJobNow({
     j,
     `Created branch ${branch} from ${start} in its own worktree.${linked.length ? ` Linked the installed dependencies (${linked.join(', ')}) so tests can run.` : ''}`,
   );
-  if (writeBrain(j, brainFiles)) say(j, `Added ${j.brain} project brain notes to ${BRAIN_DIR}/ for the agent to read (not committed).`);
+  if (writeBrain(j, brainFiles))
+    say(
+      j,
+      `Added ${j.brain} project brain notes to ${BRAIN_DIR}/ for the agent to read (not committed).`,
+    );
   if (j.status !== 'cancelled') work(j, prompt(ticket, agent, instructions, 1, context)); // runs in the background
   return publicJob(j);
 }
 /** Another round on the same worktree: "also handle…", "rename…". */
 export async function followUp(id, text) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
   if (['running', 'queued', 'starting'].includes(j.status))
     throw Object.assign(new Error('Wait for the current round to finish.'), { status: 409 });
   if (j.pr)
-    throw Object.assign(new Error('The pull request is already open. Push further changes from your editor, or start a new job.'), {
-      status: 409,
-    });
+    throw Object.assign(
+      new Error(
+        'The pull request is already open. Push further changes from your editor, or start a new job.',
+      ),
+      {
+        status: 409,
+      },
+    );
   j.rounds++;
   say(j, `You: ${text}`, 'you');
   // The agent that writes code takes follow-ups; after a read-only report, Build continues from it.
@@ -1025,12 +1257,14 @@ export async function followUp(id, text) {
     j.agentId = await requireRole(j.side === 'backend' ? 'backend' : 'build');
     j.agentName = (await resolveAgent(j.agentId)).name;
   }
-  work(j, prompt(j.ticket, await resolveAgent(j.agentId), text, j.rounds), { resume: Boolean(j.sessions?.[j.agentId]) });
+  work(j, prompt(j.ticket, await resolveAgent(j.agentId), text, j.rounds), {
+    resume: Boolean(j.sessions?.[j.agentId]),
+  });
   return publicJob(j);
 }
 /**
- * Ends a process and everything it started: its process group when it has one, else the process itself. Anything
- * still running 5 seconds later is killed outright.
+ * Ends a process and everything it started: its process group when it has one, else the process
+ * itself. Anything still running 5 seconds later is killed outright.
  */
 function killTree(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return;
@@ -1056,7 +1290,10 @@ const stopProcesses = (j) => {
   killTree(j.child);
 };
 
-/** Stop: works while the job is starting, waiting for a slot, or running (the agent or a review of its changes). */
+/**
+ * Stop: works while the job is starting, waiting for a slot, or running (the agent or a review of
+ * its changes).
+ */
 export function cancelJob(id) {
   const j = JOBS.get(id);
   if (!j) return null;
@@ -1094,36 +1331,61 @@ export async function discardJob(id) {
 }
 
 /**
- * Local-only repositories (the backend, for now): commits the reviewed changes on the job's branch in the local
- * repository. Nothing is pushed. The worktree is removed; the branch stays for you to push or merge.
+ * Local-only repositories (the backend, for now): commits the reviewed changes on the job's branch
+ * in the local repository. Nothing is pushed. The worktree is removed; the branch stays for you to
+ * push or merge.
  */
 export async function commitLocal(id, { title, appLink }: any = {}) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
   if (j.status !== 'review')
-    throw Object.assign(new Error(j.committedAt ? 'Already committed.' : 'There are no changes to commit.'), { status: 409 });
+    throw Object.assign(
+      new Error(j.committedAt ? 'Already committed.' : 'There are no changes to commit.'),
+      { status: 409 },
+    );
   const t = j.ticket;
   const msg = String(title || `${t.key}: ${t.title}`).slice(0, 250);
   await stageAll(j);
   await git(j.dir, ['commit', '-F', '-', '--no-verify'], {
-    input: `${msg}\n\n${t.userStory || ''}\n\nRefs ${t.key}${appLink ? ` (${appLink})` : ''}\n`.replace(/\n{3,}/g, '\n\n'),
+    input:
+      `${msg}\n\n${t.userStory || ''}\n\nRefs ${t.key}${appLink ? ` (${appLink})` : ''}\n`.replace(
+        /\n{3,}/g,
+        '\n\n',
+      ),
   });
   const sha = (await git(j.dir, ['rev-parse', '--short', 'HEAD'])).trim();
   j.status = 'committed';
   j.committedAt = new Date().toISOString();
-  say(j, `Committed ${sha} on the local branch ${j.branch} in ${j.repoPath}. Nothing was pushed.`, 'done');
+  say(
+    j,
+    `Committed ${sha} on the local branch ${j.branch} in ${j.repoPath}. Nothing was pushed.`,
+    'done',
+  );
   await git(j.repoPath, ['worktree', 'remove', '--force', j.dir]).catch(() => {});
   return { job: publicJob(j), commit: { sha, branch: j.branch, repoPath: j.repoPath } };
 }
 
-/** Where a repository's `origin` is hosted: { provider: 'GitHub' | 'GitLab', host, path } (path = owner/name or group/…/project). */
+/**
+ * Where a repository's `origin` is hosted: { provider: 'GitHub' | 'GitLab', host, path } (path =
+ * owner/name or group/…/project).
+ */
 export async function remoteInfo(repoPath) {
   const url = (await git(repoPath, ['remote', 'get-url', 'origin']).catch(() => '')).trim();
-  const m = url.match(/^(?:https?:\/\/(?:[^@/]+@)?|ssh:\/\/(?:[^@/]+@)?|[^@/]+@)([^/:]+)(?::\d+)?[:/]+(.+?)(?:\.git)?\/?$/i);
+  const m = url.match(
+    /^(?:https?:\/\/(?:[^@/]+@)?|ssh:\/\/(?:[^@/]+@)?|[^@/]+@)([^/:]+)(?::\d+)?[:/]+(.+?)(?:\.git)?\/?$/i,
+  );
   if (!m) return { provider: null, host: '', path: '', url };
   const host = m[1].toLowerCase();
   return {
-    provider: /github\.com$/.test(host) ? 'GitHub' : /gitlab/.test(host) || host.startsWith('git.') ? 'GitLab' : null,
+    provider: /github\.com$/.test(host)
+      ? 'GitHub'
+      : /gitlab/.test(host) || host.startsWith('git.')
+        ? 'GitLab'
+        : null,
     host,
     path: m[2],
     url: url.replace(/\/\/[^@/]+@/, '//'),
@@ -1131,19 +1393,24 @@ export async function remoteInfo(repoPath) {
 }
 
 /**
- * Commits the reviewed changes, pushes the branch and opens the review: a pull request on GitHub, a merge request on
- * GitLab (gitlab.com or self-hosted). The provider comes from the repository's origin remote.
+ * Commits the reviewed changes, pushes the branch and opens the review: a pull request on GitHub, a
+ * merge request on GitLab (gitlab.com or self-hosted). The provider comes from the repository's
+ * origin remote.
  */
-/** A short label for an update job ("Address review comments"), used in its commit message and PR comment. */
+/**
+ * A short label for an update job ("Address review comments"), used in its commit message and PR
+ * comment.
+ */
 export function setUpdateLabel(id, label) {
   const j = JOBS.get(id);
   if (j) j.updateLabel = label;
 }
 
 /**
- * Pushes the job's branch to the repository's origin the way you would from a terminal: with the repository's own
- * git configuration (its remote, your SSH key, Keychain or credential helper). Only if that is refused does it try
- * again with the project's GitHub/GitLab token, for this one command (never stored in the repository's config).
+ * Pushes the job's branch to the repository's origin the way you would from a terminal: with the
+ * repository's own git configuration (its remote, your SSH key, Keychain or credential helper).
+ * Only if that is refused does it try again with the project's GitHub/GitLab token, for this one
+ * command (never stored in the repository's config).
  */
 async function pushBranch(j, remote, { token, gitlabToken }: any = {}) {
   const args = ['push', '-u', 'origin', `HEAD:refs/heads/${j.branch}`];
@@ -1157,7 +1424,10 @@ async function pushBranch(j, remote, { token, gitlabToken }: any = {}) {
       if (remote.provider === 'GitLab') {
         const tok = gitlabToken || process.env.GITLAB_TOKEN || '';
         if (tok)
-          auth = ['-c', `http.https://${remote.host}/.extraheader=AUTHORIZATION: basic ${Buffer.from(`oauth2:${tok}`).toString('base64')}`];
+          auth = [
+            '-c',
+            `http.https://${remote.host}/.extraheader=AUTHORIZATION: basic ${Buffer.from(`oauth2:${tok}`).toString('base64')}`,
+          ];
       } else {
         const tok = await githubToken(token);
         if (tok)
@@ -1176,11 +1446,17 @@ async function pushBranch(j, remote, { token, gitlabToken }: any = {}) {
       );
     await git(j.dir, [...auth, ...args], { timeout: 180000 }).catch((e) => {
       throw Object.assign(
-        new Error(`Couldn’t push ${j.branch}: with your git setup (${first.message}), nor with the project’s token (${e.message}).`),
+        new Error(
+          `Couldn’t push ${j.branch}: with your git setup (${first.message}), nor with the project’s token (${e.message}).`,
+        ),
         { status: 400 },
       );
     });
-    say(j, `Pushed ${j.branch} with the project’s token (your git setup was refused: ${first.message.slice(0, 160)}).`, 'warn');
+    say(
+      j,
+      `Pushed ${j.branch} with the project’s token (your git setup was refused: ${first.message.slice(0, 160)}).`,
+      'warn',
+    );
   }
 }
 /** The page that opens a pull/merge request for a pushed branch, for when the API can't be used. */
@@ -1196,26 +1472,44 @@ async function prApi(remote, target, { token, gitlabToken }: any, method, sub = 
   if (remote.provider === 'GitLab') {
     const tok = gitlabToken || process.env.GITLAB_TOKEN || '';
     if (!tok)
-      throw Object.assign(new Error('No GitLab token: save one in Project settings → Code & GitHub → Backend repository.'), {
-        status: 400,
-      });
+      throw Object.assign(
+        new Error(
+          'No GitLab token: save one in Project settings → Code & GitHub → Backend repository.',
+        ),
+        {
+          status: 400,
+        },
+      );
     const res = await fetch(
       `https://${remote.host}/api/v4/projects/${encodeURIComponent(remote.path)}/merge_requests/${target.number}${sub}`,
       {
         method,
-        headers: { 'PRIVATE-TOKEN': tok, 'Content-Type': 'application/json', 'User-Agent': 'TicketForge' },
+        headers: {
+          'PRIVATE-TOKEN': tok,
+          'Content-Type': 'application/json',
+          'User-Agent': 'TicketForge',
+        },
         body: bodyIn ? JSON.stringify(bodyIn) : undefined,
       },
     );
     const out = await res.json().catch(() => ({}));
-    if (!res.ok) throw Object.assign(new Error(`GitLab said ${res.status}: ${out.message || out.error || ''}`), { status: 400 });
+    if (!res.ok)
+      throw Object.assign(
+        new Error(`GitLab said ${res.status}: ${out.message || out.error || ''}`),
+        { status: 400 },
+      );
     return out;
   }
   const tok = await githubToken(token);
   if (!tok)
-    throw Object.assign(new Error('No GitHub token: save one in Project settings → Code & GitHub, or sign in with `gh auth login`.'), {
-      status: 400,
-    });
+    throw Object.assign(
+      new Error(
+        'No GitHub token: save one in Project settings → Code & GitHub, or sign in with `gh auth login`.',
+      ),
+      {
+        status: 400,
+      },
+    );
   const res = await fetch(
     `https://api.github.com/repos/${remote.path}${sub.startsWith('/issues') ? sub.replace('/issues', `/issues/${target.number}`) : `/pulls/${target.number}${sub}`}`,
     {
@@ -1230,15 +1524,27 @@ async function prApi(remote, target, { token, gitlabToken }: any, method, sub = 
     },
   );
   const out = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(`GitHub said ${res.status}: ${out.message || ''}`), { status: 400 });
+  if (!res.ok)
+    throw Object.assign(new Error(`GitHub said ${res.status}: ${out.message || ''}`), {
+      status: 400,
+    });
   return out;
 }
 
 /**
- * Writes a pull request's title and description from what changed: the diff, the agent's summary and the issue.
+ * Writes a pull request's title and description from what changed: the diff, the agent's summary
+ * and the issue.
  * Returns { title, body } (Markdown).
  */
-export async function writePrText({ ticket, diff, summary = '', side = '', provider = 'GitHub', appLink = '', ai = {} }: any) {
+export async function writePrText({
+  ticket,
+  diff,
+  summary = '',
+  side = '',
+  provider = 'GitHub',
+  appLink = '',
+  ai = {},
+}: any) {
   const t = ticket;
   const res = await askJson({
     ...ai,
@@ -1268,7 +1574,11 @@ Return JSON: { "title": "…", "body": "…" }`,
 /** A draft title and description for the job's changes, for review before opening the PR. */
 export async function prDraft(id, { appLink, ai }: any = {}) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
   const diff = await git(j.dir, ['diff', '--cached', '--no-color']).catch(() => '');
   const remote = await remoteInfo(j.repoPath);
   return writePrText({
@@ -1283,17 +1593,27 @@ export async function prDraft(id, { appLink, ai }: any = {}) {
 }
 
 /**
- * Updating an open pull/merge request: commits the reviewed changes and pushes them to the request's own branch (the
- * request updates itself), then leaves a short comment saying what changed.
+ * Updating an open pull/merge request: commits the reviewed changes and pushes them to the
+ * request's own branch (the request updates itself), then leaves a short comment saying what
+ * changed.
  */
 export async function pushToPullRequest(id, { message, token, gitlabToken }: any = {}) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
-  if (!j.target) throw Object.assign(new Error('This job isn’t updating a pull request.'), { status: 400 });
-  if (j.status !== 'review') throw Object.assign(new Error('There are no changes to push.'), { status: 409 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
+  if (!j.target)
+    throw Object.assign(new Error('This job isn’t updating a pull request.'), { status: 400 });
+  if (j.status !== 'review')
+    throw Object.assign(new Error('There are no changes to push.'), { status: 409 });
   const remote = await remoteInfo(j.repoPath);
   const t = j.ticket;
-  const msg = String(message || `${t.key}: ${j.updateLabel || 'Address requested changes'}`).slice(0, 250);
+  const msg = String(message || `${t.key}: ${j.updateLabel || 'Address requested changes'}`).slice(
+    0,
+    250,
+  );
   await stageAll(j);
   await git(j.dir, ['commit', '-F', '-', '--no-verify'], { input: `${msg}\n\nRefs ${t.key}\n` });
   const sha = (await git(j.dir, ['rev-parse', '--short', 'HEAD'])).trim();
@@ -1316,23 +1636,47 @@ export async function pushToPullRequest(id, { message, token, gitlabToken }: any
 }
 
 /**
- * Reviews an open pull/merge request with a read-only review agent (Review a Pull Request or UI/UX Review): fetches its
- * branch, reads the diff against the base, and runs the agent on the request's own branch. The findings are the job's
- * report; postReview() can then leave them on the request as a comment.
+ * Reviews an open pull/merge request with a read-only review agent (Review a Pull Request or UI/UX
+ * Review): fetches its branch, reads the diff against the base, and runs the agent on the request's
+ * own branch. The findings are the job's report; postReview() can then leave them on the request as
+ * a comment.
  */
-export async function startPrReview({ projectId, ticket, dev, target, user, agentId = '', side = 'frontend', focus = '' }: any) {
+export async function startPrReview({
+  projectId,
+  ticket,
+  dev,
+  target,
+  user,
+  agentId = '',
+  side = 'frontend',
+  focus = '',
+}: any) {
   agentId ||= await requireRole('review');
   const repo = await inspectRepo(dev.localPath);
-  await git(repo.path, ['fetch', 'origin', `+refs/heads/${target.branch}:refs/remotes/origin/${target.branch}`, target.base], {
-    timeout: 180000,
-  }).catch((e) => {
-    throw Object.assign(new Error(`Couldn’t fetch ${target.branch} and ${target.base} from origin: ${e.message}`), { status: 400 });
+  await git(
+    repo.path,
+    [
+      'fetch',
+      'origin',
+      `+refs/heads/${target.branch}:refs/remotes/origin/${target.branch}`,
+      target.base,
+    ],
+    {
+      timeout: 180000,
+    },
+  ).catch((e) => {
+    throw Object.assign(
+      new Error(`Couldn’t fetch ${target.branch} and ${target.base} from origin: ${e.message}`),
+      { status: 400 },
+    );
   });
   const range = `origin/${target.base}...origin/${target.branch}`;
   const stat = (await git(repo.path, ['diff', '--numstat', range])).trim();
   if (!stat)
     throw Object.assign(
-      new Error(`${prNoun(target.provider)} ${prRef(target.provider, target.number)} has no changes against ${target.base}.`),
+      new Error(
+        `${prNoun(target.provider)} ${prRef(target.provider, target.number)} has no changes against ${target.base}.`,
+      ),
       { status: 400 },
     );
   const diff: any = await git(repo.path, ['diff', '--unified=4', range]);
@@ -1344,7 +1688,8 @@ export async function startPrReview({ projectId, ticket, dev, target, user, agen
   const instructions = [
     `Review ${prNoun(target.provider)} ${prRef(target.provider, target.number)} “${target.title}” (${target.branch} → ${target.base}) for issue ${t.key}: ${t.title}.`,
     t.userStory && `User story: ${t.userStory}`,
-    t.acceptanceCriteria?.length && `Acceptance criteria:\n${t.acceptanceCriteria.map((x, i) => `${i + 1}. ${x}`).join('\n')}`,
+    t.acceptanceCriteria?.length &&
+      `Acceptance criteria:\n${t.acceptanceCriteria.map((x, i) => `${i + 1}. ${x}`).join('\n')}`,
     `Changed files (${files.length}): ${files.join(', ')}`,
     `The diff against ${target.base}${diff.length > 120000 ? ' (cut to the first 120,000 characters; read the files for the rest)' : ''}:\n\`\`\`diff\n${diff.slice(0, 120000)}\n\`\`\``,
     focus && `Focus especially on: ${focus}`,
@@ -1375,23 +1720,40 @@ export async function startPrReview({ projectId, ticket, dev, target, user, agen
 /** Leaves the review job's findings on the pull/merge request as one comment. */
 export async function postReview(id, { token, gitlabToken }: any = {}) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That review is gone (the server restarted). Run it again.'), { status: 404 });
-  if (!j.target || !j.summary) throw Object.assign(new Error('There’s no finished review to post.'), { status: 409 });
+  if (!j)
+    throw Object.assign(new Error('That review is gone (the server restarted). Run it again.'), {
+      status: 404,
+    });
+  if (!j.target || !j.summary)
+    throw Object.assign(new Error('There’s no finished review to post.'), { status: 409 });
   const remote = await remoteInfo(j.repoPath);
   const body = `**AI code review** · ${j.agentName} via TicketForge for ${j.ticketKey}\n\n${j.summary.slice(0, 60000)}`;
   await (remote.provider === 'GitLab'
     ? prApi(remote, j.target, { token, gitlabToken }, 'POST', '/notes', { body })
     : prApi(remote, j.target, { token, gitlabToken }, 'POST', '/issues/comments', { body }));
   j.posted = new Date().toISOString();
-  say(j, `Posted the review on ${prNoun(remote.provider)} ${prRef(remote.provider, j.target.number)}.`, 'done');
+  say(
+    j,
+    `Posted the review on ${prNoun(remote.provider)} ${prRef(remote.provider, j.target.number)}.`,
+    'done',
+  );
   return publicJob(j);
 }
 
-/** Review comments on an open pull/merge request (for "Address review comments"). Returns [{ author, file, line, body }]. */
+/**
+ * Review comments on an open pull/merge request (for "Address review comments"). Returns [{ author,
+ * file, line, body }].
+ */
 export async function reviewComments({ repoPath, target, token, gitlabToken }: any) {
   const remote = await remoteInfo(repoPath);
   if (remote.provider === 'GitLab') {
-    const notes = await prApi(remote, target, { token, gitlabToken }, 'GET', '/notes?sort=asc&per_page=100');
+    const notes = await prApi(
+      remote,
+      target,
+      { token, gitlabToken },
+      'GET',
+      '/notes?sort=asc&per_page=100',
+    );
     return (notes || [])
       .filter((n) => !n.system && !/^\*\*Updated by TicketForge\*\*/.test(n.body || ''))
       .map((n) => ({
@@ -1411,7 +1773,12 @@ export async function reviewComments({ repoPath, target, token, gitlabToken }: a
   return [
     ...(reviews || [])
       .filter((r) => r.body)
-      .map((r) => ({ author: r.user?.login || '', file: '', line: null, body: String(r.body).slice(0, 2000) })),
+      .map((r) => ({
+        author: r.user?.login || '',
+        file: '',
+        line: null,
+        body: String(r.body).slice(0, 2000),
+      })),
     ...(inline || []).map((c) => ({
       author: c.user?.login || '',
       file: c.path || '',
@@ -1420,49 +1787,108 @@ export async function reviewComments({ repoPath, target, token, gitlabToken }: a
     })),
     ...(general || [])
       .filter((c) => !/^\*\*Updated by TicketForge\*\*/.test(c.body || ''))
-      .map((c) => ({ author: c.user?.login || '', file: '', line: null, body: String(c.body || '').slice(0, 2000) })),
+      .map((c) => ({
+        author: c.user?.login || '',
+        file: '',
+        line: null,
+        body: String(c.body || '').slice(0, 2000),
+      })),
   ];
 }
 
-/** Rewrites an open pull/merge request's title and description from its real diff against the base branch. */
-export async function describePullRequest({ repoPath, target, ticket, side, token, gitlabToken, appLink, ai }: any) {
+/**
+ * Rewrites an open pull/merge request's title and description from its real diff against the base
+ * branch.
+ */
+export async function describePullRequest({
+  repoPath,
+  target,
+  ticket,
+  side,
+  token,
+  gitlabToken,
+  appLink,
+  ai,
+}: any) {
   const remote = await remoteInfo(repoPath);
-  await git(repoPath, ['fetch', 'origin', `+refs/heads/${target.branch}:refs/remotes/origin/${target.branch}`, target.base], {
-    timeout: 180000,
+  await git(
+    repoPath,
+    [
+      'fetch',
+      'origin',
+      `+refs/heads/${target.branch}:refs/remotes/origin/${target.branch}`,
+      target.base,
+    ],
+    {
+      timeout: 180000,
+    },
+  );
+  const diff = await git(repoPath, [
+    'diff',
+    '--no-color',
+    `origin/${target.base}...origin/${target.branch}`,
+  ]).catch(() => '');
+  const { title, body } = await writePrText({
+    ticket,
+    diff,
+    side,
+    provider: remote.provider,
+    appLink,
+    ai,
   });
-  const diff = await git(repoPath, ['diff', '--no-color', `origin/${target.base}...origin/${target.branch}`]).catch(() => '');
-  const { title, body } = await writePrText({ ticket, diff, side, provider: remote.provider, appLink, ai });
-  if (remote.provider === 'GitLab') await prApi(remote, target, { token, gitlabToken }, 'PUT', '', { title, description: body });
+  if (remote.provider === 'GitLab')
+    await prApi(remote, target, { token, gitlabToken }, 'PUT', '', { title, description: body });
   else await prApi(remote, target, { token }, 'PATCH', '', { title, body });
   return { title, body };
 }
 
-export async function openPullRequest(id, { title, body, draft, token, gitlabToken, appLink }: any) {
+export async function openPullRequest(
+  id,
+  { title, body, draft, token, gitlabToken, appLink }: any,
+) {
   const j = JOBS.get(id);
-  if (!j) throw Object.assign(new Error('That code job is gone (the server restarted). Start it again.'), { status: 404 });
+  if (!j)
+    throw Object.assign(
+      new Error('That code job is gone (the server restarted). Start it again.'),
+      { status: 404 },
+    );
   if (!['review'].includes(j.status))
-    throw Object.assign(new Error(j.pr ? 'The pull request is already open.' : 'There are no changes to open a pull request for.'), {
-      status: 409,
-    });
+    throw Object.assign(
+      new Error(
+        j.pr
+          ? 'The pull request is already open.'
+          : 'There are no changes to open a pull request for.',
+      ),
+      {
+        status: 409,
+      },
+    );
   const remote = await remoteInfo(j.repoPath);
   const provider = remote.provider || (j.repo ? 'GitHub' : null);
   if (!provider)
     throw Object.assign(
-      new Error(`Can’t tell where ${j.repoPath} is hosted (origin: ${remote.url || 'none'}). Pull requests work with GitHub and GitLab.`),
+      new Error(
+        `Can’t tell where ${j.repoPath} is hosted (origin: ${remote.url || 'none'}). Pull requests work with GitHub and GitLab.`,
+      ),
       { status: 400 },
     );
   const t = j.ticket;
   const prTitle = String(title || `${t.key}: ${t.title}`).slice(0, 250);
   await stageAll(j);
-  // Commit with the repository's own git config (your name and email). Only when there's something new: after a push
-  // that failed, the changes are already committed and pressing the button again just pushes.
+  // Commit with the repository's own git config (your name and email). Only when there's something
+  // new: after a push that failed, the changes are already committed and pressing the button again
+  // just pushes.
   const pending = await git(j.dir, ['diff', '--cached', '--quiet']).then(
     () => false,
     () => true,
   );
   if (pending) {
     await git(j.dir, ['commit', '-F', '-', '--no-verify'], {
-      input: `${prTitle}\n\n${t.userStory || ''}\n\nRefs ${t.key}${appLink ? ` (${appLink})` : ''}\n`.replace(/\n{3,}/g, '\n\n'),
+      input:
+        `${prTitle}\n\n${t.userStory || ''}\n\nRefs ${t.key}${appLink ? ` (${appLink})` : ''}\n`.replace(
+          /\n{3,}/g,
+          '\n\n',
+        ),
     }).catch((e) => {
       throw Object.assign(
         new Error(
@@ -1480,7 +1906,8 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
     [
       `Implements **${t.key}: ${t.title}**${appLink ? ` ([TicketForge](${appLink}))` : ''}${j.side === 'backend' ? ' — backend part' : ''}.`,
       t.userStory && `\n> ${t.userStory}`,
-      t.acceptanceCriteria?.length && `\n### Acceptance criteria\n${t.acceptanceCriteria.map((a) => `- [ ] ${a}`).join('\n')}`,
+      t.acceptanceCriteria?.length &&
+        `\n### Acceptance criteria\n${t.acceptanceCriteria.map((a) => `- [ ] ${a}`).join('\n')}`,
       j.summary && `\n### What changed\n${j.summary.slice(0, 6000)}`,
       `\n_Written with Claude Code from TicketForge; reviewed by ${j.startedBy || 'the team'} before opening._`,
     ]
@@ -1525,7 +1952,8 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
     });
   };
 
-  // Push with your own git setup (the project's token only if that's refused), then open the request.
+  // Push with your own git setup (the project's token only if that's refused), then open the
+  // request.
   await pushBranch(j, remote, { token, gitlabToken });
 
   if (provider === 'GitLab') {
@@ -1534,18 +1962,26 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
       return viaPage(
         'No GitLab token to open the merge request with, so it opens on GitLab instead (save a token in Project settings → Code & GitHub to have TicketForge open it).',
       );
-    const res = await fetch(`https://${remote.host}/api/v4/projects/${encodeURIComponent(remote.path)}/merge_requests`, {
-      method: 'POST',
-      headers: { 'PRIVATE-TOKEN': tok, 'Content-Type': 'application/json', 'User-Agent': 'TicketForge' },
-      body: JSON.stringify({
-        source_branch: j.branch,
-        target_branch: j.base,
-        title: draft ? `Draft: ${prTitle}` : prTitle,
-        description: prBody,
-        remove_source_branch: true,
-      }),
-    }).catch(() => null);
-    if (!res) return viaPage(`GitLab at ${remote.host} couldn’t be reached to open the merge request.`);
+    const res = await fetch(
+      `https://${remote.host}/api/v4/projects/${encodeURIComponent(remote.path)}/merge_requests`,
+      {
+        method: 'POST',
+        headers: {
+          'PRIVATE-TOKEN': tok,
+          'Content-Type': 'application/json',
+          'User-Agent': 'TicketForge',
+        },
+        body: JSON.stringify({
+          source_branch: j.branch,
+          target_branch: j.base,
+          title: draft ? `Draft: ${prTitle}` : prTitle,
+          description: prBody,
+          remove_source_branch: true,
+        }),
+      },
+    ).catch(() => null);
+    if (!res)
+      return viaPage(`GitLab at ${remote.host} couldn’t be reached to open the merge request.`);
     const mr = await res.json().catch(() => ({}));
     if (!res.ok) {
       const why = Array.isArray(mr.message)
@@ -1555,10 +1991,17 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
           : mr.message || mr.error || `GitLab said ${res.status}`;
       return viaPage(`GitLab didn’t open the merge request (${why}).`);
     }
-    return done({ url: mr.web_url, number: mr.iid, title: mr.title, draft: Boolean(mr.draft || mr.work_in_progress), repo: remote.path });
+    return done({
+      url: mr.web_url,
+      number: mr.iid,
+      title: mr.title,
+      draft: Boolean(mr.draft || mr.work_in_progress),
+      repo: remote.path,
+    });
   }
 
-  // GitHub: the project's token, GITHUB_TOKEN or your gh sign-in; else gh pr create; else the compare page.
+  // GitHub: the project's token, GITHUB_TOKEN or your gh sign-in; else gh pr create; else the
+  // compare page.
   const repo = remote.provider === 'GitHub' ? remote.path : j.repo;
   const tok = await githubToken(token);
   if (!tok) {
@@ -1585,7 +2028,14 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
       ),
     );
     const url = out.split('\n').find((l) => /^https:\/\/github\.com\/.+\/pull\/\d+/.test(l));
-    if (url) return done({ url, number: Number(url.match(/\/pull\/(\d+)/)[1]), title: prTitle, draft: Boolean(draft), repo });
+    if (url)
+      return done({
+        url,
+        number: Number(url.match(/\/pull\/(\d+)/)[1]),
+        title: prTitle,
+        draft: Boolean(draft),
+        repo,
+      });
     return viaPage(
       'No GitHub token or gh sign-in to open the pull request with, so it opens on GitHub instead (save a token in Project settings → Code & GitHub, or run gh auth login, to have TicketForge open it).',
     );
@@ -1598,7 +2048,13 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
       'User-Agent': 'TicketForge',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ title: prTitle, head: j.branch, base: j.base, body: prBody, draft: Boolean(draft) }),
+    body: JSON.stringify({
+      title: prTitle,
+      head: j.branch,
+      base: j.base,
+      body: prBody,
+      draft: Boolean(draft),
+    }),
   }).catch(() => null);
   if (!res) return viaPage('GitHub couldn’t be reached to open the pull request.');
   const pr = await res.json().catch(() => ({}));
@@ -1615,9 +2071,10 @@ export async function openPullRequest(id, { title, body, draft, token, gitlabTok
   return done({ url: pr.html_url, number: pr.number, title: pr.title, draft: pr.draft, repo });
 }
 
-// ---------------------------------------------------------------- repository profile
-// "Learn from repository" (Project settings → Code & GitHub): a read-only Claude Code agent studies the checkout and
-// writes the Repository Profile, which every code job then gets (lib/devagent.ts runAgent), so code follows the repo.
+// ---------------------------------------------------------------- repository profile "Learn from
+// repository" (Project settings → Code & GitHub): a read-only Claude Code agent studies the
+// checkout and writes the Repository Profile, which every code job then gets (lib/devagent.ts
+// runAgent), so code follows the repo.
 const PROFILE_PROMPT = `Study this repository and write its REPOSITORY PROFILE: the guide another engineer (an AI coding agent) reads
 before changing code here, so new code looks like it was written by this team. Explore first: the manifest files
 (package.json, pyproject, go.mod, composer.json, Gemfile…), config, the folder layout, then read two or three existing
@@ -1648,10 +2105,17 @@ Generated or vendored files, lockfiles, migrations, anything not to touch, and a
 CONTRIBUTING, CLAUDE.md or AGENTS.md asks for.`;
 
 /**
- * Runs the read-only profile agent in the repository; onStep(text) for progress. Resolves { markdown, commit }.
- * @param {{ localPath: string, model?: string, onStep?: (text: string) => void, signal?: AbortSignal }} opts
+ * Runs the read-only profile agent in the repository; onStep(text) for progress. Resolves {
+ * markdown, commit }.
+ * @param {{ localPath: string, model?: string, onStep?: (text: string) => void, signal?:
+ *        AbortSignal }} opts
  */
-export async function learnRepo({ localPath, model = 'sonnet', onStep = (_text) => {}, signal }: any) {
+export async function learnRepo({
+  localPath,
+  model = 'sonnet',
+  onStep = (_text) => {},
+  signal,
+}: any) {
   const repo = await inspectRepo(localPath);
   const { bin, env: baseEnv } = await claudeCodeCommand();
   const env = appEnv(baseEnv); // read-only profile agent: no database at all
@@ -1672,7 +2136,11 @@ export async function learnRepo({ localPath, model = 'sonnet', onStep = (_text) 
     model,
   ];
   return new Promise((resolve, reject) => {
-    const child = spawn(/*turbopackIgnore: true*/ bin, args, { cwd: repo.path, env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(/*turbopackIgnore: true*/ bin, args, {
+      cwd: repo.path,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     signal?.addEventListener('abort', () => child.kill('SIGTERM'));
     let buf = '',
       stderr = '',
@@ -1718,18 +2186,24 @@ export async function learnRepo({ localPath, model = 'sonnet', onStep = (_text) 
       const start = md.search(/^#\s/m);
       const markdown = (start > 0 ? md.slice(start) : md).trim().slice(0, 14000);
       if (code !== 0 && !markdown)
-        return reject(new Error(stderr.trim().split('\n').slice(-2).join(' ') || `Claude Code stopped (code ${code})`));
-      if (!/^#/.test(markdown)) return reject(new Error('The agent didn’t return a profile. Try again.'));
+        return reject(
+          new Error(
+            stderr.trim().split('\n').slice(-2).join(' ') || `Claude Code stopped (code ${code})`,
+          ),
+        );
+      if (!/^#/.test(markdown))
+        return reject(new Error('The agent didn’t return a profile. Try again.'));
       resolve({ markdown, commit, costUsd: cost });
     });
     child.stdin.end(PROFILE_PROMPT);
   });
 }
 
-// ---------------------------------------------------------------- repositories cloned by TicketForge
-// Project settings → Code & GitHub → Repository → "Clone from Git": instead of pointing at a folder you cloned,
-// paste the repository (https URL, SSH URL or owner/name). TicketForge clones it into its data folder and keeps it
-// up to date; code jobs then use it like any local repository. Tokens are passed per command, never stored in .git.
+// ---------------------------------------------------------------- repositories cloned by
+// TicketForge Project settings → Code & GitHub → Repository → "Clone from Git": instead of pointing
+// at a folder you cloned, paste the repository (https URL, SSH URL or owner/name). TicketForge
+// clones it into its data folder and keeps it up to date; code jobs then use it like any local
+// repository. Tokens are passed per command, never stored in .git.
 const CLONE_ROOT = path.join(/*turbopackIgnore: true*/ DATA_DIR, 'repos');
 /** "owner/name", https or SSH → { url, host, path, provider } (url is what git clones). */
 export function parseRepoSource(input) {
@@ -1743,26 +2217,39 @@ export function parseRepoSource(input) {
       path: raw.replace(/\.git$/, ''),
       provider: 'GitHub',
     };
-  const m = raw.match(/^(?:https?:\/\/(?:[^@/]+@)?|ssh:\/\/(?:[^@/]+@)?|[\w.-]+@)([^/:]+)(?::\d+)?[:/]+(.+?)(?:\.git)?$/i);
+  const m = raw.match(
+    /^(?:https?:\/\/(?:[^@/]+@)?|ssh:\/\/(?:[^@/]+@)?|[\w.-]+@)([^/:]+)(?::\d+)?[:/]+(.+?)(?:\.git)?$/i,
+  );
   if (!m)
-    throw Object.assign(new Error('Paste the repository’s clone URL (https://… or git@…) or owner/name for GitHub.'), { status: 400 });
+    throw Object.assign(
+      new Error('Paste the repository’s clone URL (https://… or git@…) or owner/name for GitHub.'),
+      { status: 400 },
+    );
   const [, host, p] = m;
   if (/[\s;&|`$]/.test(raw) || raw.startsWith('-'))
     throw Object.assign(new Error('That doesn’t look like a repository URL.'), { status: 400 });
   return {
-    url: /^https?:/i.test(raw) ? raw.replace(/\/\/[^@/]+@/, '//') + (raw.endsWith('.git') ? '' : '.git') : raw,
+    url: /^https?:/i.test(raw)
+      ? raw.replace(/\/\/[^@/]+@/, '//') + (raw.endsWith('.git') ? '' : '.git')
+      : raw,
     host,
     path: p,
     provider: /gitlab/i.test(host) ? 'GitLab' : /github/i.test(host) ? 'GitHub' : 'Git',
   };
 }
-/** git -c options that sign in over https with a token for this one command (nothing is written to .git/config). */
+/**
+ * git -c options that sign in over https with a token for this one command (nothing is written to
+ * .git/config).
+ */
 function authArgs(src, { token = '', gitlabToken = '' }: any = {}) {
   if (!/^https:/i.test(src.url)) return []; // SSH uses your own keys
   const tok = src.provider === 'GitLab' ? gitlabToken : src.provider === 'GitHub' ? token : '';
   if (!tok) return [];
   const user = src.provider === 'GitLab' ? 'oauth2' : 'x-access-token';
-  return ['-c', `http.extraheader=AUTHORIZATION: basic ${Buffer.from(`${user}:${tok}`).toString('base64')}`];
+  return [
+    '-c',
+    `http.extraheader=AUTHORIZATION: basic ${Buffer.from(`${user}:${tok}`).toString('base64')}`,
+  ];
 }
 const cleanGitError = (e) =>
   String(e?.message || e)
@@ -1772,8 +2259,8 @@ const cleanGitError = (e) =>
     .trim()
     .replace(/\.$/, '') || 'git failed';
 /**
- * Clones (or, when already cloned, fetches and fast-forwards) a repository for a project. Returns inspectRepo's
- * details plus { cloned: true, url }. onStep(text) reports progress.
+ * Clones (or, when already cloned, fetches and fast-forwards) a repository for a project. Returns
+ * inspectRepo's details plus { cloned: true, url }. onStep(text) reports progress.
  */
 export async function cloneRepo({
   projectId,
@@ -1796,51 +2283,92 @@ export async function cloneRepo({
   try {
     if (has) {
       const cur = (await git(dir, ['remote', 'get-url', 'origin']).catch(() => '')).trim();
-      if (cur.replace(/\.git$/, '') !== src.url.replace(/\.git$/, '')) await git(dir, ['remote', 'set-url', 'origin', src.url]);
+      if (cur.replace(/\.git$/, '') !== src.url.replace(/\.git$/, ''))
+        await git(dir, ['remote', 'set-url', 'origin', src.url]);
       onStep(`Fetching ${src.path}…`);
       await git(dir, [...auth, 'fetch', '--prune', 'origin'], { timeout: 600000 });
     } else {
       onStep(`Cloning ${src.path} (this can take a minute for big repositories)…`);
-      await git(CLONE_ROOT, [...auth, 'clone', '--no-tags', ...(branch ? ['--branch', branch] : []), '--', src.url, dir], {
-        timeout: 900000,
-      });
+      await git(
+        CLONE_ROOT,
+        [
+          ...auth,
+          'clone',
+          '--no-tags',
+          ...(branch ? ['--branch', branch] : []),
+          '--',
+          src.url,
+          dir,
+        ],
+        {
+          timeout: 900000,
+        },
+      );
     }
-    // Keep the checkout on the base branch and current with origin (code jobs branch from origin/<base> anyway).
+    // Keep the checkout on the base branch and current with origin (code jobs branch from
+    // origin/<base> anyway).
     await git(dir, ['remote', 'set-head', 'origin', '--auto']).catch(() => {});
     const base =
       branch ||
-      (await git(dir, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']).catch(() => ''))
+      (
+        await git(dir, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']).catch(
+          () => '',
+        )
+      )
         .trim()
         .replace(/^origin\//, '') ||
       'main';
     const dirty = (await git(dir, ['status', '--porcelain']).catch(() => '')).trim();
     if (!dirty) {
-      await git(dir, ['checkout', '-q', base]).catch(() => git(dir, ['checkout', '-q', '-b', base, `origin/${base}`]));
-      await git(dir, ['merge', '--ff-only', '-q', `origin/${base}`]).catch(() => onStep(`${base} has local commits; left as it is.`));
+      await git(dir, ['checkout', '-q', base]).catch(() =>
+        git(dir, ['checkout', '-q', '-b', base, `origin/${base}`]),
+      );
+      await git(dir, ['merge', '--ff-only', '-q', `origin/${base}`]).catch(() =>
+        onStep(`${base} has local commits; left as it is.`),
+      );
     } else onStep('The clone has uncommitted changes; left as it is.');
   } catch (e) {
     const msg = cleanGitError(e);
-    const authHint = /authentication|could not read username|403|not found|repository .* not found|permission denied/i.test(msg)
-      ? src.provider === 'GitLab'
-        ? ' Save a GitLab token (read_repository) in the backend repository settings.'
-        : src.provider === 'GitHub'
-          ? ' Cloning here uses your own git sign-in: check that git can reach it on this computer (an SSH key or a credential helper, or `gh auth login`). A GitHub token is optional: you can also save one below.'
-          : ' Use an SSH URL with a key on this computer.'
-      : '';
-    throw Object.assign(new Error(`Couldn’t ${has ? 'update' : 'clone'} ${src.path}: ${msg}.${authHint}`), { status: 400 });
+    const authHint =
+      /authentication|could not read username|403|not found|repository .* not found|permission denied/i.test(
+        msg,
+      )
+        ? src.provider === 'GitLab'
+          ? ' Save a GitLab token (read_repository) in the backend repository settings.'
+          : src.provider === 'GitHub'
+            ? ' Cloning here uses your own git sign-in: check that git can reach it on this computer (an SSH key or a credential helper, or `gh auth login`). A GitHub token is optional: you can also save one below.'
+            : ' Use an SSH URL with a key on this computer.'
+        : '';
+    throw Object.assign(
+      new Error(`Couldn’t ${has ? 'update' : 'clone'} ${src.path}: ${msg}.${authHint}`),
+      { status: 400 },
+    );
   }
   onStep('Ready.');
   return { ...(await inspectRepo(dir)), cloned: true, url: src.url };
 }
 
 /**
- * The same agent instructions and task a local job gets, for a job that runs elsewhere (GitHub Actions):
- * { system, prompt, model, effort, allowedTools, disallowedTools, agentName, writes }.
+ * The same agent instructions and task a local job gets, for a job that runs elsewhere (GitHub
+ * Actions): { system, prompt, model, effort, allowedTools, disallowedTools, agentName, writes }.
  */
-export async function codeTask({ ticket, agentId, instructions = '', round = 1, context = '', dev = {}, previousSummary = '' }: any) {
+export async function codeTask({
+  ticket,
+  agentId,
+  instructions = '',
+  round = 1,
+  context = '',
+  dev = {},
+  previousSummary = '',
+}: any) {
   const agent = await resolveAgent(agentId);
-  if (!agent.enabled) throw Object.assign(new Error(`The ${agent.name} agent is turned off in Administration → Agents.`), { status: 400 });
-  if (agent.runner !== 'code') throw Object.assign(new Error(`${agent.name} isn’t a code agent.`), { status: 400 });
+  if (!agent.enabled)
+    throw Object.assign(
+      new Error(`The ${agent.name} agent is turned off in Administration → Agents.`),
+      { status: 400 },
+    );
+  if (agent.runner !== 'code')
+    throw Object.assign(new Error(`${agent.name} isn’t a code agent.`), { status: 400 });
   const extra = checkTools(dev.checkCommand);
   const agents = await claudeAgentsJson({ notes: dev.notes || '', checkTool: extra });
   const routed = await agentModel(agentId, agent);
@@ -1848,7 +2376,8 @@ export async function codeTask({ ticket, agentId, instructions = '', round = 1, 
   if (round > 1 && previousSummary)
     text = `${text}\n\nWhat you did in the earlier rounds (already committed on this branch):\n${String(previousSummary).slice(-6000)}`;
   const note = verifyNote({ dev, linked: [] }, agent.writes);
-  if (note) text = `${text}\n\n${note}\nThe project's dependencies were installed before you started (when it has a lockfile).`;
+  if (note)
+    text = `${text}\n\n${note}\nThe project's dependencies were installed before you started (when it has a lockfile).`;
   const profile = String(dev.repoProfile?.markdown || '').trim();
   if (profile && round === 1)
     text = `${text}\n\nREPOSITORY PROFILE (follow its structure, conventions and patterns; check it against the code when something looks different):\n${profile}`;

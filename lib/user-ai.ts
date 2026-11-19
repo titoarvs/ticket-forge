@@ -1,7 +1,8 @@
-// My AI: each person's own Claude subscription. The token from `claude setup-token` is stored encrypted in user_ai,
-// whose row-level security lets only that person (and the server's own system work) read it, so nobody else's AI
-// requests or code jobs ever use it. When it's set and on, that person's AI requests run on their own subscription
-// first (Claude Code with their token), and their code jobs on GitHub Actions run with it too.
+// My AI: each person's own Claude subscription. The token from `claude setup-token` is stored
+// encrypted in user_ai, whose row-level security lets only that person (and the server's own system
+// work) read it, so nobody else's AI requests or code jobs ever use it. When it's set and on, that
+// person's AI requests run on their own subscription first (Claude Code with their token), and
+// their code jobs on GitHub Actions run with it too.
 import { currentContext } from './db';
 import { orm, userAi, eq, sql } from './orm';
 import { encrypt, decrypt } from './settings';
@@ -15,7 +16,10 @@ export async function myAi(userId = uid()) {
   if (!userId) return null;
   let row;
   try {
-    [row] = await orm.select({ data: userAi.data, updatedAt: userAi.updatedAt }).from(userAi).where(eq(userAi.userId, userId));
+    [row] = await orm
+      .select({ data: userAi.data, updatedAt: userAi.updatedAt })
+      .from(userAi)
+      .where(eq(userAi.userId, userId));
   } catch {
     return null;
   }
@@ -50,9 +54,24 @@ export async function publicMyAi() {
         codeJobs: m.codeJobs,
         updatedAt: m.updatedAt,
       }
-    : { hasToken: false, hint: '', enabled: true, model: 'sonnet', teamFallback: true, codeJobs: true, updatedAt: null };
+    : {
+        hasToken: false,
+        hint: '',
+        enabled: true,
+        model: 'sonnet',
+        teamFallback: true,
+        codeJobs: true,
+        updatedAt: null,
+      };
 }
-export async function saveMyAi({ token, model, enabled, teamFallback, codeJobs, clear = false }: any) {
+export async function saveMyAi({
+  token,
+  model,
+  enabled,
+  teamFallback,
+  codeJobs,
+  clear = false,
+}: any) {
   const userId = uid();
   if (!userId) throw err('Sign in first.', 401);
   const cur = await myAi(userId);

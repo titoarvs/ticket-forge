@@ -3,7 +3,18 @@ import { randomUUID } from 'node:crypto';
 
 const TYPES = ['Story', 'Task', 'Spike', 'Bug'];
 const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
-const EPIC_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#84cc16', '#f97316'];
+const EPIC_COLORS = [
+  '#6366f1',
+  '#0ea5e9',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#14b8a6',
+  '#84cc16',
+  '#f97316',
+];
 
 export const uid = () => randomUUID().slice(0, 8);
 const str = (v) => (v == null ? '' : String(v)).trim();
@@ -107,7 +118,8 @@ export function assignKeys(p) {
     if (!e.key) e.key = `${p.key}-E${i + 1}`;
     if (!e.color) e.color = EPIC_COLORS[i % EPIC_COLORS.length];
   });
-  for (const e of p.epics) for (const t of p.tickets.filter((x) => x.epicId === e.id)) if (!t.key) t.key = next();
+  for (const e of p.epics)
+    for (const t of p.tickets.filter((x) => x.epicId === e.id)) if (!t.key) t.key = next();
   for (const t of p.tickets) if (!t.key) t.key = next();
   for (const t of p.tickets)
     t.testCases.forEach((tc, i) => {

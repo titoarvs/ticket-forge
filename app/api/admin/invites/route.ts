@@ -12,6 +12,10 @@ export const POST = api(async (req) => {
   const created = await auth.createInvites(actor, b);
   const results = [];
   for (const inv of created)
-    results.push(inv.error ? { email: inv.email, error: inv.error } : await sendInviteEmail(req, actor, inv, b.message));
+    results.push(
+      inv.error
+        ? { email: inv.email, error: inv.error }
+        : await sendInviteEmail(req, actor, inv, b.message),
+    );
   return { results, emailConfigured: auth.emailConfig().configured };
 });

@@ -1,6 +1,7 @@
-// Test Selection Agent: picks the automated tests worth running now (like BrowserStack's test selection), from what
-// changed in the code since the last run, issues changed recently, and recent failures / flaky / never-run tests,
-// within a budget. Returns the selection with a reason per test, for review before running. Nothing runs here.
+// Test Selection Agent: picks the automated tests worth running now (like BrowserStack's test
+// selection), from what changed in the code since the last run, issues changed recently, and recent
+// failures / flaky / never-run tests, within a budget. Returns the selection with a reason per
+// test, for review before running. Nothing runs here.
 import { askJson } from './claude';
 import { jevEnabled, jevStatus, jevDecide } from './jev';
 import { agentInstructions } from './agents';
@@ -45,13 +46,19 @@ export async function selectTests({
   if (useCode && dir) {
     try {
       emit('Reading what changed in the repository…');
-      const repo = await readRepo(dir, project.automation?.lastRunSha || project.automation?.repoSync?.sha || null);
+      const repo = await readRepo(
+        dir,
+        project.automation?.lastRunSha || project.automation?.repoSync?.sha || null,
+      );
       head = repo.head;
       const changed = repo.pages.filter((p) => p.changedFiles.length);
       changeNote = `Code changes ${repo.baseNote}: ${repo.changedFiles} files${repo.uncommitted ? ` (${repo.uncommitted} uncommitted)` : ''}, ${changed.length} pages affected${repo.sharedChanged.length ? `, plus shared files used by many pages: ${repo.sharedChanged.slice(0, 8).join(', ')}` : ''}.`;
       changes = changed
         .slice(0, 40)
-        .map((p) => `- ${p.path} (${p.name}): ${p.changedFiles.slice(0, 6).join(', ')}${p.diff ? `\n  diff: ${clip(p.diff, 600)}` : ''}`)
+        .map(
+          (p) =>
+            `- ${p.path} (${p.name}): ${p.changedFiles.slice(0, 6).join(', ')}${p.diff ? `\n  diff: ${clip(p.diff, 600)}` : ''}`,
+        )
         .join('\n');
     } catch (e) {
       changeNote = `Code changes: couldn’t read the repository (${e.message}).`;
@@ -66,8 +73,8 @@ export async function selectTests({
     return `${tc.id} | ${t.key}#${i + 1} | ${clip(tc.title, 90)} | ${t.priority || 'Medium'} | ${tc.status || 'Not run'}${r?.flaky ? ' flaky' : ''}${tc.healed ? ' healed' : ''}${age != null ? ` ${age}d ago` : ' never run'}${tc.script ? '' : ' | no script'}`;
   });
   const catalog = lines.join('\n');
-  // Jev (Administration → AI → Decisions): a yes/no for every test in a few quick calls. When it isn't set up, fails, or
-  // finds nothing worth running, the AI chooses below.
+  // Jev (Administration → AI → Decisions): a yes/no for every test in a few quick calls. When it
+  // isn't set up, fails, or finds nothing worth running, the AI chooses below.
   if (await jevEnabled().catch(() => false)) {
     try {
       emit(`Jev is scoring ${items.length} tests…`);
@@ -98,7 +105,8 @@ export async function selectTests({
             ]),
           ),
         });
-        for (const x of chunk) scored.push({ x, p: Number((r.answers[x.tc.id] as any)?.noul ?? 0) });
+        for (const x of chunk)
+          scored.push({ x, p: Number((r.answers[x.tc.id] as any)?.noul ?? 0) });
       }
       const picked = scored
         .filter((s) => s.p >= Math.max(0.5, min - 0.1))

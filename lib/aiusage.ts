@@ -1,5 +1,6 @@
-// The AI usage report (Administration → AI → Model routing → Usage): what the AI was used for, by whom, in which
-// project and on which model, with tokens and cost, from the ai_usage table (one row per AI call).
+// The AI usage report (Administration → AI → Model routing → Usage): what the AI was used for, by
+// whom, in which project and on which model, with tokens and cost, from the ai_usage table (one row
+// per AI call).
 import { qs, currentWs, DEFAULT_WS } from './db';
 
 // Every query is for the current workspace only.
@@ -54,9 +55,16 @@ export async function usageReport(days = 30) {
   ).rows.map((r) => ({ day: r.day, calls: r.calls, cost: n(r.cost), tokens: n(r.tokens) }));
   const labels = Object.fromEntries(AI_TASKS.map((t) => [t.id, t.label]));
   const byTask = (await group('task', days)).map((r) => ({ ...r, label: labels[r.key] || r.key }));
-  const byProject = await group("coalesce(p.name, u.project_id, '(no project)')", days, 'u left join projects p on p.id = u.project_id');
+  const byProject = await group(
+    "coalesce(p.name, u.project_id, '(no project)')",
+    days,
+    'u left join projects p on p.id = u.project_id',
+  );
   const byUser = await group("coalesce(nullif(user_name, ''), '(system)')", days);
-  const byModel = await group("case when cached then 'Reused answer' else coalesce(nullif(model, ''), engine) end", days);
+  const byModel = await group(
+    "case when cached then 'Reused answer' else coalesce(nullif(model, ''), engine) end",
+    days,
+  );
   const byEngine = await group('engine', days);
   const top = (
     await qs(
@@ -65,7 +73,11 @@ export async function usageReport(days = 30) {
     order by coalesce(u.cost, 0) desc, (u.input + u.output) desc limit 20`,
       [String(days), W()],
     )
-  ).rows.map((r) => ({ ...r, cost: r.cost == null ? null : n(r.cost), label: labels[r.task] || r.task }));
+  ).rows.map((r) => ({
+    ...r,
+    cost: r.cost == null ? null : n(r.cost),
+    label: labels[r.task] || r.task,
+  }));
   const routing = normalizeRouting((await getAiSettings().catch(() => ({}))).routing);
   const noCtx = (
     await qs(
@@ -154,7 +166,10 @@ export async function usageCsv(days = 30) {
   return [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n');
 }
 
-/** Average tokens and cost of one call of a task over the last 30 days (for "about this much" before big jobs). */
+/**
+ * Average tokens and cost of one call of a task over the last 30 days (for "about this much" before
+ * big jobs).
+ */
 export async function taskAverage(task) {
   const r = (
     await qs(
@@ -163,12 +178,16 @@ export async function taskAverage(task) {
       [String(task), W()],
     )
   ).rows[0];
-  return { calls: r.calls, tokens: Math.round(n(r.tokens)), cost: r.cost == null ? null : n(r.cost) };
+  return {
+    calls: r.calls,
+    tokens: Math.round(n(r.tokens)),
+    cost: r.cost == null ? null : n(r.cost),
+  };
 }
 
 /**
- * Suggestions from the actual usage: each says what to change, why, and roughly what it saves. "action" names a
- * setting the page can switch on in one click.
+ * Suggestions from the actual usage: each says what to change, why, and roughly what it saves.
+ * "action" names a setting the page can switch on in one click.
  */
 function suggest({ routing, totals, byTask, noCtx, avgIn, labels }: any) {
   const out: any[] = [];
@@ -176,7 +195,9 @@ function suggest({ routing, totals, byTask, noCtx, avgIn, labels }: any) {
   const highTasks = Object.entries<any>(routing.tiers)
     .filter(([, v]) => v === 'high')
     .map(([k]) => k);
-  const escalatable = ['tickets', 'tests', 'epics', 'split', 'plan'].filter((t) => highTasks.includes(t) && calls(t) > 0);
+  const escalatable = ['tickets', 'tests', 'epics', 'split', 'plan'].filter(
+    (t) => highTasks.includes(t) && calls(t) > 0,
+  );
   if (!routing.escalate && escalatable.length)
     out.push({
       id: 'escalate',
@@ -186,7 +207,9 @@ function suggest({ routing, totals, byTask, noCtx, avgIn, labels }: any) {
       action: 'escalate',
     });
   if (totals.calls >= 20 && totals.cached / Math.max(1, totals.calls) < 0.05) {
-    const missing = ['tests', 'plan', 'repo'].filter((t) => !routing.cacheTasks.includes(t) && calls(t) > 0);
+    const missing = ['tests', 'plan', 'repo'].filter(
+      (t) => !routing.cacheTasks.includes(t) && calls(t) > 0,
+    );
     if (!routing.cache)
       out.push({
         id: 'cache',
@@ -216,7 +239,9 @@ function suggest({ routing, totals, byTask, noCtx, avgIn, labels }: any) {
       text: 'Without it, every AI action has to be told about the app again, and answers guess names. Build it once in Project settings → App context; it’s then cached by the AI API (cheap to re-send).',
       projects: noCtx.slice(0, 5),
     });
-  const heavy = avgIn.filter((r) => r.calls >= 3 && r.avg_in > 25000).sort((a, b) => b.avg_in - a.avg_in)[0];
+  const heavy = avgIn
+    .filter((r) => r.calls >= 3 && r.avg_in > 25000)
+    .sort((a, b) => b.avg_in - a.avg_in)[0];
   if (heavy)
     out.push({
       id: 'heavy',

@@ -1,10 +1,25 @@
 'use client';
 // Planning development work with Jev (lib/devorder.ts, lib/parallel.ts):
-// - Development order: the order to build an epic's or sprint's issues, with a reason per issue, applied to the backlog.
-// - Parallel check: before code jobs start on several issues, which of them touch the same code and should wait.
-// Jev (Administration → AI → Decisions) makes the small decisions when it is on; otherwise the AI, or the rules.
+// - Development order: the order to build an epic's or sprint's issues, with a reason per issue,
+//   applied to the backlog.
+// - Parallel check: before code jobs start on several issues, which of them touch the same code and
+//   should wait.
+// Jev (Administration → AI → Decisions) makes the small decisions when it is on; otherwise the AI,
+// or the rules.
 import { useEffect, useState } from 'react';
-import { P, api, aiBody, can, feat, isDone, toast, mutate, closeModal, openModal, type Any } from './core';
+import {
+  P,
+  api,
+  aiBody,
+  can,
+  feat,
+  isDone,
+  toast,
+  mutate,
+  closeModal,
+  openModal,
+  type Any,
+} from './core';
 import { BulkCodeModal, codeReady, openCode } from './DevCode';
 import { finishedCode } from './codeStatus';
 import { Ico, I, Modal, Spinner, LayerChip, PriorityIcon } from './ui';
@@ -24,18 +39,28 @@ const engineNote = (d: Any) =>
 
 /** Whether this person can start code jobs here (Write code with AI). */
 export const canWriteCode = () => feat('code') && can('ai.use') && can('issue.edit') && codeReady();
-/** Write code for many issues at once, in development order, with the conflict check (BulkCodeModal). */
+/**
+ * Write code for many issues at once, in development order, with the conflict check
+ * (BulkCodeModal).
+ */
 export const openBulkCode = (ids: string[]) => openModal(<BulkCodeModal ids={ids} />);
 /** The open issues of an epic, top level, for "Write code for the epic". */
 export const epicCodeIds = (epicId: string) =>
   P()
-    .tickets.filter((t: Any) => t.epicId === epicId && !t.parentId && !finishedCode(t) && !isDone(t))
+    .tickets.filter(
+      (t: Any) => t.epicId === epicId && !t.parentId && !finishedCode(t) && !isDone(t),
+    )
     .map((t: Any) => t.id);
 
 /** Opens the Development order dialog of an epic or a sprint. */
-export const openDevOrder = (scope: { epicId?: string; sprintId?: string; title: string }) => openModal(<DevOrderModal scope={scope} />);
+export const openDevOrder = (scope: { epicId?: string; sprintId?: string; title: string }) =>
+  openModal(<DevOrderModal scope={scope} />);
 
-function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string; title: string } }) {
+function DevOrderModal({
+  scope,
+}: {
+  scope: { epicId?: string; sprintId?: string; title: string };
+}) {
   const [smart, setSmart] = useState(can('ai.use'));
   const [d, setD] = useState<Any>(null);
   const [error, setError] = useState('');
@@ -76,7 +101,9 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
       ).map((id) => byId.get(id));
     });
     closeModal();
-    toast(`${ids.length} issues of ${scope.title} are now in the suggested order.`, 'ok', { title: 'Backlog reordered' });
+    toast(`${ids.length} issues of ${scope.title} are now in the suggested order.`, 'ok', {
+      title: 'Backlog reordered',
+    });
   };
   return (
     <Modal
@@ -91,7 +118,12 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
           disabled: busy,
           onClick: () => openBulkCode(toCode),
         },
-        { label: 'Apply to backlog order', kind: 'primary', disabled: !d?.order?.length || busy || !canApply, onClick: apply },
+        {
+          label: 'Apply to backlog order',
+          kind: 'primary',
+          disabled: !d?.order?.length || busy || !canApply,
+          onClick: apply,
+        },
       ]}
       left={
         <CB
@@ -106,9 +138,9 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
       }
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        The order to build these issues in: blocked issues come after their blockers, then priority, what other issues need first, backend
-        before the screens that use it, and smaller issues first. Applying it moves only these issues within the places they hold in the
-        backlog.
+        The order to build these issues in: blocked issues come after their blockers, then priority,
+        what other issues need first, backend before the screens that use it, and smaller issues
+        first. Applying it moves only these issues within the places they hold in the backlog.
       </p>
       {busy && (
         <div className="muted">
@@ -133,7 +165,10 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
           {d.loops?.length > 0 && (
             <div className="warn-banner">
               <Ico svg={I.warn} />
-              <span>These issues block each other: {d.loops.map((l: string[]) => l.join(' ↔ ')).join('; ')}. Check their links.</span>
+              <span>
+                These issues block each other:{' '}
+                {d.loops.map((l: string[]) => l.join(' ↔ ')).join('; ')}. Check their links.
+              </span>
             </div>
           )}
           <ol className="dev-order">
@@ -166,7 +201,11 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
                         View code
                       </button>
                     ) : (
-                      <button className="btn sm ai" title={`Write the code for ${o.key} with AI`} onClick={() => openCode(t)}>
+                      <button
+                        className="btn sm ai"
+                        title={`Write the code for ${o.key} with AI`}
+                        onClick={() => openCode(t)}
+                      >
                         <Ico svg={I.sparkle} />
                         Write code
                       </button>
@@ -175,7 +214,11 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
               </li>
             ))}
           </ol>
-          {d.done?.length > 0 && <p className="muted small">Already done, left out: {d.done.map((x: Any) => x.key).join(', ')}.</p>}
+          {d.done?.length > 0 && (
+            <p className="muted small">
+              Already done, left out: {d.done.map((x: Any) => x.key).join(', ')}.
+            </p>
+          )}
         </>
       )}
     </Modal>
@@ -183,10 +226,18 @@ function DevOrderModal({ scope }: { scope: { epicId?: string; sprintId?: string;
 }
 
 /**
- * The parallel check inside "Write code for N issues": conflicts and rounds, with the choice to start round 1 only or
- * everything. `onStart(ids)` starts the jobs.
+ * The parallel check inside "Write code for N issues": conflicts and rounds, with the choice to
+ * start round 1 only or everything. `onStart(ids)` starts the jobs.
  */
-export function ParallelCheck({ ids, busy, onStart }: { ids: string[]; busy: boolean; onStart: (ids: string[]) => void }) {
+export function ParallelCheck({
+  ids,
+  busy,
+  onStart,
+}: {
+  ids: string[];
+  busy: boolean;
+  onStart: (ids: string[]) => void;
+}) {
   const [d, setD] = useState<Any>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -194,7 +245,12 @@ export function ParallelCheck({ ids, busy, onStart }: { ids: string[]; busy: boo
     setLoading(true);
     setError('');
     try {
-      setD(await api(`/api/projects/${P().id}/code`, { method: 'POST', body: aiBody({ action: 'plan-parallel', ticketIds: ids, smart }) }));
+      setD(
+        await api(`/api/projects/${P().id}/code`, {
+          method: 'POST',
+          body: aiBody({ action: 'plan-parallel', ticketIds: ids, smart }),
+        }),
+      );
     } catch (e: Any) {
       setError(e.message);
     } finally {
@@ -258,7 +314,15 @@ export function ParallelCheck({ ids, busy, onStart }: { ids: string[]; busy: boo
             {shown.map((c: Any, i: number) => (
               <li key={i}>
                 <span className={`par-kind k-${c.kind}`}>
-                  {{ file: 'Same file', module: 'Same module', likely: 'Likely', job: 'Busy', blocked: 'Blocked' }[c.kind as 'file']}
+                  {
+                    {
+                      file: 'Same file',
+                      module: 'Same module',
+                      likely: 'Likely',
+                      job: 'Busy',
+                      blocked: 'Blocked',
+                    }[c.kind as 'file']
+                  }
                 </span>
                 {c.kind === 'file' || c.kind === 'module' ? (
                   <>
@@ -280,18 +344,27 @@ export function ParallelCheck({ ids, busy, onStart }: { ids: string[]; busy: boo
       )}
       {d.noSpec.length > 0 && (
         <p className="muted small">
-          No coding spec (files unknown): {d.noSpec.join(', ')}. Generate coding specs on the epic for a precise check.
+          No coding spec (files unknown): {d.noSpec.join(', ')}. Generate coding specs on the epic
+          for a precise check.
         </p>
       )}
-      {d.alreadyRunning.length > 0 && <p className="muted small">Already being coded: {d.alreadyRunning.join(', ')}.</p>}
+      {d.alreadyRunning.length > 0 && (
+        <p className="muted small">Already being coded: {d.alreadyRunning.join(', ')}.</p>
+      )}
       {d.wait.length > 0 && (
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <button className="btn ai" disabled={busy || !d.runNow.length} onClick={() => onStart(d.runNow)}>
+          <button
+            className="btn ai"
+            disabled={busy || !d.runNow.length}
+            onClick={() => onStart(d.runNow)}
+          >
             <Ico svg={I.sparkle} />
             Start the {d.runNow.length} safe now
           </button>
           <span className="muted small" style={{ alignSelf: 'center' }}>
-            {d.wait.map((w: Any) => `${w.key}${w.after.length ? ` after ${w.after.join(', ')}` : ''}`).join(' · ')}
+            {d.wait
+              .map((w: Any) => `${w.key}${w.after.length ? ` after ${w.after.join(', ')}` : ''}`)
+              .join(' · ')}
           </span>
         </div>
       )}

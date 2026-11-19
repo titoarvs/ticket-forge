@@ -3,7 +3,8 @@ import { publicMyAi, saveMyAi, myAi } from '@/lib/user-ai';
 import { askViaSubscription, cliInfo } from '@/lib/claude';
 import { SERVERLESS } from '@/lib/db';
 
-// My AI (everyone, for themselves): their own Claude subscription token, stored encrypted and readable only by them.
+// My AI (everyone, for themselves): their own Claude subscription token, stored encrypted and
+// readable only by them.
 export const GET = api(async () => {
   await authed();
   const cli = await cliInfo().catch(() => ({ available: false }));
@@ -28,7 +29,11 @@ export const POST = api(async (req) => {
   const saved = await myAi();
   const token = String(b.token || '').trim() || saved?.token || '';
   if (!token) throw new HttpError(400, 'Paste your token first.');
-  if (!/^sk-ant-oat/i.test(token)) throw new HttpError(400, 'That isn’t a Claude subscription token (it starts with sk-ant-oat01-).');
+  if (!/^sk-ant-oat/i.test(token))
+    throw new HttpError(
+      400,
+      'That isn’t a Claude subscription token (it starts with sk-ant-oat01-).',
+    );
   const started = Date.now();
   try {
     const reply = await askViaSubscription({

@@ -4,7 +4,8 @@ import { listBillingPlans } from '@/lib/billing-plans';
 import { activeGateways } from '@/lib/gateways';
 import { qs } from '@/lib/db';
 
-// The workspace's plan, what it uses, and the plans it can choose (Administration → Billing, owner only).
+// The workspace's plan, what it uses, and the plans it can choose (Administration → Billing, owner
+// only).
 export const GET = api(async () => {
   const u: any = await authed();
   if (!u.is_owner) throw new HttpError(403, 'Only the workspace owner can see billing.');
@@ -32,11 +33,19 @@ export const GET = api(async () => {
       trialEndsAt: w.trial_ends_at || null,
       gateway: w.gateway || null,
       hasCustomer: Boolean(w.stripe_customer_id),
-      // A trial or a paid plan can be cancelled. It keeps access until `accessEndsAt`, then the workspace is on Free.
-      cancellable: ['subscription', 'locked'].includes(plan.source) && !w.cancel_at_period_end && w.plan !== 'free',
-      accessEndsAt: plan.source === 'subscription' && w.cancel_at_period_end ? w.current_period_end || w.trial_ends_at || null : null,
+      // A trial or a paid plan can be cancelled. It keeps access until `accessEndsAt`, then the
+      // workspace is on Free.
+      cancellable:
+        ['subscription', 'locked'].includes(plan.source) &&
+        !w.cancel_at_period_end &&
+        w.plan !== 'free',
+      accessEndsAt:
+        plan.source === 'subscription' && w.cancel_at_period_end
+          ? w.current_period_end || w.trial_ends_at || null
+          : null,
     },
-    // Archived plans are left out: they can't be bought any more (a workspace already on one keeps it in `plan`).
+    // Archived plans are left out: they can't be bought any more (a workspace already on one keeps
+    // it in `plan`).
     plans: await listBillingPlans({ forPurchase: true }),
   };
 });

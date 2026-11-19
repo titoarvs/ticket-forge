@@ -13,7 +13,8 @@ import { encrypt, decrypt } from './settings';
 import { err } from './errors';
 
 const KEY = 'jev';
-const base = () => String(process.env.TICKETFORGE_JEV_URL || 'https://api.typesafe.ai').replace(/\/$/, '');
+const base = () =>
+  String(process.env.TICKETFORGE_JEV_URL || 'https://api.typesafe.ai').replace(/\/$/, '');
 
 export type Question =
   | { type: 'choice'; instructions: string; criteria: Record<string, string | null> }
@@ -68,12 +69,17 @@ export async function saveJev({ apiKey: k, enabled, model, minConfidence }: any,
   const patch: any = { updatedAt: new Date().toISOString(), updatedBy: actor?.name || null };
   const key = typeof k === 'string' ? k.trim() : '';
   if (key) {
-    if (!/^[\w.-]{16,200}$/.test(key)) throw err('That doesn’t look like a TypeSafe API key. Copy it from console.typesafe.ai → Keys.');
+    if (!/^[\w.-]{16,200}$/.test(key))
+      throw err(
+        'That doesn’t look like a TypeSafe API key. Copy it from console.typesafe.ai → Keys.',
+      );
     patch.keyEnc = encrypt(key);
     patch.keyHint = key.slice(-4);
   }
-  if (model !== undefined) patch.model = /^[\w.-]{1,60}$/.test(String(model)) ? String(model) : 'jev-latest';
-  if (minConfidence !== undefined) patch.minConfidence = Math.min(0.99, Math.max(0.3, Number(minConfidence) || 0.6));
+  if (model !== undefined)
+    patch.model = /^[\w.-]{1,60}$/.test(String(model)) ? String(model) : 'jev-latest';
+  if (minConfidence !== undefined)
+    patch.minConfidence = Math.min(0.99, Math.max(0.3, Number(minConfidence) || 0.6));
   if (enabled !== undefined) {
     if (enabled && !key && !(await apiKey())) throw err('Add the TypeSafe API key first.');
     patch.enabled = Boolean(enabled);
@@ -91,13 +97,26 @@ export async function jevEnabled() {
 }
 
 /**
- * Asks Jev: `state` is any text or JSON about the thing being decided, `questions` are keyed by name. Retries a busy
- * service (429, 529) twice with a short wait. Returns { answers, model, usage }.
+ * Asks Jev: `state` is any text or JSON about the thing being decided, `questions` are keyed by
+ * name. Retries a busy service (429, 529) twice with a short wait. Returns { answers, model, usage
+ * }.
  */
-export async function jevDecide({ state, questions, signal }: { state: any; questions: Record<string, Question>; signal?: AbortSignal }) {
+export async function jevDecide({
+  state,
+  questions,
+  signal,
+}: {
+  state: any;
+  questions: Record<string, Question>;
+  signal?: AbortSignal;
+}) {
   const s = await load();
   const key = await apiKey(s);
-  if (!key) throw err('Jev isn’t set up: add the TypeSafe API key in Administration → AI → Decisions.', 400);
+  if (!key)
+    throw err(
+      'Jev isn’t set up: add the TypeSafe API key in Administration → AI → Decisions.',
+      400,
+    );
   const names = Object.keys(questions);
   if (!names.length) return { answers: {} as Record<string, Answer>, model: '', usage: null };
   let last: any;
@@ -115,7 +134,11 @@ export async function jevDecide({ state, questions, signal }: { state: any; ques
     }
     if (res.ok) {
       const j: any = await res.json();
-      return { answers: (j.answers || {}) as Record<string, Answer>, model: String(j.model || ''), usage: j.usage || null };
+      return {
+        answers: (j.answers || {}) as Record<string, Answer>,
+        model: String(j.model || ''),
+        usage: j.usage || null,
+      };
     }
     const body: any = await res.json().catch(() => ({}));
     const detail =
@@ -139,7 +162,10 @@ export async function jevDecide({ state, questions, signal }: { state: any; ques
   throw last;
 }
 
-/** A small real call, to check the key and the connection. Returns { ok, ms, model } or { ok: false, error }. */
+/**
+ * A small real call, to check the key and the connection. Returns { ok, ms, model } or { ok: false,
+ * error }.
+ */
 export async function testJev() {
   const t0 = Date.now();
   try {

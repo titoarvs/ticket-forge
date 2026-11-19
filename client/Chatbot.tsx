@@ -1,18 +1,22 @@
 'use client';
-// Help chatbot (rule-based, no AI) and the release announcement robot, in the corner of every signed-in page.
-// The robot's message comes from GET /api/chatbot (only while the RELEASE_ANNOUNCEMENT flag is on). With
-// prefers-reduced-motion it shows the message without animation.
+// Help chatbot (rule-based, no AI) and the release announcement robot, in the corner of every
+// signed-in page.
+// The robot's message comes from GET /api/chatbot (only while the RELEASE_ANNOUNCEMENT flag is on).
+// With prefers-reduced-motion it shows the message without animation.
 import { useEffect, useRef, useState } from 'react';
 import { api } from './core';
 import { Ico, I, Spinner } from './ui';
 
-const WELCOME = 'Hi! I’m the Ticket Forge helper. Ask me how something works, or about the tickets in your projects.';
+const WELCOME =
+  'Hi! I’m the Ticket Forge helper. Ask me how something works, or about the tickets in your projects.';
 const HINTS = ['How do I create a project?', 'How many tickets are in my project?', 'What’s new?'];
 const SEEN = 'tf.announce.seen';
 
 type Msg = { from: 'bot' | 'me'; text: string; kind?: string };
 
-const reducedMotion = () => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+const reducedMotion = () =>
+  typeof window !== 'undefined' &&
+  Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 const seenId = () => {
   try {
     return localStorage.getItem(SEEN);
@@ -24,8 +28,23 @@ const seenId = () => {
 /** A small robot drawn in SVG (no images to load). */
 function Robot({ still }: { still: boolean }) {
   return (
-    <svg className={`bot-svg ${still ? 'still' : ''}`} viewBox="0 0 40 40" width="40" height="40" aria-hidden="true" focusable="false">
-      <line x1="20" y1="3" x2="20" y2="8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg
+      className={`bot-svg ${still ? 'still' : ''}`}
+      viewBox="0 0 40 40"
+      width="40"
+      height="40"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <line
+        x1="20"
+        y1="3"
+        x2="20"
+        y2="8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
       <circle className="bot-ant" cx="20" cy="3" r="2" fill="currentColor" />
       <rect x="7" y="8" width="26" height="22" rx="7" fill="currentColor" />
       <circle cx="15" cy="18" r="3" fill="#fff" />
@@ -90,7 +109,14 @@ export function Chatbot() {
       const r = await api('/api/chatbot', { method: 'POST', body: { message: q } });
       setMsgs((m) => [...m, { from: 'bot', text: r.reply, kind: r.kind }]);
     } catch (e) {
-      setMsgs((m) => [...m, { from: 'bot', text: (e as Error)?.message || 'Something went wrong. Please try again.', kind: 'error' }]);
+      setMsgs((m) => [
+        ...m,
+        {
+          from: 'bot',
+          text: (e as Error)?.message || 'Something went wrong. Please try again.',
+          kind: 'error',
+        },
+      ]);
     } finally {
       setBusy(false);
     }
@@ -104,7 +130,11 @@ export function Chatbot() {
             <Ico svg={I.sparkle} />
             <b>Ticket Forge helper</b>
             <span className="spacer" />
-            <button className="btn sm subtle" onClick={() => setOpen(false)} aria-label="Close the chatbot">
+            <button
+              className="btn sm subtle"
+              onClick={() => setOpen(false)}
+              aria-label="Close the chatbot"
+            >
               <Ico svg={I.close} />
             </button>
           </header>
@@ -163,7 +193,12 @@ export function Chatbot() {
         </div>
       )}
       {!open && (
-        <button className="chat-fab" onClick={openChat} aria-label="Open the help chatbot" title="Help chatbot">
+        <button
+          className="chat-fab"
+          onClick={openChat}
+          aria-label="Open the help chatbot"
+          title="Help chatbot"
+        >
           <Ico svg={I.comment} />
         </button>
       )}

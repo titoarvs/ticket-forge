@@ -1,7 +1,8 @@
 'use client';
-// Code jobs page → Coding: where a project's code gets written. Pick a feature (epic), see its tickets with their coding
-// state and coding spec, and start code per ticket (its code panel: start, review, pull request) or for many at once
-// (the bulk dialog, which checks for tickets that touch the same code first and splits them into rounds).
+// Code jobs page → Coding: where a project's code gets written. Pick a feature (epic), see its
+// tickets with their coding state and coding spec, and start code per ticket (its code panel:
+// start, review, pull request) or for many at once (the bulk dialog, which checks for tickets that
+// touch the same code first and splits them into rounds).
 import { useEffect, useMemo, useState } from 'react';
 import { S, P, can, isDone, useStore, openModal, type Any } from './core';
 import { Ico, I, LayerChip, PriorityIcon, StatusLoz, Modal } from './ui';
@@ -45,7 +46,9 @@ const fromBoard = (open: () => void) => {
 
 /** How many tickets of the project are still to code (for the Start coding button). */
 export const toCodeCount = () =>
-  (P()?.tickets || []).filter((t: Any) => !t.parentId && !isDone(t) && !finishedCode(t) && codeInfo(t).state !== 'working').length;
+  (P()?.tickets || []).filter(
+    (t: Any) => !t.parentId && !isDone(t) && !finishedCode(t) && codeInfo(t).state !== 'working',
+  ).length;
 
 export function CodingBoard() {
   useStore();
@@ -58,14 +61,18 @@ export function CodingBoard() {
   useEffect(() => {
     if (p?.id)
       listSpecs(p.id, '')
-        .then((d: Any) => setSpecs(Object.fromEntries((d.specs || []).map((s: Any) => [s.ticketId, s]))))
+        .then((d: Any) =>
+          setSpecs(Object.fromEntries((d.specs || []).map((s: Any) => [s.ticketId, s]))),
+        )
         .catch(() => setSpecs({}));
   }, [p?.id]);
   const epics = useMemo(() => (p?.epics || []).filter((e: Any) => !e.draft), [p?.epics]);
   // The first feature with work left, when none was chosen before.
   useEffect(() => {
     if (!p || epicId) return;
-    const first = epics.find((e: Any) => p.tickets.some((t: Any) => t.epicId === e.id && !t.parentId && !isDone(t)));
+    const first = epics.find((e: Any) =>
+      p.tickets.some((t: Any) => t.epicId === e.id && !t.parentId && !isDone(t)),
+    );
     if (first) setEpicId(first.id);
   }, [p?.id, epics.length]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!p) return null;
@@ -80,7 +87,9 @@ export function CodingBoard() {
   const todo = (t: Any) => !isDone(t) && !finishedCode(t) && codeInfo(t).state !== 'working';
   const needle = q.trim().toLowerCase();
   const rows = all.filter(
-    (t: Any) => (showAll || todo(t) || codeInfo(t).state) && (!needle || `${t.key} ${t.title}`.toLowerCase().includes(needle)),
+    (t: Any) =>
+      (showAll || todo(t) || codeInfo(t).state) &&
+      (!needle || `${t.key} ${t.title}`.toLowerCase().includes(needle)),
   );
   const codable = rows.filter(todo);
   const sel = codable.filter((t: Any) => picked.has(t.id));
@@ -92,7 +101,8 @@ export function CodingBoard() {
       else n.add(id);
       return n;
     });
-  const count = (e: Any) => p.tickets.filter((t: Any) => !t.parentId && (e ? t.epicId === e : !t.epicId) && todo(t)).length;
+  const count = (e: Any) =>
+    p.tickets.filter((t: Any) => !t.parentId && (e ? t.epicId === e : !t.epicId) && todo(t)).length;
   const done = all.filter((t: Any) => finishedCode(t) || isDone(t)).length;
   const working = all.filter((t: Any) => codeInfo(t).state === 'working').length;
   const epic = epics.find((e: Any) => e.id === epicId);
@@ -113,7 +123,8 @@ export function CodingBoard() {
     <section className="coding-board" aria-label="Coding">
       <header className="cb-head">
         <span className="muted small">
-          {epicId === '' ? 'All features' : epic ? epic.title : 'Tickets without a feature'}: {all.length} tickets · {done} coded
+          {epicId === '' ? 'All features' : epic ? epic.title : 'Tickets without a feature'}:{' '}
+          {all.length} tickets · {done} coded
           {working ? ` · ${working} being coded` : ''} · {all.length - done - working} to code
         </span>
         {all.length > 0 && (
@@ -132,7 +143,8 @@ export function CodingBoard() {
                 'Starting code needs the Use AI and Edit issues permissions.'
               ) : (
                 <>
-                  Set up Write code with AI first: your local repository folder or the GitHub repository, in{' '}
+                  Set up Write code with AI first: your local repository folder or the GitHub
+                  repository, in{' '}
                   <a
                     href={`/p/${p.id}/settings`}
                     onClick={() => {
@@ -157,7 +169,10 @@ export function CodingBoard() {
             aria-label="Feature (epic)"
             sx={{ minWidth: 260 }}
           >
-            <MenuItem value="">All features ({count('') + epics.reduce((n: number, e: Any) => n + count(e.id), 0)} to code)</MenuItem>
+            <MenuItem value="">
+              All features ({count('') + epics.reduce((n: number, e: Any) => n + count(e.id), 0)} to
+              code)
+            </MenuItem>
             {epics.map((e: Any) => (
               <MenuItem key={e.id} value={e.id}>
                 {e.key ? `${e.key} · ` : ''}
@@ -166,9 +181,19 @@ export function CodingBoard() {
             ))}
             <MenuItem value={NO_EPIC}>Tickets without a feature ({count('')})</MenuItem>
           </SF>
-          <TF search sx={{ width: 220 }} placeholder="Find a ticket" value={q} onChange={(e: Any) => setQ(e.target.value)} />
+          <TF
+            search
+            sx={{ width: 220 }}
+            placeholder="Find a ticket"
+            value={q}
+            onChange={(e: Any) => setQ(e.target.value)}
+          />
           <label className="cb-check small">
-            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={showAll}
+              onChange={(e) => setShowAll(e.target.checked)}
+            />
             Show done tickets
           </label>
           <span className="spacer" />
@@ -185,16 +210,22 @@ export function CodingBoard() {
           <button
             className="btn ai"
             disabled={!ok || !(sel.length || codable.length)}
-            onClick={() => fromBoard(() => openBulkCode((sel.length ? sel : codable).map((t: Any) => t.id)))}
+            onClick={() =>
+              fromBoard(() => openBulkCode((sel.length ? sel : codable).map((t: Any) => t.id)))
+            }
             title="One code job per ticket, checked first for tickets that touch the same code"
           >
             <Ico svg={I.sparkle} />
-            {sel.length ? `Write code for ${sel.length} selected` : `Write code for all ${codable.length}`}
+            {sel.length
+              ? `Write code for ${sel.length} selected`
+              : `Write code for all ${codable.length}`}
           </button>
         </div>
         {!rows.length ? (
           <p className="muted small cb-empty">
-            {all.length ? 'Every ticket here is coded or done. Tick “Show done tickets” to see them.' : 'No tickets here yet.'}
+            {all.length
+              ? 'Every ticket here is coded or done. Tick “Show done tickets” to see them.'
+              : 'No tickets here yet.'}
           </p>
         ) : (
           <div className="cb-table" role="table" aria-label="Tickets to code">
@@ -205,7 +236,9 @@ export function CodingBoard() {
                   aria-label="Select all to code"
                   disabled={!codable.length}
                   checked={allPicked}
-                  onChange={() => setPicked(allPicked ? new Set() : new Set(codable.map((t: Any) => t.id)))}
+                  onChange={() =>
+                    setPicked(allPicked ? new Set() : new Set(codable.map((t: Any) => t.id)))
+                  }
                 />
               </span>
               <span role="columnheader">Ticket</span>
@@ -237,7 +270,8 @@ export function CodingBoard() {
                     <span className="cb-l2 muted small">
                       <PriorityIcon p={t.priority} />
                       {t.priority}
-                      {t.storyPoints != null && <> · {t.storyPoints} pts</>} · {(t.acceptanceCriteria || []).length} AC
+                      {t.storyPoints != null && <> · {t.storyPoints} pts</>} ·{' '}
+                      {(t.acceptanceCriteria || []).length} AC
                       <LayerChip layer={t.layer} short />
                       {specTag(t)}
                     </span>
@@ -245,11 +279,21 @@ export function CodingBoard() {
                   <span role="cell">
                     <StatusLoz s={t.status} />
                   </span>
-                  <span role="cell">{c.state ? <CodeChip t={t} /> : <span className="muted small">Not coded</span>}</span>
+                  <span role="cell">
+                    {c.state ? <CodeChip t={t} /> : <span className="muted small">Not coded</span>}
+                  </span>
                   <span role="cell" className="cb-act">
                     {finishedCode(t) || c.state === 'working' ? (
-                      <button className="btn sm" onClick={() => fromBoard(() => openCode(t))} title={c.title}>
-                        {c.state === 'working' ? 'Watch' : c.state === 'review' ? 'Review' : 'View code'}
+                      <button
+                        className="btn sm"
+                        onClick={() => fromBoard(() => openCode(t))}
+                        title={c.title}
+                      >
+                        {c.state === 'working'
+                          ? 'Watch'
+                          : c.state === 'review'
+                            ? 'Review'
+                            : 'View code'}
                       </button>
                     ) : (
                       <button

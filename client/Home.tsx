@@ -43,12 +43,16 @@ async function loadProjects() {
 
 /** Your other workspaces with projects, so projects that are "missing" here are one click away. */
 function OtherWorkspaces({ here }: { here: number }) {
-  const others = (S.auth?.workspaces || []).filter((w: Any) => w.id !== S.user?.workspaceId && w.projects > 0);
+  const others = (S.auth?.workspaces || []).filter(
+    (w: Any) => w.id !== S.user?.workspaceId && w.projects > 0,
+  );
   if (!others.length || here > 3) return null;
   return (
     <div className="ws-hint" role="note">
       <Ico svg={I.folder} />
-      <span>Looking for other projects? They’re in your other workspace{others.length > 1 ? 's' : ''}:</span>
+      <span>
+        Looking for other projects? They’re in your other workspace{others.length > 1 ? 's' : ''}:
+      </span>
       {others.map((w: Any) => (
         <button key={w.id} className="btn sm" onClick={() => switchWorkspace(w.id)}>
           {w.name} · {w.projects} project{w.projects === 1 ? '' : 's'}
@@ -67,11 +71,14 @@ export function ProjectsPage() {
     loadProjects();
   }, []);
   useAutoTour('home', Boolean(S.projectsLoaded));
-  const list = S.projects.filter((p: Any) => !q || `${p.name} ${p.key}`.toLowerCase().includes(q.toLowerCase()));
+  const list = S.projects.filter(
+    (p: Any) => !q || `${p.name} ${p.key}`.toLowerCase().includes(q.toLowerCase()),
+  );
   const importJson = async (file: File) => {
     try {
       const p = JSON.parse(await file.text());
-      if (!Array.isArray(p.tickets) || !Array.isArray(p.epics)) throw new Error('Not a TicketForge project file');
+      if (!Array.isArray(p.tickets) || !Array.isArray(p.epics))
+        throw new Error('Not a TicketForge project file');
       p.id = uid();
       p.name = p.name || file.name.replace(/\.json$/, '');
       const saved = await api('/api/projects', { method: 'POST', body: p });
@@ -119,7 +126,11 @@ export function ProjectsPage() {
         {S.projectsLoaded && <OtherWorkspaces here={S.projects.length} />}
         {!S.projectsLoaded ? (
           S.projectsError ? (
-            <ErrorState title="Couldn’t load your projects" error={S.projectsError} onRetry={loadProjects}>
+            <ErrorState
+              title="Couldn’t load your projects"
+              error={S.projectsError}
+              onRetry={loadProjects}
+            >
               <p>Check your connection and try again.</p>
             </ErrorState>
           ) : (
@@ -128,7 +139,13 @@ export function ProjectsPage() {
         ) : S.projects.length ? (
           <>
             <div className="toolbar">
-              <TF search sx={{ width: 220 }} placeholder="Search projects" value={q} onChange={(e) => setQ(e.target.value)} />
+              <TF
+                search
+                sx={{ width: 220 }}
+                placeholder="Search projects"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
             </div>
             <table className="tbl">
               <thead>
@@ -146,7 +163,15 @@ export function ProjectsPage() {
                   <tr key={p.id} className="click" onClick={() => S.nav(`/p/${p.id}/summary`)}>
                     <td>
                       <span className="row" style={{ flexWrap: 'nowrap' }}>
-                        <span className="proj-avatar" style={{ width: 24, height: 24, fontSize: 10, background: hashColor(p.key, COLORS) }}>
+                        <span
+                          className="proj-avatar"
+                          style={{
+                            width: 24,
+                            height: 24,
+                            fontSize: 10,
+                            background: hashColor(p.key, COLORS),
+                          }}
+                        >
                           {p.key.slice(0, 2)}
                         </span>
                         <a>{p.name}</a>
@@ -157,7 +182,12 @@ export function ProjectsPage() {
                     <td className="num">{p.tickets}</td>
                     <td className="muted col-upd">
                       <span className="d-full">{new Date(p.updatedAt).toLocaleString()}</span>
-                      <span className="d-short">{new Date(p.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                      <span className="d-short">
+                        {new Date(p.updatedAt).toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {canDeleteProject(p) && (
@@ -227,8 +257,12 @@ export function ProjectsPage() {
 function connLabel() {
   const st = S.status;
   if (!st) return { label: 'AI', model: '' };
-  if (st.mode === 'account') return { label: 'your Claude account', model: S.settings.model || st.model || '' };
-  return { label: st.api?.configured ? `${st.api.label} API` : 'AI (not set up)', model: st.model || '' };
+  if (st.mode === 'account')
+    return { label: 'your Claude account', model: S.settings.model || st.model || '' };
+  return {
+    label: st.api?.configured ? `${st.api.label} API` : 'AI (not set up)',
+    model: st.model || '',
+  };
 }
 
 export function CreateProjectPage() {
@@ -267,7 +301,8 @@ export function CreateProjectPage() {
   const generate = async () => {
     const text = S.doc ? S.doc.text : paste;
     const sourceName = S.doc ? S.doc.filename : 'Pasted requirements';
-    if (text.trim().length < 20) return toast('Add a document or paste some requirements first.', 'err');
+    if (text.trim().length < 20)
+      return toast('Add a document or paste some requirements first.', 'err');
     if (!S.doc) S.doc = { filename: sourceName, text };
     const answers = await askFirst({
       kind: 'project',
@@ -278,7 +313,12 @@ export function CreateProjectPage() {
     });
     if (answers === null) return;
     const ctrl = new AbortController();
-    S.gen = { running: true, ctrl, chars: 0, log: [{ message: `Sending “${sourceName}” to Claude…` }] };
+    S.gen = {
+      running: true,
+      ctrl,
+      chars: 0,
+      log: [{ message: `Sending “${sourceName}” to Claude…` }],
+    };
     emit();
     const push = (message: string, level?: string) => {
       S.gen.log.forEach((l: Any) => {
@@ -319,10 +359,14 @@ export function CreateProjectPage() {
         else if (ev.type === 'error') throw new Error(ev.error);
       });
       if (!project) throw new Error('Generation ended without a result.');
-      // Keep the original PDF or Word file so the document can be viewed as it was written (best effort).
+      // Keep the original PDF or Word file so the document can be viewed as it was written (best
+      // effort).
       if (S.doc?.file)
         await uploadOriginal(project.id, S.doc.file, 'original').catch(() =>
-          toast('The project was created, but its original file couldn’t be kept. You can attach it on the Source documents page.', 'err'),
+          toast(
+            'The project was created, but its original file couldn’t be kept. You can attach it on the Source documents page.',
+            'err',
+          ),
         );
       S.gen = null;
       S.doc = null;
@@ -368,11 +412,13 @@ export function CreateProjectPage() {
                       AI isn’t ready:{' '}
                       {st.account?.cli?.available ? (
                         <>
-                          Claude Code isn’t signed in. Run <code>claude</code> in a terminal and sign in with your Claude account.
+                          Claude Code isn’t signed in. Run <code>claude</code> in a terminal and
+                          sign in with your Claude account.
                         </>
                       ) : (
                         <>
-                          Claude Code isn’t installed on this computer. Run <code>npm install -g @anthropic-ai/claude-code</code>, then{' '}
+                          Claude Code isn’t installed on this computer. Run{' '}
+                          <code>npm install -g @anthropic-ai/claude-code</code>, then{' '}
                           <code>claude</code> to sign in.
                         </>
                       )}
@@ -439,7 +485,9 @@ export function CreateProjectPage() {
                 <div className="filebar">
                   <Ico svg={I.doc} />
                   <span className="name">{S.doc.filename}</span>
-                  <span className="muted small">{S.doc.text.split(/\s+/).length.toLocaleString()} words</span>
+                  <span className="muted small">
+                    {S.doc.text.split(/\s+/).length.toLocaleString()} words
+                  </span>
                   <button
                     className="btn sm subtle"
                     onClick={() => {
@@ -482,7 +530,9 @@ export function CreateProjectPage() {
                   maxLength={8}
                   placeholder="Auto, e.g. SHOP"
                   value={o.projectKey}
-                  onChange={(e) => setOpt('projectKey', e.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase())}
+                  onChange={(e) =>
+                    setOpt('projectKey', e.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase())
+                  }
                 />
               </label>
               <label className="field">
@@ -496,14 +546,19 @@ export function CreateProjectPage() {
               <label className="field">
                 <span>Test cases</span>
                 <label className="check" style={{ minHeight: 32 }}>
-                  <CB checked={o.includeTests} onChange={(e) => setOpt('includeTests', e.target.checked)} /> Write test cases for every
-                  issue
+                  <CB
+                    checked={o.includeTests}
+                    onChange={(e) => setOpt('includeTests', e.target.checked)}
+                  />{' '}
+                  Write test cases for every issue
                 </label>
               </label>
               <label className="field">
                 <span>
                   Test cases per issue
-                  {o.testsPicked && st?.generation && o.testsPerTicket !== st.generation.testsPerTicket ? (
+                  {o.testsPicked &&
+                  st?.generation &&
+                  o.testsPerTicket !== st.generation.testsPerTicket ? (
                     <>
                       {' '}
                       ·{' '}
@@ -547,12 +602,19 @@ export function CreateProjectPage() {
             </label>
             <div className="row">
               {can('ai.use') ? (
-                <button className="btn primary" data-tour="new-generate" disabled={g?.running} onClick={generate}>
+                <button
+                  className="btn primary"
+                  data-tour="new-generate"
+                  disabled={g?.running}
+                  onClick={generate}
+                >
                   <Ico svg={I.sparkle} />
                   Generate backlog
                 </button>
               ) : (
-                <span className="muted small">Your role can’t use Claude to generate backlogs.</span>
+                <span className="muted small">
+                  Your role can’t use Claude to generate backlogs.
+                </span>
               )}
               {g?.running ? (
                 <button className="btn" onClick={() => g.ctrl.abort()}>
@@ -584,7 +646,11 @@ export function CreateProjectPage() {
                       <span>{l.message}</span>
                     </li>
                   ))}
-                  {g.running && g.chars > 0 && <li className="muted small">Claude has written {g.chars.toLocaleString()} characters…</li>}
+                  {g.running && g.chars > 0 && (
+                    <li className="muted small">
+                      Claude has written {g.chars.toLocaleString()} characters…
+                    </li>
+                  )}
                 </ul>
               </div>
             )}
@@ -600,7 +666,8 @@ export function CreateProjectPage() {
             <div className="step">
               <TypeIcon type="Story" />
               <div>
-                <b>Issues</b>Stories, tasks, spikes and bugs with user stories, estimates and labels.
+                <b>Issues</b>Stories, tasks, spikes and bugs with user stories, estimates and
+                labels.
               </div>
             </div>
             <div className="step">
@@ -612,7 +679,8 @@ export function CreateProjectPage() {
             <div className="step">
               <TypeIcon type="Test" />
               <div>
-                <b>Test cases</b>Steps and expected results that cover each criterion, ready to automate.
+                <b>Test cases</b>Steps and expected results that cover each criterion, ready to
+                automate.
               </div>
             </div>
             <p className="small muted" style={{ margin: '16px 0 0' }}>

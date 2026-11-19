@@ -1,8 +1,10 @@
-// Google Drive storage (Administration → Google Drive, behind the "gdrive" feature flag). The owner (Super Admin) connects
-// one Google account for the workspace with OAuth and picks one folder. Generated and uploaded project documents then go
-// to that folder instead of TicketForge storage. A save that fails (Drive down, token expired and not refreshable…) is
-// queued in drive_docs and retried in the background with exponential backoff, up to MAX_RETRIES retries; after that the
-// document is "failed" and nothing retries it again. Tokens are encrypted in app_meta, which only the server can read.
+// Google Drive storage (Administration → Google Drive, behind the "gdrive" feature flag). The owner
+// (Super Admin) connects one Google account for the workspace with OAuth and picks one folder.
+// Generated and uploaded project documents then go to that folder instead of TicketForge storage. A
+// save that fails (Drive down, token expired and not refreshable…) is queued in drive_docs and
+// retried in the background with exponential backoff, up to MAX_RETRIES retries; after that the
+// document is "failed" and nothing retries it again. Tokens are encrypted in app_meta, which only
+// the server can read.
 // TicketForge never browses Drive: it only opens the folder that was picked and adds files to it.
 import crypto from 'node:crypto';
 import { q, qs, asWorkspace, currentWs } from './db';
@@ -19,7 +21,10 @@ const API = 'https://www.googleapis.com/drive/v3';
 const FOLDER = 'application/vnd.google-apps.folder';
 const G = globalThis as any;
 
-/** How many times a failed save is retried before the document is marked failed. Still to be confirmed with the team. */
+/**
+ * How many times a failed save is retried before the document is marked failed. Still to be
+ * confirmed with the team.
+ */
 const MAX_RETRIES = Math.max(1, Number(process.env.TICKETFORGE_GDRIVE_MAX_RETRIES) || 5);
 const BASE_DELAY = 30 * 1000,
   MAX_DELAY = 60 * 60 * 1000,
@@ -34,8 +39,9 @@ const creds = () => ({
   clientSecret: process.env.TICKETFORGE_GDRIVE_CLIENT_SECRET || '',
 });
 
-// ---------------------------------------------------------------- the connection (one per workspace)
-// { accessEnc, refreshEnc, expiresAt, account: { email, name }, folder: { id, name, selectedAt, selectedBy }, connectedAt, connectedBy }
+// ---------------------------------------------------------------- the connection (one per
+// workspace) { accessEnc, refreshEnc, expiresAt, account: { email, name }, folder: { id, name,
+// selectedAt, selectedBy }, connectedAt, connectedBy }
 async function readConn(): Promise<any> {
   let v = await getMeta(wsKey(KEY));
   if (typeof v === 'string') {
@@ -71,15 +77,22 @@ export async function status() {
   };
 }
 
-// ---------------------------------------------------------------- OAuth (authorization code + refresh token)
+// ---------------------------------------------------------------- OAuth (authorization code +
+// refresh token)
 G.__tfGdrivePending ??= new Map(); // state → { userId, ws, expiresAt }
 const PENDING: Map<string, any> = G.__tfGdrivePending;
 
-/** The Google consent page to send the owner to. `redirectUri` is this server's /api/gdrive/callback. */
+/**
+ * The Google consent page to send the owner to. `redirectUri` is this server's
+ * /api/gdrive/callback.
+ */
 export function authorizeUrl(user: any, redirectUri: string) {
   const { clientId, clientSecret } = creds();
   if (!clientId || !clientSecret)
-    throw err('Google Drive isn’t set up on this server yet. Set TICKETFORGE_GDRIVE_CLIENT_ID and TICKETFORGE_GDRIVE_CLIENT_SECRET.', 409);
+    throw err(
+      'Google Drive isn’t set up on this server yet. Set TICKETFORGE_GDRIVE_CLIENT_ID and TICKETFORGE_GDRIVE_CLIENT_SECRET.',
+      409,
+    );
   for (const [k, p] of PENDING) if (p.expiresAt < Date.now()) PENDING.delete(k);
   const state = crypto.randomBytes(16).toString('hex');
   PENDING.set(state, { userId: user.id, ws: currentWs(), expiresAt: Date.now() + 10 * 60 * 1000 });
@@ -118,21 +131,40 @@ async function tokenRequest(params: Record<string, string>) {
   return data;
 }
 
-/** Finishes the connection after Google sent the owner back with a code. Replaces any earlier connection. */
-export async function completeConnect(user: any, { code, state }: { code: string; state: string }, redirectUri: string) {
+/**
+ * Finishes the connection after Google sent the owner back with a code. Replaces any earlier
+ * connection.
+ */
+export async function completeConnect(
+  user: any,
+  { code, state }: { code: string; state: string },
+  redirectUri: string,
+) {
   const p = PENDING.get(String(state || ''));
   PENDING.delete(String(state || ''));
-  if (!p || p.userId !== user.id || p.expiresAt < Date.now()) throw err('The Google sign-in expired. Start the connection again.');
+  if (!p || p.userId !== user.id || p.expiresAt < Date.now())
+    throw err('The Google sign-in expired. Start the connection again.');
   if (!code) throw err('Google didn’t send a sign-in code.');
-  const t = await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: redirectUri });
+  const t = await tokenRequest({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri,
+  });
   if (!t.refresh_token)
-    throw err('Google didn’t allow ongoing access. Remove TicketForge from your Google account’s third-party access and connect again.');
+    throw err(
+      'Google didn’t allow ongoing access. Remove TicketForge from your Google account’s third-party access and connect again.',
+    );
   const draft: any = {
     accessEnc: encrypt(t.access_token),
     refreshEnc: encrypt(t.refresh_token),
     expiresAt: Date.now() + (Number(t.expires_in) || 3600) * 1000,
   };
-  const about = await driveJson(draft, `${API}/about?fields=user(displayName,emailAddress)`, {}, false);
+  const about = await driveJson(
+    draft,
+    `${API}/about?fields=user(displayName,emailAddress)`,
+    {},
+    false,
+  );
   const prev = await readConn();
   const account = { email: about.user?.emailAddress || '', name: about.user?.displayName || '' };
   // The same account connecting again keeps its folder; another account starts without one.
@@ -149,21 +181,36 @@ export async function completeConnect(user: any, { code, state }: { code: string
 /** A valid access token, refreshed with the refresh token when it has expired (or is about to). */
 async function accessToken(c: any, force = false) {
   if (!force && c.expiresAt - Date.now() > 60 * 1000) return decrypt(c.accessEnc);
-  const t = await tokenRequest({ grant_type: 'refresh_token', refresh_token: decrypt(c.refreshEnc) });
+  const t = await tokenRequest({
+    grant_type: 'refresh_token',
+    refresh_token: decrypt(c.refreshEnc),
+  });
   c.accessEnc = encrypt(t.access_token);
   c.expiresAt = Date.now() + (Number(t.expires_in) || 3600) * 1000;
   if (t.refresh_token) c.refreshEnc = encrypt(t.refresh_token);
   const cur = await readConn(); // keep a folder picked meanwhile
-  if (cur) await writeConn({ ...cur, accessEnc: c.accessEnc, refreshEnc: c.refreshEnc, expiresAt: c.expiresAt });
+  if (cur)
+    await writeConn({
+      ...cur,
+      accessEnc: c.accessEnc,
+      refreshEnc: c.refreshEnc,
+      expiresAt: c.expiresAt,
+    });
   return t.access_token as string;
 }
 
-/** One Drive API call as the connected account. An expired token (401) is refreshed and the call repeated once. */
+/**
+ * One Drive API call as the connected account. An expired token (401) is refreshed and the call
+ * repeated once.
+ */
 async function driveFetch(c: any, url: string, init: any = {}, refresh = true): Promise<Response> {
   const go = async (force: boolean) => {
     const token = await accessToken(c, force);
     try {
-      return await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
+      return await fetch(url, {
+        ...init,
+        headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` },
+      });
     } catch {
       throw err('Couldn’t reach Google Drive.', 503);
     }
@@ -172,11 +219,15 @@ async function driveFetch(c: any, url: string, init: any = {}, refresh = true): 
   if (res.status === 401 && refresh) res = await go(true);
   if (!res.ok) {
     const data: any = await res.json().catch(() => ({}));
-    throw err(data.error?.message || `Google Drive said ${res.status}.`, res.status === 401 ? 409 : res.status); // 401 would sign the person out of TicketForge
+    throw err(
+      data.error?.message || `Google Drive said ${res.status}.`,
+      res.status === 401 ? 409 : res.status,
+    ); // 401 would sign the person out of TicketForge
   }
   return res;
 }
-const driveJson = async (c: any, url: string, init: any = {}, refresh = true) => (await driveFetch(c, url, init, refresh)).json();
+const driveJson = async (c: any, url: string, init: any = {}, refresh = true) =>
+  (await driveFetch(c, url, init, refresh)).json();
 
 /** The folder id in a Drive folder link (…/folders/<id>, …?id=<id>) or an id pasted as it is. */
 export function parseFolderId(input: any) {
@@ -187,7 +238,10 @@ export function parseFolderId(input: any) {
   return /^[\w-]{10,}$/.test(s) ? s : '';
 }
 
-/** Makes one folder the document destination. Needs a connection; only the folder's id and name are kept. */
+/**
+ * Makes one folder the document destination. Needs a connection; only the folder's id and name are
+ * kept.
+ */
 export async function selectFolder(user: any, input: any) {
   const c = await readConn();
   if (!c) throw err('Connect Google Drive first.', 409);
@@ -195,18 +249,29 @@ export async function selectFolder(user: any, input: any) {
   if (!id) throw err('Paste the link of a Google Drive folder (or its ID).');
   let meta: any;
   try {
-    meta = await driveJson(c, `${API}/files/${encodeURIComponent(id)}?fields=id,name,mimeType&supportsAllDrives=true`);
+    meta = await driveJson(
+      c,
+      `${API}/files/${encodeURIComponent(id)}?fields=id,name,mimeType&supportsAllDrives=true`,
+    );
   } catch (e: any) {
     throw err(
-      e.status === 404 ? 'Couldn’t open that folder. Check the link, and that the connected Google account can open it.' : e.message,
+      e.status === 404
+        ? 'Couldn’t open that folder. Check the link, and that the connected Google account can open it.'
+        : e.message,
       e.status === 404 ? 404 : 502,
     );
   }
-  if (meta.mimeType !== FOLDER) throw err('That link isn’t a folder. Choose a Google Drive folder.');
+  if (meta.mimeType !== FOLDER)
+    throw err('That link isn’t a folder. Choose a Google Drive folder.');
   const cur = await readConn();
   await writeConn({
     ...cur,
-    folder: { id: meta.id, name: meta.name, selectedAt: new Date().toISOString(), selectedBy: user.name || null },
+    folder: {
+      id: meta.id,
+      name: meta.name,
+      selectedAt: new Date().toISOString(),
+      selectedBy: user.name || null,
+    },
   });
   return status();
 }
@@ -229,12 +294,18 @@ export async function listFolder() {
   }));
 }
 
-/** Disconnects: the tokens are forgotten (and revoked at Google). Documents already in Drive stay where they are. */
+/**
+ * Disconnects: the tokens are forgotten (and revoked at Google). Documents already in Drive stay
+ * where they are.
+ */
 export async function disconnect() {
   const c = await readConn();
   if (c) {
     try {
-      await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(decrypt(c.refreshEnc))}`, { method: 'POST' });
+      await fetch(
+        `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(decrypt(c.refreshEnc))}`,
+        { method: 'POST' },
+      );
     } catch {
       /* forgotten anyway */
     }
@@ -244,7 +315,10 @@ export async function disconnect() {
 }
 
 // ---------------------------------------------------------------- saving documents
-/** The connection when documents go to Drive: the feature is on and a folder is picked. Otherwise null (the existing storage is used). */
+/**
+ * The connection when documents go to Drive: the feature is on and a folder is picked. Otherwise
+ * null (the existing storage is used).
+ */
 export async function destination() {
   if (await isLocked('gdrive')) return null;
   const c = await readConn();
@@ -260,11 +334,15 @@ async function upload(c: any, { name, mime, data }: { name: string; mime: string
     data,
     Buffer.from(`\r\n--${b}--`),
   ]);
-  return driveJson(c, 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name', {
-    method: 'POST',
-    headers: { 'Content-Type': `multipart/related; boundary=${b}` },
-    body,
-  });
+  return driveJson(
+    c,
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/related; boundary=${b}` },
+      body,
+    },
+  );
 }
 
 type Doc = { projectId: string; epicId: string; kind: string; docKey?: string };
@@ -272,11 +350,17 @@ const where = '(project_id = $1 and epic_id = $2 and kind = $3 and doc_key = $4)
 const ids = (d: Doc) => [d.projectId, d.epicId, d.kind, d.docKey || ''];
 
 /**
- * One try at saving a queued document. Success: it is "saved" and its bytes are dropped. Failure: it waits for the next
- * retry (exponential backoff), or is "failed" once the retries are used up. Returns the document's new state.
+ * One try at saving a queued document. Success: it is "saved" and its bytes are dropped. Failure:
+ * it waits for the next retry (exponential backoff), or is "failed" once the retries are used up.
+ * Returns the document's new state.
  */
 async function attempt(d: Doc): Promise<string> {
-  const row = (await q(`select name, mime, data, attempts from drive_docs where ${where} and state = 'queued'`, ids(d))).rows[0];
+  const row = (
+    await q(
+      `select name, mime, data, attempts from drive_docs where ${where} and state = 'queued'`,
+      ids(d),
+    )
+  ).rows[0];
   if (!row) return 'gone';
   try {
     const c = await readConn();
@@ -300,14 +384,18 @@ async function attempt(d: Doc): Promise<string> {
         String(e.message || e).slice(0, 300),
       ],
     );
-    if (give) console.error(`Google Drive: gave up saving "${row.name}" after ${MAX_RETRIES} retries: ${e.message}`);
+    if (give)
+      console.error(
+        `Google Drive: gave up saving "${row.name}" after ${MAX_RETRIES} retries: ${e.message}`,
+      );
     return give ? 'failed' : 'queued';
   }
 }
 
 /**
- * Saves a document to the Drive folder. It is recorded as queued first, so it is never lost, and tried once right away;
- * if that fails it stays queued for the background retries. Never throws for a Drive problem. Returns the state.
+ * Saves a document to the Drive folder. It is recorded as queued first, so it is never lost, and
+ * tried once right away; if that fails it stays queued for the background retries. Never throws for
+ * a Drive problem. Returns the state.
  */
 export async function saveDocument({
   projectId,
@@ -354,11 +442,23 @@ export async function markFailed({
   await q(
     `insert into drive_docs (project_id, epic_id, kind, doc_key, name, state, attempts, last_error, created_by, updated_at) values ($1,$2,$3,$4,$5,'failed',$6,$7,$8,now())
     on conflict (project_id, epic_id, kind, doc_key) do update set name = excluded.name, state = 'failed', attempts = $6, next_attempt_at = null, last_error = excluded.last_error, drive_file_id = '', data = null, updated_at = now()`,
-    [projectId, epicId, kind, docKey, String(name).slice(0, 200), MAX_RETRIES + 1, String(error).slice(0, 300), user?.name || null],
+    [
+      projectId,
+      epicId,
+      kind,
+      docKey,
+      String(name).slice(0, 200),
+      MAX_RETRIES + 1,
+      String(error).slice(0, 300),
+      user?.name || null,
+    ],
   );
 }
 
-/** The save state of each document of an epic: [{ kind, key, name, state: 'saved' | 'queued' | 'failed', retries, maxRetries, message }]. */
+/**
+ * The save state of each document of an epic: [{ kind, key, name, state: 'saved' | 'queued' |
+ * 'failed', retries, maxRetries, message }].
+ */
 export async function documentStates(projectId: string, epicId: string, user: any = null) {
   const rows = (
     await q(
@@ -385,7 +485,10 @@ export async function documentStates(projectId: string, epicId: string, user: an
 }
 
 // ---------------------------------------------------------------- background retries
-/** Retries every queued document that is due, in the workspace it belongs to. Failed documents are never touched. */
+/**
+ * Retries every queued document that is due, in the workspace it belongs to. Failed documents are
+ * never touched.
+ */
 export async function retryDue() {
   if (G.__tfGdriveBusy) return 0;
   G.__tfGdriveBusy = true;
@@ -401,7 +504,12 @@ export async function retryDue() {
       if (!ws) continue;
       await asWorkspace(ws, async () => {
         if (await isLocked('gdrive')) return; // switched off: nothing is sent until it is turned on again
-        await attempt({ projectId: r.project_id, epicId: r.epic_id, kind: r.kind, docKey: r.doc_key });
+        await attempt({
+          projectId: r.project_id,
+          epicId: r.epic_id,
+          kind: r.kind,
+          docKey: r.doc_key,
+        });
         n++;
       });
     }

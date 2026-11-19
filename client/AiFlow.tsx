@@ -1,12 +1,14 @@
 'use client';
 // Administration → AI → AI flow: the AI settings as a canvas of nodes you wire together, like n8n.
 //
-//   tasks (grouped)  ──►  tiers (High · Standard · Light)  ──►  router  ──►  provider ──fallback──► provider ──► …
+//   tasks (grouped) ──► tiers (High · Standard · Light) ──► router ──► provider ──fallback──►
+//   provider ──► …
 //
 //  · Drag from a task's dot onto a tier (or an AI configuration) to choose what that task runs on.
-//  · Drag a provider's bottom dot onto another provider to make that one the next fallback (the priority order).
-//  · Click a node for its details: status, test, the model it uses for each tier, switches.
-//  · Drag nodes to arrange them, drag the background to pan, Ctrl/⌘ + scroll or pinch to zoom.
+//  · Drag a provider's bottom dot onto another provider to make that one the next fallback (the
+//  priority order). · Click a node for its details: status, test, the model it uses for each tier,
+//  switches. · Drag nodes to arrange them, drag the background to pan, Ctrl/⌘ + scroll or pinch to
+//  zoom.
 // Every change is saved straight away through the same settings the other AI sections use.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, toast, type Any } from './core';
@@ -55,7 +57,15 @@ const GROUP_COLOR: Record<string, string> = {
   Code: '#1f9d6b',
   Helpers: '#7c8aa0',
 };
-const CLAUDE_OPTIONS = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-2'];
+const CLAUDE_OPTIONS = [
+  'opus',
+  'sonnet',
+  'haiku',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+  'claude-haiku-5-5',
+  'claude-fable-5-2',
+];
 const LS = 'tf.aiflow.v1';
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const hue = (s: string) => {
@@ -71,7 +81,12 @@ function stateOf(x: Any): State {
   if (x.cooldown)
     return {
       k: 'warn',
-      label: x.cooldown.kind === 'credits' ? 'Out of credits' : x.cooldown.kind === 'auth' ? 'Key rejected' : 'Limited',
+      label:
+        x.cooldown.kind === 'credits'
+          ? 'Out of credits'
+          : x.cooldown.kind === 'auth'
+            ? 'Key rejected'
+            : 'Limited',
       title: x.cooldown.message,
     };
   if (x.active) return { k: 'ok', label: 'In use' };
@@ -99,7 +114,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     }
   }, []);
   const [pos, setPos] = useState<Record<string, Pt>>(stored.pos || {});
-  const [view, setView] = useState<{ x: number; y: number; k: number }>(stored.view || { x: 24, y: 24, k: 0.8 });
+  const [view, setView] = useState<{ x: number; y: number; k: number }>(
+    stored.view || { x: 24, y: 24, k: 0.8 },
+  );
   const [fitted, setFitted] = useState(Boolean(stored.view));
   const vp = useRef<HTMLDivElement>(null);
   const drag = useRef<Any>(null);
@@ -130,7 +147,15 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     for (const g of groups) {
       const rows = tasks.filter((t) => t.group === g);
       const h = HEAD + rows.length * ROW + 10;
-      list.push({ id: `g:${g}`, kind: 'group', w: GW, h, def: { x: 0, y }, rows, data: { group: g } });
+      list.push({
+        id: `g:${g}`,
+        kind: 'group',
+        w: GW,
+        h,
+        def: { x: 0, y },
+        rows,
+        data: { group: g },
+      });
       y += h + 18;
     }
     const colH = Math.max(y - 18, 300);
@@ -138,24 +163,54 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     const tierBlock = tiers.length * TH + (tiers.length - 1) * 28;
     const tierTop = Math.max(0, colH / 2 - tierBlock / 2 - 20);
     tiers.forEach((k, i) =>
-      list.push({ id: `t:${k}`, kind: 'tier', w: TW, h: TH, def: { x: TX, y: tierTop + i * (TH + 28) }, data: { tier: k } }),
+      list.push({
+        id: `t:${k}`,
+        kind: 'tier',
+        w: TW,
+        h: TH,
+        def: { x: TX, y: tierTop + i * (TH + 28) },
+        data: { tier: k },
+      }),
     );
     configs.forEach((cf, i) =>
-      list.push({ id: `c:${cf.id}`, kind: 'config', w: CW, h: CH, def: { x: TX, y: tierTop + tierBlock + 40 + i * (CH + 14) }, data: cf }),
+      list.push({
+        id: `c:${cf.id}`,
+        kind: 'config',
+        w: CW,
+        h: CH,
+        def: { x: TX, y: tierTop + tierBlock + 40 + i * (CH + 14) },
+        data: cf,
+      }),
     );
     const WX = TX + TW + 130;
-    list.push({ id: 'gw', kind: 'gateway', w: RW, h: RH, def: { x: WX, y: tierTop + tierBlock / 2 - RH / 2 }, data: {} });
+    list.push({
+      id: 'gw',
+      kind: 'gateway',
+      w: RW,
+      h: RH,
+      def: { x: WX, y: tierTop + tierBlock / 2 - RH / 2 },
+      data: {},
+    });
     const members: Any[] = [];
     if (localMode) {
       members.push({ id: 'a:claude', kind: 'local', data: { which: 'claude' } });
-      if (c.copilot?.available) members.push({ id: 'a:copilot', kind: 'local', data: { which: 'copilot' } });
+      if (c.copilot?.available)
+        members.push({ id: 'a:copilot', kind: 'local', data: { which: 'copilot' } });
     }
     for (const x of apis) members.push({ id: `p:${x.entryId}`, kind: 'provider', data: x });
     const PX = WX + RW + 150;
     const chainH = members.length * PH + Math.max(0, members.length - 1) * 44;
     const top = Math.max(0, colH / 2 - chainH / 2 - 20);
-    members.forEach((m, i) => list.push({ ...m, w: PW, h: PH, def: { x: PX, y: top + i * (PH + 44) } }));
-    list.push({ id: 'add', kind: 'add', w: PW, h: 64, def: { x: PX, y: top + members.length * (PH + 44) } });
+    members.forEach((m, i) =>
+      list.push({ ...m, w: PW, h: PH, def: { x: PX, y: top + i * (PH + 44) } }),
+    );
+    list.push({
+      id: 'add',
+      kind: 'add',
+      w: PW,
+      h: 64,
+      def: { x: PX, y: top + members.length * (PH + 44) },
+    });
     return { nodes: list, chain: members.map((m) => m.id) as string[] };
     /* eslint-disable react-hooks/exhaustive-deps -- the layout depends on these summaries, not on the objects */
   }, [
@@ -167,7 +222,8 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     c.copilot?.available,
   ]);
   /* eslint-enable react-hooks/exhaustive-deps */
-  // The layout is rebuilt only when nodes come or go; what each node shows is read fresh on every render.
+  // The layout is rebuilt only when nodes come or go; what each node shows is read fresh on every
+  // render.
   const nodes = baseNodes.map((n) =>
     n.kind === 'provider'
       ? { ...n, data: apis.find((x) => `p:${x.entryId}` === n.id) || n.data }
@@ -235,14 +291,35 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
         color: byId[dest]?.kind === 'tier' ? TIER[byId[dest].data.tier]?.color : '#8b5cf6',
       });
     }
-    for (const k of tiers) out.push({ id: `tg:${k}`, kind: 'tier', from: `t:${k}`, to: 'gw', color: TIER[k]?.color });
+    for (const k of tiers)
+      out.push({ id: `tg:${k}`, kind: 'tier', from: `t:${k}`, to: 'gw', color: TIER[k]?.color });
     for (const cf of configs) {
-      const dest = cf.engine === 'api' ? `p:${cf.providerId}` : cf.engine === 'copilot' ? 'a:copilot' : 'a:claude';
-      if (byId[dest]) out.push({ id: `cp:${cf.id}`, kind: 'config', from: `c:${cf.id}`, to: dest, color: '#8b5cf6' });
+      const dest =
+        cf.engine === 'api'
+          ? `p:${cf.providerId}`
+          : cf.engine === 'copilot'
+            ? 'a:copilot'
+            : 'a:claude';
+      if (byId[dest])
+        out.push({
+          id: `cp:${cf.id}`,
+          kind: 'config',
+          from: `c:${cf.id}`,
+          to: dest,
+          color: '#8b5cf6',
+        });
     }
-    if (firstUsable) out.push({ id: 'gw:first', kind: 'gw', from: 'gw', to: firstUsable, color: 'var(--brand)' });
+    if (firstUsable)
+      out.push({ id: 'gw:first', kind: 'gw', from: 'gw', to: firstUsable, color: 'var(--brand)' });
     chain.forEach((id, i) => {
-      if (i < chain.length - 1) out.push({ id: `fb:${id}`, kind: 'fallback', from: id, to: chain[i + 1], color: '#e2a400' });
+      if (i < chain.length - 1)
+        out.push({
+          id: `fb:${id}`,
+          kind: 'fallback',
+          from: id,
+          to: chain[i + 1],
+          color: '#e2a400',
+        });
     });
     return out;
   })();
@@ -280,7 +357,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
   const setTaskTier = (taskId: string, target: string) => {
     if ((r.tiers?.[taskId] || tasks.find((t) => t.id === taskId)?.tier) === target) return;
     const label = tasks.find((t) => t.id === taskId)?.label;
-    const name = /^cfg:/.test(target) ? configs.find((x) => `cfg:${x.id}` === target)?.name : TIER[target]?.label;
+    const name = /^cfg:/.test(target)
+      ? configs.find((x) => `cfg:${x.id}` === target)?.name
+      : TIER[target]?.label;
     patchRouting({ ...r, tiers: { ...r.tiers, [taskId]: target } }, `${label} now runs on ${name}`);
   };
   const resetTask = (taskId: string) => {
@@ -333,7 +412,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
   const retry = async (x: Any) => {
     setBusy(`retry:${x.entryId}`);
     try {
-      actions.onSaved(await api('/api/admin/ai', { method: 'POST', body: { action: 'reset', id: x.entryId } }));
+      actions.onSaved(
+        await api('/api/admin/ai', { method: 'POST', body: { action: 'reset', id: x.entryId } }),
+      );
     } catch (e: Any) {
       toast(e.message, 'err');
     } finally {
@@ -350,7 +431,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     return { x: (e.clientX - b.left - v.x) / v.k, y: (e.clientY - b.top - v.y) / v.k };
   };
   const nodeAt = (e: { clientX: number; clientY: number }) =>
-    (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-node]')?.dataset.node || '';
+    (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>(
+      '[data-node]',
+    )?.dataset.node || '';
   const zoomAt = (cx: number, cy: number, k2: number) => {
     touched.current = true;
     zoomTo(cx, cy, k2);
@@ -369,11 +452,20 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       x1 = Math.max(...xs),
       y0 = Math.min(...ys),
       y1 = Math.max(...ys);
-    // Leave room for the toolbar on top (taller when it wraps on narrow screens) and the zoom controls below.
+    // Leave room for the toolbar on top (taller when it wraps on narrow screens) and the zoom
+    // controls below.
     const top = b.width < 720 ? 96 : 76,
       bottom = 56;
-    const k = clamp(Math.min((b.width - 48) / (x1 - x0), (b.height - top - bottom) / (y1 - y0)), 0.2, 1);
-    const v = { k, x: (b.width - (x1 - x0) * k) / 2 - x0 * k, y: top + (b.height - top - bottom - (y1 - y0) * k) / 2 - y0 * k };
+    const k = clamp(
+      Math.min((b.width - 48) / (x1 - x0), (b.height - top - bottom) / (y1 - y0)),
+      0.2,
+      1,
+    );
+    const v = {
+      k,
+      x: (b.width - (x1 - x0) * k) / 2 - x0 * k,
+      y: top + (b.height - top - bottom - (y1 - y0) * k) / 2 - y0 * k,
+    };
     setView(v);
     persist(pos, v);
   };
@@ -417,7 +509,11 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       if (!(e.ctrlKey || e.metaKey || full)) return; // plain scrolling keeps scrolling the page, unless the canvas is full screen
       e.preventDefault();
       const b = el.getBoundingClientRect();
-      zoomAt(e.clientX - b.left, e.clientY - b.top, viewRef.current.k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016)));
+      zoomAt(
+        e.clientX - b.left,
+        e.clientY - b.top,
+        viewRef.current.k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016)),
+      );
     };
     el.addEventListener('wheel', wheel, { passive: false });
     return () => el.removeEventListener('wheel', wheel);
@@ -435,7 +531,8 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     };
   }, [full]);
 
-  // Opening a node's details: glide the canvas so that node isn't hidden under the panel (wide screens).
+  // Opening a node's details: glide the canvas so that node isn't hidden under the panel (wide
+  // screens).
   const [smooth, setSmooth] = useState(false);
   useEffect(() => {
     if (sel?.type !== 'node' || !vp.current || !byId[sel.id] || byId[sel.id].kind === 'add') return;
@@ -494,10 +591,25 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       capture(e);
       const w = toWorld(e),
         p = at(nodeEl.dataset.node!);
-      drag.current = { type: 'node', id: nodeEl.dataset.node!, ox: w.x - p.x, oy: w.y - p.y, sx: e.clientX, sy: e.clientY, moved: false };
+      drag.current = {
+        type: 'node',
+        id: nodeEl.dataset.node!,
+        ox: w.x - p.x,
+        oy: w.y - p.y,
+        sx: e.clientX,
+        sy: e.clientY,
+        moved: false,
+      };
     } else if (!nodeEl && !t.closest('[data-edge], .flow-edge-x')) {
       capture(e);
-      drag.current = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y, moved: false };
+      drag.current = {
+        type: 'pan',
+        sx: e.clientX,
+        sy: e.clientY,
+        vx: viewRef.current.x,
+        vy: viewRef.current.y,
+        moved: false,
+      };
     }
   };
   const move = (e: React.PointerEvent) => {
@@ -507,7 +619,11 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     if (d.type === 'pinch' && pts.current.size >= 2) {
       const [a, b] = [...pts.current.values()];
       const bb = rectOf();
-      zoomAt((a.x + b.x) / 2 - bb.left, (a.y + b.y) / 2 - bb.top, d.k0 * (Math.hypot(a.x - b.x, a.y - b.y) / d.d0));
+      zoomAt(
+        (a.x + b.x) / 2 - bb.left,
+        (a.y + b.y) / 2 - bb.top,
+        d.k0 * (Math.hypot(a.x - b.x, a.y - b.y) / d.d0),
+      );
       return;
     }
     const dist = Math.hypot(e.clientX - d.sx, e.clientY - d.sy);
@@ -518,7 +634,8 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     } else if (d.type === 'node' && d.moved) {
       const w = toWorld(e);
       setPos((p) => ({ ...p, [d.id]: { x: Math.round(w.x - d.ox), y: Math.round(w.y - d.oy) } }));
-    } else if (d.type === 'conn') setConn((cn: Any) => cn && { ...cn, cur: toWorld(e), over: nodeAt(e) });
+    } else if (d.type === 'conn')
+      setConn((cn: Any) => cn && { ...cn, cur: toWorld(e), over: nodeAt(e) });
   };
   const up = (e: React.PointerEvent) => {
     pts.current.delete(e.pointerId);
@@ -542,7 +659,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       setConn(null);
       if (d.moved && target && valid(d.from, target)) {
         if (d.from.kind === 'task')
-          setTaskTier(d.from.row, byId[target].kind === 'tier' ? byId[target].data.tier : `cfg:${byId[target].data.id}`);
+          setTaskTier(
+            d.from.row,
+            byId[target].kind === 'tier' ? byId[target].data.tier : `cfg:${byId[target].data.id}`,
+          );
         else setFallback(d.from.node, target);
       } else if (!d.moved) setSel({ type: 'node', id: d.from.node });
     } else if (d.type === 'node') {
@@ -573,8 +693,17 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
   const selNode = sel?.type === 'node' ? byId[sel.id] : null;
   const selEdge = sel?.type === 'edge' ? edges.find((e) => e.id === sel.id) : null;
   const overOk = conn && conn.over && valid(conn.from, conn.over) ? conn.over : '';
-  const ghost = conn ? (conn.from.kind === 'task' ? outP(conn.from.node, conn.from.row) : botP(conn.from.node)) : null;
-  const ghostPath = conn && ghost ? (conn.from.kind === 'task' ? hpath(ghost, conn.cur) : vpath(ghost, conn.cur)) : '';
+  const ghost = conn
+    ? conn.from.kind === 'task'
+      ? outP(conn.from.node, conn.from.row)
+      : botP(conn.from.node)
+    : null;
+  const ghostPath =
+    conn && ghost
+      ? conn.from.kind === 'task'
+        ? hpath(ghost, conn.cur)
+        : vpath(ghost, conn.cur)
+      : '';
 
   // ---- node faces
   const state = (n: FNode): State => {
@@ -589,7 +718,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       return c.copilot?.cooldown
         ? { k: 'warn', label: 'Limited' }
         : c.copilot?.available
-          ? { k: c.localEngine === 'copilot' ? 'ok' : 'idle', label: c.localEngine === 'copilot' ? 'Local AI' : 'Backup' }
+          ? {
+              k: c.localEngine === 'copilot' ? 'ok' : 'idle',
+              label: c.localEngine === 'copilot' ? 'Local AI' : 'Backup',
+            }
           : { k: 'off', label: 'Not installed' };
     }
     return { k: 'idle', label: '' };
@@ -622,7 +754,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
                   title={`${t.label}: ${t.desc}`}
                 >
                   <span className="fn-row-l">{t.label}</span>
-                  <em style={{ ['--c' as string]: col } as React.CSSProperties}>{isCfg ? cf?.name || 'Config' : TIER[tgt]?.label}</em>
+                  <em style={{ ['--c' as string]: col } as React.CSSProperties}>
+                    {isCfg ? cf?.name || 'Config' : TIER[tgt]?.label}
+                  </em>
                   <span
                     className="fn-port out"
                     data-port="out"
@@ -646,7 +780,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
           <span className="fn-port in" data-port="in" />
           <div
             className="fn-tier-h"
-            style={{ background: `linear-gradient(135deg, ${m.color}, color-mix(in srgb, ${m.color} 55%, #000))` }}
+            style={{
+              background: `linear-gradient(135deg, ${m.color}, color-mix(in srgb, ${m.color} 55%, #000))`,
+            }}
           >
             <b>{m.label}</b>
             <span>{m.hint}</span>
@@ -729,9 +865,17 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     const idx = chain.indexOf(n.id);
     return (
       <>
-        {idx > 0 ? <span className="fn-port top" data-port="in" /> : <span className="fn-port in" data-port="in" />}
+        {idx > 0 ? (
+          <span className="fn-port top" data-port="in" />
+        ) : (
+          <span className="fn-port in" data-port="in" />
+        )}
         <div className="fn-p">
-          <span className="fn-av" style={{ background: `hsl(${hue(isLocal ? x.which : x.id)} 55% 42%)` }} aria-hidden>
+          <span
+            className="fn-av"
+            style={{ background: `hsl(${hue(isLocal ? x.which : x.id)} 55% 42%)` }}
+            aria-hidden
+          >
             {isLocal ? (x.which === 'claude' ? 'C' : 'G') : String(label).slice(0, 1).toUpperCase()}
           </span>
           <div className="fn-pt">
@@ -773,9 +917,20 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
             ) : (
               <Ico svg={I.play} />
             )}
-            {test?.running ? 'Testing' : test?.ok === true ? `${(test.ms / 1000).toFixed(1)}s` : test?.ok === false ? 'Failed' : 'Test'}
+            {test?.running
+              ? 'Testing'
+              : test?.ok === true
+                ? `${(test.ms / 1000).toFixed(1)}s`
+                : test?.ok === false
+                  ? 'Failed'
+                  : 'Test'}
           </button>
-          <button type="button" className="fn-btn ghost" onClick={() => setSel({ type: 'node', id: n.id })} aria-label={`${label} details`}>
+          <button
+            type="button"
+            className="fn-btn ghost"
+            onClick={() => setSel({ type: 'node', id: n.id })}
+            aria-label={`${label} details`}
+          >
             Details
           </button>
         </div>
@@ -800,7 +955,12 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
         : node.data.model || c.tierHints?.[node.data.id]?.[k] || 'Provider’s model';
     if (node.kind === 'local' && node.data.which === 'copilot') {
       return (
-        <SF value={r.copilot?.[k] || ''} onChange={(e) => setR((x: Any) => ({ ...x, copilot: { ...x.copilot, [k]: e.target.value } }))}>
+        <SF
+          value={r.copilot?.[k] || ''}
+          onChange={(e) =>
+            setR((x: Any) => ({ ...x, copilot: { ...x.copilot, [k]: e.target.value } }))
+          }
+        >
           {(c.copilot?.models || ['']).map((m: string) => (
             <MenuItem key={m || 'd'} value={m}>
               {m || 'Same as Local AI'}
@@ -819,7 +979,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
           placeholder={placeholder}
         />
       );
-    const opts = [...new Set([c.tierHints?.[node.data.id]?.[k], node.data.model].filter(Boolean))] as string[];
+    const opts = [
+      ...new Set([c.tierHints?.[node.data.id]?.[k], node.data.model].filter(Boolean)),
+    ] as string[];
     return (
       <PeopleF
         avatars={false}
@@ -829,7 +991,13 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
             ...x,
             api: {
               ...x.api,
-              [node.data.entryId]: { high: '', standard: '', light: '', ...(x.api?.[node.data.entryId] || {}), [k]: v.trim() },
+              [node.data.entryId]: {
+                high: '',
+                standard: '',
+                light: '',
+                ...(x.api?.[node.data.entryId] || {}),
+                [k]: v.trim(),
+              },
             },
           }))
         }
@@ -864,7 +1032,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
             <p className="muted small">{t?.desc}</p>
             <label className="field">
               <span>Runs on</span>
-              <SF value={r.tiers?.[t.id] || t.tier} onChange={(e) => setTaskTier(t.id, String(e.target.value))}>
+              <SF
+                value={r.tiers?.[t.id] || t.tier}
+                onChange={(e) => setTaskTier(t.id, String(e.target.value))}
+              >
                 {tiers.map((k) => (
                   <MenuItem key={k} value={k}>
                     {TIER[k].label} · {TIER[k].hint}
@@ -900,7 +1071,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       return (
         <>
           <h4>{n.data.group}</h4>
-          <p className="muted small">Choose what each task runs on. You can also drag from a task’s dot to a tier.</p>
+          <p className="muted small">
+            Choose what each task runs on. You can also drag from a task’s dot to a tier.
+          </p>
           <div className="fi-list">
             {(n.rows || []).map((t) => (
               <label key={t.id} className="fi-task">
@@ -908,7 +1081,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
                   <b>{t.label}</b>
                   <small>{t.desc}</small>
                 </span>
-                <SF value={r.tiers?.[t.id] || t.tier} onChange={(e) => setTaskTier(t.id, String(e.target.value))}>
+                <SF
+                  value={r.tiers?.[t.id] || t.tier}
+                  onChange={(e) => setTaskTier(t.id, String(e.target.value))}
+                >
                   {tiers.map((k) => (
                     <MenuItem key={k} value={k}>
                       {TIER[k].label}
@@ -947,7 +1123,13 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
           <h5>Model on each AI</h5>
           {chain.map((id) => (
             <label key={id} className="field">
-              <span>{id.startsWith('a:') ? (id === 'a:claude' ? 'Claude account' : 'GitHub Copilot') : byId[id].data.label}</span>
+              <span>
+                {id.startsWith('a:')
+                  ? id === 'a:claude'
+                    ? 'Claude account'
+                    : 'GitHub Copilot'
+                  : byId[id].data.label}
+              </span>
               {tierRow(k, byId[id])}
             </label>
           ))}
@@ -961,7 +1143,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
       return (
         <>
           <h4>{cf.name}</h4>
-          <p className="muted small">A named AI setup. Tasks you wire here run on it, and people can pick it on any AI button.</p>
+          <p className="muted small">
+            A named AI setup. Tasks you wire here run on it, and people can pick it on any AI
+            button.
+          </p>
           <table className="fi-kv">
             <tbody>
               <tr>
@@ -995,8 +1180,8 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
         <>
           <h4>Router</h4>
           <p className="muted small">
-            Every request arrives here from its tier and goes to the first AI that’s available. If it’s limited or failing, the next one is
-            tried, and the first again later.
+            Every request arrives here from its tier and goes to the first AI that’s available. If
+            it’s limited or failing, the next one is tried, and the first again later.
           </p>
           <label className="fi-sw">
             <input
@@ -1004,12 +1189,17 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
               checked={routingOn}
               disabled={saving}
               onChange={(e) =>
-                patchRouting({ ...r, enabled: e.target.checked }, e.target.checked ? 'Model routing is on' : 'Model routing is off')
+                patchRouting(
+                  { ...r, enabled: e.target.checked },
+                  e.target.checked ? 'Model routing is on' : 'Model routing is off',
+                )
               }
             />
             <span>
               <b>Model routing</b>
-              <small>Each task uses its tier’s model. Off: every task uses the AI’s own model.</small>
+              <small>
+                Each task uses its tier’s model. Off: every task uses the AI’s own model.
+              </small>
             </span>
           </label>
           {localMode && (
@@ -1033,7 +1223,9 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
               onClick={async () => {
                 setBusy('reset');
                 try {
-                  actions.onSaved(await api('/api/admin/ai', { method: 'POST', body: { action: 'reset' } }));
+                  actions.onSaved(
+                    await api('/api/admin/ai', { method: 'POST', body: { action: 'reset' } }),
+                  );
                 } finally {
                   setBusy('');
                 }
@@ -1182,7 +1374,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
             checked={routingOn}
             disabled={saving}
             onChange={(e) =>
-              patchRouting({ ...r, enabled: e.target.checked }, e.target.checked ? 'Model routing is on' : 'Model routing is off')
+              patchRouting(
+                { ...r, enabled: e.target.checked },
+                e.target.checked ? 'Model routing is on' : 'Model routing is off',
+              )
             }
           />
           <span>Model routing</span>
@@ -1200,7 +1395,8 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
           )}
         </span>
         <span className="flow-hint">
-          Drag a task’s dot onto a tier · drag a provider’s bottom dot onto another to set the fallback order
+          Drag a task’s dot onto a tier · drag a provider’s bottom dot onto another to set the
+          fallback order
         </span>
       </div>
       <div className="flow-ui flow-zoom">
@@ -1214,7 +1410,12 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
         <button type="button" onClick={refit} aria-label="Fit everything" title="Fit everything">
           ⤢
         </button>
-        <button type="button" className="flow-reset" onClick={resetLayout} title="Put the nodes back where they started">
+        <button
+          type="button"
+          className="flow-reset"
+          onClick={resetLayout}
+          title="Put the nodes back where they started"
+        >
           Reset layout
         </button>
         <button
@@ -1234,7 +1435,10 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={up}
-        style={{ backgroundSize: `${22 * view.k}px ${22 * view.k}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
+        style={{
+          backgroundSize: `${22 * view.k}px ${22 * view.k}px`,
+          backgroundPosition: `${view.x}px ${view.y}px`,
+        }}
       >
         <div
           className={`flow-world ${smooth ? 'smooth' : ''}`}
@@ -1251,7 +1455,12 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
                   style={{ ['--c' as string]: e.color } as React.CSSProperties}
                 >
                   <path className="fw-line" d={d} />
-                  <path className="fw-hit" d={d} data-edge={e.id} onClick={() => setSel({ type: 'edge', id: e.id })} />
+                  <path
+                    className="fw-hit"
+                    d={d}
+                    data-edge={e.id}
+                    onClick={() => setSel({ type: 'edge', id: e.id })}
+                  />
                 </g>
               );
             })}
@@ -1289,9 +1498,16 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
                 }
                 tabIndex={n.kind === 'add' ? -1 : 0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && n.kind !== 'add' && e.target === e.currentTarget) setSel({ type: 'node', id: n.id });
+                  if (e.key === 'Enter' && n.kind !== 'add' && e.target === e.currentTarget)
+                    setSel({ type: 'node', id: n.id });
                 }}
-                style={{ left: p.x, top: p.y, width: n.w, height: n.kind === 'group' ? undefined : n.h, minHeight: n.h }}
+                style={{
+                  left: p.x,
+                  top: p.y,
+                  width: n.w,
+                  height: n.kind === 'group' ? undefined : n.h,
+                  minHeight: n.h,
+                }}
               >
                 {face(n)}
               </div>
@@ -1319,7 +1535,12 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
 
       {showInspector && (
         <aside className="flow-ui flow-insp" aria-label="Details">
-          <button type="button" className="icon-btn flow-insp-x" onClick={() => setSel(null)} aria-label="Close details">
+          <button
+            type="button"
+            className="icon-btn flow-insp-x"
+            onClick={() => setSel(null)}
+            aria-label="Close details"
+          >
             <Ico svg={I.close} />
           </button>
           {inspector()}

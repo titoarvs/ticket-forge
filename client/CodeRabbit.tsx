@@ -1,16 +1,42 @@
 'use client';
-// CodeRabbit findings: shown in the code job window, saved on the issue (t.codeReviews), turned into Bug issues or
-// sent to the Build agent, and summarised in Reports → Code review findings.
+// CodeRabbit findings: shown in the code job window, saved on the issue (t.codeReviews), turned
+// into Bug issues or sent to the Build agent, and summarised in Reports → Code review findings.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { P, api, aiBody, mutate, newTicket, addLink, logEvent, toast, ago, ticket, openModal, closeModal, type Any } from './core';
+import {
+  P,
+  api,
+  aiBody,
+  mutate,
+  newTicket,
+  addLink,
+  logEvent,
+  toast,
+  ago,
+  ticket,
+  openModal,
+  closeModal,
+  type Any,
+} from './core';
 import { Ico, I, Spinner, Modal } from './ui';
 import { Markdown } from './GuideCard';
 import { openDrawer } from './actions';
 
 const SEVS = ['critical', 'major', 'minor', 'trivial', 'info'];
-const SEV_LABEL: Record<string, string> = { critical: 'Critical', major: 'Major', minor: 'Minor', trivial: 'Trivial', info: 'Info' };
-const SEV_PRIORITY: Record<string, string> = { critical: 'Highest', major: 'High', minor: 'Medium', trivial: 'Low', info: 'Low' };
+const SEV_LABEL: Record<string, string> = {
+  critical: 'Critical',
+  major: 'Major',
+  minor: 'Minor',
+  trivial: 'Trivial',
+  info: 'Info',
+};
+const SEV_PRIORITY: Record<string, string> = {
+  critical: 'Highest',
+  major: 'High',
+  minor: 'Medium',
+  trivial: 'Low',
+  info: 'Low',
+};
 const FINDING_STATUS: Record<string, string> = {
   open: 'Open',
   bug: 'Filed as bug',
@@ -18,12 +44,15 @@ const FINDING_STATUS: Record<string, string> = {
   resolved: 'Resolved on PR',
   dismissed: 'Dismissed',
 };
-export const SevChip = ({ s }: { s: string }) => <span className={`sev-chip sev-${s}`}>{SEV_LABEL[s] || s}</span>;
+export const SevChip = ({ s }: { s: string }) => (
+  <span className={`sev-chip sev-${s}`}>{SEV_LABEL[s] || s}</span>
+);
 const where = (f: Any) =>
   `${f.file}${f.startLine ? `:${f.startLine}${f.endLine && f.endLine !== f.startLine ? `-${f.endLine}` : ''}` : ''}`;
 
 /** The saved review for this job round on the issue, or null. */
-const savedReview = (t: Any, job: Any) => (t.codeReviews || []).find((r: Any) => r.jobId === job.id && r.round === job.coderabbit?.round);
+const savedReview = (t: Any, job: Any) =>
+  (t.codeReviews || []).find((r: Any) => r.jobId === job.id && r.round === job.coderabbit?.round);
 
 /** Saves a finished CodeRabbit review on the issue (once per job round). */
 export function saveReview(t: Any, job: Any) {
@@ -49,7 +78,10 @@ export function saveReview(t: Any, job: Any) {
   });
 }
 
-/** Files a finding as a Bug issue linked to the issue it came from. Call inside nothing: it mutates itself. */
+/**
+ * Files a finding as a Bug issue linked to the issue it came from. Call inside nothing: it mutates
+ * itself.
+ */
 export function fileBug(t: Any, review: Any, f: Any, { quiet = false } = {}) {
   if (f.status === 'bug') return null;
   let bug: Any = null;
@@ -74,7 +106,10 @@ export function fileBug(t: Any, review: Any, f: Any, { quiet = false } = {}) {
       ]
         .join('\n')
         .trim(),
-      acceptanceCriteria: [`The problem at ${where(f)} is fixed`, 'A test covers the case that failed'],
+      acceptanceCriteria: [
+        `The problem at ${where(f)} is fixed`,
+        'A test covers the case that failed',
+      ],
     });
     p.tickets.push(bug);
     addLink(bug, 'relates to', t);
@@ -83,7 +118,10 @@ export function fileBug(t: Any, review: Any, f: Any, { quiet = false } = {}) {
     f.bugId = bug.id;
     logEvent(t, `filed ${bug.key} from a CodeRabbit finding (${f.severity})`, 'Development');
   });
-  if (!quiet && bug) toast(`Created ${bug.key}`, 'ok', { action: { label: 'Open', onClick: () => openDrawer('issue', bug.id) } });
+  if (!quiet && bug)
+    toast(`Created ${bug.key}`, 'ok', {
+      action: { label: 'Open', onClick: () => openDrawer('issue', bug.id) },
+    });
   return bug;
 }
 export const setStatus = (f: Any, status: string) =>
@@ -120,7 +158,8 @@ export function CodeRabbitPanel({
         <div>
           <b>CodeRabbit is reviewing the changes</b>
           <div className="muted small">
-            Started {ago(cr.startedAt)} · reviews usually take several minutes; you can close this window.
+            Started {ago(cr.startedAt)} · reviews usually take several minutes; you can close this
+            window.
             {cr.log?.length ? ` ${cr.log[cr.log.length - 1]}` : ''}
           </div>
           {findings.length > 0 && (
@@ -183,8 +222,12 @@ export function CodeRabbitPanel({
           <button
             className="btn sm"
             onClick={() => {
-              const made = serious.map((f) => fileBug(t, review, f, { quiet: true })).filter(Boolean);
-              toast(`Created ${made.length} bug${made.length === 1 ? '' : 's'}: ${made.map((b: Any) => b.key).join(', ')}`);
+              const made = serious
+                .map((f) => fileBug(t, review, f, { quiet: true }))
+                .filter(Boolean);
+              toast(
+                `Created ${made.length} bug${made.length === 1 ? '' : 's'}: ${made.map((b: Any) => b.key).join(', ')}`,
+              );
             }}
           >
             <Ico svg={I.flag} />
@@ -218,7 +261,10 @@ export function CodeRabbitPanel({
   );
 }
 
-/** Findings as expandable cards: comment, fix instructions, and Fix with agent / File as bug / Dismiss. */
+/**
+ * Findings as expandable cards: comment, fix instructions, and Fix with agent / File as bug /
+ * Dismiss.
+ */
 export function FindingsList({
   t,
   review,
@@ -238,12 +284,18 @@ export function FindingsList({
     <div className="cr-list">
       {findings.map((f) => (
         <div key={f.id} className={`cr-item s-${f.status}`}>
-          <button className="cr-head" onClick={() => setOpen(open === f.id ? null : f.id)} aria-expanded={open === f.id}>
+          <button
+            className="cr-head"
+            onClick={() => setOpen(open === f.id ? null : f.id)}
+            aria-expanded={open === f.id}
+          >
             <SevChip s={f.severity} />
             <span className="cr-title">{f.title}</span>
             <code className="cr-where">{where(f)}</code>
             {f.status !== 'open' ? (
-              <span className="cr-st">{f.status === 'bug' ? f.bugKey : FINDING_STATUS[f.status]}</span>
+              <span className="cr-st">
+                {f.status === 'bug' ? f.bugKey : FINDING_STATUS[f.status]}
+              </span>
             ) : f.outdated ? (
               <span className="cr-st">Outdated</span>
             ) : (
@@ -290,12 +342,20 @@ export function FindingsList({
                       File as bug
                     </button>
                   ) : (
-                    <button className="btn sm subtle" onClick={() => f.bugId && ticket(f.bugId) && openDrawer('issue', f.bugId)}>
+                    <button
+                      className="btn sm subtle"
+                      onClick={() => f.bugId && ticket(f.bugId) && openDrawer('issue', f.bugId)}
+                    >
                       Open {f.bugKey}
                     </button>
                   )}
                   {f.url && (
-                    <a className="btn sm subtle" href={f.url} target="_blank" rel="noopener noreferrer">
+                    <a
+                      className="btn sm subtle"
+                      href={f.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <Ico svg={I.external} />
                       Comment
                     </a>
@@ -321,13 +381,21 @@ export function FindingsList({
   );
 }
 
-// ---------------------------------------------------------------- CodeRabbit on linked pull requests
+// ---------------------------------------------------------------- CodeRabbit on linked pull
+// requests
 const prRefOf = (r: Any) => `${r.provider === 'GitLab' ? '!' : '#'}${r.number}`;
-export const prReview = (t: Any, r: Any) => (t.codeReviews || []).find((x: Any) => x.origin === 'pr' && x.prId === r.id);
+export const prReview = (t: Any, r: Any) =>
+  (t.codeReviews || []).find((x: Any) => x.origin === 'pr' && x.prId === r.id);
 
-/** Reads CodeRabbit's comments on a linked pull/merge request and merges them into the issue (statuses are kept). */
+/**
+ * Reads CodeRabbit's comments on a linked pull/merge request and merges them into the issue
+ * (statuses are kept).
+ */
 export async function importPrFindings(t: Any, r: Any, { quiet = false } = {}) {
-  const res = await api(`/api/projects/${P().id}/coderabbit`, { method: 'POST', body: { ticketId: t.id, prId: r.id } });
+  const res = await api(`/api/projects/${P().id}/coderabbit`, {
+    method: 'POST',
+    body: { ticketId: t.id, prId: r.id },
+  });
   let added = 0;
   mutate(() => {
     let rv = prReview(t, r);
@@ -361,7 +429,12 @@ export async function importPrFindings(t: Any, r: Any, { quiet = false } = {}) {
       }
     }
     rv.findings.sort((a: Any, b: Any) => SEVS.indexOf(a.severity) - SEVS.indexOf(b.severity));
-    if (added) logEvent(t, `imported ${added} CodeRabbit finding${added === 1 ? '' : 's'} from ${rv.prRef}`, 'Development');
+    if (added)
+      logEvent(
+        t,
+        `imported ${added} CodeRabbit finding${added === 1 ? '' : 's'} from ${rv.prRef}`,
+        'Development',
+      );
   });
   if (!quiet)
     toast(
@@ -378,7 +451,11 @@ export function PrFindingChips({ t, r }: { t: Any; r: Any }) {
   if (!rv) return null;
   const open = rv.findings.filter((f: Any) => f.status === 'open');
   return (
-    <button className="cr-chips" onClick={() => openPrFindings(t, r)} title={`CodeRabbit on ${rv.prRef}: read ${ago(rv.at)}`}>
+    <button
+      className="cr-chips"
+      onClick={() => openPrFindings(t, r)}
+      title={`CodeRabbit on ${rv.prRef}: read ${ago(rv.at)}`}
+    >
       🐇{' '}
       {open.length ? (
         SEVS.map((s) => {
@@ -396,7 +473,15 @@ export function PrFindingChips({ t, r }: { t: Any; r: Any }) {
   );
 }
 
-function PrFindingsModal({ t, r, fix }: { t: Any; r: Any; fix: ((t: Any, r: Any, text: string) => Promise<void>) | null }) {
+function PrFindingsModal({
+  t,
+  r,
+  fix,
+}: {
+  t: Any;
+  r: Any;
+  fix: ((t: Any, r: Any, text: string) => Promise<void>) | null;
+}) {
   const [busy, setBusy] = useState(true);
   const [, setTick] = useState(0);
   const load = async () => {
@@ -427,7 +512,8 @@ function PrFindingsModal({ t, r, fix }: { t: Any; r: Any; fix: ((t: Any, r: Any,
       <p className="muted small" style={{ marginTop: 0 }}>
         <b>{r.title}</b> · {r.repo}
         {rv?.at ? ` · read ${ago(rv.at)}` : ''}. CodeRabbit’s review comments on the{' '}
-        {r.provider === 'GitLab' ? 'merge request' : 'pull request'}; resolved threads are marked, outdated ones flagged.
+        {r.provider === 'GitLab' ? 'merge request' : 'pull request'}; resolved threads are marked,
+        outdated ones flagged.
       </p>
       <div className="cj-toolbar">
         {busy ? (
@@ -466,8 +552,12 @@ function PrFindingsModal({ t, r, fix }: { t: Any; r: Any; fix: ((t: Any, r: Any,
           <button
             className="btn sm"
             onClick={() => {
-              const made = serious.map((f: Any) => fileBug(t, rv, f, { quiet: true })).filter(Boolean);
-              toast(`Created ${made.length} bug${made.length === 1 ? '' : 's'}: ${made.map((b: Any) => b.key).join(', ')}`);
+              const made = serious
+                .map((f: Any) => fileBug(t, rv, f, { quiet: true }))
+                .filter(Boolean);
+              toast(
+                `Created ${made.length} bug${made.length === 1 ? '' : 's'}: ${made.map((b: Any) => b.key).join(', ')}`,
+              );
               setTick((x) => x + 1);
             }}
           >
@@ -482,8 +572,9 @@ function PrFindingsModal({ t, r, fix }: { t: Any; r: Any; fix: ((t: Any, r: Any,
       </div>
       {!busy && !findings.length && (
         <p className="muted">
-          CodeRabbit hasn’t left review comments on this {r.provider === 'GitLab' ? 'merge request' : 'pull request'} (or its app isn’t
-          installed on the repository).
+          CodeRabbit hasn’t left review comments on this{' '}
+          {r.provider === 'GitLab' ? 'merge request' : 'pull request'} (or its app isn’t installed
+          on the repository).
         </p>
       )}
       <FindingsList t={t} review={rv} findings={findings} onFix={sendFix} />
@@ -491,12 +582,16 @@ function PrFindingsModal({ t, r, fix }: { t: Any; r: Any; fix: ((t: Any, r: Any,
   );
 }
 let fixPr: ((t: Any, r: Any, text: string) => Promise<void>) | null = null;
-/** DevCode registers how to start an agent on a pull request's branch (it owns the code job window). */
+/**
+ * DevCode registers how to start an agent on a pull request's branch (it owns the code job window).
+ */
 export const setPrFixer = (fn: typeof fixPr) => {
   fixPr = fn;
 };
 export const openPrFindings = (t: Any, r: Any) =>
-  openModal(<PrFindingsModal t={t} r={r} fix={['Open', 'Draft'].includes(r.status) ? fixPr : null} />);
+  openModal(
+    <PrFindingsModal t={t} r={r} fix={['Open', 'Draft'].includes(r.status) ? fixPr : null} />,
+  );
 void closeModal;
 void aiBody;
 
@@ -513,8 +608,8 @@ export function CodeReviewReport() {
         <h3>Code review findings</h3>
         <p className="sub">CodeRabbit findings on the code the agents write.</p>
         <p className="muted small">
-          No CodeRabbit reviews yet. Open an issue’s <b>Write code with AI</b> job and choose <b>CodeRabbit review</b> once the agent
-          finishes.
+          No CodeRabbit reviews yet. Open an issue’s <b>Write code with AI</b> job and choose{' '}
+          <b>CodeRabbit review</b> once the agent finishes.
         </p>
       </div>
     );
@@ -536,7 +631,8 @@ export function CodeReviewReport() {
     <div className="card wide cr-report">
       <h3>Code review findings</h3>
       <p className="sub">
-        {rows.length} CodeRabbit findings from {reviews} review{reviews === 1 ? '' : 's'} on {new Set(rows.map((x) => x.t.id)).size} issues.
+        {rows.length} CodeRabbit findings from {reviews} review{reviews === 1 ? '' : 's'} on{' '}
+        {new Set(rows.map((x) => x.t.id)).size} issues.
       </p>
       <div className="cr-kpis">
         {Object.entries(FINDING_STATUS).map(([k, label]) => (
@@ -584,7 +680,8 @@ export function CodeReviewReport() {
         </div>
       </div>
       <h4>
-        Open findings{sev ? ` · ${SEV_LABEL[sev]}` : ''} <span className="muted small">({openSerious.length})</span>
+        Open findings{sev ? ` · ${SEV_LABEL[sev]}` : ''}{' '}
+        <span className="muted small">({openSerious.length})</span>
       </h4>
       {openSerious.length ? (
         <table className="tbl">

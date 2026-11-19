@@ -1,10 +1,12 @@
-// Coding several issues at once without conflicts. Before code jobs start on many issues, this checks which of them
-// touch the same files or modules (their coding specs, lib/specs.ts findOverlaps), which collide with code jobs that are
-// running or waiting for review, and which are blocked by another selected issue. It splits the issues into rounds:
-// round 1 can run together now, the others should wait for the round before. Jev (when on) makes two small calls:
-// for issues without a coding spec, which other selected issue most likely edits the same code (pick one), and for
-// issues that share only a module, whether they will really edit the same code (yes / no). What Jev isn't sure about
-// goes to the AI; when the AI fails too, the rules decide (shared module = conflict, no spec = can't check).
+// Coding several issues at once without conflicts. Before code jobs start on many issues, this
+// checks which of them touch the same files or modules (their coding specs, lib/specs.ts
+// findOverlaps), which collide with code jobs that are running or waiting for review, and which are
+// blocked by another selected issue. It splits the issues into rounds: round 1 can run together
+// now, the others should wait for the round before. Jev (when on) makes two small calls: for issues
+// without a coding spec, which other selected issue most likely edits the same code (pick one), and
+// for issues that share only a module, whether they will really edit the same code (yes / no). What
+// Jev isn't sure about goes to the AI; when the AI fails too, the rules decide (shared module =
+// conflict, no spec = can't check).
 import { askJson } from './claude';
 import { jevEnabled, jevStatus, jevDecide } from './jev';
 import { findOverlaps } from './specs';
@@ -32,10 +34,22 @@ export type Conflict = {
 
 /** Busy code: the files each running (or not yet merged) code job of another issue touches. */
 export function busyFromJobs(jobs: any[], specs: any[], selected: Set<string>) {
-  const out: { ticketId: string; key: string; status: string; files: string[]; modules: string[] }[] = [];
+  const out: {
+    ticketId: string;
+    key: string;
+    status: string;
+    files: string[];
+    modules: string[];
+  }[] = [];
   const seen = new Set<string>();
   for (const j of jobs || []) {
-    if (!j || selected.has(j.ticketId) || j.kind === 'pr-review' || seen.has(`${j.ticketId}:${j.side || ''}`)) continue;
+    if (
+      !j ||
+      selected.has(j.ticketId) ||
+      j.kind === 'pr-review' ||
+      seen.has(`${j.ticketId}:${j.side || ''}`)
+    )
+      continue;
     const live = LIVE.includes(j.status),
       open = UNMERGED.includes(j.status) && (j.files || []).length;
     if (!live && !open) continue;
@@ -59,10 +73,11 @@ export function busyFromJobs(jobs: any[], specs: any[], selected: Set<string>) {
 }
 
 /**
- * The plan (pure: no database, no AI). `tickets` are the selected issues in development order; `specs` the project's
- * coding specs; `busy` what other code jobs touch now (busyFromJobs); `likely` pairs the AI or Jev expect to edit the same
- * code; `cleared` module overlaps Jev or the AI judged harmless ("PR-1|PR-2|module"). Returns { conflicts, rounds,
- * runNow, wait, noSpec, alreadyRunning }.
+ * The plan (pure: no database, no AI). `tickets` are the selected issues in development order;
+ * `specs` the project's coding specs; `busy` what other code jobs touch now (busyFromJobs);
+ * `likely` pairs the AI or Jev expect to edit the same code; `cleared` module overlaps Jev or the
+ * AI judged harmless ("PR-1|PR-2|module"). Returns { conflicts, rounds, runNow, wait, noSpec,
+ * alreadyRunning }.
  */
 export function planParallel({
   tickets,
@@ -96,14 +111,18 @@ export function planParallel({
   ];
   const conflicts: Conflict[] = [];
   const keyFor = (id: string) =>
-    id.startsWith('busy:') ? busy.find((b) => BUSY(b.ticketId) === id)?.key || id.slice(5) : keyOf(byId.get(id));
+    id.startsWith('busy:')
+      ? busy.find((b) => BUSY(b.ticketId) === id)?.key || id.slice(5)
+      : keyOf(byId.get(id));
   for (const o of findOverlaps(pool)) {
     const inv = o.specs.map((s: any) => s.ticketId);
     if (!inv.some((x: string) => ids.has(x))) continue;
     const isJob = inv.some((x: string) => x.startsWith('busy:'));
     const sel = inv.filter((x: string) => ids.has(x)).map(keyFor);
     const allCleared = sel.every((a: string, i: number) =>
-      sel.slice(i + 1).every((b: string) => cleared.has(`${[a, b].sort().join('|')}|${o.target.toLowerCase()}`)),
+      sel
+        .slice(i + 1)
+        .every((b: string) => cleared.has(`${[a, b].sort().join('|')}|${o.target.toLowerCase()}`)),
     );
     const c: Conflict = {
       kind: isJob ? 'job' : o.kind,
@@ -150,7 +169,8 @@ export function planParallel({
     }
   }
   const active = conflicts.filter((c) => !c.cleared);
-  // Rounds: each issue, in development order, goes to the first round where nothing it conflicts with is running.
+  // Rounds: each issue, in development order, goes to the first round where nothing it conflicts
+  // with is running.
   const round = new Map<string, number>();
   const why = new Map<string, string[]>();
   for (const t of tickets) {
@@ -169,11 +189,17 @@ export function planParallel({
       }
     }
     const clash = (r: number) =>
-      mine.filter((c) => c.kind !== 'job').some((c) => c.ticketIds.some((o) => o !== t.id && round.get(o) === r));
+      mine
+        .filter((c) => c.kind !== 'job')
+        .some((c) => c.ticketIds.some((o) => o !== t.id && round.get(o) === r));
     let r = min;
     while (clash(r)) r++;
     for (const c of mine)
-      if (c.kind !== 'job' && c.kind !== 'blocked' && c.ticketIds.some((o) => o !== t.id && round.has(o) && (round.get(o) as number) < r))
+      if (
+        c.kind !== 'job' &&
+        c.kind !== 'blocked' &&
+        c.ticketIds.some((o) => o !== t.id && round.has(o) && (round.get(o) as number) < r)
+      )
         notes.push(c.why);
     round.set(t.id, r);
     why.set(t.id, [...new Set(notes)]);
@@ -182,7 +208,13 @@ export function planParallel({
   const rounds = Array.from({ length: n }, (_, i) =>
     tickets
       .filter((t) => round.get(t.id) === i)
-      .map((t) => ({ ticketId: t.id, key: keyOf(t), title: String(t.title || ''), round: i + 1, why: why.get(t.id) || [] })),
+      .map((t) => ({
+        ticketId: t.id,
+        key: keyOf(t),
+        title: String(t.title || ''),
+        round: i + 1,
+        why: why.get(t.id) || [],
+      })),
   );
   const afterOf = (t: any) => {
     const r = round.get(t.id) as number;
@@ -190,7 +222,9 @@ export function planParallel({
       ...new Set(
         active
           .filter((c) => c.ticketIds.includes(t.id) && c.kind !== 'job')
-          .flatMap((c) => c.ticketIds.filter((o) => o !== t.id && round.has(o) && (round.get(o) as number) < r))
+          .flatMap((c) =>
+            c.ticketIds.filter((o) => o !== t.id && round.has(o) && (round.get(o) as number) < r),
+          )
           .map((o) => keyOf(byId.get(o))),
       ),
     ];
@@ -210,7 +244,12 @@ export function planParallel({
     runNow: (rounds[0] || []).map((x) => x.ticketId),
     wait,
     noSpec: tickets
-      .filter((t) => !specs.some((s) => s.ticketId === t.id && ((s.files || []).length || (s.modules || []).length)))
+      .filter(
+        (t) =>
+          !specs.some(
+            (s) => s.ticketId === t.id && ((s.files || []).length || (s.modules || []).length),
+          ),
+      )
       .map(keyOf),
     alreadyRunning: tickets.filter((t) => running.has(t.id)).map(keyOf),
   };
@@ -224,8 +263,9 @@ const realDeciders: Required<Deciders> = {
 };
 
 /**
- * The smart part: likely conflicts for issues without a coding spec, and module overlaps judged harmless. Jev first,
- * the AI for what Jev isn't sure about, nothing when both fail. { likely, cleared, engine, byJev, byAi, note }.
+ * The smart part: likely conflicts for issues without a coding spec, and module overlaps judged
+ * harmless. Jev first, the AI for what Jev isn't sure about, nothing when both fail. { likely,
+ * cleared, engine, byJev, byAi, note }.
  */
 export async function parallelHints({
   project,
@@ -242,17 +282,22 @@ export async function parallelHints({
 }) {
   const d = { ...realDeciders, ...(use || {}) };
   const byKey = new Map(tickets.map((t) => [keyOf(t), t]));
-  const specOf = (t: any) => specs.find((s) => s.ticketId === t.id && ((s.files || []).length || (s.modules || []).length));
+  const specOf = (t: any) =>
+    specs.find((s) => s.ticketId === t.id && ((s.files || []).length || (s.modules || []).length));
   const unknown = tickets.filter((t) => !specOf(t));
   // Module-only overlaps between selected issues (no shared file): maybe harmless.
   const ids = new Set(tickets.map((t) => t.id));
-  const overlaps = findOverlaps(specs.filter((s) => ids.has(s.ticketId)).map((s) => ({ ...s, epicId: 'batch' })));
+  const overlaps = findOverlaps(
+    specs.filter((s) => ids.has(s.ticketId)).map((s) => ({ ...s, epicId: 'batch' })),
+  );
   const fileShared = new Set(
     overlaps
       .filter((o: any) => o.kind === 'file')
       .flatMap((o: any) => {
         const k = o.specs.map((s: any) => s.ticketId);
-        return k.flatMap((a: string) => k.filter((b: string) => b !== a).map((b: string) => `${a}|${b}`));
+        return k.flatMap((a: string) =>
+          k.filter((b: string) => b !== a).map((b: string) => `${a}|${b}`),
+        );
       }),
   );
   const modulePairs: { a: any; b: any; module: string }[] = [];
@@ -261,7 +306,11 @@ export async function parallelHints({
     for (let i = 0; i < list.length; i++)
       for (let j = i + 1; j < list.length; j++) {
         if (!fileShared.has(`${list[i]}|${list[j]}`) && modulePairs.length < 40)
-          modulePairs.push({ a: tickets.find((t) => t.id === list[i]), b: tickets.find((t) => t.id === list[j]), module: o.target });
+          modulePairs.push({
+            a: tickets.find((t) => t.id === list[i]),
+            b: tickets.find((t) => t.id === list[j]),
+            module: o.target,
+          });
       }
   }
   const describe = (t: any) => {
@@ -276,7 +325,8 @@ export async function parallelHints({
   };
   const likely: { a: string; b: string; why: string; source: 'jev' | 'ai' }[] = [];
   const cleared = new Set<string>();
-  const pairName = (a: any, b: any, m: string) => `${[keyOf(a), keyOf(b)].sort().join('|')}|${m.toLowerCase()}`;
+  const pairName = (a: any, b: any, m: string) =>
+    `${[keyOf(a), keyOf(b)].sort().join('|')}|${m.toLowerCase()}`;
   let byJev = 0,
     byAi = 0,
     note = '';
@@ -314,12 +364,19 @@ export async function parallelHints({
         };
       });
       const r = await d.jevDecide({
-        state: { project: project?.name, issues: Object.fromEntries(tickets.map((t) => [keyOf(t), describe(t)])) },
+        state: {
+          project: project?.name,
+          issues: Object.fromEntries(tickets.map((t) => [keyOf(t), describe(t)])),
+        },
         questions,
       });
       for (const t of unsureUnknown.slice(0, 40)) {
         const a: any = r.answers[`${keyOf(t)}.overlaps`];
-        if (!a?.choice || (a.confidence ?? 0) < min || (a.choice !== 'none' && !byKey.has(a.choice))) {
+        if (
+          !a?.choice ||
+          (a.confidence ?? 0) < min ||
+          (a.choice !== 'none' && !byKey.has(a.choice))
+        ) {
           leftU.push(t);
           continue;
         }
@@ -404,20 +461,32 @@ ${unsurePairs.map((p, i) => `${i}. ${keyOf(p.a)} and ${keyOf(p.b)} in ${p.module
 }
 
 /**
- * Checks issues before their code jobs start together. `jobs` are the project's code jobs (local or remote),
- * `specs` its coding specs. { rounds, runNow, wait, conflicts, noSpec, alreadyRunning, engine, byJev, byAi, note, summary }.
+ * Checks issues before their code jobs start together. `jobs` are the project's code jobs (local or
+ * remote), `specs` its coding specs. { rounds, runNow, wait, conflicts, noSpec, alreadyRunning,
+ * engine, byJev, byAi, note, summary }.
  */
-export async function checkParallel({ project, ticketIds, specs = [], jobs = [], ai = {}, smart = true, use }: any) {
+export async function checkParallel({
+  project,
+  ticketIds,
+  specs = [],
+  jobs = [],
+  ai = {},
+  smart = true,
+  use,
+}: any) {
   const { open } = issuesFor(project, { ticketIds });
   const all = (project?.tickets || []).filter((t: any) => (ticketIds || []).includes(t.id));
   const tickets = orderTickets(open.length ? open : all, { project }).order.map((o) =>
     (project.tickets || []).find((t: any) => t.id === o.ticketId),
   );
-  if (!tickets.length) throw Object.assign(new Error('Choose at least one issue.'), { status: 400 });
+  if (!tickets.length)
+    throw Object.assign(new Error('Choose at least one issue.'), { status: 400 });
   const selected = new Set<string>(tickets.map((t: any) => t.id));
   const running = new Set<string>(
     (jobs || [])
-      .filter((j: any) => selected.has(j.ticketId) && LIVE.includes(j.status) && j.kind !== 'pr-review')
+      .filter(
+        (j: any) => selected.has(j.ticketId) && LIVE.includes(j.status) && j.kind !== 'pr-review',
+      )
       .map((j: any) => j.ticketId),
   );
   const busy = busyFromJobs(jobs, specs, selected);
@@ -425,7 +494,14 @@ export async function checkParallel({ project, ticketIds, specs = [], jobs = [],
     smart && tickets.length > 1
       ? await parallelHints({ project, tickets, specs, ai, use })
       : { likely: [], cleared: new Set<string>(), engine: 'rules', byJev: 0, byAi: 0, note: '' };
-  const plan = planParallel({ tickets, specs, busy, likely: h.likely as any, cleared: h.cleared, running });
+  const plan = planParallel({
+    tickets,
+    specs,
+    busy,
+    likely: h.likely as any,
+    cleared: h.cleared,
+    running,
+  });
   const now = plan.runNow.length,
     later = plan.wait.length;
   const summary = later

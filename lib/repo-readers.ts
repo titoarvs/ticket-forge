@@ -1,5 +1,6 @@
-// The project's repositories as file readers, backend first (that's where schemas, migrations and seeds usually live):
-// the person's own folder when TicketForge is opened at localhost on their computer, otherwise the GitHub repository.
+// The project's repositories as file readers, backend first (that's where schemas, migrations and
+// seeds usually live): the person's own folder when TicketForge is opened at localhost on their
+// computer, otherwise the GitHub repository.
 import { localReader, githubReader } from './codebase';
 import { withMyLocal } from './mylocal';
 import { getProjectSecret } from './secrets';
@@ -12,7 +13,10 @@ export const isLocalRequest = () => !SERVERLESS && Boolean((currentContext() as 
 export async function localRepoDirs(project: any): Promise<string[]> {
   if (!isLocalRequest()) return [];
   const mine = await withMyLocal(project);
-  return [project.devBackend?.enabled ? mine.devBackend?.localPath : '', mine.dev?.localPath].filter(Boolean);
+  return [
+    project.devBackend?.enabled ? mine.devBackend?.localPath : '',
+    mine.dev?.localPath,
+  ].filter(Boolean);
 }
 
 export async function repoReaders(project: any) {
@@ -30,8 +34,16 @@ export async function repoReaders(project: any) {
       }
     }
     if (dev.repo && (!dev.provider || dev.provider === 'GitHub'))
-      out.push(await githubReader(dev.repo, { branch: dev.baseBranch || '', token: await getProjectSecret(project.id, 'githubToken') }));
+      out.push(
+        await githubReader(dev.repo, {
+          branch: dev.baseBranch || '',
+          token: await getProjectSecret(project.id, 'githubToken'),
+        }),
+      );
   }
-  if (!out.length) throw fail('No repository is set up for this project. Connect one in Project settings → Code & GitHub.');
+  if (!out.length)
+    throw fail(
+      'No repository is set up for this project. Connect one in Project settings → Code & GitHub.',
+    );
   return out;
 }

@@ -1,7 +1,7 @@
 'use client';
-// Issues: every issue of the project in one flat, sortable table (an issue navigator). Quick views (Open, Assigned to me,
-// Bugs, Blocked…), filters, a column chooser and saved views (per browser), inline status and assignee, bulk changes
-// and CSV export. Click a row to open the issue.
+// Issues: every issue of the project in one flat, sortable table (an issue navigator). Quick views
+// (Open, Assigned to me, Bugs, Blocked…), filters, a column chooser and saved views (per browser),
+// inline status and assignee, bulk changes and CSV export. Click a row to open the issue.
 import { useState } from 'react';
 import {
   S,
@@ -25,7 +25,18 @@ import {
   fmtDate,
   type Any,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, ELoz, StatusLoz, LayerChip, EmptyState, LAYER_LABEL } from './ui';
+import {
+  Ico,
+  I,
+  TypeIcon,
+  PriorityIcon,
+  Avatar,
+  ELoz,
+  StatusLoz,
+  LayerChip,
+  EmptyState,
+  LAYER_LABEL,
+} from './ui';
 import { TF, SF, CB, MenuItem, opts } from './fields';
 import { openDrawer, openCreateIssue } from './actions';
 import { BulkBar, RowStatus, RowAssignee } from './views';
@@ -41,10 +52,17 @@ type Col = {
 };
 const PRIO_RANK: Record<string, number> = { Highest: 0, High: 1, Medium: 2, Low: 3 };
 const passing = (t: Any) => t.testCases.filter((x: Any) => x.status === 'Pass').length;
-const openPrs = (t: Any) => (t.prs || []).filter((r: Any) => ['Open', 'Draft'].includes(r.status)).length;
+const openPrs = (t: Any) =>
+  (t.prs || []).filter((r: Any) => ['Open', 'Draft'].includes(r.status)).length;
 
 const COLS: Col[] = [
-  { key: 'type', label: 'Type', sort: (t) => t.type, cell: (t) => <TypeIcon type={t.type} />, csv: (t) => t.type },
+  {
+    key: 'type',
+    label: 'Type',
+    sort: (t) => t.type,
+    cell: (t) => <TypeIcon type={t.type} />,
+    csv: (t) => t.type,
+  },
   {
     key: 'key',
     label: 'Key',
@@ -176,7 +194,13 @@ const COLS: Col[] = [
       ),
     csv: (t) => String((t.prs || []).length),
   },
-  { key: 'reporter', label: 'Reporter', sort: (t) => t.reporter || '', cell: (t) => t.reporter || '', csv: (t) => t.reporter || '' },
+  {
+    key: 'reporter',
+    label: 'Reporter',
+    sort: (t) => t.reporter || '',
+    cell: (t) => t.reporter || '',
+    csv: (t) => t.reporter || '',
+  },
   {
     key: 'due',
     label: 'Due',
@@ -199,7 +223,19 @@ const COLS: Col[] = [
     csv: (t) => t.createdAt || '',
   },
 ];
-const DEFAULT_COLS = ['type', 'key', 'title', 'status', 'priority', 'assignee', 'epic', 'sprint', 'points', 'tests', 'updated'];
+const DEFAULT_COLS = [
+  'type',
+  'key',
+  'title',
+  'status',
+  'priority',
+  'assignee',
+  'epic',
+  'sprint',
+  'points',
+  'tests',
+  'updated',
+];
 
 /** Built-in quick views. */
 const QUICK: { key: string; label: string; test: (t: Any) => boolean }[] = [
@@ -209,8 +245,16 @@ const QUICK: { key: string; label: string; test: (t: Any) => boolean }[] = [
   { key: 'unassigned', label: 'Unassigned', test: (t) => !t.assignee && !isDone(t) },
   { key: 'bugs', label: 'Open bugs', test: (t) => t.type === 'Bug' && !isDone(t) },
   { key: 'blocked', label: 'Blocked', test: (t) => isBlocked(t) },
-  { key: 'failing', label: 'Failing tests', test: (t) => t.testCases.some((x: Any) => x.status === 'Fail') },
-  { key: 'recent', label: 'Updated this week', test: (t) => Date.now() - new Date(t.updatedAt || 0).getTime() < 7 * 864e5 },
+  {
+    key: 'failing',
+    label: 'Failing tests',
+    test: (t) => t.testCases.some((x: Any) => x.status === 'Fail'),
+  },
+  {
+    key: 'recent',
+    label: 'Updated this week',
+    test: (t) => Date.now() - new Date(t.updatedAt || 0).getTime() < 7 * 864e5,
+  },
   { key: 'done', label: 'Done', test: (t) => isDone(t) },
 ];
 
@@ -249,7 +293,9 @@ export function Issues() {
   const store = `tf.issues.${p.id}`;
   const [f, setF] = useState<Any>(() => ({ ...EMPTY, ...read(`${store}.filter`, {}) }));
   const [cols, setCols] = useState<string[]>(() => read('tf.issues.cols', DEFAULT_COLS));
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>(() => read(`${store}.sort`, { key: 'updated', dir: -1 }));
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>(() =>
+    read(`${store}.sort`, { key: 'updated', dir: -1 }),
+  );
   const [views, setViews] = useState<Any[]>(() => read(`${store}.views`, []));
   const [colsOpen, setColsOpen] = useState(false);
   const set = (patch: Any) =>
@@ -260,13 +306,22 @@ export function Issues() {
     });
   const setSortKey = (key: string) =>
     setSort((s) => {
-      const n = { key, dir: (s.key === key ? -s.dir : ['updated', 'created', 'points', 'tests', 'prs'].includes(key) ? -1 : 1) as 1 | -1 };
+      const n = {
+        key,
+        dir: (s.key === key
+          ? -s.dir
+          : ['updated', 'created', 'points', 'tests', 'prs'].includes(key)
+            ? -1
+            : 1) as 1 | -1,
+      };
       write(`${store}.sort`, n);
       return n;
     });
   const toggleCol = (k: string) =>
     setCols((c) => {
-      const n = c.includes(k) ? c.filter((x) => x !== k) : COLS.map((x) => x.key).filter((x) => x === k || c.includes(x));
+      const n = c.includes(k)
+        ? c.filter((x) => x !== k)
+        : COLS.map((x) => x.key).filter((x) => x === k || c.includes(x));
       write('tf.issues.cols', n);
       return n;
     });
@@ -296,25 +351,45 @@ export function Issues() {
   );
   const sc = COLS.find((c) => c.key === sort.key) || COLS[0];
   const cmp = (a: Any, b: Any): number =>
-    Array.isArray(a) ? (a[0] === b[0] ? cmp(a[1], b[1]) : a[0] < b[0] ? -1 : 1) : a === b ? 0 : a < b ? -1 : 1;
+    Array.isArray(a)
+      ? a[0] === b[0]
+        ? cmp(a[1], b[1])
+        : a[0] < b[0]
+          ? -1
+          : 1
+      : a === b
+        ? 0
+        : a < b
+          ? -1
+          : 1;
   const rows = [...list].sort((a, b) => cmp(sc.sort!(a), sc.sort!(b)) * sort.dir);
   const shown = COLS.filter((c) => c.always || cols.includes(c.key));
-  const extra = ['type', 'status', 'priority', 'assignee', 'epic', 'sprint', 'layer', 'label'].filter((k) => f[k]).length + (ql ? 1 : 0);
-  const checks = can('issue.edit') || can('issue.delete') || can('sprint.manage') || can('test.run');
+  const extra =
+    ['type', 'status', 'priority', 'assignee', 'epic', 'sprint', 'layer', 'label'].filter(
+      (k) => f[k],
+    ).length + (ql ? 1 : 0);
+  const checks =
+    can('issue.edit') || can('issue.delete') || can('sprint.manage') || can('test.run');
   const allChecked = rows.length > 0 && rows.every((t: Any) => S.checked.has(t.id));
   const pts = rows.reduce((n: number, t: Any) => n + (t.storyPoints || 0), 0);
 
   const exportCsv = () => {
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const cs = COLS.filter((c) => c.always || cols.includes(c.key));
-    const text = [cs.map((c) => c.label).join(','), ...rows.map((t: Any) => cs.map((c) => esc(c.csv(t))).join(','))].join('\n');
+    const text = [
+      cs.map((c) => c.label).join(','),
+      ...rows.map((t: Any) => cs.map((c) => esc(c.csv(t))).join(',')),
+    ].join('\n');
     saveBlob(new Blob([`﻿${text}`], { type: 'text/csv' }), `${p.key}-issues.csv`);
     toast(`Exported ${rows.length} issue${rows.length === 1 ? '' : 's'}`);
   };
   const saveView = () => {
     const name = window.prompt('Name this view', quick.label + (extra ? ' (filtered)' : ''));
     if (!name?.trim()) return;
-    const n = [...views.filter((v) => v.name !== name.trim()), { name: name.trim(), f, sort, cols }];
+    const n = [
+      ...views.filter((v) => v.name !== name.trim()),
+      { name: name.trim(), f, sort, cols },
+    ];
     setViews(n);
     write(`${store}.views`, n);
     toast(`Saved the view “${name.trim()}”`);
@@ -369,7 +444,9 @@ export function Issues() {
                 onClick={() => set({ ...EMPTY, quick: v.key, subtasks: f.subtasks })}
               >
                 <span>{v.label}</span>
-                <span className="n">{p.tickets.filter((t: Any) => !isSub(t) && v.test(t)).length}</span>
+                <span className="n">
+                  {p.tickets.filter((t: Any) => !isSub(t) && v.test(t)).length}
+                </span>
               </button>
             ))}
             {views.length > 0 && (
@@ -448,26 +525,46 @@ export function Issues() {
                 </MenuItem>,
               ])}
               {labels.length > 0 && sel('label', 'Label', opts(labels))}
-              <CB label="Sub-tasks" checked={f.subtasks} onChange={(e: Any) => set({ subtasks: e.target.checked })} />
+              <CB
+                label="Sub-tasks"
+                checked={f.subtasks}
+                onChange={(e: Any) => set({ subtasks: e.target.checked })}
+              />
               {extra > 0 && (
-                <button className="btn sm subtle" onClick={() => set({ ...EMPTY, quick: f.quick, subtasks: f.subtasks })}>
+                <button
+                  className="btn sm subtle"
+                  onClick={() => set({ ...EMPTY, quick: f.quick, subtasks: f.subtasks })}
+                >
                   Clear {extra} filter{extra > 1 ? 's' : ''}
                 </button>
               )}
               <span className="spacer" />
-              <button className="btn sm subtle" onClick={saveView} title="Save these filters, sort and columns as a view (this browser)">
+              <button
+                className="btn sm subtle"
+                onClick={saveView}
+                title="Save these filters, sort and columns as a view (this browser)"
+              >
                 <Ico svg={I.plus} />
                 Save view
               </button>
               <div className="iss-cols-wrap">
-                <button className="btn sm subtle" aria-expanded={colsOpen} onClick={() => setColsOpen(!colsOpen)}>
+                <button
+                  className="btn sm subtle"
+                  aria-expanded={colsOpen}
+                  onClick={() => setColsOpen(!colsOpen)}
+                >
                   <Ico svg={I.settings} />
                   Columns
                 </button>
                 {colsOpen && (
                   <div className="iss-cols" role="menu">
                     {COLS.filter((c) => !c.always).map((c) => (
-                      <CB key={c.key} label={c.label} checked={cols.includes(c.key)} onChange={() => toggleCol(c.key)} />
+                      <CB
+                        key={c.key}
+                        label={c.label}
+                        checked={cols.includes(c.key)}
+                        onChange={() => toggleCol(c.key)}
+                      />
                     ))}
                     <button
                       className="link-btn small"
@@ -485,7 +582,8 @@ export function Issues() {
 
             <BulkBar />
             <div className="iss-sumline muted small">
-              {rows.length} issue{rows.length === 1 ? '' : 's'} · {pts} points · {rows.filter(isDone).length} done
+              {rows.length} issue{rows.length === 1 ? '' : 's'} · {pts} points ·{' '}
+              {rows.filter(isDone).length} done
               {S.checked.size ? ` · ${S.checked.size} selected` : ''}
             </div>
 
@@ -502,7 +600,10 @@ export function Issues() {
                   )
                 }
               >
-                <p>Create issues here or in the Backlog, or start the project from a requirements document.</p>
+                <p>
+                  Create issues here or in the Backlog, or start the project from a requirements
+                  document.
+                </p>
               </EmptyState>
             ) : !rows.length ? (
               <EmptyState
@@ -529,7 +630,9 @@ export function Issues() {
                             aria-label="Select all shown"
                             checked={allChecked}
                             onChange={() => {
-                              rows.forEach((t: Any) => (allChecked ? S.checked.delete(t.id) : S.checked.add(t.id)));
+                              rows.forEach((t: Any) =>
+                                allChecked ? S.checked.delete(t.id) : S.checked.add(t.id),
+                              );
                               emit();
                             }}
                           />
@@ -539,11 +642,19 @@ export function Issues() {
                         <th
                           key={c.key}
                           className={`${c.num ? 'num' : ''} c-${c.key}`}
-                          aria-sort={sort.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}
+                          aria-sort={
+                            sort.key === c.key
+                              ? sort.dir === 1
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
                         >
                           <button type="button" onClick={() => setSortKey(c.key)}>
                             {c.label}
-                            {sort.key === c.key && <span className="iss-arrow">{sort.dir === 1 ? '▲' : '▼'}</span>}
+                            {sort.key === c.key && (
+                              <span className="iss-arrow">{sort.dir === 1 ? '▲' : '▼'}</span>
+                            )}
                           </button>
                         </th>
                       ))}
@@ -555,7 +666,11 @@ export function Issues() {
                         key={t.id}
                         className={`${S.drawer?.kind === 'issue' && S.drawer.id === t.id ? 'active' : ''} ${isDone(t) ? 'done' : ''}`}
                         onClick={(e) => {
-                          if (!(e.target as HTMLElement).closest('input,button,.MuiInputBase-root,.MuiSelect-select,a'))
+                          if (
+                            !(e.target as HTMLElement).closest(
+                              'input,button,.MuiInputBase-root,.MuiSelect-select,a',
+                            )
+                          )
                             openDrawer('issue', t.id);
                         }}
                       >

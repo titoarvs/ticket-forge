@@ -14,9 +14,13 @@ export const POST = api(async (req, p) => {
     url: link,
     note: 'This link works once and expires in 2 hours.',
   });
-  const sent = await auth.sendMail({ to: u.email, subject: 'Set a new TicketForge password', ...mail });
-  // Someone who also belongs to other workspaces: the link goes only to their email. Showing it here would let this
-  // workspace's owner take over an account other companies rely on.
+  const sent = await auth.sendMail({
+    to: u.email,
+    subject: 'Set a new TicketForge password',
+    ...mail,
+  });
+  // Someone who also belongs to other workspaces: the link goes only to their email. Showing it
+  // here would let this workspace's owner take over an account other companies rely on.
   const shared = await auth.inOtherWorkspaces(u.id);
   return {
     link: shared ? undefined : link,

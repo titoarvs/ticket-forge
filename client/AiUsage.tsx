@@ -1,15 +1,21 @@
 'use client';
-// Administration → AI → Model routing → Usage: what the AI was used for, by whom, in which project and on which
-// model, with tokens and cost (from every AI call, kept in the database), suggestions to use less, the monthly
-// budget and the prices used to work out costs.
+// Administration → AI → Model routing → Usage: what the AI was used for, by whom, in which project
+// and on which model, with tokens and cost (from every AI call, kept in the database), suggestions
+// to use less, the monthly budget and the prices used to work out costs.
 import { useEffect, useState } from 'react';
 import { api, toast, type Any } from './core';
 import { Ico, I, Spinner, EmptyState } from './ui';
 import { SF, MenuItem, CB } from './fields';
 
-const k = (x: number) => (x >= 1e6 ? `${(x / 1e6).toFixed(1)}M` : x >= 1e3 ? `${Math.round(x / 1e3)}k` : String(x));
-const usd = (x: number | null | undefined) => (x == null ? '—' : x < 0.01 && x > 0 ? '<$0.01' : `$${x.toFixed(2)}`);
-const IMPACT: Record<string, string> = { high: 'Big saving', medium: 'Good saving', low: 'Housekeeping' };
+const k = (x: number) =>
+  x >= 1e6 ? `${(x / 1e6).toFixed(1)}M` : x >= 1e3 ? `${Math.round(x / 1e3)}k` : String(x);
+const usd = (x: number | null | undefined) =>
+  x == null ? '—' : x < 0.01 && x > 0 ? '<$0.01' : `$${x.toFixed(2)}`;
+const IMPACT: Record<string, string> = {
+  high: 'Big saving',
+  medium: 'Good saving',
+  low: 'Housekeeping',
+};
 const ENGINE: Record<string, string> = {
   api: 'AI API',
   account: 'Claude account',
@@ -20,7 +26,10 @@ const ENGINE: Record<string, string> = {
 
 const IMPACT_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-/** Suggestions, most useful first: savings you can switch on, then housekeeping (folded when there's anything bigger). */
+/**
+ * Suggestions, most useful first: savings you can switch on, then housekeeping (folded when there's
+ * anything bigger).
+ */
 function Suggestions({
   list,
   days,
@@ -35,13 +44,19 @@ function Suggestions({
   go?: (k: string) => void;
 }) {
   const sorted = [...list].sort(
-    (a, b) => (IMPACT_ORDER[a.impact] ?? 3) - (IMPACT_ORDER[b.impact] ?? 3) || Number(Boolean(b.action)) - Number(Boolean(a.action)),
+    (a, b) =>
+      (IMPACT_ORDER[a.impact] ?? 3) - (IMPACT_ORDER[b.impact] ?? 3) ||
+      Number(Boolean(b.action)) - Number(Boolean(a.action)),
   );
   const main = sorted.filter((s) => s.impact !== 'low');
   const minor = sorted.filter((s) => s.impact === 'low');
   const item = (s: Any) => (
     <li key={s.id} className={`imp-${s.impact}`}>
-      <span className={`loz ${s.impact === 'high' ? 't-pass' : s.impact === 'medium' ? 's-inprogress' : ''}`}>{IMPACT[s.impact]}</span>
+      <span
+        className={`loz ${s.impact === 'high' ? 't-pass' : s.impact === 'medium' ? 's-inprogress' : ''}`}
+      >
+        {IMPACT[s.impact]}
+      </span>
       <div>
         <b>{s.title}</b>
         <p className="muted small">{s.text}</p>
@@ -73,7 +88,9 @@ function Suggestions({
           <Ico svg={I.sparkle} /> Suggestions
         </h3>
         <span className="muted small">
-          {list.length ? `${list.length} from the last ${days} days` : `nothing to change from the last ${days} days`}
+          {list.length
+            ? `${list.length} from the last ${days} days`
+            : `nothing to change from the last ${days} days`}
         </span>
       </div>
       {!list.length ? (
@@ -100,7 +117,9 @@ function Suggestions({
   );
 }
 
-/** Tokens per day across the whole period (days without calls show as gaps, so the shape is honest). */
+/**
+ * Tokens per day across the whole period (days without calls show as gaps, so the shape is honest).
+ */
 function Days({ rows, days }: { rows: Any[]; days: number }) {
   const by = new Map(rows.map((r) => [r.day, r]));
   const all: Any[] = [];
@@ -113,10 +132,18 @@ function Days({ rows, days }: { rows: Any[]; days: number }) {
   return (
     <div className="au-days" role="img" aria-label={`Tokens per day over the last ${days} days`}>
       {all.map((x, i) => (
-        <div key={x.day} title={`${x.day}: ${x.calls} call${x.calls === 1 ? '' : 's'} · ${k(x.tokens)} tokens · ${usd(x.cost)}`}>
+        <div
+          key={x.day}
+          title={`${x.day}: ${x.calls} call${x.calls === 1 ? '' : 's'} · ${k(x.tokens)} tokens · ${usd(x.cost)}`}
+        >
           <i style={{ height: x.tokens ? `${Math.max(4, (x.tokens / max) * 100)}%` : 0 }} />
           {((i % every === 0 && all.length - 1 - i >= every / 2) || i === all.length - 1) && (
-            <span>{new Date(`${x.day}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+            <span>
+              {new Date(`${x.day}T00:00:00`).toLocaleDateString([], {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </span>
           )}
         </div>
       ))}
@@ -135,7 +162,8 @@ const VIEWS: [string, string][] = [
 function Breakdowns({ d }: { d: Any }) {
   const [v, setV] = useState('byTask');
   const rows: Any[] = d[v] || [];
-  const label = (r: Any) => (v === 'byTask' ? r.label : v === 'byEngine' ? ENGINE[r.key] || r.key : r.key);
+  const label = (r: Any) =>
+    v === 'byTask' ? r.label : v === 'byEngine' ? ENGINE[r.key] || r.key : r.key;
   const max = Math.max(...rows.map((r) => r.tokens), 1);
   return (
     <div className="card wide au-card">
@@ -144,7 +172,13 @@ function Breakdowns({ d }: { d: Any }) {
         <span className="spacer" />
         <div className="seg" role="tablist" aria-label="Break down by">
           {VIEWS.map(([key, l]) => (
-            <button key={key} role="tab" aria-selected={v === key} className={v === key ? 'on' : ''} onClick={() => setV(key)}>
+            <button
+              key={key}
+              role="tab"
+              aria-selected={v === key}
+              className={v === key ? 'on' : ''}
+              onClick={() => setV(key)}
+            >
               {l}
             </button>
           ))}
@@ -183,7 +217,10 @@ function Breakdowns({ d }: { d: Any }) {
                 <td className="num">
                   {usd(r.cost)}
                   {r.equiv ? (
-                    <div className="muted small" title="What the Claude account runs would cost on the API">
+                    <div
+                      className="muted small"
+                      title="What the Claude account runs would cost on the API"
+                    >
                       ≈ {usd(r.equiv)} on account
                     </div>
                   ) : null}
@@ -197,7 +234,9 @@ function Breakdowns({ d }: { d: Any }) {
   );
 }
 
-/** view 'usage': suggestions and the usage report · 'limits': budget, try Standard first and prices. */
+/**
+ * view 'usage': suggestions and the usage report · 'limits': budget, try Standard first and prices.
+ */
 export function UsageReport({
   routing,
   apply,
@@ -238,11 +277,16 @@ export function UsageReport({
   };
   const doSuggestion = (s: Any) =>
     run(s.id, async () => {
-      if (s.action === 'escalate') await apply({ escalate: true }, 'High work now tries Standard first');
+      if (s.action === 'escalate')
+        await apply({ escalate: true }, 'High work now tries Standard first');
       else if (s.action === 'cache') await apply({ cache: true }, 'Reusing answers is on');
       else if (s.action === 'cache-tasks')
-        await apply({ cacheTasks: [...new Set([...routing.cacheTasks, ...s.tasks])] }, 'Answers are reused for those tasks too');
-      else if (s.action === 'light-fast') await apply({ lightFast: true }, 'Light tasks no longer use extended thinking');
+        await apply(
+          { cacheTasks: [...new Set([...routing.cacheTasks, ...s.tasks])] },
+          'Answers are reused for those tasks too',
+        );
+      else if (s.action === 'light-fast')
+        await apply({ lightFast: true }, 'Light tasks no longer use extended thinking');
     });
   const saveBudget = () =>
     run('budget', () =>
@@ -291,10 +335,17 @@ export function UsageReport({
           <div className="au-toolbar">
             <div>
               <h3 style={{ margin: 0 }}>AI usage</h3>
-              <span className="muted small">Every AI call in this workspace, with tokens and cost.</span>
+              <span className="muted small">
+                Every AI call in this workspace, with tokens and cost.
+              </span>
             </div>
             <span className="spacer" />
-            <SF filter value={String(days)} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">
+            <SF
+              filter
+              value={String(days)}
+              onChange={(e) => setDays(Number(e.target.value))}
+              aria-label="Period"
+            >
               {[7, 30, 90].map((n) => (
                 <MenuItem key={n} value={String(n)}>
                   Last {n} days
@@ -321,7 +372,10 @@ export function UsageReport({
                   <span>AI calls</span>
                   <b>{t.calls.toLocaleString()}</b>
                   <small>
-                    {[t.errors ? `${t.errors} failed` : '', t.escalated ? `${t.escalated} stepped up to High` : '']
+                    {[
+                      t.errors ? `${t.errors} failed` : '',
+                      t.escalated ? `${t.escalated} stepped up to High` : '',
+                    ]
                       .filter(Boolean)
                       .join(' · ') || 'all answered'}
                   </small>
@@ -331,7 +385,9 @@ export function UsageReport({
                   <b>{k(t.input + t.cacheRead + t.output)}</b>
                   <small>
                     {k(t.input + t.cacheRead)} in · {k(t.output)} out
-                    {t.cacheRead ? ` · ${Math.round((t.cacheRead / Math.max(1, t.input + t.cacheRead)) * 100)}% from cache` : ''}
+                    {t.cacheRead
+                      ? ` · ${Math.round((t.cacheRead / Math.max(1, t.input + t.cacheRead)) * 100)}% from cache`
+                      : ''}
                   </small>
                 </div>
                 <div>
@@ -345,18 +401,28 @@ export function UsageReport({
                 <div>
                   <span>Saved</span>
                   <b>{t.cached.toLocaleString()}</b>
-                  <small>reused answers{t.cachedChars ? ` · ~${k(Math.round(t.cachedChars / 4))} tokens` : ''}</small>
+                  <small>
+                    reused answers
+                    {t.cachedChars ? ` · ~${k(Math.round(t.cachedChars / 4))} tokens` : ''}
+                  </small>
                 </div>
               </div>
               {t.estimated > 0 && (
                 <p className="muted small au-note">
-                  {t.estimated} call{t.estimated === 1 ? '' : 's'} ran on the Claude account or Copilot, which don’t report tokens: those
-                  tokens are estimated from the text length.
+                  {t.estimated} call{t.estimated === 1 ? '' : 's'} ran on the Claude account or
+                  Copilot, which don’t report tokens: those tokens are estimated from the text
+                  length.
                 </p>
               )}
 
               {/* 3. What to change, most useful first */}
-              <Suggestions list={d.suggestions || []} days={d.days} busy={busy} onTurnOn={doSuggestion} go={go} />
+              <Suggestions
+                list={d.suggestions || []}
+                days={d.days}
+                busy={busy}
+                onTurnOn={doSuggestion}
+                go={go}
+              />
 
               {/* 4. Over time */}
               <div className="card wide au-card">
@@ -373,7 +439,8 @@ export function UsageReport({
               {/* 6. The biggest single calls */}
               <details className="card wide au-top">
                 <summary>
-                  <h3 style={{ display: 'inline' }}>Largest calls</h3> <span className="muted small">the 20 calls that used the most</span>
+                  <h3 style={{ display: 'inline' }}>Largest calls</h3>{' '}
+                  <span className="muted small">the 20 calls that used the most</span>
                 </summary>
                 <table className="rt-tbl">
                   <thead>
@@ -390,7 +457,12 @@ export function UsageReport({
                     {d.top.map((r: Any, i: number) => (
                       <tr key={i}>
                         <td className="small">
-                          {new Date(r.at).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                          {new Date(r.at).toLocaleString([], {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
                         </td>
                         <td>{r.label}</td>
                         <td className="small">
@@ -403,7 +475,13 @@ export function UsageReport({
                           {k(r.input + r.cache_read)} / {k(r.output)}
                           {r.estimated ? ' (est.)' : ''}
                         </td>
-                        <td>{r.engine === 'api' ? usd(r.cost) : <span className="muted small">{ENGINE[r.engine]}</span>}</td>
+                        <td>
+                          {r.engine === 'api' ? (
+                            usd(r.cost)
+                          ) : (
+                            <span className="muted small">{ENGINE[r.engine]}</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -418,8 +496,8 @@ export function UsageReport({
         <div className="card wide">
           <h3>Spending limits</h3>
           <p className="sub">
-            A monthly budget for AI API spend (Claude account and Copilot runs are part of those plans and don’t count). Owners are never
-            stopped.
+            A monthly budget for AI API spend (Claude account and Copilot runs are part of those
+            plans and don’t count). Owners are never stopped.
           </p>
           {b.limit > 0 && (
             <div className={`au-budget ${b.over ? 'over' : b.near ? 'near' : ''}`}>
@@ -468,8 +546,8 @@ export function UsageReport({
               <>
                 <b>Try Standard first for High work</b>{' '}
                 <span className="muted">
-                  — tickets, test cases, epics, splitting and test plans routed to High run on Standard, and are asked again on High only
-                  when the answer isn’t usable.
+                  — tickets, test cases, epics, splitting and test plans routed to High run on
+                  Standard, and are asked again on High only when the answer isn’t usable.
                 </span>
               </>
             }
@@ -479,7 +557,9 @@ export function UsageReport({
               run('esc', () =>
                 apply(
                   { escalate: e.target.checked },
-                  e.target.checked ? 'High work now tries Standard first' : 'High work runs on High again',
+                  e.target.checked
+                    ? 'High work now tries Standard first'
+                    : 'High work runs on High again',
                 ),
               )
             }
@@ -509,8 +589,9 @@ export function UsageReport({
             <span className="muted small">used to work out costs (USD per million tokens)</span>
           </summary>
           <p className="sub">
-            Anthropic’s models are built in. Add your other models (OpenAI, Gemini, OpenRouter…) with their prices from the provider’s
-            pricing page; a model without a price shows tokens only.
+            Anthropic’s models are built in. Add your other models (OpenAI, Gemini, OpenRouter…)
+            with their prices from the provider’s pricing page; a model without a price shows tokens
+            only.
           </p>
           <table className="rt-tbl au-price-tbl">
             <thead>
@@ -529,7 +610,11 @@ export function UsageReport({
                       className="au-in"
                       value={m}
                       placeholder="e.g. gpt-4.1"
-                      onChange={(e) => setPrices(prices.map((x, j) => (j === idx ? [e.target.value, x[1], x[2]] : x)))}
+                      onChange={(e) =>
+                        setPrices(
+                          prices.map((x, j) => (j === idx ? [e.target.value, x[1], x[2]] : x)),
+                        )
+                      }
                     />
                   </td>
                   <td>
@@ -539,7 +624,11 @@ export function UsageReport({
                       min={0}
                       step="any"
                       value={i}
-                      onChange={(e) => setPrices(prices.map((x, j) => (j === idx ? [x[0], e.target.value, x[2]] : x)))}
+                      onChange={(e) =>
+                        setPrices(
+                          prices.map((x, j) => (j === idx ? [x[0], e.target.value, x[2]] : x)),
+                        )
+                      }
                     />
                   </td>
                   <td>
@@ -549,11 +638,19 @@ export function UsageReport({
                       min={0}
                       step="any"
                       value={o}
-                      onChange={(e) => setPrices(prices.map((x, j) => (j === idx ? [x[0], x[1], e.target.value] : x)))}
+                      onChange={(e) =>
+                        setPrices(
+                          prices.map((x, j) => (j === idx ? [x[0], x[1], e.target.value] : x)),
+                        )
+                      }
                     />
                   </td>
                   <td>
-                    <button className="icon-btn" aria-label="Remove price" onClick={() => setPrices(prices.filter((_, j) => j !== idx))}>
+                    <button
+                      className="icon-btn"
+                      aria-label="Remove price"
+                      onClick={() => setPrices(prices.filter((_, j) => j !== idx))}
+                    >
                       <Ico svg={I.trash} />
                     </button>
                   </td>

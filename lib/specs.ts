@@ -1,6 +1,6 @@
-// Coding specs: the prompt written for each ticket of an epic, and the overlap check that keeps features coded in
-// parallel from touching the same files or modules. Pure functions (no database, no AI): lib/store.ts saves the specs,
-// lib/specgen.ts asks the AI which files a ticket will touch.
+// Coding specs: the prompt written for each ticket of an epic, and the overlap check that keeps
+// features coded in parallel from touching the same files or modules. Pure functions (no database,
+// no AI): lib/store.ts saves the specs, lib/specgen.ts asks the AI which files a ticket will touch.
 import { tablesMentioned } from './dbschema';
 
 const OVERLAP_MODES = ['block', 'warn'];
@@ -11,7 +11,10 @@ const clip = (s, n) => {
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 
-/** A repository path in one form (no ./ or leading /, forward slashes, lower case), or '' when it isn't a usable path. */
+/**
+ * A repository path in one form (no ./ or leading /, forward slashes, lower case), or '' when it
+ * isn't a usable path.
+ */
 function normalizePath(p) {
   const s = String(p ?? '')
     .trim()
@@ -24,7 +27,10 @@ function normalizePath(p) {
   return s.toLowerCase();
 }
 
-/** The project's settings for coding specs: { overlapMode: 'block' | 'warn', reviewers: [userId] }. Blocking is the default. */
+/**
+ * The project's settings for coding specs: { overlapMode: 'block' | 'warn', reviewers: [userId] }.
+ * Blocking is the default.
+ */
 export function specConfig(project) {
   const c = project?.specConfig || {};
   return {
@@ -33,7 +39,10 @@ export function specConfig(project) {
   };
 }
 
-/** What the AI said a ticket touches, cleaned: { files: [{ path, action, why }], modules: [string] }. */
+/**
+ * What the AI said a ticket touches, cleaned: { files: [{ path, action, why }], modules: [string]
+ * }.
+ */
 export function cleanTouches(raw) {
   const seen = new Set(),
     files = [];
@@ -46,7 +55,11 @@ export function cleanTouches(raw) {
     const key = normalizePath(path);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    files.push({ path, action: f?.action === 'create' ? 'create' : 'modify', why: clip(f?.why, 200) });
+    files.push({
+      path,
+      action: f?.action === 'create' ? 'create' : 'modify',
+      why: clip(f?.why, 200),
+    });
     if (files.length >= 25) break;
   }
   const mods = new Set(),
@@ -67,15 +80,35 @@ export function cleanTouches(raw) {
 }
 
 /**
- * The prompt a developer (or an AI coding agent) works from for one ticket: the goal, the acceptance criteria, the
- * files and modules it may change, and the rules for parallel work. Markdown.
+ * The prompt a developer (or an AI coding agent) works from for one ticket: the goal, the
+ * acceptance criteria, the files and modules it may change, and the rules for parallel work.
+ * Markdown.
  */
-export function specPrompt({ project, epic, ticket, subtasks = [], files = [], modules = [] }: any) {
-  const ac = Array.isArray(ticket.acceptanceCriteria) ? ticket.acceptanceCriteria.filter(Boolean) : [];
-  // The tables this ticket talks about, from the project's database schema (Project settings → Database).
+export function specPrompt({
+  project,
+  epic,
+  ticket,
+  subtasks = [],
+  files = [],
+  modules = [],
+}: any) {
+  const ac = Array.isArray(ticket.acceptanceCriteria)
+    ? ticket.acceptanceCriteria.filter(Boolean)
+    : [];
+  // The tables this ticket talks about, from the project's database schema (Project settings →
+  // Database).
   const tables = tablesMentioned(
     project,
-    [ticket.title, ticket.userStory, ticket.description, ...ac, ...subtasks.map((t) => t.title), epic?.title].filter(Boolean).join('\n'),
+    [
+      ticket.title,
+      ticket.userStory,
+      ticket.description,
+      ...ac,
+      ...subtasks.map((t) => t.title),
+      epic?.title,
+    ]
+      .filter(Boolean)
+      .join('\n'),
   );
   const lines = [
     `# Coding spec: ${ticket.key || ''} ${ticket.title}`.trim(),
@@ -83,7 +116,8 @@ export function specPrompt({ project, epic, ticket, subtasks = [], files = [], m
     ticket.userStory && `## User story\n${ticket.userStory}`,
     ticket.description && `## Description\n${ticket.description}`,
     `## Acceptance criteria\n${ac.length ? ac.map((a, i) => `${i + 1}. ${a}`).join('\n') : 'None written yet: derive them from the description and confirm them before coding.'}`,
-    subtasks.length && `## Sub-tasks (part of this ticket)\n${subtasks.map((t) => `- ${t.key || ''} ${t.title}`.trim()).join('\n')}`,
+    subtasks.length &&
+      `## Sub-tasks (part of this ticket)\n${subtasks.map((t) => `- ${t.key || ''} ${t.title}`.trim()).join('\n')}`,
     `## Files and modules expected to change\n${files.length ? files.map((f) => `- ${f.path} (${f.action === 'create' ? 'new' : 'change'})${f.why ? `: ${f.why}` : ''}`).join('\n') : 'No files were predicted: find them in the repository first.'}${modules.length ? `\n\nModules: ${modules.join(', ')}` : ''}`,
     tables.length &&
       `## Database tables involved\n${tables.join('\n')}\n\nUse these exact table and column names. If the ticket needs a table or column that isn’t listed, add a migration and say so in your summary.`,
@@ -93,10 +127,12 @@ export function specPrompt({ project, epic, ticket, subtasks = [], files = [], m
 }
 
 /**
- * Overlaps between specs: the same file (compared without case, ./ or leading /) or the same module in two specs.
- * Specs of one epic always count. Specs of different epics count only when one of them is ready (being coded now),
- * so two epics still being planned don't warn about each other.
- * Returns [{ kind: 'file' | 'module', target, crossEpic, specs: [{ ticketId, key, title, epicId, status }] }].
+ * Overlaps between specs: the same file (compared without case, ./ or leading /) or the same module
+ * in two specs.
+ * Specs of one epic always count. Specs of different epics count only when one of them is ready
+ * (being coded now), so two epics still being planned don't warn about each other.
+ * Returns [{ kind: 'file' | 'module', target, crossEpic, specs: [{ ticketId, key, title, epicId,
+ * status }] }].
  */
 export function findOverlaps(specs) {
   const groups: Map<any, any> = new Map();
@@ -139,15 +175,26 @@ export function findOverlaps(specs) {
       kind: g.kind,
       target: g.target,
       crossEpic: new Set(involved.map((s) => s.epicId)).size > 1,
-      specs: involved.map((s) => ({ ticketId: s.ticketId, key: s.key, title: s.title, epicId: s.epicId, status: s.status })),
+      specs: involved.map((s) => ({
+        ticketId: s.ticketId,
+        key: s.key,
+        title: s.title,
+        epicId: s.epicId,
+        status: s.status,
+      })),
     });
   }
-  return out.sort((x, y) => (x.kind === y.kind ? x.target.localeCompare(y.target) : x.kind === 'file' ? -1 : 1));
+  return out.sort((x, y) =>
+    x.kind === y.kind ? x.target.localeCompare(y.target) : x.kind === 'file' ? -1 : 1,
+  );
 }
 
 /** One overlap in words: "PR-2 and PR-3 both touch lib/store.ts (file)". */
 export function describeOverlap(o) {
   const keys = o.specs.map((s) => s.key || s.ticketId);
-  const who = keys.length === 2 ? `${keys[0]} and ${keys[1]} both` : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]} all`;
+  const who =
+    keys.length === 2
+      ? `${keys[0]} and ${keys[1]} both`
+      : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]} all`;
   return `${who} touch ${o.target} (${o.kind}${o.crossEpic ? ', different epics' : ''})`;
 }

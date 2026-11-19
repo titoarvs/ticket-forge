@@ -5,7 +5,9 @@ import { readFolderSettings, saveFolderSettings } from '@/lib/userfolders';
 export const GET = api(async (req) => {
   const user = await authed();
   const u = new URL(req.url);
-  return { data: await readFolderSettings(user, u.searchParams.get('repo'), u.searchParams.get('kind')) };
+  return {
+    data: await readFolderSettings(user, u.searchParams.get('repo'), u.searchParams.get('kind')),
+  };
 });
 
 export const PUT = api(async (req) => {

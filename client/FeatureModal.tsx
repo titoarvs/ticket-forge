@@ -1,7 +1,8 @@
 'use client';
-// Add feature: new epics and issues (with test cases) for an existing project, from a description or a document.
-// The AI knows the project's epics and issues, so it reuses epics and doesn't repeat issues. You review the plan and
-// pick what to add; nothing changes until you do (and it can be undone).
+// Add feature: new epics and issues (with test cases) for an existing project, from a description
+// or a document.
+// The AI knows the project's epics and issues, so it reuses epics and doesn't repeat issues. You
+// review the plan and pick what to add; nothing changes until you do (and it can be undone).
 import { useRef, useState } from 'react';
 import {
   S,
@@ -31,7 +32,10 @@ import { saveEpicDraft } from './EpicDrafts';
 
 type Step = 'input' | 'ask' | 'running' | 'review';
 
-export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename: string; text: string }; sourceId?: string } = {}) {
+export function FeatureModal({
+  initialDoc,
+  sourceId,
+}: { initialDoc?: { filename: string; text: string }; sourceId?: string } = {}) {
   const p = P();
   const std = S.status?.generation?.testsPerTicket || 3;
   const [step, setStep] = useState<Step>('input');
@@ -39,7 +43,12 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   const [text, setText] = useState('');
   const [doc, setDoc] = useState<Any>(initialDoc || null);
   const [reading, setReading] = useState(false);
-  const [opts, setOpts] = useState({ granularity: 'balanced', includeTests: true, testsPerTicket: std, instructions: '' });
+  const [opts, setOpts] = useState({
+    granularity: 'balanced',
+    includeTests: true,
+    testsPerTicket: std,
+    instructions: '',
+  });
   const [log, setLog] = useState<Any[]>([]);
   const [chars, setChars] = useState(0);
   const [result, setResult] = useState<Any>(null);
@@ -48,7 +57,12 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
   const ctrl = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const source = mode === 'document' ? doc : text.trim() ? { filename: 'Feature description', text: text.trim() } : null;
+  const source =
+    mode === 'document'
+      ? doc
+      : text.trim()
+        ? { filename: 'Feature description', text: text.trim() }
+        : null;
   const upload = async (file?: File) => {
     if (!file) return;
     const fd = new FormData();
@@ -72,7 +86,8 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
     setStep('running');
     setLog([{ message: `Sending “${source.filename}” to the AI…` }]);
     setChars(0);
-    const push = (message: string, level?: string) => setLog((l) => [...l.map((x) => ({ ...x, done: true })), { message, level }]);
+    const push = (message: string, level?: string) =>
+      setLog((l) => [...l.map((x) => ({ ...x, done: true })), { message, level }]);
     try {
       const res = await api(`/api/projects/${p.id}/feature`, {
         method: 'POST',
@@ -81,7 +96,10 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
         body: aiBody({
           text: source.text,
           sourceName: source.filename,
-          options: { ...opts, instructions: [opts.instructions, answers].filter(Boolean).join('\n\n') },
+          options: {
+            ...opts,
+            instructions: [opts.instructions, answers].filter(Boolean).join('\n\n'),
+          },
         }),
       });
       let out: Any = null;
@@ -109,15 +127,18 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
     }
   };
 
-  // ---------------------------------------------------------------- add the chosen issues
-  // An epic saved as a draft is kept out of what gets added here (its issues stay in the draft's AI output).
+  // ---------------------------------------------------------------- add the chosen issues An epic
+  // saved as a draft is kept out of what gets added here (its issues stay in the draft's AI
+  // output).
   const [drafted, setDrafted] = useState<Record<string, boolean>>({});
   const chosen = result ? result.tickets.filter((t: Any) => pick[t.id] && !drafted[t.epicId]) : [];
   const canEpic = can('epic.manage');
   const draft = async (e: Any, items: Any[]) => {
     if (await saveEpicDraft(e, items)) setDrafted((d) => ({ ...d, [e.id]: true }));
   };
-  const newEpics = result ? result.epics.filter((e: Any) => !e.existing && chosen.some((t: Any) => t.epicId === e.id)) : [];
+  const newEpics = result
+    ? result.epics.filter((e: Any) => !e.existing && chosen.some((t: Any) => t.epicId === e.id))
+    : [];
   const add = () => {
     const created: string[] = [],
       issueIds: string[] = [],
@@ -204,7 +225,10 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
           }),
         )
         .catch(() =>
-          toast('The issues were added, but the original file couldn’t be kept. You can attach it on the Source documents page.', 'err'),
+          toast(
+            'The issues were added, but the original file couldn’t be kept. You can attach it on the Source documents page.',
+            'err',
+          ),
         );
     toast(
       `Added ${created.length} issue${created.length === 1 ? '' : 's'} (${created[0]}${created.length > 1 ? `–${created[created.length - 1]}` : ''})${canEpic && newEpics.length ? ` and ${newEpics.length} new epic${newEpics.length === 1 ? '' : 's'}` : ''} to the backlog`,
@@ -213,10 +237,22 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
 
   // ---------------------------------------------------------------- views
   if (step === 'ask' && source)
-    return <FeatureQuestions text={source.text} instructions={opts.instructions} onBack={() => setStep('input')} onGo={generate} />;
+    return (
+      <FeatureQuestions
+        text={source.text}
+        instructions={opts.instructions}
+        onBack={() => setStep('input')}
+        onGo={generate}
+      />
+    );
   if (step === 'running') {
     return (
-      <Modal title="Add feature with AI" wide persistent actions={[{ label: 'Cancel', onClick: () => ctrl.current?.abort() }]}>
+      <Modal
+        title="Add feature with AI"
+        wide
+        persistent
+        actions={[{ label: 'Cancel', onClick: () => ctrl.current?.abort() }]}
+      >
         <div className="progress-box">
           <div className="pbar">
             <i />
@@ -280,7 +316,8 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
         {result.openQuestions?.length > 0 && (
           <details className="feat-q">
             <summary className="small">
-              {result.openQuestions.length} open question{result.openQuestions.length === 1 ? '' : 's'} to raise
+              {result.openQuestions.length} open question
+              {result.openQuestions.length === 1 ? '' : 's'} to raise
             </summary>
             <ul className="small">
               {result.openQuestions.map((q: string, i: number) => (
@@ -291,13 +328,18 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
         )}
         {!result.tickets.length && (
           <EmptyState compact icon={I.search} tone="neutral" title="Nothing new to add">
-            <p>The AI found that the project already covers this. Try describing what’s different.</p>
+            <p>
+              The AI found that the project already covers this. Try describing what’s different.
+            </p>
           </EmptyState>
         )}
         {!canEpic && result.epics.some((e: Any) => !e.existing) && (
           <div className="warn-banner">
             <Ico svg={I.warn} />
-            <span>Your role can’t create epics, so issues planned for new epics are added without an epic.</span>
+            <span>
+              Your role can’t create epics, so issues planned for new epics are added without an
+              epic.
+            </span>
           </div>
         )}
         {byEpic.map(({ e, items }: Any) => {
@@ -311,16 +353,25 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
                   ref={(el) => {
                     if (el) el.indeterminate = !all && items.some((t: Any) => pick[t.id]);
                   }}
-                  onChange={(ev) => setPick({ ...pick, ...Object.fromEntries(items.map((t: Any) => [t.id, ev.target.checked])) })}
+                  onChange={(ev) =>
+                    setPick({
+                      ...pick,
+                      ...Object.fromEntries(items.map((t: Any) => [t.id, ev.target.checked])),
+                    })
+                  }
                 />
                 <TypeIcon type="Epic" />
                 <b>{e.title}</b>
-                <span className={`loz ${e.existing ? '' : 't-pass'}`}>{e.existing ? 'Existing epic' : 'New epic'}</span>
+                <span className={`loz ${e.existing ? '' : 't-pass'}`}>
+                  {e.existing ? 'Existing epic' : 'New epic'}
+                </span>
                 <span className="muted small" style={{ marginLeft: 'auto' }}>
                   {items.filter((t: Any) => pick[t.id]).length} of {items.length}
                 </span>
               </label>
-              {!e.existing && e.description && <p className="muted small feat-desc">{e.description}</p>}
+              {!e.existing && e.description && (
+                <p className="muted small feat-desc">{e.description}</p>
+              )}
               {!e.existing && canEpic && (
                 <div className="row" style={{ margin: '4px 0' }}>
                   {drafted[e.id] ? (
@@ -334,7 +385,11 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
                       Save as draft
                     </button>
                   )}
-                  {drafted[e.id] && <span className="muted small">Find it in the Epics list, with a Draft badge.</span>}
+                  {drafted[e.id] && (
+                    <span className="muted small">
+                      Find it in the Epics list, with a Draft badge.
+                    </span>
+                  )}
                 </div>
               )}
               {items.map((t: Any) => (
@@ -355,7 +410,8 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
                     <TypeIcon type={t.type} />
                     <span className="feat-title">{t.title}</span>
                     <span className="muted small">
-                      {t.storyPoints ?? '–'} pts · {t.acceptanceCriteria.length} AC · {t.testCases.length} tests
+                      {t.storyPoints ?? '–'} pts · {t.acceptanceCriteria.length} AC ·{' '}
+                      {t.testCases.length} tests
                     </span>
                     <Ico svg={I.chevron} className={open[t.id] ? 'up' : ''} />
                   </button>
@@ -401,17 +457,19 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
           kind: 'primary',
           disabled: !source || reading,
           onClick: () => {
-            if (!source || source.text.length < 15) toast('Describe the feature in a sentence or two, or add a document.', 'err');
+            if (!source || source.text.length < 15)
+              toast('Describe the feature in a sentence or two, or add a document.', 'err');
             else setStep('ask');
           },
         },
       ]}
     >
       <p style={{ marginTop: 0 }}>
-        Describe a new feature, or import a document. The AI plans epics and issues{opts.includeTests ? ' with test cases' : ''} that fit{' '}
-        <b>{p.name}</b>: it knows its {p.epics.length} epic{p.epics.length === 1 ? '' : 's'} and {p.tickets.length} issue
-        {p.tickets.length === 1 ? '' : 's'}, adds to existing epics where they fit and doesn’t repeat work. You review everything before
-        it’s added.
+        Describe a new feature, or import a document. The AI plans epics and issues
+        {opts.includeTests ? ' with test cases' : ''} that fit <b>{p.name}</b>: it knows its{' '}
+        {p.epics.length} epic{p.epics.length === 1 ? '' : 's'} and {p.tickets.length} issue
+        {p.tickets.length === 1 ? '' : 's'}, adds to existing epics where they fit and doesn’t
+        repeat work. You review everything before it’s added.
       </p>
       <div className="seg" role="tablist" style={{ marginBottom: 12 }}>
         <button
@@ -460,7 +518,9 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
             <div className="row" style={{ gap: 8 }}>
               <Ico svg={I.doc} />
               <b>{doc.filename}</b>
-              <span className="muted small">{doc.text.split(/\s+/).length.toLocaleString()} words</span>
+              <span className="muted small">
+                {doc.text.split(/\s+/).length.toLocaleString()} words
+              </span>
               <button className="btn sm subtle" onClick={() => fileRef.current?.click()}>
                 Replace
               </button>
@@ -484,14 +544,18 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
             </button>
           )}
           <p className="muted small" style={{ margin: '8px 0 0' }}>
-            PDF, Word (.docx), Markdown, text or HTML: a spec, PRD or change request for the new work.
+            PDF, Word (.docx), Markdown, text or HTML: a spec, PRD or change request for the new
+            work.
           </p>
         </div>
       )}
       <div className="grid2" style={{ marginTop: 12 }}>
         <label className="field">
           <span>Issue size</span>
-          <SF value={opts.granularity} onChange={(e) => setOpts({ ...opts, granularity: e.target.value })}>
+          <SF
+            value={opts.granularity}
+            onChange={(e) => setOpts({ ...opts, granularity: e.target.value })}
+          >
             <MenuItem value="coarse">Fewer, larger issues</MenuItem>
             <MenuItem value="balanced">Balanced</MenuItem>
             <MenuItem value="fine">Many small issues</MenuItem>
@@ -500,7 +564,11 @@ export function FeatureModal({ initialDoc, sourceId }: { initialDoc?: { filename
         <label className="field">
           <span>Test cases per issue{opts.testsPerTicket === std ? ' (team standard)' : ''}</span>
           <div className="row" style={{ flexWrap: 'nowrap', gap: 8 }}>
-            <CB checked={opts.includeTests} onChange={(e: Any) => setOpts({ ...opts, includeTests: e.target.checked })} label="" />
+            <CB
+              checked={opts.includeTests}
+              onChange={(e: Any) => setOpts({ ...opts, includeTests: e.target.checked })}
+              label=""
+            />
             <TF
               type="number"
               disabled={!opts.includeTests}
@@ -536,7 +604,10 @@ function FeatureQuestions({
   onBack: () => void;
   onGo: (answers: string) => void;
 }) {
-  const q = useQuestions({ kind: 'feature', subject: 'the epics and issues', text, instructions }, () => onGo(''));
+  const q = useQuestions(
+    { kind: 'feature', subject: 'the epics and issues', text, instructions },
+    () => onGo(''),
+  );
   return (
     <Modal
       title="Add feature with AI"

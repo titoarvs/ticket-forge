@@ -1,5 +1,6 @@
 // Builds the Ticket Forge overview and technical Word document from its Markdown source.
-// Usage: `npm run docs:overview`. Reads docs/ticket-forge-overview-technical.md, writes docs/ticket-forge-overview-technical.docx.
+// Usage: `npm run docs:overview`. Reads docs/ticket-forge-overview-technical.md, writes
+// docs/ticket-forge-overview-technical.docx.
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdownToDocx } from '../lib/md-docx';

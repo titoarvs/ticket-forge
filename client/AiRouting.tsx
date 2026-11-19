@@ -1,7 +1,8 @@
 'use client';
-// Administration → AI → Model routing: which model each kind of AI work uses. Tasks get a tier (High, Standard, Light);
-// each tier maps to a model on every AI (Claude account, GitHub Copilot, each AI API). Cheap, routine work (epic
-// outlines, questions, failure notes) runs on lighter models, saving usage and credits for the work that needs the best.
+// Administration → AI → Model routing: which model each kind of AI work uses. Tasks get a tier
+// (High, Standard, Light); each tier maps to a model on every AI (Claude account, GitHub Copilot,
+// each AI API). Cheap, routine work (epic outlines, questions, failure notes) runs on lighter
+// models, saving usage and credits for the work that needs the best.
 import { useState } from 'react';
 import { api, toast, openModal, type Any } from './core';
 import { Ico, I, Spinner, Confirm } from './ui';
@@ -14,11 +15,30 @@ const TIER_HINT: Record<string, string> = {
   standard: 'Good quality, moderate usage',
   light: 'Fast and cheap',
 };
-const CLAUDE_OPTIONS = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-2'];
+const CLAUDE_OPTIONS = [
+  'opus',
+  'sonnet',
+  'haiku',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+  'claude-haiku-5-5',
+  'claude-fable-5-2',
+];
 
 /** One-click starting points. */
-const PRESETS: { key: string; label: string; desc: string; tiers: (t: Any) => string; escalate?: boolean }[] = [
-  { key: 'quality', label: 'Best quality', desc: 'Every task on the High tier. Uses the most.', tiers: () => 'high' },
+const PRESETS: {
+  key: string;
+  label: string;
+  desc: string;
+  tiers: (t: Any) => string;
+  escalate?: boolean;
+}[] = [
+  {
+    key: 'quality',
+    label: 'Best quality',
+    desc: 'Every task on the High tier. Uses the most.',
+    tiers: () => 'high',
+  },
   {
     key: 'balanced',
     label: 'Balanced',
@@ -36,14 +56,17 @@ const PRESETS: { key: string; label: string; desc: string; tiers: (t: Any) => st
     key: 'economy',
     label: 'Economy',
     desc: 'Light for most work; Standard for tickets, documents, scripts and coding agents.',
-    tiers: (t) => (['tickets', 'docs', 'automation', 'code', 'agent-tests', 'review'].includes(t.id) ? 'standard' : 'light'),
+    tiers: (t) =>
+      ['tickets', 'docs', 'automation', 'code', 'agent-tests', 'review'].includes(t.id)
+        ? 'standard'
+        : 'light',
   },
 ];
 
 type Part = 'routing' | 'models' | 'usage' | 'savings';
 /**
- * One part of the AI page's model routing settings (they share one draft and one Save bar):
- * routing (presets, tier per task) · models (the model behind each tier) · usage (report and suggestions) ·
+ * One part of the AI page's model routing settings (they share one draft and one Save bar): routing
+ * (presets, tier per task) · models (the model behind each tier) · usage (report and suggestions) ·
  * savings (reused answers, try Standard first, budget, prices).
  */
 export function RoutingSection({
@@ -64,8 +87,11 @@ export function RoutingSection({
   const tasks: Any[] = c.tasks || [];
   const tiers: string[] = c.tiers || ['high', 'standard', 'light'];
   const dirty = JSON.stringify(r) !== JSON.stringify(saved);
-  const preset = PRESETS.find((p) => tasks.every((t) => r.tiers[t.id] === p.tiers(t)) && (!p.escalate || r.escalate))?.key;
-  const setTier = (id: string, v: string) => setR((x: Any) => ({ ...x, tiers: { ...x.tiers, [id]: v } }));
+  const preset = PRESETS.find(
+    (p) => tasks.every((t) => r.tiers[t.id] === p.tiers(t)) && (!p.escalate || r.escalate),
+  )?.key;
+  const setTier = (id: string, v: string) =>
+    setR((x: Any) => ({ ...x, tiers: { ...x.tiers, [id]: v } }));
   const setModel = (ai: string, tier: string, v: string, entry?: string) =>
     setR((x: Any) => {
       const n = structuredClone(x);
@@ -108,7 +134,8 @@ export function RoutingSection({
         }
       />,
     );
-  // One-click changes from the usage report (suggestions, budget, prices): saved at once, on top of what's saved.
+  // One-click changes from the usage report (suggestions, budget, prices): saved at once, on top of
+  // what's saved.
   const apply = async (change: Any, msg: string) => {
     const st = await patch({ ...saved, ...change });
     onSaved(st);
@@ -121,7 +148,8 @@ export function RoutingSection({
   const modelFor = (tier: string, agent = false) => {
     if (agent) return r.claude[tier] || c.claudeTiers?.[tier];
     if (c.mode === 'account') {
-      if (c.localEngine === 'copilot') return r.copilot[tier] || c.copilotModel || 'Copilot default';
+      if (c.localEngine === 'copilot')
+        return r.copilot[tier] || c.copilotModel || 'Copilot default';
       return r.claude[tier] || c.claudeTiers?.[tier];
     }
     const a = apis.find((x) => x.active) || apis[0];
@@ -138,8 +166,9 @@ export function RoutingSection({
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3>Model routing</h3>
               <p className="sub" style={{ marginBottom: 10 }}>
-                Each kind of AI work uses a tier: <b>High</b> for work that needs the best model, <b>Standard</b> for everyday work and{' '}
-                <b>Light</b> for small, frequent jobs. Lighter tiers answer faster and use less of your Claude plan or API credits.
+                Each kind of AI work uses a tier: <b>High</b> for work that needs the best model,{' '}
+                <b>Standard</b> for everyday work and <b>Light</b> for small, frequent jobs. Lighter
+                tiers answer faster and use less of your Claude plan or API credits.
               </p>
             </div>
           </div>
@@ -147,7 +176,10 @@ export function RoutingSection({
             label={
               <>
                 <b>Use a model per task</b>{' '}
-                <span className="muted">— off: everything uses the main model (or the model each person picks on this computer)</span>
+                <span className="muted">
+                  — off: everything uses the main model (or the model each person picks on this
+                  computer)
+                </span>
               </>
             }
             checked={r.enabled}
@@ -164,7 +196,11 @@ export function RoutingSection({
                   className={preset === p.key ? 'on' : ''}
                   disabled={off}
                   onClick={() =>
-                    setR({ ...r, tiers: Object.fromEntries(tasks.map((t) => [t.id, p.tiers(t)])), escalate: Boolean(p.escalate) })
+                    setR({
+                      ...r,
+                      tiers: Object.fromEntries(tasks.map((t) => [t.id, p.tiers(t)])),
+                      escalate: Boolean(p.escalate),
+                    })
                   }
                 >
                   <b>{p.label}</b>
@@ -197,11 +233,17 @@ export function RoutingSection({
                       <tr key={t.id}>
                         <td>
                           <b>{t.label}</b>
-                          {r.tiers[t.id] !== t.tier && <div className="muted small">default {TIER_LABEL[t.tier]}</div>}
+                          {r.tiers[t.id] !== t.tier && (
+                            <div className="muted small">default {TIER_LABEL[t.tier]}</div>
+                          )}
                         </td>
                         <td className="rt-desc muted small">
                           {t.desc}
-                          {t.agent && <div>Runs in Claude Code. A model picked on the agent in Agents wins.</div>}
+                          {t.agent && (
+                            <div>
+                              Runs in Claude Code. A model picked on the agent in Agents wins.
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div className="rt-tier" role="radiogroup" aria-label={`${t.label} tier`}>
@@ -242,7 +284,9 @@ export function RoutingSection({
                             {off
                               ? '—'
                               : String(r.tiers[t.id]).startsWith('cfg:')
-                                ? (c.settings?.configs || []).find((x: Any) => `cfg:${x.id}` === r.tiers[t.id])?.name || '—'
+                                ? (c.settings?.configs || []).find(
+                                    (x: Any) => `cfg:${x.id}` === r.tiers[t.id],
+                                  )?.name || '—'
                                 : modelFor(r.tiers[t.id], t.agent) || '—'}
                           </code>
                         </td>
@@ -302,7 +346,9 @@ export function RoutingSection({
       {part === 'models' && (
         <div className={`card wide ${off ? 'rt-off' : ''}`}>
           <h3>Models for each tier</h3>
-          <p className="sub">Which model each AI uses for a tier. A blank API field uses that provider’s own model.</p>
+          <p className="sub">
+            Which model each AI uses for a tier. A blank API field uses that provider’s own model.
+          </p>
           <div className="rt-scroll rt-models">
             <table className="rt-tbl">
               <thead>
@@ -338,11 +384,19 @@ export function RoutingSection({
                   <tr>
                     <td className="rt-ai">
                       <b>GitHub Copilot</b>
-                      <span>{c.localEngine === 'copilot' ? 'Your local AI' : 'Backup for your Claude account'}</span>
+                      <span>
+                        {c.localEngine === 'copilot'
+                          ? 'Your local AI'
+                          : 'Backup for your Claude account'}
+                      </span>
                     </td>
                     {tiers.map((k) => (
                       <td key={k}>
-                        <SF value={r.copilot[k]} disabled={off} onChange={(e) => setModel('copilot', k, e.target.value)}>
+                        <SF
+                          value={r.copilot[k]}
+                          disabled={off}
+                          onChange={(e) => setModel('copilot', k, e.target.value)}
+                        >
                           {(c.copilot.models || ['']).map((m: string) => (
                             <MenuItem key={m || 'd'} value={m}>
                               {m || `Same as Local AI (${c.copilotModel || 'default'})`}
@@ -391,7 +445,8 @@ export function RoutingSection({
           </div>
           {c.mode !== 'account' && (
             <p className="muted small" style={{ marginBottom: 0 }}>
-              Your Claude account and GitHub Copilot rows show when TicketForge is opened on your own computer (localhost).
+              Your Claude account and GitHub Copilot rows show when TicketForge is opened on your
+              own computer (localhost).
             </p>
           )}
           {off && (
@@ -416,17 +471,18 @@ export function RoutingSection({
         <div className="card wide">
           <h3>Reuse answers</h3>
           <p className="sub">
-            Besides model routing, two things keep AI costs down: <b>prompt caching</b> (the stable part of every prompt, such as rules and
-            the project’s App context, is cached by the AI API and re-read at about a tenth of the price; always on), and{' '}
-            <b>reusing answers</b> to identical requests.
+            Besides model routing, two things keep AI costs down: <b>prompt caching</b> (the stable
+            part of every prompt, such as rules and the project’s App context, is cached by the AI
+            API and re-read at about a tenth of the price; always on), and <b>reusing answers</b> to
+            identical requests.
           </p>
           <CB
             label={
               <>
                 <b>Reuse answers to identical requests</b>{' '}
                 <span className="muted">
-                  — the same task, choice of model and input within the days below gets the stored answer, at no AI cost. “Again” and
-                  “Rewrite” always ask fresh.
+                  — the same task, choice of model and input within the days below gets the stored
+                  answer, at no AI cost. “Again” and “Rewrite” always ask fresh.
                 </span>
               </>
             }
@@ -458,7 +514,12 @@ export function RoutingSection({
                 disabled={!r.cache}
                 checked={r.cacheTasks.includes(t.id)}
                 onChange={(e: Any) =>
-                  setR({ ...r, cacheTasks: e.target.checked ? [...r.cacheTasks, t.id] : r.cacheTasks.filter((x: string) => x !== t.id) })
+                  setR({
+                    ...r,
+                    cacheTasks: e.target.checked
+                      ? [...r.cacheTasks, t.id]
+                      : r.cacheTasks.filter((x: string) => x !== t.id),
+                  })
                 }
               />
             ))}
@@ -466,13 +527,17 @@ export function RoutingSection({
           <div className="rt-saved small">
             <span>
               <b>{c.cacheStore?.hits || 0}</b> reused answers
-              {c.cacheStore?.savedChars ? <> · ~{Math.round(c.cacheStore.savedChars / 4 / 1000)}k tokens not sent</> : ''} ·{' '}
-              {c.cacheStore?.entries || 0} stored
+              {c.cacheStore?.savedChars ? (
+                <> · ~{Math.round(c.cacheStore.savedChars / 4 / 1000)}k tokens not sent</>
+              ) : (
+                ''
+              )}{' '}
+              · {c.cacheStore?.entries || 0} stored
             </span>
             {c.usage?.tokens && (
               <span>
-                Prompt caching: <b>{Math.round((c.usage.tokens.cacheRead || 0) / 1000)}k</b> tokens read from cache vs{' '}
-                {Math.round((c.usage.tokens.input || 0) / 1000)}k sent fresh
+                Prompt caching: <b>{Math.round((c.usage.tokens.cacheRead || 0) / 1000)}k</b> tokens
+                read from cache vs {Math.round((c.usage.tokens.input || 0) / 1000)}k sent fresh
               </span>
             )}
             {(c.cacheStore?.entries || 0) > 0 && (
@@ -480,7 +545,14 @@ export function RoutingSection({
                 className="btn sm subtle"
                 disabled={!!busy}
                 onClick={() =>
-                  run('cclear', async () => onSaved(await api('/api/admin/ai', { method: 'POST', body: { action: 'cache-clear' } })))
+                  run('cclear', async () =>
+                    onSaved(
+                      await api('/api/admin/ai', {
+                        method: 'POST',
+                        body: { action: 'cache-clear' },
+                      }),
+                    ),
+                  )
                 }
               >
                 Clear stored answers

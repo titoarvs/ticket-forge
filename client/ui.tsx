@@ -1,16 +1,51 @@
 'use client';
 // Small shared React components.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { I, typeIcon, priorityIcon } from './icons';
-import { S, emit, closeModal, hashColor, initials, sCls, toast, dismissToast, setAiRun, type Any } from './core';
+import {
+  S,
+  emit,
+  closeModal,
+  hashColor,
+  initials,
+  sCls,
+  toast,
+  dismissToast,
+  setAiRun,
+  type Any,
+} from './core';
 
 export { I };
-const sized = (svg: string, size?: number) => (size ? svg.replace('width="16" height="16"', `width="${size}" height="${size}"`) : svg);
+const sized = (svg: string, size?: number) =>
+  size ? svg.replace('width="16" height="16"', `width="${size}" height="${size}"`) : svg;
 /** Renders one of the built-in SVG icons. */
-export const Ico = ({ svg, size, className = '', style }: { svg: string; size?: number; className?: string; style?: Any }) => (
-  <span className={`ico ${className}`} style={style} dangerouslySetInnerHTML={{ __html: sized(svg, size) }} />
+export const Ico = ({
+  svg,
+  size,
+  className = '',
+  style,
+}: {
+  svg: string;
+  size?: number;
+  className?: string;
+  style?: Any;
+}) => (
+  <span
+    className={`ico ${className}`}
+    style={style}
+    dangerouslySetInnerHTML={{ __html: sized(svg, size) }}
+  />
 );
-export const TypeIcon = ({ type, size }: { type: string; size?: number }) => <Ico svg={typeIcon(type)} size={size} />;
+export const TypeIcon = ({ type, size }: { type: string; size?: number }) => (
+  <Ico svg={typeIcon(type)} size={size} />
+);
 export const PriorityIcon = ({ p }: { p: string }) => <Ico svg={priorityIcon(p)} />;
 
 export function Avatar({ name, size = 24 }: { name?: string; size?: number }) {
@@ -21,7 +56,16 @@ export function Avatar({ name, size = 24 }: { name?: string; size?: number }) {
       </span>
     );
   return (
-    <span className="avatar" style={{ background: hashColor(name), width: size, height: size, fontSize: size < 24 ? 9 : 10 }} title={name}>
+    <span
+      className="avatar"
+      style={{
+        background: hashColor(name),
+        width: size,
+        height: size,
+        fontSize: size < 24 ? 9 : 10,
+      }}
+      title={name}
+    >
       {initials(name)}
     </span>
   );
@@ -33,8 +77,15 @@ export const ELoz = ({ e }: { e: Any }) =>
     </span>
   ) : null;
 export const StatusLoz = ({ s }: { s: string }) => <span className={`loz ${sCls(s)}`}>{s}</span>;
-/** Where an issue's implementation lives: frontend, backend or both (projects with a separate backend repository). */
-export const LAYER_LABEL: Record<string, string> = { frontend: 'Frontend', backend: 'Backend', both: 'Frontend + Backend' };
+/**
+ * Where an issue's implementation lives: frontend, backend or both (projects with a separate
+ * backend repository).
+ */
+export const LAYER_LABEL: Record<string, string> = {
+  frontend: 'Frontend',
+  backend: 'Backend',
+  both: 'Frontend + Backend',
+};
 export const LayerChip = ({ layer, short = false }: { layer?: string; short?: boolean }) =>
   layer && LAYER_LABEL[layer] ? (
     <span className={`layer-chip l-${layer}`} title={`Implementation: ${LAYER_LABEL[layer]}`}>
@@ -47,7 +98,11 @@ export const Swatch = ({ color, style }: { color: string; style?: Any }) => (
 export { opts, MenuItem } from './fields';
 
 /** A textarea that grows with its content. */
-export function AutoTextarea({ value, max = 640, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { max?: number }) {
+export function AutoTextarea({
+  value,
+  max = 640,
+  ...rest
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { max?: number }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const ta = ref.current;
@@ -142,7 +197,12 @@ export function Modal({
         if (e.target === e.currentTarget && !persistent) closeModal();
       }}
     >
-      <div className={`modal ${wide ? 'wide' : ''} ${wide === 'xl' ? 'xl' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div
+        className={`modal ${wide ? 'wide' : ''} ${wide === 'xl' ? 'xl' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <header>
           <h3>{title}</h3>
           <button className="icon-btn" onClick={closeModal} aria-label="Close">
@@ -292,7 +352,9 @@ export function TaskTray() {
   const running = tasks.filter((t) => t.status === 'running');
   useTick(running.length > 0);
   if (!tasks.length) return null;
-  const head = running.length ? `Working on ${running.length} task${running.length > 1 ? 's' : ''}` : 'All done';
+  const head = running.length
+    ? `Working on ${running.length} task${running.length > 1 ? 's' : ''}`
+    : 'All done';
   return (
     <section id="task-tray" className={open ? '' : 'closed'} aria-label="Background work">
       <button className="tray-head" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -305,17 +367,27 @@ export function TaskTray() {
       {open && (
         <ul className="tray-list">
           {tasks.map((t) => {
-            const pct = t.total ? Math.min(100, Math.round(((t.status === 'ok' ? t.total : t.done) / t.total) * 100)) : 0;
+            const pct = t.total
+              ? Math.min(100, Math.round(((t.status === 'ok' ? t.total : t.done) / t.total) * 100))
+              : 0;
             return (
               <li key={t.id} className={`tray-item ${t.status}`}>
                 <div className="tray-row">
-                  {t.status === 'ok' ? <Ico svg={I.check} className="tray-ok" /> : <span className="spinner" />}
+                  {t.status === 'ok' ? (
+                    <Ico svg={I.check} className="tray-ok" />
+                  ) : (
+                    <span className="spinner" />
+                  )}
                   <div className="tray-text">
                     <b>{t.label}</b>
-                    <span className="muted small">{t.status === 'ok' ? t.message || 'Done' : t.detail || 'Starting…'}</span>
+                    <span className="muted small">
+                      {t.status === 'ok' ? t.message || 'Done' : t.detail || 'Starting…'}
+                    </span>
                   </div>
                   <span className="muted small tray-time">
-                    {t.status === 'ok' ? clock((t.endedAt || Date.now()) - t.startedAt) : clock(Date.now() - t.startedAt)}
+                    {t.status === 'ok'
+                      ? clock((t.endedAt || Date.now()) - t.startedAt)
+                      : clock(Date.now() - t.startedAt)}
                   </span>
                   {t.cancel && t.status === 'running' && (
                     <button className="link-btn small" onClick={t.cancel}>
@@ -331,7 +403,13 @@ export function TaskTray() {
                   aria-valuemax={t.total || undefined}
                   aria-valuenow={t.total ? t.done : undefined}
                 >
-                  <span style={t.total ? { width: `${t.status === 'ok' ? 100 : Math.max(pct, 4)}%` } : undefined} />
+                  <span
+                    style={
+                      t.total
+                        ? { width: `${t.status === 'ok' ? 100 : Math.max(pct, 4)}%` }
+                        : undefined
+                    }
+                  />
                 </div>
                 {t.total > 0 && t.status === 'running' && (
                   <span className="muted small tray-count">
@@ -346,10 +424,14 @@ export function TaskTray() {
     </section>
   );
 }
-export const Spinner = ({ style }: { style?: Any }) => <span className="spinner" style={{ color: 'var(--brand)', ...style }} />;
+export const Spinner = ({ style }: { style?: Any }) => (
+  <span className="spinner" style={{ color: 'var(--brand)', ...style }} />
+);
 
 // ---------------------------------------------------------------- loading, empty and error states
-/** A placeholder block that shimmers while content loads. Size it like the content it stands in for. */
+/**
+ * A placeholder block that shimmers while content loads. Size it like the content it stands in for.
+ */
 export const Sk = ({
   w,
   h = 12,
@@ -362,8 +444,17 @@ export const Sk = ({
   r?: number | string;
   style?: Any;
   className?: string;
-}) => <span className={`sk ${className}`} style={{ width: w ?? '100%', height: h, borderRadius: r, ...style }} aria-hidden="true" />;
-/** Wraps skeletons: tells screen readers something is loading, and fades in after a moment so quick loads don't flash. */
+}) => (
+  <span
+    className={`sk ${className}`}
+    style={{ width: w ?? '100%', height: h, borderRadius: r, ...style }}
+    aria-hidden="true"
+  />
+);
+/**
+ * Wraps skeletons: tells screen readers something is loading, and fades in after a moment so quick
+ * loads don't flash.
+ */
 export function Loading({
   label = 'Loading…',
   children,
@@ -384,7 +475,10 @@ export function Loading({
 }
 
 export type Tone = 'brand' | 'ai' | 'danger' | 'neutral' | 'success' | 'epic';
-/** A centred message for "nothing here yet" or "nothing matches", with an icon and the next thing to do. */
+/**
+ * A centred message for "nothing here yet" or "nothing matches", with an icon and the next thing to
+ * do.
+ */
 export function EmptyState({
   icon,
   tone = 'brand',
@@ -416,7 +510,9 @@ export function EmptyState({
   );
 }
 
-/** Something failed to load: says what, offers "Try again", and notices when the browser is offline. */
+/**
+ * Something failed to load: says what, offers "Try again", and notices when the browser is offline.
+ */
 export function ErrorState({
   title = 'Couldn’t load this',
   error,
@@ -480,7 +576,9 @@ export function ErrorState({
   );
 }
 
-/** A settings card: title, one-line explanation, optional actions on the right, then the content. */
+/**
+ * A settings card: title, one-line explanation, optional actions on the right, then the content.
+ */
 export function SetCard({
   title,
   desc,
@@ -497,7 +595,11 @@ export function SetCard({
   id?: string;
 }) {
   return (
-    <section className={`set-card ${tone ? `tone-${tone}` : ''}`} id={id} aria-labelledby={id ? `${id}-h` : undefined}>
+    <section
+      className={`set-card ${tone ? `tone-${tone}` : ''}`}
+      id={id}
+      aria-labelledby={id ? `${id}-h` : undefined}
+    >
       <header className="set-card-h">
         <div style={{ minWidth: 0 }}>
           <h3 id={id ? `${id}-h` : undefined}>{title}</h3>
@@ -511,7 +613,11 @@ export function SetCard({
 }
 
 /** Which section of a long settings page is open; remembered per browser. */
-export function useSection(key: string, keys: string[], dflt: string): [string, (k: string) => void] {
+export function useSection(
+  key: string,
+  keys: string[],
+  dflt: string,
+): [string, (k: string) => void] {
   const [v, setV] = useState(() => {
     try {
       const x = localStorage.getItem(key);
@@ -530,7 +636,10 @@ export function useSection(key: string, keys: string[], dflt: string): [string, 
   };
   return [keys.includes(v) ? v : dflt, set];
 }
-/** Section navigation for a long settings page: a list on the left (a scrolling row on small screens). */
+/**
+ * Section navigation for a long settings page: a list on the left (a scrolling row on small
+ * screens).
+ */
 export function SectionNav({
   items,
   value,
@@ -568,17 +677,26 @@ export function SectionNav({
 }
 
 /**
- * Which AI runs this action: Auto (model routing picks per task), a tier (High / Standard / Light, with the model it
- * runs on here) or a custom configuration from Administration → AI. The choice is the person's, remembered per browser.
+ * Which AI runs this action: Auto (model routing picks per task), a tier (High / Standard / Light,
+ * with the model it runs on here) or a custom configuration from Administration → AI. The choice is
+ * the person's, remembered per browser.
  */
-export const TIER_NAME: Record<string, string> = { high: 'High', standard: 'Standard', light: 'Light' };
+export const TIER_NAME: Record<string, string> = {
+  high: 'High',
+  standard: 'Standard',
+  light: 'Light',
+};
 export function AiRunPicker({ compact = false }: { compact?: boolean }) {
   const ch = S.status?.aiChoices;
   const v = S.aiRun || 'auto';
-  const known = v === 'auto' || TIER_NAME[v] || (ch?.configs || []).some((c: Any) => `cfg:${c.id}` === v);
+  const known =
+    v === 'auto' || TIER_NAME[v] || (ch?.configs || []).some((c: Any) => `cfg:${c.id}` === v);
   const val = known ? v : 'auto';
   const label = (k: string) => {
-    if (k === 'auto') return S.status?.routingOn ? 'Auto · per task' : `Auto${S.status?.model ? ` · ${S.status.model}` : ''}`;
+    if (k === 'auto')
+      return S.status?.routingOn
+        ? 'Auto · per task'
+        : `Auto${S.status?.model ? ` · ${S.status.model}` : ''}`;
     if (TIER_NAME[k]) return `${TIER_NAME[k]}${ch?.tiers?.[k] ? ` · ${ch.tiers[k]}` : ''}`;
     const c = (ch?.configs || []).find((x: Any) => `cfg:${x.id}` === k);
     return c ? `${c.name}${c.model ? ` · ${c.model}` : ''}` : k;
@@ -590,7 +708,11 @@ export function AiRunPicker({ compact = false }: { compact?: boolean }) {
     >
       <Ico svg={I.sparkle} />
       <span className="ai-run-l">Runs on</span>
-      <select value={val} onChange={(e) => setAiRun(e.target.value)} aria-label="Which AI runs this">
+      <select
+        value={val}
+        onChange={(e) => setAiRun(e.target.value)}
+        aria-label="Which AI runs this"
+      >
         <option value="auto">{label('auto')}</option>
         <optgroup label="Model tier">
           {Object.keys(TIER_NAME).map((k) => (
@@ -620,7 +742,8 @@ export function resetLabel(iso?: string | null) {
     now = new Date();
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   if (d.toDateString() === now.toDateString()) return `Resets at ${time}`;
-  if (d.getTime() - now.getTime() < 6 * 86400e3) return `Resets ${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  if (d.getTime() - now.getTime() < 6 * 86400e3)
+    return `Resets ${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
   return `Resets ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
 }
 const PLAN_ROWS: [string, string][] = [
@@ -640,10 +763,14 @@ export function planPeak(u: Any) {
   }));
   return rows.sort((a, b) => b.pct - a.pct)[0] || null;
 }
-/** Your Claude plan's usage limits as bars (5-hour, weekly), like Claude's own "Plan usage limits". */
+/**
+ * Your Claude plan's usage limits as bars (5-hour, weekly), like Claude's own "Plan usage limits".
+ */
 export function PlanLimits({ u, compact = false }: { u: Any; compact?: boolean }) {
   if (!u) return null;
-  const rows = PLAN_ROWS.filter(([k]) => u[k] && (k === 'fiveHour' || k === 'weekly' || u[k].pct > 0));
+  const rows = PLAN_ROWS.filter(
+    ([k]) => u[k] && (k === 'fiveHour' || k === 'weekly' || u[k].pct > 0),
+  );
   return (
     <div className={`plan-limits ${compact ? 'compact' : ''}`}>
       {rows.map(([k, label]) => {

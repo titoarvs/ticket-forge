@@ -1,10 +1,13 @@
-// MCP server (Model Context Protocol, Streamable HTTP, stateless): lets third-party clients create, read and search a
-// project's issues and epics. Every call acts as the person the API token belongs to (lib/auth.ts apiTokenUser), and
-// every tool checks, on the server, that the project is in that person's workspace and on their access list, and that
-// their role allows the action (issue.create to create; reading needs project access only, like the AI helper's search).
-// A project the person can't open answers like one that doesn't exist, and nothing about it is returned.
-// Created issues go straight to the end of the backlog (first workflow status, no sprint), with a history and a
-// project timeline entry. The transport is in app/api/mcp/route.ts; the tools are plain functions, so tests call them directly.
+// MCP server (Model Context Protocol, Streamable HTTP, stateless): lets third-party clients create,
+// read and search a project's issues and epics. Every call acts as the person the API token belongs
+// to (lib/auth.ts apiTokenUser), and every tool checks, on the server, that the project is in that
+// person's workspace and on their access list, and that their role allows the action (issue.create
+// to create; reading needs project access only, like the AI helper's search).
+// A project the person can't open answers like one that doesn't exist, and nothing about it is
+// returned.
+// Created issues go straight to the end of the backlog (first workflow status, no sprint), with a
+// history and a project timeline entry. The transport is in app/api/mcp/route.ts; the tools are
+// plain functions, so tests call them directly.
 import { q, tx } from './db';
 import { HttpError } from './auth';
 import { has, projectWorkspace, requireAccess, requirePerm, noteVersion } from './store';
@@ -26,18 +29,23 @@ const bad = (msg: string) => new HttpError(400, msg);
 
 // ---------------------------------------------------------------- project and argument checks
 /**
- * The project the call is about. Unknown ids (also another workspace's or an archived project's) are one error, a project the
- * person can't open another; `unknownIsInvalid` makes the first a validation error (create_issue) instead of "not found".
+ * The project the call is about. Unknown ids (also another workspace's or an archived project's)
+ * are one error, a project the person can't open another; `unknownIsInvalid` makes the first a
+ * validation error (create_issue) instead of "not found".
  */
 async function openProject(user, projectId: unknown, unknownIsInvalid = false) {
   const id = typeof projectId === 'string' ? projectId.trim() : '';
   if (!id) throw bad('projectId is required.');
-  const unknown = unknownIsInvalid ? bad(`Unknown project id “${id.slice(0, 64)}”.`) : new HttpError(404, 'Project not found');
+  const unknown = unknownIsInvalid
+    ? bad(`Unknown project id “${id.slice(0, 64)}”.`)
+    : new HttpError(404, 'Project not found');
   if (!/^[\w-]{1,64}$/.test(id)) throw unknown;
   const w = await projectWorkspace(id);
   if (!w || w !== user.workspace_id) throw unknown;
   requireAccess(user, id);
-  const p = (await q('select id, key, data from projects where id = $1 and archived_at is null', [id])).rows[0];
+  const p = (
+    await q('select id, key, data from projects where id = $1 and archived_at is null', [id])
+  ).rows[0];
   if (!p) throw unknown;
   return { id, key: String(p.key), data: p.data || {} };
 }
@@ -62,15 +70,19 @@ const list = (v: unknown, field: string) => {
 };
 const oneOf = (v: unknown, field: string, allowed: string[], dflt: string) => {
   if (v == null || v === '') return dflt;
-  const m = allowed.find((x) => typeof v === 'string' && x.toLowerCase() === v.trim().toLowerCase());
+  const m = allowed.find(
+    (x) => typeof v === 'string' && x.toLowerCase() === v.trim().toLowerCase(),
+  );
   if (!m) throw bad(`${field} must be one of ${allowed.join(', ')}.`);
   return m;
 };
 const paging = (args: any) => {
   const limit = args?.limit == null ? DEFAULT_LIMIT : Number(args.limit);
   const offset = args?.offset == null ? 0 : Number(args.offset);
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) throw bad(`limit must be a whole number from 1 to ${MAX_LIMIT}.`);
-  if (!Number.isInteger(offset) || offset < 0) throw bad('offset must be a whole number, 0 or more.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT)
+    throw bad(`limit must be a whole number from 1 to ${MAX_LIMIT}.`);
+  if (!Number.isInteger(offset) || offset < 0)
+    throw bad('offset must be a whole number, 0 or more.');
   return { limit, offset };
 };
 const likeOf = (s: string) => `%${s.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -100,9 +112,16 @@ const issueFull = (d: any) => ({
   createdAt: d.createdAt || null,
   updatedAt: d.updatedAt || null,
 });
-// Draft epics are saved AI output that nobody published yet: they aren't part of the backlog, so they aren't shown.
-const publishedEpics = (data: any) => (Array.isArray(data?.epics) ? data.epics : []).filter((e: any) => e && e.id && !e.draft);
-const epicOut = (e: any) => ({ id: e.id, key: e.key || '', title: e.title || '', description: e.description || '' });
+// Draft epics are saved AI output that nobody published yet: they aren't part of the backlog, so
+// they aren't shown.
+const publishedEpics = (data: any) =>
+  (Array.isArray(data?.epics) ? data.epics : []).filter((e: any) => e && e.id && !e.draft);
+const epicOut = (e: any) => ({
+  id: e.id,
+  key: e.key || '',
+  title: e.title || '',
+  description: e.description || '',
+});
 
 // ---------------------------------------------------------------- tools
 /** Creates one issue at the end of the project's backlog, as the calling person. */
@@ -124,19 +143,29 @@ export async function createIssue(user, args: any) {
 
   const project = await openProject(user, args?.projectId, true);
   requirePerm(user, 'issue.create');
-  if (epicId && !publishedEpics(project.data).some((e: any) => e.id === epicId)) throw bad('That epic isn’t in this project.');
+  if (epicId && !publishedEpics(project.data).some((e: any) => e.id === epicId))
+    throw bad('That epic isn’t in this project.');
 
   const out = await tx(async (t) => {
-    // The project row first (the same order as every other save): it holds the project's lock while the key is chosen.
+    // The project row first (the same order as every other save): it holds the project's lock while
+    // the key is chosen.
     const pr = (
-      await t.query('update projects set version = version + 1, updated_at = now() where id = $1 and archived_at is null returning version, data', [
-        project.id,
-      ])
+      await t.query(
+        'update projects set version = version + 1, updated_at = now() where id = $1 and archived_at is null returning version, data',
+        [project.id],
+      )
     ).rows[0];
     if (!pr) throw bad(`Unknown project id “${project.id}”.`);
     const re = new RegExp(`^${project.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`);
-    const rows = (await t.query("select data->>'key' as key, position from issues where project_id = $1", [project.id])).rows;
-    const max = rows.reduce((m, r) => Math.max(m, Number(String(r.key || '').match(re)?.[1] || 0)), 0);
+    const rows = (
+      await t.query("select data->>'key' as key, position from issues where project_id = $1", [
+        project.id,
+      ])
+    ).rows;
+    const max = rows.reduce(
+      (m, r) => Math.max(m, Number(String(r.key || '').match(re)?.[1] || 0)),
+      0,
+    );
     const maxPos = rows.reduce((m, r) => Math.max(m, Number(r.position)), -1);
     const now = new Date().toISOString();
     const issue = {
@@ -162,33 +191,43 @@ export async function createIssue(user, args: any) {
       links: [],
       prs: [],
       comments: [],
-      history: [{ id: uid(), at: now, author: user.name || '', field: 'created', text: 'created the issue through MCP' }],
+      history: [
+        {
+          id: uid(),
+          at: now,
+          author: user.name || '',
+          field: 'created',
+          text: 'created the issue through MCP',
+        },
+      ],
       createdAt: now,
       updatedAt: now,
     };
-    await t.query('insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)', [
-      project.id,
-      issue.id,
-      maxPos + 1,
-      JSON.stringify(issue),
-      user.id,
-      pr.version,
-    ]);
-    await t.query("insert into activity (project_id, version, user_id, author, kind, target, text) values ($1,$2,$3,$4,'issue',$5,$6)", [
-      project.id,
-      pr.version,
-      user.id,
-      user.name || '',
-      issue.key,
-      `created ${issue.key} “${title.slice(0, 120)}” through MCP`,
-    ]);
+    await t.query(
+      'insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)',
+      [project.id, issue.id, maxPos + 1, JSON.stringify(issue), user.id, pr.version],
+    );
+    await t.query(
+      "insert into activity (project_id, version, user_id, author, kind, target, text) values ($1,$2,$3,$4,'issue',$5,$6)",
+      [
+        project.id,
+        pr.version,
+        user.id,
+        user.name || '',
+        issue.key,
+        `created ${issue.key} “${title.slice(0, 120)}” through MCP`,
+      ],
+    );
     return { version: pr.version, issue };
   });
   noteVersion(project.id, out.version);
   return { issue: issueFull(out.issue) };
 }
 
-/** Issues of one project, newest position last; `query` searches key, title, user story and description. */
+/**
+ * Issues of one project, newest position last; `query` searches key, title, user story and
+ * description.
+ */
 export async function listIssues(user, args: any) {
   const project = await openProject(user, args?.projectId);
   const { limit, offset } = paging(args);
@@ -199,40 +238,68 @@ export async function listIssues(user, args: any) {
     where.push(sql.replace('$$', () => `$${params.length}`));
   };
   const query = text(args?.query, 'query', 200);
-  if (query) add("concat_ws(' ', data->>'key', data->>'title', data->>'userStory', data->>'description') ilike $$", likeOf(query));
+  if (query)
+    add(
+      "concat_ws(' ', data->>'key', data->>'title', data->>'userStory', data->>'description') ilike $$",
+      likeOf(query),
+    );
   for (const f of ['status', 'type', 'priority', 'assignee', 'epicId']) {
     const v = text(args?.[f], f, 200);
     if (v) add(`data->>'${f}' = $$`, v);
   }
   const rows = (
-    await q(`select data from issues where ${where.join(' and ')} order by position, id limit ${limit + 1} offset ${offset}`, params)
+    await q(
+      `select data from issues where ${where.join(' and ')} order by position, id limit ${limit + 1} offset ${offset}`,
+      params,
+    )
   ).rows;
-  return { issues: rows.slice(0, limit).map((r) => issueSummary(r.data)), more: rows.length > limit };
+  return {
+    issues: rows.slice(0, limit).map((r) => issueSummary(r.data)),
+    more: rows.length > limit,
+  };
 }
 
 /** One issue of the project, by id or key. */
 export async function getIssue(user, args: any) {
   const project = await openProject(user, args?.projectId);
   const ref = text(args?.issueId, 'issueId', 200, true);
-  const row = (await q("select data from issues where project_id = $1 and (id = $2 or upper(data->>'key') = upper($2))", [project.id, ref])).rows[0];
+  const row = (
+    await q(
+      "select data from issues where project_id = $1 and (id = $2 or upper(data->>'key') = upper($2))",
+      [project.id, ref],
+    )
+  ).rows[0];
   if (!row) throw new HttpError(404, `No issue “${ref}” in this project.`);
   return { issue: issueFull(row.data) };
 }
 
-/** Epics of one project with how many issues each has; `query` searches key, title and description. */
+/**
+ * Epics of one project with how many issues each has; `query` searches key, title and description.
+ */
 export async function listEpics(user, args: any) {
   const project = await openProject(user, args?.projectId);
   const { limit, offset } = paging(args);
   const query = text(args?.query, 'query', 200).toLowerCase();
-  const match = (e: any) => !query || [e.key, e.title, e.description].some((s) => String(s || '').toLowerCase().includes(query));
+  const match = (e: any) =>
+    !query ||
+    [e.key, e.title, e.description].some((s) =>
+      String(s || '')
+        .toLowerCase()
+        .includes(query),
+    );
   const found = publishedEpics(project.data).filter(match);
   const counts = new Map(
     (
-      await q("select data->>'epicId' as epic, count(*)::int as n from issues where project_id = $1 and data->>'epicId' is not null group by 1", [project.id])
+      await q(
+        "select data->>'epicId' as epic, count(*)::int as n from issues where project_id = $1 and data->>'epicId' is not null group by 1",
+        [project.id],
+      )
     ).rows.map((r) => [r.epic, r.n]),
   );
   return {
-    epics: found.slice(offset, offset + limit).map((e: any) => ({ ...epicOut(e), issueCount: counts.get(e.id) || 0 })),
+    epics: found
+      .slice(offset, offset + limit)
+      .map((e: any) => ({ ...epicOut(e), issueCount: counts.get(e.id) || 0 })),
     more: found.length > offset + limit,
   };
 }
@@ -241,24 +308,50 @@ export async function listEpics(user, args: any) {
 export async function getEpic(user, args: any) {
   const project = await openProject(user, args?.projectId);
   const ref = text(args?.epicId, 'epicId', 200, true).toLowerCase();
-  const epic = publishedEpics(project.data).find((e: any) => String(e.id).toLowerCase() === ref || String(e.key || '').toLowerCase() === ref);
+  const epic = publishedEpics(project.data).find(
+    (e: any) => String(e.id).toLowerCase() === ref || String(e.key || '').toLowerCase() === ref,
+  );
   if (!epic) throw new HttpError(404, `No epic “${ref.slice(0, 64)}” in this project.`);
-  const rows = (await q("select data from issues where project_id = $1 and data->>'epicId' = $2 order by position, id limit $3", [project.id, epic.id, MAX_LIMIT + 1])).rows;
-  return { epic: { ...epicOut(epic), issueCount: rows.length, issues: rows.slice(0, MAX_LIMIT).map((r) => issueSummary(r.data)), more: rows.length > MAX_LIMIT } };
+  const rows = (
+    await q(
+      "select data from issues where project_id = $1 and data->>'epicId' = $2 order by position, id limit $3",
+      [project.id, epic.id, MAX_LIMIT + 1],
+    )
+  ).rows;
+  return {
+    epic: {
+      ...epicOut(epic),
+      issueCount: rows.length,
+      issues: rows.slice(0, MAX_LIMIT).map((r) => issueSummary(r.data)),
+      more: rows.length > MAX_LIMIT,
+    },
+  };
 }
 
 // ---------------------------------------------------------------- tool catalogue
 const str = (description: string) => ({ type: 'string', description });
 const projectId = str('The id of the project.');
 const pagingProps = {
-  limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, description: `How many to return (default ${DEFAULT_LIMIT}).` },
+  limit: {
+    type: 'integer',
+    minimum: 1,
+    maximum: MAX_LIMIT,
+    description: `How many to return (default ${DEFAULT_LIMIT}).`,
+  },
   offset: { type: 'integer', minimum: 0, description: 'How many to skip, for the next page.' },
 };
-type Tool = { name: string; description: string; inputSchema: any; run: (user: any, args: any) => Promise<any>; needs?: string };
+type Tool = {
+  name: string;
+  description: string;
+  inputSchema: any;
+  run: (user: any, args: any) => Promise<any>;
+  needs?: string;
+};
 export const TOOLS: Tool[] = [
   {
     name: 'create_issue',
-    description: 'Create one issue in a project’s backlog. Needs the “Create issues” permission. The new issue gets the first workflow status.',
+    description:
+      'Create one issue in a project’s backlog. Needs the “Create issues” permission. The new issue gets the first workflow status.',
     needs: 'issue.create',
     inputSchema: {
       type: 'object',
@@ -269,7 +362,11 @@ export const TOOLS: Tool[] = [
         priority: { type: 'string', enum: PRIORITIES, description: 'Default Medium.' },
         description: str('What the issue is about.'),
         userStory: str('“As a …, I want …, so that …”.'),
-        acceptanceCriteria: { type: 'array', items: { type: 'string' }, description: 'One item per criterion.' },
+        acceptanceCriteria: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'One item per criterion.',
+        },
         labels: { type: 'array', items: { type: 'string' } },
         storyPoints: { type: 'number', minimum: 0 },
         epicId: str('The id of an epic of this project to put the issue in.'),
@@ -281,7 +378,8 @@ export const TOOLS: Tool[] = [
   },
   {
     name: 'list_issues',
-    description: 'List or search the issues of a project. “query” searches key, title, user story and description.',
+    description:
+      'List or search the issues of a project. “query” searches key, title, user story and description.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -312,7 +410,8 @@ export const TOOLS: Tool[] = [
   },
   {
     name: 'list_epics',
-    description: 'List or search the epics of a project. “query” searches key, title and description.',
+    description:
+      'List or search the epics of a project. “query” searches key, title and description.',
     inputSchema: {
       type: 'object',
       properties: { projectId, query: str('Text to look for.'), ...pagingProps },
@@ -335,29 +434,45 @@ export const TOOLS: Tool[] = [
 ];
 
 /** The tools this person may use (create_issue is left out for a role without issue.create). */
-export const toolsFor = (user) => TOOLS.filter((t) => !t.needs || has(user, t.needs)).map(({ run: _r, needs: _n, ...t }) => t);
+export const toolsFor = (user) =>
+  TOOLS.filter((t) => !t.needs || has(user, t.needs)).map(({ run: _r, needs: _n, ...t }) => t);
 
-/** Runs one tool as `user`. Throws HttpError (400 validation, 403 permission, 404 project or item not found). */
+/**
+ * Runs one tool as `user`. Throws HttpError (400 validation, 403 permission, 404 project or item
+ * not found).
+ */
 export async function callTool(user, name: string, args: any) {
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) throw bad(`Unknown tool “${String(name).slice(0, 64)}”.`);
-  if (args != null && (typeof args !== 'object' || Array.isArray(args))) throw bad('The tool arguments must be an object.');
+  if (args != null && (typeof args !== 'object' || Array.isArray(args)))
+    throw bad('The tool arguments must be an object.');
   return tool.run(user, args || {});
 }
 
 // ---------------------------------------------------------------- JSON-RPC
 const rpcResult = (id, result) => ({ jsonrpc: '2.0', id, result });
-export const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } });
+export const rpcError = (id, code, message) => ({
+  jsonrpc: '2.0',
+  id: id ?? null,
+  error: { code, message },
+});
 const CODE = { 400: 'validation_error', 403: 'permission_denied', 404: 'not_found' };
 
 /**
- * Answers one JSON-RPC message as `user`: the response object, or null for a notification (nothing to send back).
- * A tool that is refused (validation, permission, no access) is a normal result with isError, as MCP defines for tool
- * errors; the structured error carries the HTTP-style status.
+ * Answers one JSON-RPC message as `user`: the response object, or null for a notification (nothing
+ * to send back).
+ * A tool that is refused (validation, permission, no access) is a normal result with isError, as
+ * MCP defines for tool errors; the structured error carries the HTTP-style status.
  */
 export async function handleMessage(user, msg: any) {
   // A client's answer to a server request: this server sends none, so there is nothing to do.
-  if (msg && typeof msg === 'object' && msg.method === undefined && ('result' in msg || 'error' in msg)) return null;
+  if (
+    msg &&
+    typeof msg === 'object' &&
+    msg.method === undefined &&
+    ('result' in msg || 'error' in msg)
+  )
+    return null;
   if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string')
     return rpcError(msg?.id, -32600, 'Invalid request.');
   const isNotification = msg.id === undefined || msg.id === null;
@@ -365,10 +480,13 @@ export async function handleMessage(user, msg: any) {
   switch (msg.method) {
     case 'initialize':
       return rpcResult(msg.id, {
-        protocolVersion: PROTOCOL_VERSIONS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOL_VERSIONS[0],
+        protocolVersion: PROTOCOL_VERSIONS.includes(params.protocolVersion)
+          ? params.protocolVersion
+          : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
-        instructions: 'Create, list, search and read issues and epics of Ticket Forge projects. Every call acts as the person the token belongs to.',
+        instructions:
+          'Create, list, search and read issues and epics of Ticket Forge projects. Every call acts as the person the token belongs to.',
       });
     case 'ping':
       return rpcResult(msg.id, {});
@@ -379,15 +497,25 @@ export async function handleMessage(user, msg: any) {
         return rpcError(msg.id, -32602, `Unknown tool “${String(params.name).slice(0, 64)}”.`);
       try {
         const out = await callTool(user, params.name, params.arguments);
-        return rpcResult(msg.id, { content: [{ type: 'text', text: JSON.stringify(out) }], structuredContent: out, isError: false });
+        return rpcResult(msg.id, {
+          content: [{ type: 'text', text: JSON.stringify(out) }],
+          structuredContent: out,
+          isError: false,
+        });
       } catch (e: any) {
         if (!e.status || e.status >= 500) throw e;
         const error = { status: e.status, code: CODE[e.status] || 'error', message: e.message };
-        return rpcResult(msg.id, { content: [{ type: 'text', text: `${error.code}: ${error.message}` }], structuredContent: { error }, isError: true });
+        return rpcResult(msg.id, {
+          content: [{ type: 'text', text: `${error.code}: ${error.message}` }],
+          structuredContent: { error },
+          isError: true,
+        });
       }
     }
     default:
       // Notifications (such as notifications/initialized) need no answer; an unknown request does.
-      return isNotification ? null : rpcError(msg.id, -32601, `Method not found: ${msg.method.slice(0, 64)}`);
+      return isNotification
+        ? null
+        : rpcError(msg.id, -32601, `Method not found: ${msg.method.slice(0, 64)}`);
   }
 }

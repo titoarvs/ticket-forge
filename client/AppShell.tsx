@@ -48,7 +48,14 @@ import {
   resetLabel,
 } from './ui';
 import { AppSkeleton, NotifSkeleton } from './skeletons';
-import { loadEngine, logout, exportAs, AiSettingsModal, openCreateIssue, openDrawer } from './actions';
+import {
+  loadEngine,
+  logout,
+  exportAs,
+  AiSettingsModal,
+  openCreateIssue,
+  openDrawer,
+} from './actions';
 import { AccountModal } from './Admin';
 import { MyAiModal } from './MyAi';
 import { useThemeMode } from './theme';
@@ -96,8 +103,9 @@ export async function bootSession() {
 }
 
 /**
- * Reloads the AI connection status. A failed request never clears a status we already have; when there is none
- * yet, it tries again shortly (3 s, 10 s, 30 s) instead of leaving the pill empty until the next poll.
+ * Reloads the AI connection status. A failed request never clears a status we already have; when
+ * there is none yet, it tries again shortly (3 s, 10 s, 30 s) instead of leaving the pill empty
+ * until the next poll.
  */
 let statusRetry: Any = null;
 export async function refreshStatus(attempt = 0, fresh = false) {
@@ -107,13 +115,15 @@ export async function refreshStatus(attempt = 0, fresh = false) {
     emit();
   }
   try {
-    // fresh: the server checks the Claude sign-in and AI settings again instead of answering from its cache.
+    // fresh: the server checks the Claude sign-in and AI settings again instead of answering from
+    // its cache.
     S.status = await api(`/api/status${fresh ? '?fresh=1' : ''}`);
     S.statusError = null;
     S.statusAt = Date.now();
   } catch (e: Any) {
     S.statusError = e?.message || 'Couldn’t check the AI connection';
-    if (!S.status && attempt < 3) statusRetry = setTimeout(() => refreshStatus(attempt + 1), [3000, 10000, 30000][attempt]);
+    if (!S.status && attempt < 3)
+      statusRetry = setTimeout(() => refreshStatus(attempt + 1), [3000, 10000, 30000][attempt]);
   } finally {
     S.statusBusy = false;
   }
@@ -124,7 +134,14 @@ export const aiInactive = (st: Any) => !st || !st.ready || Boolean(st.switched);
 
 function connInfo() {
   const st = S.status;
-  if (!st) return { ok: false, label: S.statusError ? 'AI status unavailable' : 'Checking AI…', model: '', switched: false, unknown: true };
+  if (!st)
+    return {
+      ok: false,
+      label: S.statusError ? 'AI status unavailable' : 'Checking AI…',
+      model: '',
+      switched: false,
+      unknown: true,
+    };
   const ok = Boolean(st.ready);
   const label = st.label || 'AI';
   const model = !ok
@@ -135,18 +152,28 @@ function connInfo() {
   return { ok, label, model, switched: Boolean(st.switched) };
 }
 
-/** Local only: switch this computer's AI between your Claude account and GitHub Copilot in one click. */
+/**
+ * Local only: switch this computer's AI between your Claude account and GitHub Copilot in one
+ * click.
+ */
 export async function setLocalEngine(k: 'claude' | 'copilot') {
   if (S.status?.localEngine === k || S.localSwitching) return;
   S.localSwitching = k;
   emit();
   try {
     await api('/api/admin/ai', { method: 'PATCH', body: { localEngine: k } });
-    // The saved AI settings are current on the server already: no need for the slower full check (?fresh=1).
+    // The saved AI settings are current on the server already: no need for the slower full check
+    // (?fresh=1).
     await refreshStatus();
-    toast(k === 'copilot' ? 'AI actions now run on GitHub Copilot.' : 'AI actions now run on your Claude account.', 'ok', {
-      title: 'Local AI switched',
-    });
+    toast(
+      k === 'copilot'
+        ? 'AI actions now run on GitHub Copilot.'
+        : 'AI actions now run on your Claude account.',
+      'ok',
+      {
+        title: 'Local AI switched',
+      },
+    );
   } catch (e: Any) {
     toast(e?.message || 'Couldn’t switch the local AI', 'err');
   } finally {
@@ -173,7 +200,11 @@ function LocalSwitch({ st }: { st: Any }) {
     [
       'copilot',
       'Copilot',
-      !cp.available ? 'Not installed' : cp.cooldown ? 'Limited' : st.copilotModel || 'GitHub Copilot',
+      !cp.available
+        ? 'Not installed'
+        : cp.cooldown
+          ? 'Limited'
+          : st.copilotModel || 'GitHub Copilot',
       Boolean(cp.available),
     ],
   ];
@@ -190,13 +221,19 @@ function LocalSwitch({ st }: { st: Any }) {
             aria-checked={cur === k}
             className={cur === k ? 'on' : ''}
             disabled={!ok || Boolean(S.localSwitching)}
-            title={!ok ? 'Install the GitHub Copilot CLI first (Administration → AI → Local AI)' : `Run AI actions on ${label}`}
+            title={
+              !ok
+                ? 'Install the GitHub Copilot CLI first (Administration → AI → Local AI)'
+                : `Run AI actions on ${label}`
+            }
             onClick={() => setLocalEngine(k)}
           >
             {S.localSwitching === k ? (
               <Spinner />
             ) : (
-              <span className={`dot ${!ok ? 'bad' : (k === 'claude' ? acct.cooldown || !acct.signedIn : cp.cooldown) ? 'warn' : 'ok'}`} />
+              <span
+                className={`dot ${!ok ? 'bad' : (k === 'claude' ? acct.cooldown || !acct.signedIn : cp.cooldown) ? 'warn' : 'ok'}`}
+              />
             )}
             <b>{label}</b>
             <small>{sub}</small>
@@ -212,28 +249,43 @@ function LocalSwitch({ st }: { st: Any }) {
 }
 
 /**
- * The AI menu in the top bar: which AI the app is using now (and why, when it's a backup), which AI runs your next AI
- * actions ("Runs on"), a way to check the connection again and the AI settings.
+ * The AI menu in the top bar: which AI the app is using now (and why, when it's a backup), which AI
+ * runs your next AI actions ("Runs on"), a way to check the connection again and the AI settings.
  */
 function AiMenu() {
   const st = S.status;
   const c = connInfo();
   const unknown = 'unknown' in c;
   const cool = st?.account?.cooldown;
-  const at = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '');
+  const at = (iso?: string) =>
+    iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
   const why = c.switched
     ? cool
       ? `Claude ${/weekly/.test(cool.reason || '') ? 'weekly limit' : /daily/.test(cool.reason || '') ? 'daily limit' : 'limit'}${cool.until ? ` · back ${at(cool.until)}` : ''}`
       : 'Main AI unavailable'
     : '';
   const tone = unknown ? 'pending' : !c.ok ? 'bad' : c.switched ? 'warn' : 'ok';
-  const name = unknown ? (S.statusError ? 'Status unavailable' : 'Checking…') : !c.ok ? 'Not connected' : c.label;
+  const name = unknown
+    ? S.statusError
+      ? 'Status unavailable'
+      : 'Checking…'
+    : !c.ok
+      ? 'Not connected'
+      : c.label;
   const ch = st?.aiChoices;
   const run = S.aiRun || 'auto';
   const runs: [string, string, string][] = [
     ['auto', 'Auto', st?.routingOn ? 'per task (Model routing)' : st?.model || ''],
-    ...Object.keys(TIER_NAME).map((k): [string, string, string] => [k, TIER_NAME[k], ch?.tiers?.[k] || '']),
-    ...(ch?.configs || []).map((x: Any): [string, string, string] => [`cfg:${x.id}`, x.name, x.model || '']),
+    ...Object.keys(TIER_NAME).map((k): [string, string, string] => [
+      k,
+      TIER_NAME[k],
+      ch?.tiers?.[k] || '',
+    ]),
+    ...(ch?.configs || []).map((x: Any): [string, string, string] => [
+      `cfg:${x.id}`,
+      x.name,
+      x.model || '',
+    ]),
   ];
   const runName = runs.find((r) => r[0] === run)?.[1] || 'Auto';
   const open = S.menu === 'ai';
@@ -281,8 +333,12 @@ function AiMenu() {
         <div>
           <b>{name}</b>
           {c.model && <code className="ai-model">{c.model}</code>}
-          {c.switched && <p className="warn-text small">Backup: {why}. It switches back by itself.</p>}
-          {!unknown && !c.ok && <p className="muted small">AI actions are off until an AI is connected.</p>}
+          {c.switched && (
+            <p className="warn-text small">Backup: {why}. It switches back by itself.</p>
+          )}
+          {!unknown && !c.ok && (
+            <p className="muted small">AI actions are off until an AI is connected.</p>
+          )}
         </div>
       </div>
       {st?.copilot && can('users.manage') && <LocalSwitch st={st} />}
@@ -291,15 +347,23 @@ function AiMenu() {
           <div className="mh">
             Claude plan limits
             {st.account?.subscriptionType ? (
-              <small className="muted"> · {String(st.account.subscriptionType).replace(/^./, (c: string) => c.toUpperCase())}</small>
+              <small className="muted">
+                {' '}
+                ·{' '}
+                {String(st.account.subscriptionType).replace(/^./, (c: string) => c.toUpperCase())}
+              </small>
             ) : null}
           </div>
           <PlanLimits u={st.planUsage} compact />
         </div>
       )}
       {st?.budget?.near && (
-        <p className={st.budget.over ? 'warn-text small ai-budget' : 'muted small ai-budget'} onClick={(e) => e.stopPropagation()}>
-          AI budget: ${st.budget.spent.toFixed(2)} of ${st.budget.limit} this month ({Math.round(st.budget.pct * 100)}%).
+        <p
+          className={st.budget.over ? 'warn-text small ai-budget' : 'muted small ai-budget'}
+          onClick={(e) => e.stopPropagation()}
+        >
+          AI budget: ${st.budget.spent.toFixed(2)} of ${st.budget.limit} this month (
+          {Math.round(st.budget.pct * 100)}%).
           {st.budget.over
             ? st.budget.action === 'pause'
               ? ' AI is paused for everyone but owners.'
@@ -316,7 +380,12 @@ function AiMenu() {
             Runs on <small className="muted">your next AI actions</small>
           </div>
           {runs.map(([k, label, model]) => (
-            <button key={k} role="menuitemradio" aria-checked={run === k} onClick={() => setAiRun(k)}>
+            <button
+              key={k}
+              role="menuitemradio"
+              aria-checked={run === k}
+              onClick={() => setAiRun(k)}
+            >
               <span className="radio-dot">{run === k && <Ico svg={I.check} />}</span>
               {label}
               {model && <small>{model}</small>}
@@ -379,7 +448,11 @@ export function ProjectSwitcher({ p }: { p: Any }) {
           aria-haspopup="menu"
           aria-expanded={open}
         >
-          <span className="proj-avatar xs" style={{ background: hashColor(p.key, COLORS) }} aria-hidden>
+          <span
+            className="proj-avatar xs"
+            style={{ background: hashColor(p.key, COLORS) }}
+            aria-hidden
+          >
             {String(p.key).slice(0, 2)}
           </span>
           <span className="proj-name">{p.name}</span>
@@ -419,7 +492,10 @@ export function ProjectSwitcher({ p }: { p: Any }) {
   );
 }
 
-/** Search in the top bar (⌘K): issues by key or summary inside a project, projects elsewhere. Enter opens the first match. */
+/**
+ * Search in the top bar (⌘K): issues by key or summary inside a project, projects elsewhere. Enter
+ * opens the first match.
+ */
 function HeaderSearch({ inProject }: { inProject: boolean }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -445,7 +521,14 @@ function HeaderSearch({ inProject }: { inProject: boolean }) {
       }
     }
   };
-  type Hit = { id: string; key: string; title: string; go: () => void; icon: ReactNode; meta?: string };
+  type Hit = {
+    id: string;
+    key: string;
+    title: string;
+    go: () => void;
+    icon: ReactNode;
+    meta?: string;
+  };
   let hits: Hit[] = [];
   if (qq) {
     if (inProject) {
@@ -455,7 +538,15 @@ function HeaderSearch({ inProject }: { inProject: boolean }) {
           const key = String(t.key).toLowerCase(),
             title = String(t.title).toLowerCase();
           const score =
-            key === qq ? 0 : key.startsWith(qq) ? 1 : title.startsWith(qq) ? 2 : title.includes(qq) || key.includes(qq) ? 3 : -1;
+            key === qq
+              ? 0
+              : key.startsWith(qq)
+                ? 1
+                : title.startsWith(qq)
+                  ? 2
+                  : title.includes(qq) || key.includes(qq)
+                    ? 3
+                    : -1;
           return { t, score };
         })
         .filter((x: Any) => x.score >= 0)
@@ -577,15 +668,18 @@ function HeaderSearch({ inProject }: { inProject: boolean }) {
 }
 
 /**
- * The top bar, left to right: the app and its main pages, where you are (project switcher), search and Create;
- * then this project's save state, undo/redo and export; then the AI, notifications and your account.
+ * The top bar, left to right: the app and its main pages, where you are (project switcher), search
+ * and Create; then this project's save state, undo/redo and export; then the AI, notifications and
+ * your account.
  */
 export function TopNav() {
   const pathname = usePathname();
   const p = P();
   const { mode, toggle } = useThemeMode();
   // Only once the project in the address has loaded (not the previous one while switching).
-  const inProject = Boolean(pathname.startsWith('/p/') && p && p.id === decodeURIComponent(pathname.split('/')[2] || ''));
+  const inProject = Boolean(
+    pathname.startsWith('/p/') && p && p.id === decodeURIComponent(pathname.split('/')[2] || ''),
+  );
   const inAdmin = pathname.startsWith('/admin');
   const saving = /Saving/.test(S.saveText),
     failed = /failed/i.test(S.saveText);
@@ -653,17 +747,34 @@ export function TopNav() {
               {saving ? <span className="spinner sm" /> : <Ico svg={failed ? I.warn : I.check} />}
               <span className="hide-md">{S.saveText || 'Saved'}</span>
             </span>
-            <button className="icon-btn" title="Undo (⌘Z)" aria-label="Undo" disabled={!S.undo.length} onClick={undo}>
+            <button
+              className="icon-btn"
+              title="Undo (⌘Z)"
+              aria-label="Undo"
+              disabled={!S.undo.length}
+              onClick={undo}
+            >
               <Ico svg={I.undo} />
             </button>
-            <button className="icon-btn" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!S.redo.length} onClick={redo}>
+            <button
+              className="icon-btn"
+              title="Redo (⇧⌘Z)"
+              aria-label="Redo"
+              disabled={!S.redo.length}
+              onClick={redo}
+            >
               <Ico svg={I.redo} />
             </button>
             {can('export') && (
               <Menu
                 id="export"
                 button={
-                  <button className="icon-btn" title="Export" aria-label="Export" onClick={() => setMenu('export')}>
+                  <button
+                    className="icon-btn"
+                    title="Export"
+                    aria-label="Export"
+                    onClick={() => setMenu('export')}
+                  >
                     <Ico svg={I.download} />
                   </button>
                 }
@@ -760,7 +871,9 @@ export function TopNav() {
               title="Where Write code with AI and test runs go (this browser only; the deployed app always uses GitHub Actions)"
             >
               <Ico svg={runPlace() === 'github' ? I.pr : I.folder} />
-              {runPlace() === 'github' ? 'Code & tests: GitHub Actions' : 'Code & tests: this computer'}
+              {runPlace() === 'github'
+                ? 'Code & tests: GitHub Actions'
+                : 'Code & tests: this computer'}
             </button>
           )}
           <button
@@ -860,7 +973,11 @@ function Notifications() {
           )
         ) : items.length ? (
           items.map((n: Any) => (
-            <button key={n.id} className={`notif ${n.read_at ? '' : 'unread'}`} onClick={() => open(n)}>
+            <button
+              key={n.id}
+              className={`notif ${n.read_at ? '' : 'unread'}`}
+              onClick={() => open(n)}
+            >
               <span className="notif-ic">
                 <Ico svg={n.kind === 'test-failed' ? I.bot : I.bell} />
               </span>
@@ -945,7 +1062,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const inField = (e.target as HTMLElement).closest?.('input,textarea,select,[contenteditable],[role=combobox],[role=listbox]');
+      const inField = (e.target as HTMLElement).closest?.(
+        'input,textarea,select,[contenteditable],[role=combobox],[role=listbox]',
+      );
       if (S.modal) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !inField && P()) {
         e.preventDefault();
@@ -997,7 +1116,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         }
         return;
       }
-      if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey && P() && location.pathname.startsWith('/p/')) {
+      if (
+        !inField &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        P() &&
+        location.pathname.startsWith('/p/')
+      ) {
         if (e.key === 'c') {
           e.preventDefault();
           openCreateIssue();
@@ -1059,7 +1185,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <TourHost>
       <TopNav />
       {/* A trial that ended without a payment: the pay prompt replaces the app (checkout stays reachable so it can be paid). */}
-      <main id="app">{S.auth?.billing?.locked && !pathname.startsWith('/checkout') ? <LockedScreen /> : children}</main>
+      <main id="app">
+        {S.auth?.billing?.locked && !pathname.startsWith('/checkout') ? <LockedScreen /> : children}
+      </main>
       {S.modal as Any}
       <LegalPrompt />
       <Toasts />
@@ -1072,8 +1200,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
 const DOC_TITLE: Record<string, string> = { terms: 'Terms of Use', privacy: 'Privacy Policy' };
 /**
- * Asks people to accept the Terms of Use and Privacy Policy when they haven't yet (accounts from before consent
- * existed) or after a material change. On the hosted service (SaaS) it can't be put off; self-hosted, it can.
+ * Asks people to accept the Terms of Use and Privacy Policy when they haven't yet (accounts from
+ * before consent existed) or after a material change. On the hosted service (SaaS) it can't be put
+ * off; self-hosted, it can.
  */
 function LegalPrompt() {
   const [accept, setAccept] = useState(false);
@@ -1117,8 +1246,15 @@ function LegalPrompt() {
           ))}
         </ul>
         <label className="consent">
-          <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} data-testid="accept-legal" />
-          <span>I have read and agree to the {needs.map((d) => DOC_TITLE[d] || d).join(' and ')}.</span>
+          <input
+            type="checkbox"
+            checked={accept}
+            onChange={(e) => setAccept(e.target.checked)}
+            data-testid="accept-legal"
+          />
+          <span>
+            I have read and agree to the {needs.map((d) => DOC_TITLE[d] || d).join(' and ')}.
+          </span>
         </label>
         <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
           {!S.auth?.saas && (

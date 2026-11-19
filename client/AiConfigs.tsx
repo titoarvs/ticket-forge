@@ -1,20 +1,33 @@
 'use client';
-// Administration → AI → Configurations: named AI setups (engine + model + reasoning + standing instructions), e.g.
-// "Deep review: Claude Opus, thorough" or "Cheap drafts: OpenAI gpt-4.1-mini, fast". People pick one on any AI button
-// ("Runs on"), and Model routing can send a whole task to one.
+// Administration → AI → Configurations: named AI setups (engine + model + reasoning + standing
+// instructions), e.g. "Deep review: Claude Opus, thorough" or "Cheap drafts: OpenAI gpt-4.1-mini,
+// fast". People pick one on any AI button ("Runs on"), and Model routing can send a whole task to
+// one.
 import { useState } from 'react';
 import { api, toast, openModal, closeModal, uid, type Any } from './core';
 import { Ico, I, Modal, Confirm, EmptyState } from './ui';
 import { TF, TA, SF, CB, MenuItem, PeopleF } from './fields';
 
-const ENGINE: Record<string, string> = { claude: 'Claude account (Claude Code)', copilot: 'GitHub Copilot', api: 'An AI API provider' };
+const ENGINE: Record<string, string> = {
+  claude: 'Claude account (Claude Code)',
+  copilot: 'GitHub Copilot',
+  api: 'An AI API provider',
+};
 const REASONING: [string, string][] = [
   ['', 'Default (Generation settings)'],
   ['fast', 'Fast: no extended thinking'],
   ['balanced', 'Balanced'],
   ['thorough', 'Thorough: thinks deeply'],
 ];
-const CLAUDE_MODELS = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-2'];
+const CLAUDE_MODELS = [
+  'opus',
+  'sonnet',
+  'haiku',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
+  'claude-haiku-5-5',
+  'claude-fable-5-2',
+];
 
 function ConfigModal({ c, cfg, onSave }: { c: Any; cfg?: Any; onSave: (x: Any) => Promise<void> }) {
   const apis: Any[] = (c.apis || []).filter((x: Any) => x.entryId && x.configured);
@@ -40,7 +53,13 @@ function ConfigModal({ c, cfg, onSave }: { c: Any; cfg?: Any; onSave: (x: Any) =
       ? CLAUDE_MODELS
       : f.engine === 'copilot'
         ? (c.copilot?.models || []).filter(Boolean)
-        : ([...new Set([...(prov ? Object.values(c.tierHints?.[prov.id] || {}) : []), prov?.model].filter(Boolean))] as string[]);
+        : ([
+            ...new Set(
+              [...(prov ? Object.values(c.tierHints?.[prov.id] || {}) : []), prov?.model].filter(
+                Boolean,
+              ),
+            ),
+          ] as string[]);
   const ok = f.name.trim() && (f.engine !== 'api' || f.providerId);
   return (
     <Modal
@@ -67,7 +86,12 @@ function ConfigModal({ c, cfg, onSave }: { c: Any; cfg?: Any; onSave: (x: Any) =
       <div className="grid2">
         <label className="field">
           <span>Name</span>
-          <TF autoFocus value={f.name} placeholder="e.g. Deep review" onChange={(e) => set('name', e.target.value)} />
+          <TF
+            autoFocus
+            value={f.name}
+            placeholder="e.g. Deep review"
+            onChange={(e) => set('name', e.target.value)}
+          />
         </label>
         <label className="field">
           <span>Runs on</span>
@@ -104,7 +128,11 @@ function ConfigModal({ c, cfg, onSave }: { c: Any; cfg?: Any; onSave: (x: Any) =
             onChange={(v) => set('model', v.trim())}
             options={models}
             placeholder={
-              f.engine === 'api' ? prov?.model || 'The provider’s model' : f.engine === 'copilot' ? 'Copilot’s default' : 'sonnet'
+              f.engine === 'api'
+                ? prov?.model || 'The provider’s model'
+                : f.engine === 'copilot'
+                  ? 'Copilot’s default'
+                  : 'sonnet'
             }
           />
         </label>
@@ -128,11 +156,15 @@ function ConfigModal({ c, cfg, onSave }: { c: Any; cfg?: Any; onSave: (x: Any) =
           onChange={(e) => set('instructions', e.target.value)}
         />
       </label>
-      <CB label="Available on AI buttons" checked={f.enabled} onChange={(e: Any) => set('enabled', e.target.checked)} />
+      <CB
+        label="Available on AI buttons"
+        checked={f.enabled}
+        onChange={(e: Any) => set('enabled', e.target.checked)}
+      />
       {f.engine !== 'api' && c.mode !== 'account' && (
         <p className="warn-text small">
-          Claude account and GitHub Copilot run only when TicketForge is opened on your own computer. On a web address this configuration
-          falls back to the usual AI.
+          Claude account and GitHub Copilot run only when TicketForge is opened on your own
+          computer. On a web address this configuration falls back to the usual AI.
         </p>
       )}
     </Modal>
@@ -150,9 +182,11 @@ export function ConfigsSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
       throw e;
     }
   };
-  const upsert = (x: Any) => save(list.some((y) => y.id === x.id) ? list.map((y) => (y.id === x.id ? x : y)) : [...list, x]);
+  const upsert = (x: Any) =>
+    save(list.some((y) => y.id === x.id) ? list.map((y) => (y.id === x.id ? x : y)) : [...list, x]);
   const edit = (cfg?: Any) => openModal(<ConfigModal c={c} cfg={cfg} onSave={upsert} />);
-  const apiName = (id: string) => (c.apis || []).find((x: Any) => x.entryId === id)?.label || 'a removed provider';
+  const apiName = (id: string) =>
+    (c.apis || []).find((x: Any) => x.entryId === id)?.label || 'a removed provider';
   return (
     <div className="cards">
       <div className="card wide">
@@ -160,8 +194,9 @@ export function ConfigsSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3>Custom AI configurations</h3>
             <p className="sub">
-              Named setups people can choose on any AI button (<b>Runs on</b>), and that Model routing can assign to a task. Each one names
-              the AI, the model, how hard it thinks and standing instructions.
+              Named setups people can choose on any AI button (<b>Runs on</b>), and that Model
+              routing can assign to a task. Each one names the AI, the model, how hard it thinks and
+              standing instructions.
             </p>
           </div>
           <button className="btn primary" onClick={() => edit()}>
@@ -183,7 +218,9 @@ export function ConfigsSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
                     <div className="muted small">
                       {x.engine === 'api' ? apiName(x.providerId) : ENGINE[x.engine]}
                       {x.reasoning ? ` · ${x.reasoning}` : ''}
-                      {x.instructions ? ` · “${x.instructions.slice(0, 80)}${x.instructions.length > 80 ? '…' : ''}”` : ''}
+                      {x.instructions
+                        ? ` · “${x.instructions.slice(0, 80)}${x.instructions.length > 80 ? '…' : ''}”`
+                        : ''}
                     </div>
                   </div>
                   <div className="prov-actions">
@@ -224,7 +261,10 @@ export function ConfigsSection({ c, onSaved }: { c: Any; onSaved: (st: Any) => v
               </button>
             }
           >
-            <p>For example “Deep review” on Claude Opus with thorough reasoning, or “Cheap drafts” on a mini model.</p>
+            <p>
+              For example “Deep review” on Claude Opus with thorough reasoning, or “Cheap drafts” on
+              a mini model.
+            </p>
           </EmptyState>
         )}
       </div>

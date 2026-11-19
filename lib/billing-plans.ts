@@ -1,15 +1,19 @@
-// Subscription plans the owner manages (Administration → Billing): name, price, currency (PHP or USD), recurring
-// cycle, free-plan option and trial days. A plan has versions: editing the price, currency, cycle, free option or trial
-// days of a plan that has subscribers adds a new version. Workspaces keep the version they subscribed to
-// (workspaces.plan_version); new subscriptions use the latest version. Other edits (name, text, limits) change the latest
-// version in place. The default plans in plans.js are copied in the first time the plans are read.
+// Subscription plans the owner manages (Administration → Billing): name, price, currency (PHP or
+// USD), recurring cycle, free-plan option and trial days. A plan has versions: editing the price,
+// currency, cycle, free option or trial days of a plan that has subscribers adds a new version.
+// Workspaces keep the version they subscribed to (workspaces.plan_version); new subscriptions use
+// the latest version. Other edits (name, text, limits) change the latest version in place. The
+// default plans in plans.js are copied in the first time the plans are read.
 import { qs } from './db';
 import { PLANS, PLAN_ORDER, TRIAL_DAYS, CURRENCY, validatePlan, publicPlan } from './plans';
 import { err } from './errors';
 
 export const CURRENCIES = ['PHP', 'USD'];
 export const INTERVALS = ['month', 'year'];
-/** Subscription states that count as an active subscriber (the same ones limits.js keeps the plan for). */
+/**
+ * Subscription states that count as an active subscriber (the same ones limits.js keeps the plan
+ * for).
+ */
 const SUBSCRIBED = ['active', 'trialing', 'past_due'];
 
 const row = (r) =>
@@ -28,10 +32,16 @@ const row = (r) =>
     position: r.position,
     archived: r.archived,
   };
-/** A plan as the API returns it: its details plus its limits as a list with units (see publicPlan in plans.js). */
+/**
+ * A plan as the API returns it: its details plus its limits as a list with units (see publicPlan in
+ * plans.js).
+ */
 const out = (p, extra: any = {}) => ({ ...publicPlan(p), ...extra });
 
-/** Copies the default plans in when there are none yet (once; safe to call often and from several places). */
+/**
+ * Copies the default plans in when there are none yet (once; safe to call often and from several
+ * places).
+ */
 let seeded = false;
 async function ensureSeeded() {
   if (seeded) return;
@@ -62,7 +72,10 @@ async function ensureSeeded() {
   }
 }
 
-/** How many workspaces are subscribed to each plan, by version: { [id]: { [version]: n } }. A free plan counts everyone on it. */
+/**
+ * How many workspaces are subscribed to each plan, by version: { [id]: { [version]: n } }. A free
+ * plan counts everyone on it.
+ */
 async function subscriberCounts() {
   const r = (
     await qs(`select plan, coalesce(plan_version, 1) as version, count(*)::int as n from workspaces
@@ -76,21 +89,28 @@ async function subscriberCounts() {
 const total = (by, id) => Object.values<any>(by[id] || {}).reduce((a: any, b) => a + b, 0);
 
 /**
- * The latest version of every plan, in order: [{ …plan, subscribers, versions }]. With `forPurchase`, archived plans are
- * left out (workspaces already on one keep it).
+ * The latest version of every plan, in order: [{ …plan, subscribers, versions }]. With
+ * `forPurchase`, archived plans are left out (workspaces already on one keep it).
  */
 export async function listBillingPlans({ forPurchase = false }: any = {}) {
   await ensureSeeded();
-  const rows = (await qs('select * from billing_plans order by position, id, version')).rows.map(row);
+  const rows = (await qs('select * from billing_plans order by position, id, version')).rows.map(
+    row,
+  );
   const by = await subscriberCounts();
   const latest: Map<any, any> = new Map();
   for (const p of rows) latest.set(p.id, p); // rows are ordered by version, so the last one wins
   return [...latest.values()]
     .filter((p) => !(forPurchase && p.archived))
-    .map((p) => out(p, { subscribers: total(by, p.id), versions: rows.filter((x) => x.id === p.id).length }));
+    .map((p) =>
+      out(p, { subscribers: total(by, p.id), versions: rows.filter((x) => x.id === p.id).length }),
+    );
 }
 
-/** One plan version (the latest when `version` is empty), or null. Workspaces on a plan read their own version. */
+/**
+ * One plan version (the latest when `version` is empty), or null. Workspaces on a plan read their
+ * own version.
+ */
 export async function getPlanVersion(id, version = null) {
   await ensureSeeded();
   const r = version
@@ -99,7 +119,10 @@ export async function getPlanVersion(id, version = null) {
   return row(r.rows[0]) || null;
 }
 
-/** Checks what the owner typed and returns clean values. `base` holds the current values when editing. Throws 400 on the first problem. */
+/**
+ * Checks what the owner typed and returns clean values. `base` holds the current values when
+ * editing. Throws 400 on the first problem.
+ */
 function clean(input, base: any = {}) {
   const v = { ...base };
   if ('name' in input) {
@@ -121,7 +144,8 @@ function clean(input, base: any = {}) {
   }
   if ('price' in input) {
     v.price = Number(input.price);
-    if (!Number.isFinite(v.price) || v.price < 0 || v.price > 10000000) throw err('The price must be a number of 0 or more.');
+    if (!Number.isFinite(v.price) || v.price < 0 || v.price > 10000000)
+      throw err('The price must be a number of 0 or more.');
   }
   if ('trialDays' in input) {
     v.trialDays = Number(input.trialDays ?? 0);
@@ -147,7 +171,8 @@ function clean(input, base: any = {}) {
   if (v.isFree) {
     v.price = 0;
     v.trialDays = 0;
-  } else if (!(v.price > 0)) throw err('A paid plan needs a price above 0. Tick “Free plan” for a free one.');
+  } else if (!(v.price > 0))
+    throw err('A paid plan needs a price above 0. Tick “Free plan” for a free one.');
   return v;
 }
 
@@ -163,14 +188,26 @@ const slug = (s) =>
 export async function createPlan(input, actor) {
   await ensureSeeded();
   const v = clean(
-    { name: '', blurb: '', isFree: false, price: 0, currency: 'USD', interval: 'month', trialDays: 0, features: [], ...input },
+    {
+      name: '',
+      blurb: '',
+      isFree: false,
+      price: 0,
+      currency: 'USD',
+      interval: 'month',
+      trialDays: 0,
+      features: [],
+      ...input,
+    },
     {},
   );
   v.limits ??= (v.isFree ? PLANS.free : PLANS.pro).limits; // the owner can edit limits later; start from the default tier
   let id = slug(v.name),
     n = 1;
-  while ((await qs('select 1 from billing_plans where id = $1 limit 1', [id])).rows[0]) id = `${slug(v.name).slice(0, 26)}-${++n}`;
-  const pos = (await qs('select coalesce(max(position), -1) + 1 as n from billing_plans')).rows[0].n;
+  while ((await qs('select 1 from billing_plans where id = $1 limit 1', [id])).rows[0])
+    id = `${slug(v.name).slice(0, 26)}-${++n}`;
+  const pos = (await qs('select coalesce(max(position), -1) + 1 as n from billing_plans')).rows[0]
+    .n;
   await qs(
     `insert into billing_plans (id, version, name, blurb, price, currency, interval, is_free, trial_days, limits, features, position, archived, created_by)
     values ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, $12)`,
@@ -192,13 +229,16 @@ export async function createPlan(input, actor) {
   return out(await getPlanVersion(id), { subscribers: 0, versions: 1 });
 }
 
-/** The terms a subscriber agreed to: changing any of them while there are subscribers makes a new version. */
+/**
+ * The terms a subscriber agreed to: changing any of them while there are subscribers makes a new
+ * version.
+ */
 const TERMS = ['price', 'currency', 'interval', 'isFree', 'trialDays'];
 
 /**
- * Edits a plan. When the plan has subscribers and a price, currency, cycle, free option or trial days changes, a new
- * version is added: subscribers stay on their version and new subscriptions use the new one. Otherwise the latest version
- * is changed in place. Returns { plan, newVersion }.
+ * Edits a plan. When the plan has subscribers and a price, currency, cycle, free option or trial
+ * days changes, a new version is added: subscribers stay on their version and new subscriptions use
+ * the new one. Otherwise the latest version is changed in place. Returns { plan, newVersion }.
  */
 export async function updatePlan(id, input, actor) {
   const cur = await getPlanVersion(String(id));
@@ -235,7 +275,8 @@ export async function updatePlan(id, input, actor) {
       [...args, cur.version],
     );
   }
-  const versions = (await qs('select count(*)::int n from billing_plans where id = $1', [cur.id])).rows[0].n;
+  const versions = (await qs('select count(*)::int n from billing_plans where id = $1', [cur.id]))
+    .rows[0].n;
   return {
     newVersion: version !== cur.version,
     plan: out(await getPlanVersion(cur.id, version), { subscribers: total(by, cur.id), versions }),

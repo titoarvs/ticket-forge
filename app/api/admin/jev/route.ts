@@ -1,7 +1,8 @@
 import { api, perm, body } from '@/lib/server/http';
 import { jevStatus, saveJev, removeJevKey, testJev } from '@/lib/jev';
 
-// Jev (TypeSafe AI) for decisions, for administrators: the API key (stored encrypted, never sent back) and whether it is on.
+// Jev (TypeSafe AI) for decisions, for administrators: the API key (stored encrypted, never sent
+// back) and whether it is on.
 export const GET = api(async () => {
   await perm('users.manage');
   return jevStatus();

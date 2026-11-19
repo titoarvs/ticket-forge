@@ -1,16 +1,22 @@
 'use client';
-// Diff review (TF-121): what a code-with-AI job changed. One file at a time, like a code review tool: the changed files
-// on the left (filterable, grouped by folder), the chosen file's diff on the right with previous / next, and a choice of
-// what to compare with (the repository default branch, the previous job run or the prior spec version).
-// Split (side by side) or Unified (one column) view; a narrow panel always shows Unified and a file menu instead of the
-// list. Long lines wrap, so nothing scrolls sideways. Anyone who can open the project sees it.
+// Diff review (TF-121): what a code-with-AI job changed. One file at a time, like a code review
+// tool: the changed files on the left (filterable, grouped by folder), the chosen file's diff on
+// the right with previous / next, and a choice of what to compare with (the repository default
+// branch, the previous job run or the prior spec version).
+// Split (side by side) or Unified (one column) view; a narrow panel always shows Unified and a file
+// menu instead of the list. Long lines wrap, so nothing scrolls sideways. Anyone who can open the
+// project sees it.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { P, api, type Any } from './core';
 import { Ico, I, Spinner, EmptyState, ErrorState } from './ui';
 import { parseDiff, type DiffFile, type Row, type Cell } from './logic/diff';
 
 export const DIFF_TARGETS: [string, string, string][] = [
-  ['default', 'Repository default branch', 'Everything this job changed compared with the default branch'],
+  [
+    'default',
+    'Repository default branch',
+    'Everything this job changed compared with the default branch',
+  ],
   ['job', 'Previous job run', 'What changed since the last code run for this issue'],
   ['spec', 'Prior spec version', 'What changed since the last run made before the current spec'],
 ];
@@ -37,8 +43,13 @@ function Bar({ a, d }: { a: number; d: number }) {
   );
 }
 
-type ULine = { kind: 'hunk'; text: string } | { kind: 'line'; o: number | null; n: number | null; text: string; t: 'ctx' | 'add' | 'del' };
-/** Side-by-side rows as unified lines: unchanged lines once, and in each changed block the removed lines before the added ones. */
+type ULine =
+  | { kind: 'hunk'; text: string }
+  | { kind: 'line'; o: number | null; n: number | null; text: string; t: 'ctx' | 'add' | 'del' };
+/**
+ * Side-by-side rows as unified lines: unchanged lines once, and in each changed block the removed
+ * lines before the added ones.
+ */
 function unified(rows: Row[]): ULine[] {
   const out: ULine[] = [];
   let dels: Cell[] = [],
@@ -57,7 +68,13 @@ function unified(rows: Row[]): ULine[] {
     }
     if (r.ctx) {
       flush();
-      out.push({ kind: 'line', o: r.l?.no ?? null, n: r.r?.no ?? null, text: r.r?.text ?? r.l?.text ?? '', t: 'ctx' });
+      out.push({
+        kind: 'line',
+        o: r.l?.no ?? null,
+        n: r.r?.no ?? null,
+        text: r.r?.text ?? r.l?.text ?? '',
+        t: 'ctx',
+      });
       continue;
     }
     if (r.l) dels.push(r.l);
@@ -70,7 +87,8 @@ function unified(rows: Row[]): ULine[] {
 const hunkLabel = (text: string) => {
   const m = text.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$/);
   if (!m) return text;
-  // The new file's lines, or the old file's when the file was deleted (nothing is left on the new side).
+  // The new file's lines, or the old file's when the file was deleted (nothing is left on the new
+  // side).
   const newN = m[4] === undefined ? 1 : Number(m[4]);
   const from = Number(newN ? m[3] : m[1]),
     n = newN || (m[2] === undefined ? 1 : Number(m[2]));
@@ -80,7 +98,11 @@ const hunkLabel = (text: string) => {
 function FileBody({ f, view }: { f: DiffFile; view: 'split' | 'unified' }) {
   if (f.binary) return <p className="muted small dv-note">Binary file: not shown.</p>;
   if (!f.rows.length)
-    return <p className="muted small dv-note">{f.status === 'added' ? 'Empty file added.' : 'No line changes (only its mode or name).'}</p>;
+    return (
+      <p className="muted small dv-note">
+        {f.status === 'added' ? 'Empty file added.' : 'No line changes (only its mode or name).'}
+      </p>
+    );
   if (view === 'unified') {
     return (
       <table className="dv-tbl dv-uni" aria-label={`Changes in ${f.path}`}>
@@ -132,7 +154,9 @@ function FileBody({ f, view }: { f: DiffFile; view: 'split' | 'unified' }) {
             </tr>
           ) : (
             <tr key={i} className={r.ctx ? 'ctx' : ''}>
-              <td className={`dv-no ${r.l && !r.ctx ? 'del' : ''} ${r.l ? '' : 'empty'}`}>{r.l?.no ?? ''}</td>
+              <td className={`dv-no ${r.l && !r.ctx ? 'del' : ''} ${r.l ? '' : 'empty'}`}>
+                {r.l?.no ?? ''}
+              </td>
               <td className={`dv-code left ${r.l ? (r.ctx ? '' : 'del') : 'empty'}`}>
                 {r.l ? (
                   <>
@@ -143,7 +167,9 @@ function FileBody({ f, view }: { f: DiffFile; view: 'split' | 'unified' }) {
                   </>
                 ) : null}
               </td>
-              <td className={`dv-no ${r.r && !r.ctx ? 'add' : ''} ${r.r ? '' : 'empty'}`}>{r.r?.no ?? ''}</td>
+              <td className={`dv-no ${r.r && !r.ctx ? 'add' : ''} ${r.r ? '' : 'empty'}`}>
+                {r.r?.no ?? ''}
+              </td>
               <td className={`dv-code ${r.r ? (r.ctx ? '' : 'add') : 'empty'}`}>
                 {r.r ? (
                   <>
@@ -162,8 +188,17 @@ function FileBody({ f, view }: { f: DiffFile; view: 'split' | 'unified' }) {
   );
 }
 
-/** The diff of one code job (`job`: id, projectId, status). `defaultTarget` is the comparison shown first. */
-export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defaultTarget?: string }) {
+/**
+ * The diff of one code job (`job`: id, projectId, status). `defaultTarget` is the comparison shown
+ * first.
+ */
+export function DiffReview({
+  job,
+  defaultTarget = 'default',
+}: {
+  job: Any;
+  defaultTarget?: string;
+}) {
   const [target, setTarget] = useState(defaultTarget);
   const [res, setRes] = useState<Any>(null);
   const [error, setError] = useState<Any>(null);
@@ -195,8 +230,8 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
       if (mine === seq.current) setError(e);
     }
   };
-  // Recalculates for the chosen target; the earlier answer is dropped so a slow one can't replace a newer choice.
-  // (load numbers each request; an answer that isn't the latest one is ignored.)
+  // Recalculates for the chosen target; the earlier answer is dropped so a slow one can't replace a
+  // newer choice. (load numbers each request; an answer that isn't the latest one is ignored.)
   useEffect(() => {
     const s = seq;
     load(target);
@@ -204,7 +239,8 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
       s.current++;
     };
   }, [job.id, job.finishedAt, job.rounds, target]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The panel's own width decides the layout (the same view sits in a dialog, a page and a side panel).
+  // The panel's own width decides the layout (the same view sits in a dialog, a page and a side
+  // panel).
   useEffect(() => {
     const el = box.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
@@ -219,7 +255,9 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
   }, [files]); // eslint-disable-line react-hooks/exhaustive-deps
   const add = files.reduce((n, f) => n + f.added, 0),
     del = files.reduce((n, f) => n + f.removed, 0);
-  const shown = q.trim() ? files.filter((f) => f.path.toLowerCase().includes(q.trim().toLowerCase())) : files;
+  const shown = q.trim()
+    ? files.filter((f) => f.path.toLowerCase().includes(q.trim().toLowerCase()))
+    : files;
   const idx = Math.max(
     0,
     files.findIndex((f) => f.path === sel),
@@ -258,7 +296,11 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
       <div className="dv-top">
         <label className="dv-cmp">
           <span>Compare with</span>
-          <select value={target} onChange={(e) => setTarget(e.target.value)} title={DIFF_TARGETS.find((x) => x[0] === target)?.[2]}>
+          <select
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            title={DIFF_TARGETS.find((x) => x[0] === target)?.[2]}
+          >
             {DIFF_TARGETS.map(([k, l]) => (
               <option key={k} value={k}>
                 {l}
@@ -273,8 +315,8 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
         )}
         {res?.available && files.length > 0 && (
           <span className="dv-stats" aria-live="polite">
-            {files.length} file{files.length === 1 ? '' : 's'} <span className="da">+{fmt(add)}</span>{' '}
-            <span className="dr">−{fmt(del)}</span>
+            {files.length} file{files.length === 1 ? '' : 's'}{' '}
+            <span className="da">+{fmt(add)}</span> <span className="dr">−{fmt(del)}</span>
           </span>
         )}
         <span className="dv-grow" />
@@ -296,7 +338,12 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
         )}
       </div>
       {error ? (
-        <ErrorState compact title="Couldn’t load the changes" error={error} onRetry={() => load(target)} />
+        <ErrorState
+          compact
+          title="Couldn’t load the changes"
+          error={error}
+          onRetry={() => load(target)}
+        />
       ) : !res ? (
         <div className="muted small dv-note" role="status">
           <Spinner /> Loading the changes…
@@ -348,7 +395,8 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
                               </span>
                               <span className="dv-name">{name}</span>
                               <span className="dv-n">
-                                <span className="da">+{f.added}</span> <span className="dr">−{f.removed}</span>
+                                <span className="da">+{f.added}</span>{' '}
+                                <span className="dr">−{f.removed}</span>
                               </span>
                             </button>
                           </li>
@@ -375,7 +423,12 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
                   <Ico svg={I.chevron} className="left" />
                 </button>
                 {narrow ? (
-                  <select className="dv-fsel" value={cur.path} onChange={(e) => pick(e.target.value)} aria-label="File">
+                  <select
+                    className="dv-fsel"
+                    value={cur.path}
+                    onChange={(e) => pick(e.target.value)}
+                    aria-label="File"
+                  >
                     {files.map((f) => (
                       <option key={f.path} value={f.path}>
                         {f.path}
@@ -390,7 +443,8 @@ export function DiffReview({ job, defaultTarget = 'default' }: { job: Any; defau
                   </span>
                 )}
                 <span className="dv-fstat">
-                  <span className="da">+{cur.added}</span> <span className="dr">−{cur.removed}</span>
+                  <span className="da">+{cur.added}</span>{' '}
+                  <span className="dr">−{cur.removed}</span>
                   <Bar a={cur.added} d={cur.removed} />
                 </span>
                 <span className="dv-count muted small">

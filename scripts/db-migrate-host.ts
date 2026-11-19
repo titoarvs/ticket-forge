@@ -1,26 +1,46 @@
 // Moves TicketForge's data from one PostgreSQL host to another, and proves the copy is complete.
 // Full procedure: docs/postgres-host-migration.md.
 //
-//   SOURCE_DATABASE_URL   the host the app uses now (default: DATABASE_URL)
-//   TARGET_DATABASE_URL   the host to move to
-//   SOURCE_PGSSL / TARGET_PGSSL   SSL mode per side (default: PGSSL, then ?sslmode= of each URL)
+//   SOURCE_DATABASE_URL the host the app uses now (default: DATABASE_URL) TARGET_DATABASE_URL the
+//   host to move to SOURCE_PGSSL / TARGET_PGSSL SSL mode per side (default: PGSSL, then ?sslmode=
+//   of each URL)
 //
-//   npm run db:migrate-host -- copy      create the tables on the target and copy every row. Safe while the app is in use,
+//   npm run db:migrate-host -- copy create the tables on the target and copy every row. Safe while
+//   the app is in use,
 //                                        and repeatable: rows already there are updated only when they differ.
-//   npm run db:migrate-host -- verify    compare row counts and checksums of every table (a report is written)
-//   npm run db:migrate-host -- cutover   the final step: hold writes on the source, copy the last changes (and remove rows
+//   npm run db:migrate-host -- verify compare row counts and checksums of every table (a report is
+//   written) npm run db:migrate-host -- cutover the final step: hold writes on the source, copy the
+//   last changes (and remove rows
 //                                        deleted since), verify, then mark the source "moved". Stops and re-opens the source
 //                                        when anything doesn't match. Add --keep-hold to keep writes on hold until `finish`.
-//   npm run db:migrate-host -- finish    mark the source "moved" (after `cutover --keep-hold`)
-//   npm run db:migrate-host -- release   re-open the source for writes (abort a cutover, or reuse the old host later)
+//   npm run db:migrate-host -- finish mark the source "moved" (after `cutover --keep-hold`) npm run
+//   db:migrate-host -- release re-open the source for writes (abort a cutover, or reuse the old
+//   host later)
 //
-// The source is only ever read, apart from the cutover marker in its app_meta table. Nothing is changed when either
-// connection string is wrong or unreachable: both are checked before the first write.
+// The source is only ever read, apart from the cutover marker in its app_meta table. Nothing is
+// changed when either connection string is wrong or unreachable: both are checked before the first
+// write.
 import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
-import { checkConnectionString, endpointOf, pgConfig, connectTimeoutMs, databaseUrl, hostOf } from '../lib/db-config';
-import { TABLES, CUTOVER_KEY, FENCE_POLL_MS, DATA_DIR, connectionFailure, useOwner, migrate, dbInfo } from '../lib/db';
+import {
+  checkConnectionString,
+  endpointOf,
+  pgConfig,
+  connectTimeoutMs,
+  databaseUrl,
+  hostOf,
+} from '../lib/db-config';
+import {
+  TABLES,
+  CUTOVER_KEY,
+  FENCE_POLL_MS,
+  DATA_DIR,
+  connectionFailure,
+  useOwner,
+  migrate,
+  dbInfo,
+} from '../lib/db';
 
 const [cmd = '', ...flags] = process.argv.slice(2);
 const KEEP_HOLD = flags.includes('--keep-hold');
@@ -45,27 +65,53 @@ const where = (table: string) => (FILTER[table] ? ` where ${FILTER[table]}` : ''
 const BIG = new Set(['files', 'screenshots', 'drive_docs', 'code_jobs']);
 
 type Client = any; // a node-postgres client
-type Side = { name: 'source' | 'target'; url: string; env: Record<string, string | undefined>; client?: Client };
-const source: Side = { name: 'source', url: sourceUrl, env: { ...process.env, PGSSL: process.env.SOURCE_PGSSL ?? process.env.PGSSL } };
-const target: Side = { name: 'target', url: targetUrl, env: { ...process.env, PGSSL: process.env.TARGET_PGSSL ?? process.env.PGSSL } };
+type Side = {
+  name: 'source' | 'target';
+  url: string;
+  env: Record<string, string | undefined>;
+  client?: Client;
+};
+const source: Side = {
+  name: 'source',
+  url: sourceUrl,
+  env: { ...process.env, PGSSL: process.env.SOURCE_PGSSL ?? process.env.PGSSL },
+};
+const target: Side = {
+  name: 'target',
+  url: targetUrl,
+  env: { ...process.env, PGSSL: process.env.TARGET_PGSSL ?? process.env.PGSSL },
+};
 
-/** Opens a connection that behaves like the app's own writer (versions and rows are copied as they are, not re-numbered). */
+/**
+ * Opens a connection that behaves like the app's own writer (versions and rows are copied as they
+ * are, not re-numbered).
+ */
 async function open(side: Side) {
   const { connectionString, ssl } = pgConfig(side.url, side.env);
-  const c = new pg.Client({ connectionString, ssl, connectionTimeoutMillis: connectTimeoutMs(), application_name: 'ticketforge-migrate' });
+  const c = new pg.Client({
+    connectionString,
+    ssl,
+    connectionTimeoutMillis: connectTimeoutMs(),
+    application_name: 'ticketforge-migrate',
+  });
   c.on('error', (e) => console.error(`${side.name} connection error: ${e.message}`));
   try {
     await c.connect();
   } catch (e) {
-    throw new Error(`The ${side.name} database: ${connectionFailure(e, endpointOf(side.url)).message}`);
+    throw new Error(
+      `The ${side.name} database: ${connectionFailure(e, endpointOf(side.url)).message}`,
+    );
   }
-  await c.query(`select set_config('TimeZone', 'UTC', false), set_config('app.writer', '2', false), set_config('app.system', 'on', false)`);
+  await c.query(
+    `select set_config('TimeZone', 'UTC', false), set_config('app.writer', '2', false), set_config('app.system', 'on', false)`,
+  );
   side.client = c;
   return c;
 }
 
 function checkConfig(needTarget: boolean) {
-  if (!sourceUrl) fail('Set SOURCE_DATABASE_URL (or DATABASE_URL) to the PostgreSQL host the app uses now.');
+  if (!sourceUrl)
+    fail('Set SOURCE_DATABASE_URL (or DATABASE_URL) to the PostgreSQL host the app uses now.');
   checkConnectionString(sourceUrl, 'SOURCE_DATABASE_URL');
   if (!needTarget) return;
   if (!targetUrl) fail('Set TARGET_DATABASE_URL to the PostgreSQL host you are moving to.');
@@ -74,7 +120,10 @@ function checkConfig(needTarget: boolean) {
     const x = new URL(u);
     return `${x.hostname}:${x.port || 5432}${x.pathname}`.toLowerCase();
   };
-  if (key(sourceUrl) === key(targetUrl)) fail('SOURCE_DATABASE_URL and TARGET_DATABASE_URL point at the same database. Nothing to move.');
+  if (key(sourceUrl) === key(targetUrl))
+    fail(
+      'SOURCE_DATABASE_URL and TARGET_DATABASE_URL point at the same database. Nothing to move.',
+    );
 }
 
 // ---------------------------------------------------------------- table facts
@@ -94,7 +143,11 @@ async function infoOf(c: Client, table: string): Promise<Info | null> {
       [qi(table)],
     )
   ).rows.map((r) => r.attname);
-  return { all: cols.map((r) => r.column_name), cols: cols.filter((r) => r.is_generated !== 'ALWAYS').map((r) => r.column_name), pk };
+  return {
+    all: cols.map((r) => r.column_name),
+    cols: cols.filter((r) => r.is_generated !== 'ALWAYS').map((r) => r.column_name),
+    pk,
+  };
 }
 
 /** Parents before the tables that refer to them, so foreign keys hold while rows are copied. */
@@ -105,7 +158,8 @@ async function insertOrder(c: Client) {
     )
   ).rows;
   const deps = new Map<string, Set<string>>(TABLES.map((t) => [t, new Set<string>()]));
-  for (const { child, parent } of fks) if (child !== parent && deps.has(child) && deps.has(parent)) deps.get(child)!.add(parent);
+  for (const { child, parent } of fks)
+    if (child !== parent && deps.has(child) && deps.has(parent)) deps.get(child)!.add(parent);
   const out: string[] = [],
     left = new Set(TABLES);
   while (left.size) {
@@ -123,11 +177,17 @@ async function insertOrder(c: Client) {
 }
 
 // ---------------------------------------------------------------- copy
-/** Reads a table from the source (inside one consistent snapshot) in batches and upserts each batch into the target. */
+/**
+ * Reads a table from the source (inside one consistent snapshot) in batches and upserts each batch
+ * into the target.
+ */
 async function copyTable(table: string, from: Info, to: Info) {
   const src = source.client!,
     dst = target.client!;
-  if (!to.pk.length) throw new Error(`Table ${table} has no primary key on the target, so it can't be copied safely.`);
+  if (!to.pk.length)
+    throw new Error(
+      `Table ${table} has no primary key on the target, so it can't be copied safely.`,
+    );
   const cols = to.cols.filter((c) => from.all.includes(c));
   const list = cols.map(qi).join(', ');
   const data = cols.filter((c) => !to.pk.includes(c));
@@ -141,7 +201,9 @@ async function copyTable(table: string, from: Info, to: Info) {
   const batch = BIG.has(table) ? 10 : 500;
   let seen = 0,
     written = 0;
-  await src.query(`declare tf_copy no scroll cursor for select to_jsonb(t)::text as j from ${qi(table)} t${where(table)}`);
+  await src.query(
+    `declare tf_copy no scroll cursor for select to_jsonb(t)::text as j from ${qi(table)} t${where(table)}`,
+  );
   try {
     for (;;) {
       const { rows } = await src.query(`fetch ${batch} from tf_copy`);
@@ -155,28 +217,37 @@ async function copyTable(table: string, from: Info, to: Info) {
   return { seen, written };
 }
 
-/** Removes rows from the target that no longer exist on the source (deleted since an earlier copy). */
+/**
+ * Removes rows from the target that no longer exist on the source (deleted since an earlier copy).
+ */
 async function pruneTable(table: string, to: Info) {
   const src = source.client!,
     dst = target.client!;
   const key = `concat_ws(chr(31), ${to.pk.map((c) => `${qi(c)}::text`).join(', ')})`;
   await dst.query('create temp table if not exists tf_keys (kv text primary key)');
   await dst.query('truncate tf_keys');
-  await src.query(`declare tf_keys_cur no scroll cursor for select ${key} as k from ${qi(table)}${where(table)}`);
+  await src.query(
+    `declare tf_keys_cur no scroll cursor for select ${key} as k from ${qi(table)}${where(table)}`,
+  );
   try {
     for (;;) {
       const { rows } = await src.query('fetch 5000 from tf_keys_cur');
       if (!rows.length) break;
-      await dst.query('insert into tf_keys select * from jsonb_array_elements_text($1::jsonb) on conflict do nothing', [
-        JSON.stringify(rows.map((r) => r.k)),
-      ]);
+      await dst.query(
+        'insert into tf_keys select * from jsonb_array_elements_text($1::jsonb) on conflict do nothing',
+        [JSON.stringify(rows.map((r) => r.k))],
+      );
     }
   } finally {
     await src.query('close tf_keys_cur').catch(() => {});
   }
   const filter = FILTER[table] ? ` and ${FILTER[table]}` : '';
   return (
-    (await dst.query(`delete from ${qi(table)} where not exists (select 1 from tf_keys x where x.kv = ${key})${filter}`)).rowCount || 0
+    (
+      await dst.query(
+        `delete from ${qi(table)} where not exists (select 1 from tf_keys x where x.kv = ${key})${filter}`,
+      )
+    ).rowCount || 0
   );
 }
 
@@ -184,7 +255,8 @@ async function pruneTable(table: string, to: Info) {
 async function fixSequences(table: string, to: Info) {
   const dst = target.client!;
   for (const col of to.all) {
-    const seq = (await dst.query('select pg_get_serial_sequence($1, $2) s', [qi(table), col])).rows[0]?.s;
+    const seq = (await dst.query('select pg_get_serial_sequence($1, $2) s', [qi(table), col]))
+      .rows[0]?.s;
     if (seq)
       await dst.query(
         `select setval($1::regclass, coalesce((select max(${qi(col)}) from ${qi(table)}), 1), (select max(${qi(col)}) is not null from ${qi(table)}))`,
@@ -193,7 +265,9 @@ async function fixSequences(table: string, to: Info) {
   }
 }
 
-/** Creates the tables, policies and triggers on the target exactly as the app would on first start. */
+/**
+ * Creates the tables, policies and triggers on the target exactly as the app would on first start.
+ */
 async function prepareTarget() {
   process.env.DATABASE_URL = target.url;
   delete process.env.SUPABASE_DB_URL;
@@ -210,7 +284,11 @@ async function copyAll({ prune }: { prune: boolean }) {
   const order = await insertOrder(dst);
   await src.query('begin isolation level repeatable read read only'); // one snapshot for every table
   try {
-    const have = new Set((await src.query(`select tablename from pg_tables where schemaname = 'public'`)).rows.map((r) => r.tablename));
+    const have = new Set(
+      (await src.query(`select tablename from pg_tables where schemaname = 'public'`)).rows.map(
+        (r) => r.tablename,
+      ),
+    );
     const infos = new Map<string, { from: Info; to: Info }>();
     for (const t of order) {
       if (!have.has(t)) {
@@ -245,8 +323,18 @@ async function copyAll({ prune }: { prune: boolean }) {
 }
 
 // ---------------------------------------------------------------- verify
-type Row = { table: string; sourceRows: string; targetRows: string; sourceChecksum: string; targetChecksum: string; ok: boolean };
-/** Row count and an order-independent checksum (sum of a 64-bit hash of each row as JSON, so column order doesn't matter). */
+type Row = {
+  table: string;
+  sourceRows: string;
+  targetRows: string;
+  sourceChecksum: string;
+  targetChecksum: string;
+  ok: boolean;
+};
+/**
+ * Row count and an order-independent checksum (sum of a 64-bit hash of each row as JSON, so column
+ * order doesn't matter).
+ */
 async function fingerprint(c: Client, table: string, skip: string[]) {
   const r = (
     await c.query(
@@ -301,11 +389,21 @@ function report(mode: string, rows: Row[]) {
   const ok = rows.every((r) => r.ok);
   const dir = path.join(DATA_DIR, 'migration-reports');
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `db-migration-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+  const file = path.join(
+    dir,
+    `db-migration-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+  );
   fs.writeFileSync(
     file,
     JSON.stringify(
-      { mode, at: new Date().toISOString(), source: endpointOf(sourceUrl), target: endpointOf(targetUrl), ok, tables: rows },
+      {
+        mode,
+        at: new Date().toISOString(),
+        source: endpointOf(sourceUrl),
+        target: endpointOf(targetUrl),
+        ok,
+        tables: rows,
+      },
       null,
       2,
     ),
@@ -336,13 +434,15 @@ async function setFence(state: 'hold' | 'moved' | 'open') {
   const c = source.client!;
   if (state === 'open') await c.query('delete from app_meta where key = $1', [CUTOVER_KEY]);
   else
-    await c.query(`insert into app_meta (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [
-      CUTOVER_KEY,
-      JSON.stringify({ state, at: new Date().toISOString(), to: hostOf(targetUrl) }),
-    ]);
+    await c.query(
+      `insert into app_meta (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`,
+      [CUTOVER_KEY, JSON.stringify({ state, at: new Date().toISOString(), to: hostOf(targetUrl) })],
+    );
 }
 
-/** Waits until every server has seen the hold and the writes that started before it have finished. */
+/**
+ * Waits until every server has seen the hold and the writes that started before it have finished.
+ */
 async function drain() {
   const c = source.client!;
   const since = (await c.query('select clock_timestamp()::text t')).rows[0].t;
@@ -387,7 +487,9 @@ async function main() {
   }
   if (cmd === 'finish') {
     await setFence('moved');
-    log('The source is marked "moved": servers still on it refuse writes (the browser retries them on the new host).');
+    log(
+      'The source is marked "moved": servers still on it refuse writes (the browser retries them on the new host).',
+    );
     return;
   }
 
@@ -399,7 +501,9 @@ async function main() {
   await prepareTarget();
   if (cmd === 'copy') {
     await copyAll({ prune: false });
-    log('Copied. Run it again to catch up, then `cutover`. (`verify` shows differences while the app is still in use.)');
+    log(
+      'Copied. Run it again to catch up, then `cutover`. (`verify` shows differences while the app is still in use.)',
+    );
     return;
   }
 
@@ -417,7 +521,9 @@ async function main() {
       );
   } catch (e) {
     await setFence('open').catch((x) =>
-      console.error(`Could not re-open the source: ${x.message}. Run \`npm run db:migrate-host -- release\`.`),
+      console.error(
+        `Could not re-open the source: ${x.message}. Run \`npm run db:migrate-host -- release\`.`,
+      ),
     );
     throw e;
   }
@@ -428,7 +534,9 @@ async function main() {
     return;
   }
   await setFence('moved');
-  log('Verified. The source is marked "moved". Send traffic to the servers that use the new host now.');
+  log(
+    'Verified. The source is marked "moved". Send traffic to the servers that use the new host now.',
+  );
 }
 
 main().then(

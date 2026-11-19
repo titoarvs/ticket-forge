@@ -5,7 +5,8 @@ import { SUPPORTED } from '@/lib/parse';
 import { dbInfo } from '@/lib/db';
 import { getRules } from '@/lib/genrules';
 
-// ?fresh=1 (the Refresh button): skip the caches, so the Claude sign-in and the AI settings are checked again now.
+// ?fresh=1 (the Refresh button): skip the caches, so the Claude sign-in and the AI settings are
+// checked again now.
 export const GET = api(async (req: Request) => {
   await authed();
   const fresh = Boolean(new URL(req.url).searchParams.get('fresh'));

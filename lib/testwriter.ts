@@ -1,5 +1,6 @@
-// AI for the test repository (Test management): writes repository tests for issues, and improves one test, following
-// the company's test standard (Administration → Generation → Test management). Nothing is saved here.
+// AI for the test repository (Test management): writes repository tests for issues, and improves
+// one test, following the company's test standard (Administration → Generation → Test management).
+// Nothing is saved here.
 import { askJson } from './claude';
 import { getRules, getGuide, guideBlock, rulesText } from './genrules';
 import { contextBlock } from './appcontext';
@@ -45,14 +46,27 @@ function clean(t, rules) {
         ? []
         : (Array.isArray(t.steps) ? t.steps : [])
             .slice(0, m.stepsMax)
-            .map((st) => ({ action: clip(st.action, 300), data: clip(st.data || '', 200), expected: clip(st.expected || '', 400) }))
+            .map((st) => ({
+              action: clip(st.action, 300),
+              data: clip(st.data || '', 200),
+              expected: clip(st.expected || '', 400),
+            }))
             .filter((st) => st.action),
     gherkin: type === 'Cucumber' ? clip(t.gherkin || '', 3000) : '',
   };
 }
 
-/** Repository tests for each issue (in parallel). Returns { results: [{ ticketId, key, tests: [...] , error }] }. */
-export async function writeRepoTests({ project, issueIds, instruction = '', ai = {}, emit = (_e) => {} }: any) {
+/**
+ * Repository tests for each issue (in parallel). Returns { results: [{ ticketId, key, tests: [...]
+ * , error }] }.
+ */
+export async function writeRepoTests({
+  project,
+  issueIds,
+  instruction = '',
+  ai = {},
+  emit = (_e) => {},
+}: any) {
   const { rules, text } = await system(project);
   const repo = project.testRepo || { tests: [] };
   const issues = issueIds.map((id) => project.tickets.find((t) => t.id === id)).filter(Boolean);
@@ -98,10 +112,21 @@ Return JSON: { "tests": [ ${SHAPE} ] }`,
         });
       } catch (e) {
         if (ai.signal?.aborted) return;
-        results.push({ ticketId: t.id, key: t.key, title: t.title, tests: [], error: clip(e.message, 300) });
+        results.push({
+          ticketId: t.id,
+          key: t.key,
+          title: t.title,
+          tests: [],
+          error: clip(e.message, 300),
+        });
       }
       done++;
-      emit({ type: 'progress', message: `${done} of ${issues.length} issues done`, done, total: issues.length });
+      emit({
+        type: 'progress',
+        message: `${done} of ${issues.length} issues done`,
+        done,
+        total: issues.length,
+      });
     }
   };
   await Promise.all(Array.from({ length: Math.min(3, issues.length) }, worker));
@@ -109,10 +134,15 @@ Return JSON: { "tests": [ ${SHAPE} ] }`,
   return { results: results.sort((a, b) => order.get(a.ticketId) - order.get(b.ticketId)) };
 }
 
-/** One test rewritten to the standard (or as the instruction says: convert to Gherkin, add negative steps…). */
+/**
+ * One test rewritten to the standard (or as the instruction says: convert to Gherkin, add negative
+ * steps…).
+ */
 export async function improveRepoTest({ project, test, instruction = '', ai = {} }: any) {
   const { rules, text } = await system(project);
-  const issues = (test.issueIds || []).map((id) => project.tickets.find((t) => t.id === id)).filter(Boolean);
+  const issues = (test.issueIds || [])
+    .map((id) => project.tickets.find((t) => t.id === id))
+    .filter(Boolean);
   const res = await askJson({
     ...ai,
     task: 'tests',

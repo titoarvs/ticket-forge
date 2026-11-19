@@ -1,7 +1,8 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
 import { approveDraft, discardDraft } from '@/lib/helper';
 
-// Approves (turns the draft into an issue) or discards one of the helper's ticket drafts (body: action, "approve" or "discard").
+// Approves (turns the draft into an issue) or discards one of the helper's ticket drafts (body:
+// action, "approve" or "discard").
 export const POST = api(async (req, p) => {
   const user = await authed();
   const { action } = await body(req);

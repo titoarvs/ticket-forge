@@ -1,7 +1,7 @@
-// Questions before the AI writes: for every generation or enhancement (tickets, acceptance criteria, test cases,
-// automation scripts), the AI first reads what it was given and asks the
-// few questions whose answers would most change the result. The person answers (or skips), and the answers go to the
-// generation as extra instructions.
+// Questions before the AI writes: for every generation or enhancement (tickets, acceptance
+// criteria, test cases, automation scripts), the AI first reads what it was given and asks the few
+// questions whose answers would most change the result. The person answers (or skips), and the
+// answers go to the generation as extra instructions.
 import { askJson } from './claude';
 import { getRules } from './genrules';
 import { contextBlock } from './appcontext';
@@ -14,9 +14,12 @@ const clip = (s, n) => {
 };
 
 const TASKS = {
-  project: 'turn the requirements document into epics, user stories, acceptance criteria and test cases',
-  feature: 'plan new epics and issues (with acceptance criteria and test cases) for this feature in the existing project',
-  'new-ticket': 'write one new issue (user story, description, acceptance criteria and test cases) from the idea',
+  project:
+    'turn the requirements document into epics, user stories, acceptance criteria and test cases',
+  feature:
+    'plan new epics and issues (with acceptance criteria and test cases) for this feature in the existing project',
+  'new-ticket':
+    'write one new issue (user story, description, acceptance criteria and test cases) from the idea',
   enhance:
     'enhance the issue: sharpen the title, complete the user story and description, make the acceptance criteria complete and testable, and update the test cases',
   ac: 'rewrite the issue’s acceptance criteria so they are complete and testable',
@@ -24,7 +27,8 @@ const TASKS = {
   split: 'split the issue into 2–5 smaller, independently deliverable issues',
   custom: 'apply the user’s instruction to the issue',
   'bulk-tests': 'write test cases for each of these issues',
-  automation: 'write Playwright test scripts that automate these test cases against the running application',
+  automation:
+    'write Playwright test scripts that automate these test cases against the running application',
 };
 
 const ticketText = (t) =>
@@ -61,7 +65,8 @@ export async function clarifyQuestions({
   if (!task) throw Object.assign(new Error('Unknown generation.'), { status: 400 });
   const epic = project?.epics?.find((e) => e.id === (epicId || ticket?.epicId));
   const material = [
-    project && `Project: ${project.name}\nDescription: ${clip(project.description || project.summary, 1200) || 'n/a'}`,
+    project &&
+      `Project: ${project.name}\nDescription: ${clip(project.description || project.summary, 1200) || 'n/a'}`,
     project?.assumptions?.length &&
       `Assumptions already recorded: ${project.assumptions
         .slice(0, 15)

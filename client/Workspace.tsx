@@ -45,8 +45,13 @@ import { watchCodeStatus, stopWatching } from './codeStatus';
 import { ProjectCodeJobs } from './CodeJobsPage';
 import pkg from '../package.json';
 
-/** App version shown at the top of the sidebar, as v<major.minor.patch> (read from package.json, so it follows each release). */
-const APP_VERSION = /^\d+\.\d+\.\d+/.test(pkg.version) ? `v${pkg.version.match(/^\d+\.\d+\.\d+/)![0]}` : '';
+/**
+ * App version shown at the top of the sidebar, as v<major.minor.patch> (read from package.json, so
+ * it follows each release).
+ */
+const APP_VERSION = /^\d+\.\d+\.\d+/.test(pkg.version)
+  ? `v${pkg.version.match(/^\d+\.\d+\.\d+/)![0]}`
+  : '';
 
 export const VIEWS: Record<string, string> = {
   summary: 'Summary',
@@ -87,7 +92,10 @@ const COMPONENTS: Record<string, () => React.ReactNode> = {
   settings: Settings,
 };
 
-/** Sidenav layout for the screen width: phone (< 600px) drawer, tablet (600–1023px) icon rail, desktop (1024px+) full. */
+/**
+ * Sidenav layout for the screen width: phone (< 600px) drawer, tablet (600–1023px) icon rail,
+ * desktop (1024px+) full.
+ */
 type SideMode = 'phone' | 'rail' | 'full';
 const PHONE_Q = '(max-width: 599px)',
   RAIL_Q = '(max-width: 1023px)';
@@ -96,10 +104,14 @@ const subscribeMode = (cb: () => void) => {
   qs.forEach((q) => q.addEventListener('change', cb));
   return () => qs.forEach((q) => q.removeEventListener('change', cb));
 };
-const modeNow = (): SideMode => (matchMedia(PHONE_Q).matches ? 'phone' : matchMedia(RAIL_Q).matches ? 'rail' : 'full');
+const modeNow = (): SideMode =>
+  matchMedia(PHONE_Q).matches ? 'phone' : matchMedia(RAIL_Q).matches ? 'rail' : 'full';
 const useSideMode = () => useSyncExternalStore(subscribeMode, modeNow, () => 'full' as SideMode);
 
-/** Whether the phone drawer is open is remembered in this browser; a missing or invalid saved value means closed. */
+/**
+ * Whether the phone drawer is open is remembered in this browser; a missing or invalid saved value
+ * means closed.
+ */
 const DRAWER_KEY = 'tf.sideDrawerOpen';
 const readDrawerOpen = () => store.get(DRAWER_KEY, false) === true;
 const FOCUSABLE =
@@ -194,7 +206,11 @@ function Sidebar({ view }: { view: string }) {
         if (drawerOpen && (e.target as HTMLElement).closest('a')) closeDrawer(false);
       }}
     >
-      <div className="side-version" aria-label={`App version ${APP_VERSION}`} title={`Ticket Forge ${APP_VERSION}`}>
+      <div
+        className="side-version"
+        aria-label={`App version ${APP_VERSION}`}
+        title={`Ticket Forge ${APP_VERSION}`}
+      >
         {APP_VERSION}
       </div>
       <div className="proj-head" title={mini ? p.name : undefined}>
@@ -208,11 +224,21 @@ function Sidebar({ view }: { view: string }) {
       </div>
       <div className="side-label">Planning</div>
       {item('summary', I.summary, 'Summary')}
-      {item('issues', I.grid, 'Issues', p.tickets.filter((t: any) => !isSub(t) && !isDone(t)).length)}
+      {item(
+        'issues',
+        I.grid,
+        'Issues',
+        p.tickets.filter((t: any) => !isSub(t) && !isDone(t)).length,
+      )}
       {item('backlog', I.backlog, 'Backlog', p.tickets.filter((t: any) => !isSub(t)).length)}
       {item('board', I.board, activeSprint() ? 'Active sprint' : 'Board')}
       {item('epics', I.epic, 'Epics', p.epics.length)}
-      {item('releases', I.pr, 'Releases', (p.releases || []).filter((r: any) => r.status === 'unreleased').length)}
+      {item(
+        'releases',
+        I.pr,
+        'Releases',
+        (p.releases || []).filter((r: any) => r.status === 'unreleased').length,
+      )}
       {item('timeline', I.calendar, 'Timeline')}
       {item('activity', I.history, 'Activity')}
       {item('reports', I.chart, 'Reports')}
@@ -220,12 +246,18 @@ function Sidebar({ view }: { view: string }) {
       {item('tests', I.test, 'Test cases', tests)}
       {item('testmgmt', I.folder, 'Test management', (p.testRepo?.tests || []).length)}
       {item('automation', I.bot, 'Test automation')}
-      {(feat('prs') || (feat('code') && can('ai.use'))) && <div className="side-label">Development</div>}
+      {(feat('prs') || (feat('code') && can('ai.use'))) && (
+        <div className="side-label">Development</div>
+      )}
       {item(
         'prs',
         I.pr,
         'Pull requests',
-        p.tickets.reduce((n: number, t: any) => n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length, 0),
+        p.tickets.reduce(
+          (n: number, t: any) =>
+            n + (t.prs || []).filter((r: any) => ['Open', 'Draft'].includes(r.status)).length,
+          0,
+        ),
       )}
       {can('ai.use') && item('codejobs', I.bot, 'Code jobs')}
       <div className="side-label">Requirements</div>
@@ -264,7 +296,12 @@ function Sidebar({ view }: { view: string }) {
               aria-label="Project navigation"
               onKeyDown={onDrawerKey}
             >
-              <button type="button" className="icon-btn side-drawer-x" onClick={() => closeDrawer()} aria-label="Close navigation menu">
+              <button
+                type="button"
+                className="icon-btn side-drawer-x"
+                onClick={() => closeDrawer()}
+                aria-label="Close navigation menu"
+              >
                 <Ico svg={I.close} />
               </button>
               {nav}
@@ -358,7 +395,10 @@ function ProjectError({ id }: { id: string }) {
           title={`This project is in ${e.elsewhere.name}`}
           actions={
             <>
-              <button className="btn primary" onClick={() => switchWorkspace(e.elsewhere.id, location.pathname)}>
+              <button
+                className="btn primary"
+                onClick={() => switchWorkspace(e.elsewhere.id, location.pathname)}
+              >
                 Switch to {e.elsewhere.name}
               </button>
               {back}
@@ -366,7 +406,8 @@ function ProjectError({ id }: { id: string }) {
           }
         >
           <p>
-            You’re working in <b>{S.user?.workspaceName}</b> right now. Switch workspaces to open it.
+            You’re working in <b>{S.user?.workspaceName}</b> right now. Switch workspaces to open
+            it.
           </p>
         </EmptyState>
       );
@@ -382,7 +423,10 @@ function ProjectError({ id }: { id: string }) {
           </Link>
         }
       >
-        <p>It may have been deleted, or you don’t have access to it. If you think you should, ask an administrator to add you.</p>
+        <p>
+          It may have been deleted, or you don’t have access to it. If you think you should, ask an
+          administrator to add you.
+        </p>
       </EmptyState>
     );
   }
@@ -415,15 +459,17 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   const hireParam = params.get('hire');
   const codeParam = params.get('code'); // from the Code jobs page: also open the issue's code job (frontend | backend)
   const loaded = P()?.id === id;
-  // Changing page closes the issue/epic panel and any row popup, so the next page doesn't open with the last
-  // page's issue beside it. (Runs before the ?issue / ?epic effects below, which may open one for the new page.)
+  // Changing page closes the issue/epic panel and any row popup, so the next page doesn't open with
+  // the last page's issue beside it. (Runs before the ?issue / ?epic effects below, which may open
+  // one for the new page.)
   useEffect(() => {
     if (S.drawer || S.full || S.pop) {
       Object.assign(S, { drawer: null, full: false, pop: null, menu: null });
       emit();
     }
   }, [view, id]);
-  // From Administration → Agents → Hire: /p/<id>/backlog?epic=<epicId>&hire=<agentId> opens the epic and hires the agent.
+  // From Administration → Agents → Hire: /p/<id>/backlog?epic=<epicId>&hire=<agentId> opens the
+  // epic and hires the agent.
   useEffect(() => {
     if (!loaded || !epicParam) return;
     const ep = P().epics.find((x: Any) => x.id === epicParam);
@@ -470,7 +516,9 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
       <style>{statusColorCss()}</style>
       <Sidebar view={v} />
       <div className="main">
-        <section className="view">{feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}</section>
+        <section className="view">
+          {feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}
+        </section>
         <Drawer />
         <ProjectChat />
       </div>

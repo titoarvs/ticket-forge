@@ -3,15 +3,16 @@ import * as store from '@/lib/store';
 import { credentialStatus, setRoleSecret, clearRoleSecrets } from '@/lib/secrets';
 import { checkTotp } from '@/lib/totp.mjs';
 
-// Secrets for the roles in this project's App setup: passwords, authenticator (MFA) secrets and saved sessions.
+// Secrets for the roles in this project's App setup: passwords, authenticator (MFA) secrets and
+// saved sessions.
 // They're never sent back: only whether one is saved.
 export const GET = api(async (_req, p) => {
   store.requireAccess(await authed(), p.id);
   return credentialStatus(p.id);
 });
 
-// { roleId, password } · { roleId, totp } · { roleId, session: '' } (forget the session) · { roleId, clearAll: true }
-// An empty value removes that secret.
+// { roleId, password } · { roleId, totp } · { roleId, session: '' } (forget the session) · {
+// roleId, clearAll: true } An empty value removes that secret.
 export const PUT = api(async (req, p) => {
   const user = await perm('project.settings');
   store.requireAccess(user, p.id);

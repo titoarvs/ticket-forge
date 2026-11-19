@@ -1,13 +1,19 @@
 'use client';
 // Client state, data model helpers, history, undo, saving and sync.
-// State lives in one mutable object `S`; any change calls emit(), and components re-render via useStore().
+// State lives in one mutable object `S`; any change calls emit(), and components re-render via
+// useStore().
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { merge3 } from './merge';
 
 export type Any = any;
 
 export const uid = () =>
-  (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)).replace(/-/g, '').slice(0, 8);
+  (
+    globalThis.crypto?.randomUUID?.() ||
+    Math.random().toString(36).slice(2) + Date.now().toString(36)
+  )
+    .replace(/-/g, '')
+    .slice(0, 8);
 export const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o));
 export const nowIso = () => new Date().toISOString();
 export const store = {
@@ -27,8 +33,9 @@ export const store = {
   },
 };
 /**
- * Where code jobs and test runs go. The deployed TicketForge uses the AI API and GitHub for code (and GitHub Actions for tests); on your computer they run
- * here by default, and you can switch to them (your choice, remembered in this browser).
+ * Where code jobs and test runs go. The deployed TicketForge uses the AI API and GitHub for code
+ * (and GitHub Actions for tests); on your computer they run here by default, and you can switch to
+ * them (your choice, remembered in this browser).
  */
 export const isDeployed = () => S.status?.local === false || Boolean(S.status?.serverless);
 export const runPlace = (): 'local' | 'github' =>
@@ -45,22 +52,56 @@ export function ago(iso?: string) {
   if (s < 3600) return `${Math.round(s / 60)} min ago`;
   if (s < 86400) return `${Math.round(s / 3600)} hr ago`;
   if (s < 86400 * 7) return `${Math.round(s / 86400)} days ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
-export const fmtDate = (d: Any) => (d ? new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '');
+export const fmtDate = (d: Any) =>
+  d ? new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
 export const dateInput = (d: Any) => (d ? new Date(d).toISOString().slice(0, 10) : '');
 
 export const TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 export const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
-export const TC_TYPES = ['Functional', 'Negative', 'Edge', 'UI', 'Integration', 'Security', 'Performance', 'Accessibility'];
+export const TC_TYPES = [
+  'Functional',
+  'Negative',
+  'Edge',
+  'UI',
+  'Integration',
+  'Security',
+  'Performance',
+  'Accessibility',
+];
 export const TC_STATUS = ['Not run', 'Pass', 'Fail', 'Blocked'];
 export const CATEGORIES: [string, string][] = [
   ['todo', 'To do'],
   ['inprogress', 'In progress'],
   ['done', 'Done'],
 ];
-export const COLORS = ['#6e5dc6', '#0c66e4', '#1f845a', '#e06c00', '#c9372c', '#206a83', '#943d73', '#5b7f24', '#b65c02', '#626f86'];
-export const AVATAR_COLORS = ['#0c66e4', '#1f845a', '#6e5dc6', '#c9372c', '#a54800', '#206a83', '#943d73', '#5e4db2'];
+export const COLORS = [
+  '#6e5dc6',
+  '#0c66e4',
+  '#1f845a',
+  '#e06c00',
+  '#c9372c',
+  '#206a83',
+  '#943d73',
+  '#5b7f24',
+  '#b65c02',
+  '#626f86',
+];
+export const AVATAR_COLORS = [
+  '#0c66e4',
+  '#1f845a',
+  '#6e5dc6',
+  '#c9372c',
+  '#a54800',
+  '#206a83',
+  '#943d73',
+  '#5e4db2',
+];
 export const LINK_TYPES: Record<string, string> = {
   blocks: 'is blocked by',
   'is blocked by': 'blocks',
@@ -76,7 +117,15 @@ export const DEFAULT_WORKFLOW = [
   { id: 'inreview', name: 'In Review', category: 'inprogress' },
   { id: 'done', name: 'Done', category: 'done' },
 ];
-export const EMPTY_FILTER = () => ({ q: '', type: '', priority: '', status: '', epic: '', assignee: '', version: '' });
+export const EMPTY_FILTER = () => ({
+  q: '',
+  type: '',
+  priority: '',
+  status: '',
+  epic: '',
+  assignee: '',
+  version: '',
+});
 
 // ---------------------------------------------------------------- state
 export const S: Any = {
@@ -120,7 +169,13 @@ export const S: Any = {
   openTc: new Set<string>(),
   // testsPerTicket: null = the team default (Administration → Generation)
   doc: null,
-  genOpts: { projectKey: '', granularity: 'balanced', includeTests: true, testsPerTicket: null, instructions: '' },
+  genOpts: {
+    projectKey: '',
+    granularity: 'balanced',
+    includeTests: true,
+    testsPerTicket: null,
+    instructions: '',
+  },
   gen: null,
   busy: null,
   autoRun: null,
@@ -169,7 +224,8 @@ export function loadPrefs() {
   Object.assign(S, {
     settings: store.get('tf.settings', { provider: '', model: '' }),
     aiRun: store.get('tf.aiRun', 'auto'),
-    // Older saves stored the old fixed default (4); only a number the user picked on purpose is kept.
+    // Older saves stored the old fixed default (4); only a number the user picked on purpose is
+    // kept.
     genOpts: (({ testsPerTicket, testsPicked, ...g }: Any) => ({
       ...S.genOpts,
       ...g,
@@ -215,7 +271,12 @@ export function toggleSidebar(force?: boolean) {
 // ---------------------------------------------------------------- api & feedback
 export async function api(
   url: string,
-  { method = 'GET', body, raw, signal }: { method?: string; body?: Any; raw?: boolean; signal?: AbortSignal } = {},
+  {
+    method = 'GET',
+    body,
+    raw,
+    signal,
+  }: { method?: string; body?: Any; raw?: boolean; signal?: AbortSignal } = {},
 ): Promise<Any> {
   // Tells the server where code jobs and test runs go for this person (see runPlace).
   const opts: RequestInit = { method, headers: { 'X-TF-Run-On': runPlace() }, signal };
@@ -225,10 +286,11 @@ export async function api(
     (opts.headers as Any)['Content-Type'] = 'application/json';
   }
   let res = await fetch(url, opts);
-  // The database is moving to another host (docs/postgres-host-migration.md): the server refused this request before
-  // running it, so asking again is safe. The retry reaches a server that already uses the new host.
-  // "db-busy" (every database connection of that server was taken during a spike) is retried for reads only: a write
-  // may have run part of its work before the busy answer.
+  // The database is moving to another host (docs/postgres-host-migration.md): the server refused
+  // this request before running it, so asking again is safe. The retry reaches a server that
+  // already uses the new host. "db-busy" (every database connection of that server was taken during
+  // a spike) is retried for reads only: a write may have run part of its work before the busy
+  // answer.
   const read = method === 'GET' || method === 'HEAD';
   for (let attempt = 1; res.status === 503 && attempt <= 8; attempt++) {
     const moved = await res
@@ -260,7 +322,8 @@ export async function api(
     err.status = res.status;
     err.body = errBody;
     if (res.status === 402 && errBody?.code === 'limit') onPlanLimit(errBody);
-    // The trial ended without a payment: the app shows the pay prompt (AppShell) instead of the page.
+    // The trial ended without a payment: the app shows the pay prompt (AppShell) instead of the
+    // page.
     if (res.status === 402 && errBody?.code === 'locked' && S.auth) {
       S.auth.billing = {
         locked: true,
@@ -288,7 +351,10 @@ export const aiBody = (b: Any) => ({
   run: S.aiRun && S.aiRun !== 'auto' ? S.aiRun : undefined,
   project: b.project && slimProject(b.project),
 });
-/** Which AI runs the person's next AI actions: 'auto' (model routing), a tier, or 'cfg:<id>' (a custom configuration). */
+/**
+ * Which AI runs the person's next AI actions: 'auto' (model routing), a tier, or 'cfg:<id>' (a
+ * custom configuration).
+ */
 export function setAiRun(v: string) {
   S.aiRun = v || 'auto';
   store.set('tf.aiRun', S.aiRun);
@@ -307,7 +373,9 @@ export function slimProject(p: Any) {
     })),
   };
 }
-/** A plan limit was reached (SaaS): the app shows the upgrade prompt (set by client/Billing.tsx). */
+/**
+ * A plan limit was reached (SaaS): the app shows the upgrade prompt (set by client/Billing.tsx).
+ */
 export const planLimitHandler: { fn: ((info: Any) => void) | null } = { fn: null };
 function onPlanLimit(info: Any) {
   try {
@@ -338,13 +406,18 @@ export async function readNdjson(res: Response, onEvent: (ev: Any) => void | Pro
 }
 
 /**
- * Saves a file from the server. Checks the response really is the file (a JSON error becomes a readable message),
- * clicks a link attached to the page (some browsers ignore detached links) and keeps the blob URL alive long enough
- * for Safari and Firefox to finish saving (revoking it after a moment cancels big downloads there).
+ * Saves a file from the server. Checks the response really is the file (a JSON error becomes a
+ * readable message), clicks a link attached to the page (some browsers ignore detached links) and
+ * keeps the blob URL alive long enough for Safari and Firefox to finish saving (revoking it after a
+ * moment cancels big downloads there).
  */
 export async function downloadFrom(
   url: string,
-  { method = 'POST', body, fallbackName = 'download' }: { method?: string; body?: Any; fallbackName?: string } = {},
+  {
+    method = 'POST',
+    body,
+    fallbackName = 'download',
+  }: { method?: string; body?: Any; fallbackName?: string } = {},
 ) {
   const res = await api(url, { method, body, raw: true });
   const type = res.headers.get('content-type') || '';
@@ -360,7 +433,11 @@ export async function downloadFrom(
   const blob = await res.blob();
   if (!blob.size) throw new Error('The server sent an empty file. Try again.');
   const cd = res.headers.get('content-disposition') || '';
-  const name = decodeURIComponent(cd.match(/filename\*=UTF-8''([^;]+)/i)?.[1] || cd.match(/filename="?([^";]+)"?/i)?.[1] || fallbackName);
+  const name = decodeURIComponent(
+    cd.match(/filename\*=UTF-8''([^;]+)/i)?.[1] ||
+      cd.match(/filename="?([^";]+)"?/i)?.[1] ||
+      fallbackName,
+  );
   saveBlob(blob, name);
   return name;
 }
@@ -380,10 +457,15 @@ export function saveBlob(blob: Blob, name: string) {
 
 // ---------------------------------------------------------------- toasts
 export type ToastKind = 'ok' | 'err' | 'info' | 'warn';
-export type ToastOpts = { title?: string; action?: { label: string; onClick: () => void }; duration?: number };
+export type ToastOpts = {
+  title?: string;
+  action?: { label: string; onClick: () => void };
+  duration?: number;
+};
 /**
- * Shows a toast. Errors written as "What failed: why" get the first part as their title. Repeating the same message
- * bumps a counter on the toast already shown instead of stacking copies; at most 4 are shown.
+ * Shows a toast. Errors written as "What failed: why" get the first part as their title. Repeating
+ * the same message bumps a counter on the toast already shown instead of stacking copies; at most 4
+ * are shown.
  */
 export function toast(msg: string, kind: ToastKind = 'ok', o: ToastOpts = {}) {
   let title = o.title,
@@ -395,14 +477,26 @@ export function toast(msg: string, kind: ToastKind = 'ok', o: ToastOpts = {}) {
       body = m[2];
     }
   }
-  const duration = o.duration ?? (kind === 'err' ? 9000 : o.action ? 8000 : kind === 'warn' ? 6500 : 4200);
+  const duration =
+    o.duration ?? (kind === 'err' ? 9000 : o.action ? 8000 : kind === 'warn' ? 6500 : 4200);
   const same = S.toasts.find((x: Any) => x.msg === body && x.kind === kind && x.title === title);
   if (same) {
-    S.toasts = S.toasts.map((x: Any) => (x === same ? { ...x, count: (x.count || 1) + 1, shownAt: Date.now() } : x));
+    S.toasts = S.toasts.map((x: Any) =>
+      x === same ? { ...x, count: (x.count || 1) + 1, shownAt: Date.now() } : x,
+    );
     emit();
     return same.id as string;
   }
-  const t = { id: uid(), msg: body, kind, title, action: o.action, duration, count: 1, shownAt: Date.now() };
+  const t = {
+    id: uid(),
+    msg: body,
+    kind,
+    title,
+    action: o.action,
+    duration,
+    count: 1,
+    shownAt: Date.now(),
+  };
   S.toasts = [...S.toasts, t].slice(-4);
   emit();
   return t.id;
@@ -412,7 +506,8 @@ export function dismissToast(id: string) {
   emit();
 }
 
-// ---------------------------------------------------------------- background tasks ("Working on…" tray)
+// ---------------------------------------------------------------- background tasks ("Working on…"
+// tray)
 export type TaskHandle = {
   id: string;
   update: (p: { label?: string; detail?: string; done?: number; total?: number }) => void;
@@ -420,8 +515,9 @@ export type TaskHandle = {
   fail: (message: string) => void;
 };
 /**
- * Long AI work shown in the tray at the bottom right: label, detail, elapsed time, "3 of 5" progress and Cancel.
- * finish() shows a tick and the message for a moment; fail() removes the row and shows an error toast.
+ * Long AI work shown in the tray at the bottom right: label, detail, elapsed time, "3 of 5"
+ * progress and Cancel. finish() shows a tick and the message for a moment; fail() removes the row
+ * and shows an error toast.
  */
 export function startTask(
   label: string,
@@ -469,7 +565,9 @@ let busyTask: TaskHandle | null = null;
 /** One Claude request at a time on an issue (enhance, split, test cases…), shown in the tray. */
 export async function withBusy<T>(label: string, fn: () => Promise<T>): Promise<T | null> {
   if (S.busy) {
-    toast('Wait for it to finish, or cancel it in the tray.', 'warn', { title: 'Claude is still working on the previous request' });
+    toast('Wait for it to finish, or cancel it in the tray.', 'warn', {
+      title: 'Claude is still working on the previous request',
+    });
     return null;
   }
   S.busy = label;
@@ -479,7 +577,9 @@ export async function withBusy<T>(label: string, fn: () => Promise<T>): Promise<
     busyTask?.finish('Done');
     return out;
   } catch (e: Any) {
-    busyTask?.fail(`${label.replace(/^Claude is |…$/g, '').replace(/^./, (c) => c.toUpperCase())} failed: ${e.message}`);
+    busyTask?.fail(
+      `${label.replace(/^Claude is |…$/g, '').replace(/^./, (c) => c.toUpperCase())} failed: ${e.message}`,
+    );
     return null;
   } finally {
     S.busy = null;
@@ -495,15 +595,18 @@ export function setBusy(label: string | null) {
     return;
   }
   const m = label?.match(/(\d+) of (\d+)/);
-  busyTask.update({ detail: label || '', ...(m ? { done: Number(m[1]) - 1, total: Number(m[2]) } : {}) });
+  busyTask.update({
+    detail: label || '',
+    ...(m ? { done: Number(m[1]) - 1, total: Number(m[2]) } : {}),
+  });
 }
 export function openModal(node: ReactNode) {
   S.modal = node;
   emit();
 }
 /**
- * Closes the dialog. When it was opened from another dialog that asked to come back (S.modalBack, e.g. the Coding
- * dialog opening a ticket's code panel), that one opens again.
+ * Closes the dialog. When it was opened from another dialog that asked to come back (S.modalBack,
+ * e.g. the Coding dialog opening a ticket's code panel), that one opens again.
  */
 export function closeModal() {
   const back = (S as Any).modalBack;
@@ -530,22 +633,28 @@ export const P = () => S.project;
 export const ticket = (id: string) => P()?.tickets.find((t: Any) => t.id === id);
 export const epic = (id: string) => P()?.epics.find((e: Any) => e.id === id);
 export const sprint = (id: string) => P()?.sprints.find((s: Any) => s.id === id);
-/** Releases (Jira "versions"): { id, name, description, startDate, releaseDate, status: unreleased | released | archived }. */
+/**
+ * Releases (Jira "versions"): { id, name, description, startDate, releaseDate, status: unreleased |
+ * released | archived }.
+ */
 export const releases = (): Any[] => P()?.releases || [];
 export const release = (id: string) => releases().find((r: Any) => r.id === id);
 export const isSub = (t: Any) => t?.type === 'Sub-task';
 export const childrenOf = (t: Any) => P().tickets.filter((x: Any) => x.parentId === t.id);
-export const epicTickets = (eid: string) => P().tickets.filter((t: Any) => t.epicId === eid && !isSub(t));
+export const epicTickets = (eid: string) =>
+  P().tickets.filter((t: Any) => t.epicId === eid && !isSub(t));
 export const noEpic = () => P().tickets.filter((t: Any) => !isSub(t) && !epic(t.epicId));
 export const activeSprint = () => P().sprints.find((s: Any) => s.state === 'active');
 export const openSprints = () => P().sprints.filter((s: Any) => s.state !== 'closed');
 export const tcKey = (t: Any, i: number) => `TC-${t.key}-${String(i + 1).padStart(2, '0')}`;
 export const spSum = (list: Any[]) => list.reduce((s, t) => s + (Number(t.storyPoints) || 0), 0);
 export const statusNames = (): string[] => P().workflow.map((w: Any) => w.name);
-export const catOf = (status: string) => P()?.workflow.find((w: Any) => w.name === status)?.category || 'todo';
+export const catOf = (status: string) =>
+  P()?.workflow.find((w: Any) => w.name === status)?.category || 'todo';
 
-// ---- workflow transitions (Project settings → Workflow). flowMode 'free' (default): any status to any status.
-// 'custom': each status lists the statuses it can move to (next: [ids]); fromAny lets every status move to it.
+// ---- workflow transitions (Project settings → Workflow). flowMode 'free' (default): any status to
+// any status. 'custom': each status lists the statuses it can move to (next: [ids]); fromAny lets
+// every status move to it.
 export const statusOf = (name: string) => P()?.workflow.find((w: Any) => w.name === name);
 export const customFlow = () => P()?.flowMode === 'custom';
 /** Whether an issue may move from its status to `to` under the project's workflow. */
@@ -567,7 +676,8 @@ export const moveError = (t: Any, to: string) => {
 };
 export const isDone = (t: Any) => catOf(t.status) === 'done';
 /** A status's own colour (Project settings → Workflow), if it has one. Only #rrggbb is accepted. */
-export const statusColor = (w: Any): string => (typeof w?.color === 'string' && /^#[0-9a-f]{6}$/i.test(w.color) ? w.color : '');
+export const statusColor = (w: Any): string =>
+  typeof w?.color === 'string' && /^#[0-9a-f]{6}$/i.test(w.color) ? w.color : '';
 const scId = (w: Any) => String(w.id).replace(/[^\w-]/g, '');
 /** Class for a status: its category colours, plus its own colour when set (see statusColorCss). */
 export const sCls = (status: string) => {
@@ -598,9 +708,17 @@ export const me = () => S.user?.name || 'You';
 /** Feature flags (Administration → Features): features the owner locked are hidden for everyone. */
 export const feat = (id: string) => !(S.flags?.locked || []).includes(id);
 /** Permissions that mean nothing while their feature is locked. */
-const PERM_FEATURE: Record<string, string> = { 'ai.use': 'ai', 'test.run': 'automation', export: 'export' };
+const PERM_FEATURE: Record<string, string> = {
+  'ai.use': 'ai',
+  'test.run': 'automation',
+  export: 'export',
+};
 export const can = (perm: string) =>
-  Boolean(S.user && (S.user.isOwner || S.user.permissions.includes(perm)) && (!PERM_FEATURE[perm] || feat(PERM_FEATURE[perm])));
+  Boolean(
+    S.user &&
+    (S.user.isOwner || S.user.permissions.includes(perm)) &&
+    (!PERM_FEATURE[perm] || feat(PERM_FEATURE[perm])),
+  );
 export async function loadFlags() {
   try {
     S.flags = await api('/api/features');
@@ -610,14 +728,21 @@ export async function loadFlags() {
   }
 }
 export const peopleNames = (): string[] =>
-  [...new Set([...S.people.map((u: Any) => u.name), ...(P()?.members || []).map((m: Any) => m.name)])].filter(Boolean) as string[];
+  [
+    ...new Set([
+      ...S.people.map((u: Any) => u.name),
+      ...(P()?.members || []).map((m: Any) => m.name),
+    ]),
+  ].filter(Boolean) as string[];
 export const keyOf = (id: string) => ticket(id)?.key || '';
 export const isBlocked = (t: Any) =>
-  t.links.some((l: Any) => l.type === 'is blocked by' && ticket(l.targetId) && !isDone(ticket(l.targetId)));
+  t.links.some(
+    (l: Any) => l.type === 'is blocked by' && ticket(l.targetId) && !isDone(ticket(l.targetId)),
+  );
 let idxCache: Any = null;
 /**
- * Lookups for drawing many rows: issues by id and sub-tasks by parent, built once per change instead of searching
- * the whole project for every row (which gets slow with thousands of issues).
+ * Lookups for drawing many rows: issues by id and sub-tasks by parent, built once per change
+ * instead of searching the whole project for every row (which gets slow with thousands of issues).
  */
 export function idx(): { byId: Map<string, Any>; kids: Map<string, Any[]> } {
   const p = P();
@@ -652,11 +777,17 @@ export function hashColor(s: string, list = AVATAR_COLORS) {
 export function nextTicketKey() {
   const p = P();
   const re = new RegExp(`^${p.key}-(\\d+)$`);
-  const max = p.tickets.reduce((m: number, t: Any) => Math.max(m, Number(t.key?.match(re)?.[1] || 0)), 0);
+  const max = p.tickets.reduce(
+    (m: number, t: Any) => Math.max(m, Number(t.key?.match(re)?.[1] || 0)),
+    0,
+  );
   return `${p.key}-${max + 1}`;
 }
 export function nextEpicKey() {
-  const max = P().epics.reduce((m: number, e: Any) => Math.max(m, Number(e.key?.match(/-E(\d+)$/)?.[1] || 0)), 0);
+  const max = P().epics.reduce(
+    (m: number, e: Any) => Math.max(m, Number(e.key?.match(/-E(\d+)$/)?.[1] || 0)),
+    0,
+  );
   return `${P().key}-E${max + 1}`;
 }
 export function newTicket(fields: Any = {}) {
@@ -687,7 +818,13 @@ export function newTicket(fields: Any = {}) {
     updatedAt: nowIso(),
     ...fields,
   };
-  t.history.push({ id: uid(), at: t.createdAt, author: me(), field: 'created', text: 'created the issue' });
+  t.history.push({
+    id: uid(),
+    at: t.createdAt,
+    author: me(),
+    field: 'created',
+    text: 'created the issue',
+  });
   return t;
 }
 export const newTest = () => ({
@@ -703,7 +840,8 @@ export const newTest = () => ({
   script: '',
   lastRun: null,
 });
-export const withIds = (list: Any[]) => (list || []).map((tc) => ({ script: '', lastRun: null, ...tc, id: tc.id || uid() }));
+export const withIds = (list: Any[]) =>
+  (list || []).map((tc) => ({ script: '', lastRun: null, ...tc, id: tc.id || uid() }));
 const AI_FIELDS = [
   'title',
   'type',
@@ -729,7 +867,8 @@ export function ensureProject(p: Any) {
   for (const w of p.workflow) w.id ??= uid();
   p.flowMode ??= 'free';
   const ids = new Set(p.workflow.map((w: Any) => w.id));
-  for (const w of p.workflow) if (w.next) w.next = w.next.filter((id: string) => ids.has(id) && id !== w.id);
+  for (const w of p.workflow)
+    if (w.next) w.next = w.next.filter((id: string) => ids.has(id) && id !== w.id);
   p.sprints ??= [];
   p.automation ??= { baseUrl: '' };
   const names = new Set(p.workflow.map((w: Any) => w.name));
@@ -747,14 +886,18 @@ export function ensureProject(p: Any) {
     if (!names.has(t.status)) t.status = p.workflow[0].name;
     t.testCases = withIds(t.testCases);
   }
-  for (const n of new Set(p.tickets.flatMap((t: Any) => [t.assignee, t.reporter]).filter(Boolean))) {
-    if (!p.members.some((m: Any) => m.name === n)) p.members.push({ id: uid(), name: n, email: '', role: '' });
+  for (const n of new Set(
+    p.tickets.flatMap((t: Any) => [t.assignee, t.reporter]).filter(Boolean),
+  )) {
+    if (!p.members.some((m: Any) => m.name === n))
+      p.members.push({ id: uid(), name: n, email: '', role: '' });
   }
   return p;
 }
 export function addMember(name: string) {
   const n = String(name || '').trim();
-  if (n && !peopleNames().some((x) => x.toLowerCase() === n.toLowerCase())) P().members.push({ id: uid(), name: n, email: '', role: '' });
+  if (n && !peopleNames().some((x) => x.toLowerCase() === n.toLowerCase()))
+    P().members.push({ id: uid(), name: n, email: '', role: '' });
 }
 
 // ---------------------------------------------------------------- history
@@ -778,7 +921,14 @@ export const FIELD_LABEL: Record<string, string> = {
   flagged: 'Flag',
   fixVersions: 'Fix versions',
 };
-const TEXT_FIELDS = new Set(['description', 'userStory', 'acceptanceCriteria', 'testCases', 'dependencies', 'title']);
+const TEXT_FIELDS = new Set([
+  'description',
+  'userStory',
+  'acceptanceCriteria',
+  'testCases',
+  'dependencies',
+  'title',
+]);
 export function fmtField(field: string, v: Any) {
   if (field === 'epicId') return epic(v)?.title || 'None';
   if (field === 'sprintId') return sprint(v)?.name || 'None';
@@ -786,7 +936,10 @@ export function fmtField(field: string, v: Any) {
   if (field === 'labels') return (v || []).join(', ') || 'None';
   if (field === 'assignee') return v || 'Unassigned';
   if (field === 'flagged') return v ? 'Flagged' : 'Not flagged';
-  if (field === 'fixVersions') return (v || []).map((id: string) => release(id)?.name || 'a deleted version').join(', ') || 'None';
+  if (field === 'fixVersions')
+    return (
+      (v || []).map((id: string) => release(id)?.name || 'a deleted version').join(', ') || 'None'
+    );
   if (v === null || v === undefined || v === '') return 'None';
   return String(v);
 }
@@ -800,7 +953,12 @@ export function logChange(t: Any, field: string, from: Any, to: Any, author = me
   const at = nowIso();
   t.updatedAt = at;
   const last = t.history[t.history.length - 1];
-  if (last && last.field === field && last.author === author && Date.now() - Date.parse(last.at) < 120000) {
+  if (
+    last &&
+    last.field === field &&
+    last.author === author &&
+    Date.now() - Date.parse(last.at) < 120000
+  ) {
     last.at = at;
     if (!TEXT_FIELDS.has(field)) last.to = fmtField(field, to);
     if (!TEXT_FIELDS.has(field) && last.from === last.to) t.history.pop();
@@ -833,7 +991,8 @@ export function setField(t: Any, field: string, value: Any, author?: string) {
 
 // ---------------------------------------------------------------- links & deletes
 export function addLink(a: Any, type: string, b: Any) {
-  if (!a || !b || a.id === b.id || a.links.some((l: Any) => l.type === type && l.targetId === b.id)) return false;
+  if (!a || !b || a.id === b.id || a.links.some((l: Any) => l.type === type && l.targetId === b.id))
+    return false;
   a.links.push({ id: uid(), type, targetId: b.id });
   b.links.push({ id: uid(), type: LINK_TYPES[type], targetId: a.id });
   logEvent(a, `linked ${b.key} (${type})`);
@@ -845,7 +1004,8 @@ export function removeLink(a: Any, linkId: string) {
   if (!l) return;
   a.links = a.links.filter((x: Any) => x.id !== linkId);
   const b = ticket(l.targetId);
-  if (b) b.links = b.links.filter((x: Any) => !(x.targetId === a.id && x.type === LINK_TYPES[l.type]));
+  if (b)
+    b.links = b.links.filter((x: Any) => !(x.targetId === a.id && x.type === LINK_TYPES[l.type]));
   logEvent(a, `removed link to ${b?.key || 'an issue'}`);
 }
 export function deleteIssues(ids: string[]) {
@@ -867,11 +1027,21 @@ export function filtered(list: Any[]) {
       (!priority || t.priority === priority) &&
       (!status || t.status === status) &&
       (!version ||
-        (version === 'none' ? !(t.fixVersions || []).some((v: string) => release(v)) : (t.fixVersions || []).includes(version))) &&
+        (version === 'none'
+          ? !(t.fixVersions || []).some((v: string) => release(v))
+          : (t.fixVersions || []).includes(version))) &&
       (!ep || (ep === 'none' ? !epic(t.epicId) : t.epicId === ep)) &&
       (!assignee || (assignee === 'none' ? !t.assignee : t.assignee === assignee)) &&
       (!qq ||
-        [t.key, t.title, t.userStory, t.description, t.assignee, ...t.labels, ...t.acceptanceCriteria]
+        [
+          t.key,
+          t.title,
+          t.userStory,
+          t.description,
+          t.assignee,
+          ...t.labels,
+          ...t.acceptanceCriteria,
+        ]
           .join(' ')
           .toLowerCase()
           .includes(qq)),
@@ -879,15 +1049,17 @@ export function filtered(list: Any[]) {
 }
 export const filtersActive = () => Object.values(S.filter).some(Boolean);
 
-// ---------------------------------------------------------------- undo / mutate
-// Undo keeps up to 100 earlier states. When nothing is unsaved, the last saved snapshot (every issue already as text)
-// is shared instead of turning the whole project into text again: no work per change, and the issues that didn't
-// change share one copy between all the states (a big project used to cost hundreds of MB of undo history).
+// ---------------------------------------------------------------- undo / mutate Undo keeps up to
+// 100 earlier states. When nothing is unsaved, the last saved snapshot (every issue already as
+// text) is shared instead of turning the whole project into text again: no work per change, and the
+// issues that didn't change share one copy between all the states (a big project used to cost
+// hundreds of MB of undo history).
 S.mutSeq = 0;
 S.baseSeq = -1;
 const isClean = () => Boolean(S.base) && !S.saveTimer && !S.saving && S.baseSeq === S.mutSeq;
 function currentState(): Any {
-  if (isClean()) return { meta: { ...S.base.meta }, tickets: new Map(S.base.tickets), order: S.base.order };
+  if (isClean())
+    return { meta: { ...S.base.meta }, tickets: new Map(S.base.tickets), order: S.base.order };
   return JSON.stringify(P());
 }
 function snapshot(tag = '') {
@@ -941,13 +1113,17 @@ export function redo() {
   restore(S.redo.pop());
 }
 
-// ---------------------------------------------------------------- saving & sync (patches)
-// The browser keeps the whole project. Saving sends only what changed (a patch), with the version of each issue and
-// section it started from (S.revs). If a teammate saved the same issue meanwhile, the server refuses (409) and sends
-// their copy: both people's changes are merged (merge3) and saved again. Teammates' changes arrive as "changes
-// since my version" (a few kB) instead of the whole project, and are merged with unsaved edits the same way.
+// ---------------------------------------------------------------- saving & sync (patches) The
+// browser keeps the whole project. Saving sends only what changed (a patch), with the version of
+// each issue and section it started from (S.revs). If a teammate saved the same issue meanwhile,
+// the server refuses (409) and sends their copy: both people's changes are merged (merge3) and
+// saved again. Teammates' changes arrive as "changes since my version" (a few kB) instead of the
+// whole project, and are merged with unsaved edits the same way.
 const META_SKIP = new Set(['tickets', 'version', 'updatedAt', 'id', 'createdBy', '_revs']);
-S.revs = { issues: {}, meta: {} } as { issues: Record<string, number>; meta: Record<string, number> };
+S.revs = { issues: {}, meta: {} } as {
+  issues: Record<string, number>;
+  meta: Record<string, number>;
+};
 /** Takes the server's per-issue and per-section versions off a project as it arrives. */
 function takeRevs(p: Any) {
   const r = p?._revs || { issues: {}, meta: {} };
@@ -956,7 +1132,10 @@ function takeRevs(p: Any) {
 }
 /** Bumped when issues are added, removed or re-parented (render indexes, see idx()). */
 S.dataRev = 0;
-/** The project as text, per issue and section. Unchanged text is the same string as in the last snapshot (shared). */
+/**
+ * The project as text, per issue and section. Unchanged text is the same string as in the last
+ * snapshot (shared).
+ */
 function snapshotOf(p: Any) {
   const prev = S.base;
   const meta: Record<string, string> = {};
@@ -993,7 +1172,8 @@ function diff(snap: Any) {
     }
   for (const id of b.tickets.keys()) if (!snap.tickets.has(id)) patch.remove.push(id);
   if (b.order !== snap.order) patch.order = JSON.parse(snap.order);
-  const empty = !Object.keys(patch.meta).length && !patch.upsert.length && !patch.remove.length && !patch.order;
+  const empty =
+    !Object.keys(patch.meta).length && !patch.upsert.length && !patch.remove.length && !patch.order;
   return empty ? null : patch;
 }
 const hasLocalChanges = () => Boolean(P() && diff(snapshotOf(P())));
@@ -1007,24 +1187,48 @@ export function scheduleSave() {
   S.saveTimer = setTimeout(saveNow, 700);
 }
 
-// Quick edits (assignee, story points, priority on a card or row) save at once instead of waiting for the delay, and
-// if the save fails the field goes back to what it was. Each edit remembers the value before it (S.rollbacks) until
-// the save that holds it succeeds; `seq` is the change count at the time, so a save only answers for edits up to its own.
-S.rollbacks = [] as { id: string; field: string; prev: Any; updatedAt: string; history: Any[]; seq: number }[];
-/** Sets one field on several issues, saves right away and, if the save fails, restores each previous value. */
+// Quick edits (assignee, story points, priority on a card or row) save at once instead of waiting
+// for the delay, and if the save fails the field goes back to what it was. Each edit remembers the
+// value before it (S.rollbacks) until the save that holds it succeeds; `seq` is the change count at
+// the time, so a save only answers for edits up to its own.
+S.rollbacks = [] as {
+  id: string;
+  field: string;
+  prev: Any;
+  updatedAt: string;
+  history: Any[];
+  seq: number;
+}[];
+/**
+ * Sets one field on several issues, saves right away and, if the save fails, restores each previous
+ * value.
+ */
 export function editField(list: Any[], field: string, value: Any) {
-  const changed = list.filter((t) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null));
+  const changed = list.filter(
+    (t) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null),
+  );
   if (!changed.length) return Promise.resolve();
-  // The issue as it was (value, update time and history, whose last entry can be edited in place), to put back exactly.
+  // The issue as it was (value, update time and history, whose last entry can be edited in place),
+  // to put back exactly.
   const prev = changed.map((t) => {
     const h = t.history || [];
-    return { id: t.id, prev: t[field], updatedAt: t.updatedAt, history: h.map((x: Any, i: number) => (i === h.length - 1 ? { ...x } : x)) };
+    return {
+      id: t.id,
+      prev: t[field],
+      updatedAt: t.updatedAt,
+      history: h.map((x: Any, i: number) => (i === h.length - 1 ? { ...x } : x)),
+    };
   });
-  mutate(() => changed.forEach((t) => setField(t, field, value)), { tag: changed.length === 1 ? `t.${field}${changed[0].id}` : '' });
+  mutate(() => changed.forEach((t) => setField(t, field, value)), {
+    tag: changed.length === 1 ? `t.${field}${changed[0].id}` : '',
+  });
   for (const r of prev) S.rollbacks.push({ ...r, field, seq: S.mutSeq });
   return saveNow();
 }
-/** A save up to change `seq` failed: put back the value each edited field had before its first edit in that save. */
+/**
+ * A save up to change `seq` failed: put back the value each edited field had before its first edit
+ * in that save.
+ */
 function rollBack(seq: number) {
   const failed = S.rollbacks.filter((r: Any) => r.seq <= seq);
   if (!failed.length) return;
@@ -1069,8 +1273,9 @@ function ensureTicket(t: Any, p: Any) {
   return t;
 }
 /**
- * Merges the server's copies into the project: an issue or section without unsaved edits simply takes theirs; one
- * with edits gets both (merge3). The base becomes the server's copy, so only this person's edits are left to save.
+ * Merges the server's copies into the project: an issue or section without unsaved edits simply
+ * takes theirs; one with edits gets both (merge3). The base becomes the server's copy, so only this
+ * person's edits are left to save.
  * Returns how many issues changed on screen.
  */
 function mergeRemote(p: Any, { tickets = [], remove = [], meta = {}, order, revs }: Any) {
@@ -1107,7 +1312,8 @@ function mergeRemote(p: Any, { tickets = [], remove = [], meta = {}, order, revs
       const mineStr = JSON.stringify(mine);
       const dirty = baseStr !== undefined && mineStr !== baseStr;
       const next = dirty ? merge3(JSON.parse(baseStr!), mine, theirs) : theirs;
-      // In place, so open dialogs and the drawer holding this issue keep working on the current copy.
+      // In place, so open dialogs and the drawer holding this issue keep working on the current
+      // copy.
       if (JSON.stringify(next) !== mineStr) {
         for (const k of Object.keys(mine)) if (!(k in next)) delete mine[k];
         Object.assign(mine, next);
@@ -1130,11 +1336,14 @@ function mergeRemote(p: Any, { tickets = [], remove = [], meta = {}, order, revs
     changed += before - p.tickets.length;
   }
   if (Array.isArray(order)) {
-    // Their order, unless this browser has a reorder of its own waiting to be saved (then that is saved next).
+    // Their order, unless this browser has a reorder of its own waiting to be saved (then that is
+    // saved next).
     const localOrder = JSON.stringify(p.tickets.map((t: Any) => t.id));
     if (localOrder === b.order || !b.order) {
       const pos = new Map(order.map((id: string, i: number) => [id, i]));
-      const next = [...p.tickets].sort((x: Any, y: Any) => (pos.get(x.id) ?? 1e9) - (pos.get(y.id) ?? 1e9));
+      const next = [...p.tickets].sort(
+        (x: Any, y: Any) => (pos.get(x.id) ?? 1e9) - (pos.get(y.id) ?? 1e9),
+      );
       if (JSON.stringify(next.map((t: Any) => t.id)) !== localOrder) {
         p.tickets = next;
         changed += 1;
@@ -1142,7 +1351,8 @@ function mergeRemote(p: Any, { tickets = [], remove = [], meta = {}, order, revs
     }
     b.order = JSON.stringify(order.filter((id: string) => b.tickets.has(id)));
   } else if (tickets.length || remove.length) {
-    // New and removed issues change the order the server has: keep the base in step (no order to save for them).
+    // New and removed issues change the order the server has: keep the base in step (no order to
+    // save for them).
     const known = JSON.parse(b.order || '[]').filter((id: string) => b.tickets.has(id));
     const have = new Set(known);
     for (const t of tickets) if (!have.has(t.id) && b.tickets.has(t.id)) known.push(t.id);
@@ -1197,16 +1407,21 @@ export async function saveNow() {
     } // teammates saved in between: fetch their changes
   } catch (e: Any) {
     if (e.status === 409 && e.body?.conflict && P() === p && saveTries < 4) {
-      // A teammate saved some of the same issues: merge their copies with these edits, then save again.
+      // A teammate saved some of the same issues: merge their copies with these edits, then save
+      // again.
       saveTries += 1;
       const c = e.body.conflict;
       for (const id of c.deleted || []) {
         S.base.tickets.delete(id);
         delete S.revs.issues[id];
       }
-      const deleted = (c.deleted || []).filter((id: string) => p.tickets.some((t: Any) => t.id === id));
+      const deleted = (c.deleted || []).filter((id: string) =>
+        p.tickets.some((t: Any) => t.id === id),
+      );
       if (deleted.length) {
-        const keys = deleted.map((id: string) => p.tickets.find((t: Any) => t.id === id)?.key).filter(Boolean);
+        const keys = deleted
+          .map((id: string) => p.tickets.find((t: Any) => t.id === id)?.key)
+          .filter(Boolean);
         p.tickets = p.tickets.filter((t: Any) => !deleted.includes(t.id));
         toast(
           `${keys.join(', ')} ${keys.length === 1 ? 'was' : 'were'} deleted by a teammate, so ${keys.length === 1 ? 'that change wasn’t' : 'those changes weren’t'} saved.`,
@@ -1232,7 +1447,10 @@ export async function saveNow() {
   if (again) await saveNow();
 }
 
-/** Brings in teammates' changes: only what changed since this browser's version, merged with unsaved edits. */
+/**
+ * Brings in teammates' changes: only what changed since this browser's version, merged with unsaved
+ * edits.
+ */
 export async function pullRemote({ force = false, quiet = false } = {}) {
   const p = P();
   if (!p || S.saving) return;
@@ -1242,9 +1460,17 @@ export async function pullRemote({ force = false, quiet = false } = {}) {
     if (P() !== p || S.saving) return;
     if (d.full) return pullFull({ quiet });
     if (d.version <= p.version) return;
-    // The version moved but nothing is listed: an older server saved without recording what changed. Reload.
-    if (!d.upsert?.length && !d.remove?.length && !Object.keys(d.meta || {}).length && !d.order) return pullFull({ quiet });
-    const changed = mergeRemote(p, { tickets: d.upsert || [], remove: d.remove || [], meta: d.meta || {}, order: d.order, revs: d.revs });
+    // The version moved but nothing is listed: an older server saved without recording what
+    // changed. Reload.
+    if (!d.upsert?.length && !d.remove?.length && !Object.keys(d.meta || {}).length && !d.order)
+      return pullFull({ quiet });
+    const changed = mergeRemote(p, {
+      tickets: d.upsert || [],
+      remove: d.remove || [],
+      meta: d.meta || {},
+      order: d.order,
+      revs: d.revs,
+    });
     p.version = d.version;
     if (changed && !quiet) S.saveText = 'Updated with teammates’ changes';
     if (changed) emit();
@@ -1290,8 +1516,8 @@ export function startSync() {
       /* offline or signed out */
     }
   };
-  // Every 10 s (a little random, so thousands of open tabs don't all ask in the same second), and at once when
-  // the tab comes back into view.
+  // Every 10 s (a little random, so thousands of open tabs don't all ask in the same second), and
+  // at once when the tab comes back into view.
   const loop = () =>
     setTimeout(
       async () => {
@@ -1326,13 +1552,18 @@ export async function markNotifsRead(ids?: string[]) {
   await loadNotifs();
 }
 
-/** The whole project. Downloaded gzipped and unpacked here when the browser can (a big project is ~30× smaller). */
+/**
+ * The whole project. Downloaded gzipped and unpacked here when the browser can (a big project is
+ * ~30× smaller).
+ */
 export async function fetchProject(id: string): Promise<Any> {
   if (typeof DecompressionStream === 'function') {
     try {
       const res = await api(`/api/projects/${id}?gz=1`, { raw: true });
       if (res.headers.get('content-type')?.includes('octet-stream') && res.body) {
-        return JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text());
+        return JSON.parse(
+          await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text(),
+        );
       }
       return await res.json();
     } catch (e: Any) {
@@ -1368,9 +1599,12 @@ export async function openProject(id: string) {
     S.people = await api(`/api/projects/${id}/people`).catch(() => []);
   } catch (e: Any) {
     S.projectError = { id, status: e.status, message: e.message };
-    // Not in this workspace: is it in another workspace of yours? Then the page offers to switch there.
+    // Not in this workspace: is it in another workspace of yours? Then the page offers to switch
+    // there.
     if (e.status === 404) {
-      const w = await api(`/api/workspaces/locate?project=${encodeURIComponent(id)}`).catch(() => null);
+      const w = await api(`/api/workspaces/locate?project=${encodeURIComponent(id)}`).catch(
+        () => null,
+      );
       if (w?.workspace) S.projectError.elsewhere = w.workspace;
     }
   } finally {

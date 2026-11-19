@@ -1,6 +1,7 @@
-// Passwords for the roles in a project's App setup (Test automation). They're stored encrypted (AES-256-GCM)
-// in app_meta, which row-level security limits to the server. They never go into the project data, so they're
-// never sent to the browser, exported, or shown to the AI; test runs get them only while they run.
+// Passwords for the roles in a project's App setup (Test automation). They're stored encrypted
+// (AES-256-GCM) in app_meta, which row-level security limits to the server. They never go into the
+// project data, so they're never sent to the browser, exported, or shown to the AI; test runs get
+// them only while they run.
 import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { encrypt, decrypt } from './settings';
 
@@ -15,8 +16,8 @@ async function store(projectId, v) {
 }
 
 /**
- * What each role has saved, never the values: { [roleId]: { hasPassword, hasTotp, hasSession, sessionAt, sessionBy,
- * sessionExpires, updatedAt, updatedBy } }.
+ * What each role has saved, never the values: { [roleId]: { hasPassword, hasTotp, hasSession,
+ * sessionAt, sessionBy, sessionExpires, updatedAt, updatedBy } }.
  */
 export async function credentialStatus(projectId) {
   const v = await load(projectId);
@@ -37,7 +38,8 @@ export async function credentialStatus(projectId) {
   );
 }
 
-// A role's secrets: its password, its authenticator (TOTP) secret and a saved signed-in session, each encrypted.
+// A role's secrets: its password, its authenticator (TOTP) secret and a saved signed-in session,
+// each encrypted.
 const FIELDS = { password: 'passEnc', totp: 'totpEnc', session: 'sessionEnc' };
 /** Saves (or, with an empty value, removes) one of a role's secrets, keeping the others. */
 export async function setRoleSecret(projectId, roleId, field, value, actor, extra: any = {}) {
@@ -46,7 +48,12 @@ export async function setRoleSecret(projectId, roleId, field, value, actor, extr
   const v = await load(projectId);
   const cur = { ...(v.roles[roleId] || {}) };
   const val = String(value ?? '');
-  if (val) Object.assign(cur, { [k]: encrypt(val), updatedAt: new Date().toISOString(), updatedBy: actor?.name || null }, extra);
+  if (val)
+    Object.assign(
+      cur,
+      { [k]: encrypt(val), updatedAt: new Date().toISOString(), updatedBy: actor?.name || null },
+      extra,
+    );
   else {
     delete cur[k];
     if (field === 'session') {
@@ -59,7 +66,8 @@ export async function setRoleSecret(projectId, roleId, field, value, actor, extr
   else delete v.roles[roleId];
   await store(projectId, v);
 }
-export const setRolePassword = (projectId, roleId, password, actor) => setRoleSecret(projectId, roleId, 'password', password, actor);
+export const setRolePassword = (projectId, roleId, password, actor) =>
+  setRoleSecret(projectId, roleId, 'password', password, actor);
 /** Forgets everything saved for a role (it was removed). */
 export async function clearRoleSecrets(projectId, roleId) {
   const v = await load(projectId);
@@ -110,7 +118,12 @@ export async function appWithSecrets(projectId, app: any = {}) {
     })
     .filter((r) => r.name);
   const pages = (app.pages || [])
-    .map((p) => ({ id: p.id, name: String(p.name || '').trim(), path: normPath(p.path), description: p.description || '' }))
+    .map((p) => ({
+      id: p.id,
+      name: String(p.name || '').trim(),
+      path: normPath(p.path),
+      description: p.description || '',
+    }))
     .filter((p) => p.name);
   return { pages, roles, login: app.login || {}, notes: app.notes || '' };
 }
@@ -129,11 +142,19 @@ export function normPath(p) {
   return s.startsWith('/') || s.startsWith('#') ? s : `/${s}`;
 }
 
-/** Other per-project secrets (e.g. a GitHub token for route scanning), stored like the role passwords. */
+/**
+ * Other per-project secrets (e.g. a GitHub token for route scanning), stored like the role
+ * passwords.
+ */
 export async function setProjectSecret(projectId, name, value, actor) {
   const v = await load(projectId);
   v.extra = v.extra || {};
-  if (value) v.extra[name] = { enc: encrypt(String(value)), updatedAt: new Date().toISOString(), updatedBy: actor?.name || null };
+  if (value)
+    v.extra[name] = {
+      enc: encrypt(String(value)),
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor?.name || null,
+    };
   else delete v.extra[name];
   await store(projectId, v);
 }

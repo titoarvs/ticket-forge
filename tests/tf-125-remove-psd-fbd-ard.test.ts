@@ -1,4 +1,5 @@
-// TF-125: PSD, FBD and ARD are gone from the app, and the data migration deletes them (and only them) for good.
+// TF-125: PSD, FBD and ARD are gone from the app, and the data migration deletes them (and only
+// them) for good.
 // Run with `npm test`. The data tests use an in-memory PostgreSQL (PGlite), never a real database.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,8 @@ const files = (dir: string, re: RegExp): string[] =>
     return e.isDirectory() ? files(rel, re) : re.test(e.name) ? [rel] : [];
   });
 
-// ---------------------------------------------------------------- AC 1 and 3: nothing in the app offers them
+// ---------------------------------------------------------------- AC 1 and 3: nothing in the app
+// offers them
 
 test('AC1: no PSD, FBD or ARD endpoint exists, so each returns not found', () => {
   for (const route of [
@@ -38,9 +40,18 @@ test('AC1: the Word export refuses PSD, FBD and ARD, and still builds the Agent 
   const { epicDocx } = await import('../lib/epic-docx');
   const epic = { id: 'e1', title: 'Checkout' };
   for (const kind of ['psd', 'fbd', 'ard']) {
-    await assert.rejects(epicDocx({ kind, epic, doc: { markdown: '# x' } }), (e: any) => e.status === 404, `${kind} should be not found`);
+    await assert.rejects(
+      epicDocx({ kind, epic, doc: { markdown: '# x' } }),
+      (e: any) => e.status === 404,
+      `${kind} should be not found`,
+    );
   }
-  const agent = await epicDocx({ kind: 'agent', epic, doc: { name: 'Kick Off', markdown: '# Kick Off\n\nHello' }, agentId: 'kick-off' });
+  const agent = await epicDocx({
+    kind: 'agent',
+    epic,
+    doc: { name: 'Kick Off', markdown: '# Kick Off\n\nHello' },
+    agentId: 'kick-off',
+  });
   assert.match(agent.name, /Kick Off - Checkout\.docx/);
   assert.ok(agent.buf.length > 0);
 });
@@ -67,7 +78,11 @@ test('AC1: the PSD, FBD and ARD agents and the Epic documents feature are gone',
 
 test('AC3: the admin templates area lists no PSD, FBD or ARD template', () => {
   for (const f of ['client/GenerationTab.tsx', 'client/ProjectSettings.tsx']) {
-    assert.doesNotMatch(read(f), /TemplateCard|psd-template|fbd-template|ard-template|templates\/(psd|fbd|ard)/, f);
+    assert.doesNotMatch(
+      read(f),
+      /TemplateCard|psd-template|fbd-template|ard-template|templates\/(psd|fbd|ard)/,
+      f,
+    );
   }
 });
 
@@ -106,14 +121,20 @@ async function seeded() {
   ];
   await db.query(
     "insert into projects (id, name, key, data, version, revs) values ('p1', 'Shop', 'SH', $1, 7, '{\"epics\": 5}'), ('p2', 'Blog', 'BL', $2, 3, '{}')",
-    [JSON.stringify({ epics, sprints: [] }), JSON.stringify({ epics: [{ id: 'b1', title: 'Posts' }] })],
+    [
+      JSON.stringify({ epics, sprints: [] }),
+      JSON.stringify({ epics: [{ id: 'b1', title: 'Posts' }] }),
+    ],
   );
   for (const kind of ['psd', 'fbd', 'ard', 'agent']) {
-    await db.query("insert into drive_docs (project_id, epic_id, kind, doc_key, name) values ('p1', 'e1', $1, $2, $1)", [
-      kind,
-      kind === 'agent' ? 'kick-off' : '',
+    await db.query(
+      "insert into drive_docs (project_id, epic_id, kind, doc_key, name) values ('p1', 'e1', $1, $2, $1)",
+      [kind, kind === 'agent' ? 'kick-off' : ''],
+    );
+    await db.query("insert into files (id, project_id, name) values ($1, 'p1', $2)", [
+      `f-${kind}`,
+      `${kind}.pdf`,
     ]);
-    await db.query("insert into files (id, project_id, name) values ($1, 'p1', $2)", [`f-${kind}`, `${kind}.pdf`]);
     await db.query(
       "insert into epic_doc_versions (project_id, epic_id, kind, number, file_id, text) values ('p1', 'e1', $1, 1, $2, 'text')",
       [kind, `f-${kind}`],
@@ -127,14 +148,17 @@ async function seeded() {
       [`c-${kind}`, kind],
     );
   }
-  await db.query("insert into files (id, project_id, name) values ('f-attachment', 'p1', 'screenshot.png')");
+  await db.query(
+    "insert into files (id, project_id, name) values ('f-attachment', 'p1', 'screenshot.png')",
+  );
   for (const key of ['psd', 'fbd:p1', 'ws:acme:ard', 'ws:acme:psd:p9', 'agent-kickoff', 'psdx'])
     await db.query('insert into doc_templates (key, name) values ($1, $1)', [key]);
   await db.exec(`insert into brain_notes (project_id, id, kind, type, tags) values
     ('p1', 'n-doc', 'auto', 'doc', '["psd"]'), ('p1', 'n-dec', 'auto', 'decision', '["architecture"]'), ('p1', 'n-q-fbd', 'auto', 'question', '["open-decision"]'),
     ('p1', 'n-q-project', 'auto', 'question', '["open-question"]'), ('p1', 'n-issue', 'auto', 'issue', '[]'), ('p1', 'n-mine', 'user', 'doc', '[]');
     insert into ai_cache (key, task, value) values ('k1', 'docs', 'psd text'), ('k2', 'tickets', 'tickets');`);
-  // The migration's query function, as the script gives it (rows and rowCount, inside one transaction).
+  // The migration's query function, as the script gives it (rows and rowCount, inside one
+  // transaction).
   const q = async (sql: string, params: any[] = []) => {
     const r: any = await db.query(sql, params);
     return { rows: r.rows, rowCount: r.affectedRows ?? r.rows.length };
@@ -150,14 +174,19 @@ async function seeded() {
       throw e;
     }
   };
-  const col = async (sql: string) => (await db.query<any>(sql)).rows.map((r) => Object.values(r)[0]);
+  const col = async (sql: string) =>
+    (await db.query<any>(sql)).rows.map((r) => Object.values(r)[0]);
   return { db, q, inTx, col };
 }
 
 test('AC2: PSD, FBD and ARD documents, versions, reviews and comments are deleted', async () => {
   const { q, inTx, col } = await seeded();
   const before = await survey(q);
-  assert.deepEqual(before.kinds.drive_docs, ['agent', 'ard', 'fbd', 'psd'], 'the survey shows which kinds are in the data');
+  assert.deepEqual(
+    before.kinds.drive_docs,
+    ['agent', 'ard', 'fbd', 'psd'],
+    'the survey shows which kinds are in the data',
+  );
   assert.equal(before.counts.epics, 2);
   const { skipped, counts } = await inTx(removePsdFbdArd);
   assert.equal(skipped, false);
@@ -174,7 +203,9 @@ test('AC2: PSD, FBD and ARD documents, versions, reviews and comments are delete
   for (const t of ['drive_docs', 'epic_doc_versions', 'epic_doc_reviews', 'epic_doc_comments'])
     assert.deepEqual(await col(`select distinct kind from ${t}`), ['agent'], t);
   const data = (await col("select data from projects where id = 'p1'"))[0] as any;
-  for (const e of data.epics) for (const k of ['psd', 'fbd', 'ard']) assert.equal(k in e, false, `${e.id}.${k} should be gone`);
+  for (const e of data.epics)
+    for (const k of ['psd', 'fbd', 'ard'])
+      assert.equal(k in e, false, `${e.id}.${k} should be gone`);
   assert.deepEqual(
     await col('select id from brain_notes order by id'),
     ['n-issue', 'n-mine', 'n-q-project'],
@@ -186,7 +217,10 @@ test('AC2: PSD, FBD and ARD documents, versions, reviews and comments are delete
 test('AC3: the PSD, FBD and ARD doc_templates rows no longer exist', async () => {
   const { inTx, col } = await seeded();
   await inTx(removePsdFbdArd);
-  assert.deepEqual(await col('select key from doc_templates order by key'), ['agent-kickoff', 'psdx']);
+  assert.deepEqual(await col('select key from doc_templates order by key'), [
+    'agent-kickoff',
+    'psdx',
+  ]);
 });
 
 test('AC4: the Agent doc and other data stay unchanged', async () => {
@@ -204,7 +238,11 @@ test('AC4: the Agent doc and other data stay unchanged', async () => {
   assert.deepEqual(await col('select body from epic_doc_comments'), ['looks good']);
   const p2 = (await col("select version from projects where id = 'p2'"))[0];
   assert.equal(p2, 3, 'a project without documents is not touched');
-  assert.deepEqual(await col("select version from projects where id = 'p1'"), [8], 'a changed project gets a new version');
+  assert.deepEqual(
+    await col("select version from projects where id = 'p1'"),
+    [8],
+    'a changed project gets a new version',
+  );
   assert.deepEqual(await col("select revs from projects where id = 'p1'"), [{ epics: 8 }]);
 });
 
@@ -214,7 +252,11 @@ test('AC5: the run is recorded in schema_migrations, and a second run changes no
   assert.deepEqual(await col('select id from schema_migrations'), [MIGRATION_ID]);
   const again = await inTx(removePsdFbdArd);
   assert.equal(again.skipped, true);
-  assert.deepEqual(await col("select version from projects where id = 'p1'"), [8], 'no second version bump');
+  assert.deepEqual(
+    await col("select version from projects where id = 'p1'"),
+    [8],
+    'no second version bump',
+  );
 });
 
 test('AC2: a failure part-way changes nothing (one transaction)', async () => {
@@ -229,5 +271,9 @@ test('AC2: a failure part-way changes nothing (one transaction)', async () => {
   );
   assert.deepEqual(await col('select count(*)::int from drive_docs'), [4]);
   assert.deepEqual(await col('select count(*)::int from doc_templates'), [6]);
-  assert.deepEqual(await col("select to_regclass('public.schema_migrations')::text"), [null], 'not recorded either');
+  assert.deepEqual(
+    await col("select to_regclass('public.schema_migrations')::text"),
+    [null],
+    'not recorded either',
+  );
 });

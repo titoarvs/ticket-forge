@@ -1,5 +1,6 @@
 'use client';
-// Sign-in screens: first-run setup, login, sign-up (request access), forgot/reset password, accept invite.
+// Sign-in screens: first-run setup, login, sign-up (request access), forgot/reset password, accept
+// invite.
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,7 +13,17 @@ import { TF } from './fields';
 
 type Mode = 'setup' | 'login' | 'signup' | 'forgot' | 'reset' | 'invite';
 
-function Card({ title, sub, children, foot }: { title: string; sub?: ReactNode; children?: ReactNode; foot?: ReactNode }) {
+function Card({
+  title,
+  sub,
+  children,
+  foot,
+}: {
+  title: string;
+  sub?: ReactNode;
+  children?: ReactNode;
+  foot?: ReactNode;
+}) {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
@@ -29,11 +40,20 @@ function Card({ title, sub, children, foot }: { title: string; sub?: ReactNode; 
     </div>
   );
 }
-/** The unticked box people must tick to accept the Terms of Use and Privacy Policy (links open in a new tab). */
+/**
+ * The unticked box people must tick to accept the Terms of Use and Privacy Policy (links open in a
+ * new tab).
+ */
 function Consent({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="consent">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} required data-testid="accept-terms" />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        required
+        data-testid="accept-terms"
+      />
       <span>
         I have read and agree to the{' '}
         <a href="/terms" target="_blank" rel="noopener">
@@ -48,7 +68,10 @@ function Consent({ checked, onChange }: { checked: boolean; onChange: (v: boolea
     </label>
   );
 }
-function Field({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+function Field({
+  label,
+  ...props
+}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="field">
       <span>{label}</span>
@@ -61,7 +84,15 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
   useStore();
   const router = useRouter();
   const params = useSearchParams();
-  const [f, setF] = useState({ name: '', email: '', pass: '', pass2: '', company: '', note: '', website: '' });
+  const [f, setF] = useState({
+    name: '',
+    email: '',
+    pass: '',
+    pass2: '',
+    company: '',
+    note: '',
+    website: '',
+  });
   const [accept, setAccept] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,7 +107,8 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
     if (!S.ready || S.bootError) return;
     if (S.auth?.setupRequired && mode !== 'setup') router.replace('/setup');
     else if (!S.auth?.setupRequired && mode === 'setup') router.replace('/login');
-    else if (S.user && (mode === 'login' || mode === 'signup')) router.replace(params.get('next') || '/projects');
+    else if (S.user && (mode === 'login' || mode === 'signup'))
+      router.replace(params.get('next') || '/projects');
   }, [S.ready, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (mode !== 'invite' || !token) return;
@@ -98,30 +130,57 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
     setBusy(true);
     try {
       const needsConsent = mode === 'setup' || mode === 'invite' || mode === 'signup';
-      if (needsConsent && !accept) throw new Error('Please tick the box to accept the Terms of Use and Privacy Policy.');
+      if (needsConsent && !accept)
+        throw new Error('Please tick the box to accept the Terms of Use and Privacy Policy.');
       if (mode === 'setup')
         await done(
           await api('/api/auth/setup', {
             method: 'POST',
-            body: { name: f.name, email: f.email, password: f.pass, company: f.company, acceptTerms: accept },
+            body: {
+              name: f.name,
+              email: f.email,
+              password: f.pass,
+              company: f.company,
+              acceptTerms: accept,
+            },
           }),
         );
       else if (mode === 'signup') {
         const plan = params.get('plan');
-        const note = [f.note.trim(), plan && /^[a-z]{2,12}$/.test(plan) ? `Interested in the ${plan} plan.` : '']
+        const note = [
+          f.note.trim(),
+          plan && /^[a-z]{2,12}$/.test(plan) ? `Interested in the ${plan} plan.` : '',
+        ]
           .filter(Boolean)
           .join('\n');
         const r = await api('/api/auth/signup', {
           method: 'POST',
-          body: { name: f.name, email: f.email, company: f.company, note, password: f.pass, website: f.website, acceptTerms: accept },
+          body: {
+            name: f.name,
+            email: f.email,
+            company: f.company,
+            note,
+            password: f.pass,
+            website: f.website,
+            acceptTerms: accept,
+          },
         });
         if (r.user) await done(r);
         else setSent(r);
-      } else if (mode === 'login') await done(await api('/api/auth/login', { method: 'POST', body: { email: f.email, password: f.pass } }));
-      else if (mode === 'forgot') setSent(await api('/api/auth/forgot', { method: 'POST', body: { email: f.email } }));
+      } else if (mode === 'login')
+        await done(
+          await api('/api/auth/login', {
+            method: 'POST',
+            body: { email: f.email, password: f.pass },
+          }),
+        );
+      else if (mode === 'forgot')
+        setSent(await api('/api/auth/forgot', { method: 'POST', body: { email: f.email } }));
       else if (mode === 'reset') {
         if (f.pass !== f.pass2) throw new Error('The passwords don’t match.');
-        await done(await api('/api/auth/reset', { method: 'POST', body: { token, password: f.pass } }));
+        await done(
+          await api('/api/auth/reset', { method: 'POST', body: { token, password: f.pass } }),
+        );
       } else if (mode === 'invite')
         await done(
           await api(`/api/invites/${encodeURIComponent(token!)}/accept`, {
@@ -179,9 +238,26 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
       >
         {form(
           <>
-            <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
-            <Field label="Work email" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
-            <Field label="Company or team name (optional)" autoComplete="organization" value={f.company} onChange={set('company')} />
+            <Field
+              label="Your name"
+              autoFocus
+              autoComplete="name"
+              value={f.name}
+              onChange={set('name')}
+            />
+            <Field
+              label="Work email"
+              type="email"
+              autoComplete="email"
+              value={f.email}
+              onChange={set('email')}
+            />
+            <Field
+              label="Company or team name (optional)"
+              autoComplete="organization"
+              value={f.company}
+              onChange={set('company')}
+            />
             <Field
               label="Password (at least 8 characters)"
               type="password"
@@ -207,11 +283,15 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
       );
     else if (sent)
       body = (
-        <Card title="Thanks, we’ve got your request" foot={<Link href="/">Back to the home page</Link>}>
+        <Card
+          title="Thanks, we’ve got your request"
+          foot={<Link href="/">Back to the home page</Link>}
+        >
           <div className="auth-ok">
             <Ico svg={I.check} />
             <div>
-              We’ll email <b>{f.email || 'you'}</b> an invitation as soon as your workspace is ready.
+              We’ll email <b>{f.email || 'you'}</b> an invitation as soon as your workspace is
+              ready.
             </div>
           </div>
         </Card>
@@ -230,9 +310,26 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
         >
           {form(
             <>
-              <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
-              <Field label="Work email" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
-              <Field label="Company or team name" autoComplete="organization" value={f.company} onChange={set('company')} />
+              <Field
+                label="Your name"
+                autoFocus
+                autoComplete="name"
+                value={f.name}
+                onChange={set('name')}
+              />
+              <Field
+                label="Work email"
+                type="email"
+                autoComplete="email"
+                value={f.email}
+                onChange={set('email')}
+              />
+              <Field
+                label="Company or team name"
+                autoComplete="organization"
+                value={f.company}
+                onChange={set('company')}
+              />
               <Field
                 label="Password (at least 8 characters)"
                 type="password"
@@ -269,10 +366,31 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
         >
           {form(
             <>
-              <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
-              <Field label="Work email" type="email" autoComplete="email" value={f.email} onChange={set('email')} />
-              <Field label="Company (optional)" autoComplete="organization" value={f.company} onChange={set('company')} />
-              <Field label="What will you use it for? (optional)" value={f.note} onChange={set('note')} />
+              <Field
+                label="Your name"
+                autoFocus
+                autoComplete="name"
+                value={f.name}
+                onChange={set('name')}
+              />
+              <Field
+                label="Work email"
+                type="email"
+                autoComplete="email"
+                value={f.email}
+                onChange={set('email')}
+              />
+              <Field
+                label="Company (optional)"
+                autoComplete="organization"
+                value={f.company}
+                onChange={set('company')}
+              />
+              <Field
+                label="What will you use it for? (optional)"
+                value={f.note}
+                onChange={set('note')}
+              />
               <input
                 className="hp-field"
                 tabIndex={-1}
@@ -304,7 +422,8 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
                 <>
                   <br />
                   <span className="muted small">
-                    Email isn’t set up on this server yet — ask an administrator to send you a reset link from Administration → Users.
+                    Email isn’t set up on this server yet — ask an administrator to send you a reset
+                    link from Administration → Users.
                   </span>
                 </>
               )}
@@ -312,7 +431,14 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
           </div>
         ) : (
           form(
-            <Field label="Email" type="email" autoFocus autoComplete="email" value={f.email} onChange={set('email')} />,
+            <Field
+              label="Email"
+              type="email"
+              autoFocus
+              autoComplete="email"
+              value={f.email}
+              onChange={set('email')}
+            />,
             'Send reset link',
           )
         )}
@@ -331,7 +457,13 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
               value={f.pass}
               onChange={set('pass')}
             />
-            <Field label="Confirm new password" type="password" autoComplete="new-password" value={f.pass2} onChange={set('pass2')} />
+            <Field
+              label="Confirm new password"
+              type="password"
+              autoComplete="new-password"
+              value={f.pass2}
+              onChange={set('pass2')}
+            />
           </>,
           'Save password and sign in',
         )}
@@ -353,11 +485,22 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
           </Loading>
         </Card>
       );
-    else if (invite.error) body = <Card title="Invite unavailable" sub={invite.error} foot={<Link href="/login">Go to sign in</Link>} />;
+    else if (invite.error)
+      body = (
+        <Card
+          title="Invite unavailable"
+          sub={invite.error}
+          foot={<Link href="/login">Go to sign in</Link>}
+        />
+      );
     else
       body = (
         <Card
-          title={invite.workspace ? `Join ${invite.workspace} on TicketForge` : 'Join your team on TicketForge'}
+          title={
+            invite.workspace
+              ? `Join ${invite.workspace} on TicketForge`
+              : 'Join your team on TicketForge'
+          }
           sub={
             <>
               <b>{invite.inviter}</b> invited <b>{invite.email}</b> as <b>{invite.role}</b>.
@@ -370,7 +513,8 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
               {invite.existingAccount ? (
                 <>
                   <p className="muted small" style={{ marginTop: 0 }}>
-                    You already have a TicketForge account. Enter your password to add this workspace to it.
+                    You already have a TicketForge account. Enter your password to add this
+                    workspace to it.
                   </p>
                   <Field
                     label="Your password"
@@ -383,7 +527,13 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
                 </>
               ) : (
                 <>
-                  <Field label="Your name" autoFocus autoComplete="name" value={f.name} onChange={set('name')} />
+                  <Field
+                    label="Your name"
+                    autoFocus
+                    autoComplete="name"
+                    value={f.name}
+                    onChange={set('name')}
+                  />
                   <Field
                     label="Create a password (at least 8 characters)"
                     type="password"
@@ -411,7 +561,9 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
             {S.auth?.signupMode && S.auth.signupMode !== 'closed' ? (
               <>
                 <span className="muted">New here?</span>
-                <Link href="/signup">{S.auth.signupMode === 'open' ? 'Create a workspace' : 'Request access'}</Link>
+                <Link href="/signup">
+                  {S.auth.signupMode === 'open' ? 'Create a workspace' : 'Request access'}
+                </Link>
               </>
             ) : (
               <span className="muted">New here? Ask an administrator for an invite.</span>
@@ -421,8 +573,21 @@ export default function AuthPage({ mode, token }: { mode: Mode; token?: string }
       >
         {form(
           <>
-            <Field label="Email" type="email" autoFocus autoComplete="username" value={f.email} onChange={set('email')} />
-            <Field label="Password" type="password" autoComplete="current-password" value={f.pass} onChange={set('pass')} />
+            <Field
+              label="Email"
+              type="email"
+              autoFocus
+              autoComplete="username"
+              value={f.email}
+              onChange={set('email')}
+            />
+            <Field
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              value={f.pass}
+              onChange={set('pass')}
+            />
           </>,
           'Sign in',
         )}

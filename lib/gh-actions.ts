@@ -1,9 +1,11 @@
-// Playwright tests on GitHub Actions. TicketForge sends the run (scripts, App setup with test passwords, run settings)
-// to a workflow in a repository you choose, encrypted with a key that only TicketForge and that repository's
-// TICKETFORGE_RUN_KEY secret know. The workflow runs the same runner TicketForge uses locally (run-one.mjs and its
-// helpers, copied into .github/ticketforge/) in Playwright's container, and uploads the encrypted results; TicketForge
-// downloads them and records them like any other run (results, screenshots, comments on the issue).
-// Works from the deployed TicketForge too: nothing needs to reach TicketForge, it calls GitHub's API.
+// Playwright tests on GitHub Actions. TicketForge sends the run (scripts, App setup with test
+// passwords, run settings) to a workflow in a repository you choose, encrypted with a key that only
+// TicketForge and that repository's TICKETFORGE_RUN_KEY secret know. The workflow runs the same
+// runner TicketForge uses locally (run-one.mjs and its helpers, copied into .github/ticketforge/)
+// in Playwright's container, and uploads the encrypted results; TicketForge downloads them and
+// records them like any other run (results, screenshots, comments on the issue).
+// Works from the deployed TicketForge too: nothing needs to reach TicketForge, it calls GitHub's
+// API.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -21,20 +23,28 @@ const RUNNER_VERSION = 3;
 const MAX_INPUT = 60_000; // GitHub limits workflow_dispatch inputs to 65,535 characters in all
 const RUNNER_SOURCES = ['run-one.mjs', 'app-helpers.mjs', 'browser.mjs', 'totp.mjs'];
 // GitHub Enterprise Server: set TICKETFORGE_GITHUB_API (e.g. https://github.example.com/api/v3).
-const API = String(process.env.TICKETFORGE_GITHUB_API || 'https://api.github.com').replace(/\/$/, '');
+const API = String(process.env.TICKETFORGE_GITHUB_API || 'https://api.github.com').replace(
+  /\/$/,
+  '',
+);
 
 // ---------------------------------------------------------------- GitHub API
 const execBuf = (cmd, args, input): Promise<Buffer> =>
   new Promise((resolve, reject) => {
-    const child = execFile(cmd, args, { timeout: 60000, maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' }, (e, stdout, stderr) =>
-      e ? reject(Object.assign(e, { stderr: String(stderr || '') })) : resolve(stdout),
+    const child = execFile(
+      cmd,
+      args,
+      { timeout: 60000, maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' },
+      (e, stdout, stderr) =>
+        e ? reject(Object.assign(e, { stderr: String(stderr || '') })) : resolve(stdout),
     );
     if (input != null) child.stdin.end(input);
     else child.stdin.end();
   });
 /**
- * One GitHub REST call. With a token (the project's GitHub token, or GITHUB_TOKEN) it uses fetch; without one, the
- * signed-in `gh` CLI on this computer. { raw: true } returns the body as a Buffer (artifact downloads).
+ * One GitHub REST call. With a token (the project's GitHub token, or GITHUB_TOKEN) it uses fetch;
+ * without one, the signed-in `gh` CLI on this computer. { raw: true } returns the body as a Buffer
+ * (artifact downloads).
  */
 export async function gh(method, apiPath, { token = '', body, raw = false }: any = {}) {
   const tok = token || process.env.GITHUB_TOKEN || '';
@@ -56,7 +66,9 @@ export async function gh(method, apiPath, { token = '', body, raw = false }: any
     } catch (e) {
       const msg = String(e.stderr || e.message || '');
       if (/ENOENT/.test(String(e.code || e.message)))
-        throw err('Save a GitHub token for this project (Project settings → Code & GitHub) to run tests on GitHub Actions.');
+        throw err(
+          'Save a GitHub token for this project (Project settings → Code & GitHub) to run tests on GitHub Actions.',
+        );
       throw err(ghMessage(msg.match(/HTTP (\d+)/)?.[1], msg.split('\n')[0]));
     }
   }
@@ -93,17 +105,22 @@ export async function gh(method, apiPath, { token = '', body, raw = false }: any
 }
 function ghMessage(status, detail = '') {
   const s = Number(status);
-  if (s === 401) return 'GitHub rejected the token. Save a new one in Project settings → Code & GitHub.';
+  if (s === 401)
+    return 'GitHub rejected the token. Save a new one in Project settings → Code & GitHub.';
   if (s === 403)
     return `GitHub refused (${detail || 'permission'}). The token needs Actions (read and write), Contents (read and write), Pull requests (write), Secrets (read and write) and Workflows (write) on the repository.`;
-  if (s === 404) return `GitHub couldn’t find it (${detail || 'not found'}). Check the repository name and that the token can see it.`;
+  if (s === 404)
+    return `GitHub couldn’t find it (${detail || 'not found'}). Check the repository name and that the token can see it.`;
   if (s === 422) return `GitHub didn’t accept the request: ${detail}`;
   return `GitHub said ${status || 'an error'}${detail ? `: ${detail}` : ''}`;
 }
 const repoOk = (repo) => /^[\w.-]+\/[\w.-]+$/.test(String(repo || ''));
 
 // ---------------------------------------------------------------- crypto
-/** libsodium's crypto_box_seal, which GitHub requires for secrets (X25519 + XSalsa20-Poly1305, blake2b nonce). */
+/**
+ * libsodium's crypto_box_seal, which GitHub requires for secrets (X25519 + XSalsa20-Poly1305,
+ * blake2b nonce).
+ */
 function sealForGitHub(publicKeyB64, message) {
   const pk = Buffer.from(publicKeyB64, 'base64');
   const { publicKey, privateKey } = crypto.generateKeyPairSync('x25519');
@@ -120,22 +137,36 @@ function sealForGitHub(publicKeyB64, message) {
   const k32 = new Uint32Array(8);
   hsalsa(u32(Buffer.from('expand 32-byte k')), u32(shared), new Uint32Array(4), k32);
   const nonce = blake2b(new Uint8Array(Buffer.concat([epk, pk])), { dkLen: 24 });
-  const box = secretbox(new Uint8Array(Buffer.from(k32.buffer)), nonce).seal(new Uint8Array(Buffer.from(message)));
+  const box = secretbox(new Uint8Array(Buffer.from(k32.buffer)), nonce).seal(
+    new Uint8Array(Buffer.from(message)),
+  );
   return Buffer.concat([epk, Buffer.from(box)]).toString('base64');
 }
-/** AES-256-GCM over gzipped JSON: iv(12) | tag(16) | ciphertext, base64. The runner does the reverse. */
+/**
+ * AES-256-GCM over gzipped JSON: iv(12) | tag(16) | ciphertext, base64. The runner does the
+ * reverse.
+ */
 function sealJson(keyB64, obj) {
   const key = Buffer.from(keyB64, 'base64');
   const iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const ct = Buffer.concat([c.update(zlib.gzipSync(Buffer.from(JSON.stringify(obj)), { level: 9 })), c.final()]);
+  const ct = Buffer.concat([
+    c.update(zlib.gzipSync(Buffer.from(JSON.stringify(obj)), { level: 9 })),
+    c.final(),
+  ]);
   return Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64');
 }
 function openJson(keyB64, data) {
   const b = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'base64');
-  const d = crypto.createDecipheriv('aes-256-gcm', Buffer.from(keyB64, 'base64'), b.subarray(0, 12));
+  const d = crypto.createDecipheriv(
+    'aes-256-gcm',
+    Buffer.from(keyB64, 'base64'),
+    b.subarray(0, 12),
+  );
   d.setAuthTag(b.subarray(12, 28));
-  return JSON.parse(zlib.gunzipSync(Buffer.concat([d.update(b.subarray(28)), d.final()])).toString('utf8'));
+  return JSON.parse(
+    zlib.gunzipSync(Buffer.concat([d.update(b.subarray(28)), d.final()])).toString('utf8'),
+  );
 }
 export const newRunKey = () => crypto.randomBytes(32).toString('base64');
 
@@ -143,7 +174,16 @@ export const newRunKey = () => crypto.randomBytes(32).toString('base64');
 function playwrightVersion() {
   try {
     return JSON.parse(
-      fs.readFileSync(path.join(/*turbopackIgnore: true*/ process.cwd(), 'node_modules', '@playwright', 'test', 'package.json'), 'utf8'),
+      fs.readFileSync(
+        path.join(
+          /*turbopackIgnore: true*/ process.cwd(),
+          'node_modules',
+          '@playwright',
+          'test',
+          'package.json',
+        ),
+        'utf8',
+      ),
     ).version;
   } catch {
     return '1.65.0';
@@ -241,7 +281,11 @@ function runnerFiles() {
     '.github/ticketforge/README.md':
       '# TicketForge test runner\n\nUsed by the **TicketForge tests** workflow to run Playwright tests sent by TicketForge. Written by TicketForge; run the setup again from TicketForge to update it.\n',
   };
-  for (const f of RUNNER_SOURCES) files[`.github/ticketforge/${f}`] = fs.readFileSync(path.join(/*turbopackIgnore: true*/ lib, f), 'utf8');
+  for (const f of RUNNER_SOURCES)
+    files[`.github/ticketforge/${f}`] = fs.readFileSync(
+      path.join(/*turbopackIgnore: true*/ lib, f),
+      'utf8',
+    );
   return files;
 }
 
@@ -256,27 +300,45 @@ async function fileOn(repo, ref, p, token) {
 }
 /** What's ready for running tests on GitHub Actions in `repo`. */
 export async function runnerStatus({ repo, token, hasKey }: any) {
-  if (!repoOk(repo)) return { ready: false, checks: [{ ok: false, label: 'Repository', detail: 'Enter the repository as owner/name.' }] };
+  if (!repoOk(repo))
+    return {
+      ready: false,
+      checks: [{ ok: false, label: 'Repository', detail: 'Enter the repository as owner/name.' }],
+    };
   const info = await gh('GET', `repos/${repo}`, { token });
   const def = info.default_branch;
   const [wf, ver, secret, pr] = await Promise.all([
     fileOn(repo, def, `.github/workflows/${WORKFLOW}`, token),
     fileOn(repo, def, '.github/ticketforge/version.json', token)
-      .then((f) => (f?.content ? JSON.parse(Buffer.from(f.content, 'base64').toString('utf8')) : null))
+      .then((f) =>
+        f?.content ? JSON.parse(Buffer.from(f.content, 'base64').toString('utf8')) : null,
+      )
       .catch(() => null),
     gh('GET', `repos/${repo}/actions/secrets/${SECRET}`, { token })
       .then(() => true)
       .catch((e) => (/couldn’t find/.test(e.message) ? false : null)),
-    gh('GET', `repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${repo.split('/')[0]}:${SETUP_BRANCH}`)}`, { token })
+    gh(
+      'GET',
+      `repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${repo.split('/')[0]}:${SETUP_BRANCH}`)}`,
+      { token },
+    )
       .then((l) => l?.[0] || null)
       .catch(() => null),
   ]);
   const checks = [
-    { ok: true, label: 'Repository', detail: `${info.full_name} (${info.private ? 'private' : 'public'}), default branch ${def}` },
+    {
+      ok: true,
+      label: 'Repository',
+      detail: `${info.full_name} (${info.private ? 'private' : 'public'}), default branch ${def}`,
+    },
     {
       ok: Boolean(wf),
       label: 'Workflow',
-      detail: wf ? `${WORKFLOW} is on ${def}` : pr ? `Waiting for the setup pull request #${pr.number} to be merged` : `Not on ${def} yet`,
+      detail: wf
+        ? `${WORKFLOW} is on ${def}`
+        : pr
+          ? `Waiting for the setup pull request #${pr.number} to be merged`
+          : `Not on ${def} yet`,
     },
     {
       ok: Boolean(ver && ver.version >= RUNNER_VERSION),
@@ -310,7 +372,8 @@ export async function runnerStatus({ repo, token, hasKey }: any) {
 }
 
 /**
- * Sets the repository secret and opens a pull request with the workflow and runner (or updates the open one).
+ * Sets the repository secret and opens a pull request with the workflow and runner (or updates the
+ * open one).
  * Returns { pr: { number, url }, created }.
  */
 export async function setupRunner({ repo, token, key }: any) {
@@ -325,8 +388,14 @@ export async function setupRunner({ repo, token, key }: any) {
   });
   // 2. A branch with the files.
   const base = await gh('GET', `repos/${repo}/git/ref/heads/${encodeURIComponent(def)}`, { token });
-  const exists = await gh('GET', `repos/${repo}/git/ref/heads/${SETUP_BRANCH}`, { token }).catch(() => null);
-  if (!exists) await gh('POST', `repos/${repo}/git/refs`, { token, body: { ref: `refs/heads/${SETUP_BRANCH}`, sha: base.object.sha } });
+  const exists = await gh('GET', `repos/${repo}/git/ref/heads/${SETUP_BRANCH}`, { token }).catch(
+    () => null,
+  );
+  if (!exists)
+    await gh('POST', `repos/${repo}/git/refs`, {
+      token,
+      body: { ref: `refs/heads/${SETUP_BRANCH}`, sha: base.object.sha },
+    });
   for (const [p, content] of Object.entries<any>(runnerFiles())) {
     const cur = await fileOn(repo, SETUP_BRANCH, p, token);
     const b64 = Buffer.from(content).toString('base64');
@@ -342,9 +411,13 @@ export async function setupRunner({ repo, token, key }: any) {
     });
   }
   // 3. The pull request (one stays open until it is merged).
-  const open = await gh('GET', `repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${repo.split('/')[0]}:${SETUP_BRANCH}`)}`, {
-    token,
-  });
+  const open = await gh(
+    'GET',
+    `repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${repo.split('/')[0]}:${SETUP_BRANCH}`)}`,
+    {
+      token,
+    },
+  );
   if (open?.[0]) return { pr: { number: open[0].number, url: open[0].html_url }, created: false };
   const pr = await gh('POST', `repos/${repo}/pulls`, {
     token,
@@ -359,12 +432,27 @@ export async function setupRunner({ repo, token, key }: any) {
 }
 
 // ---------------------------------------------------------------- runs
-/** Starts the workflow for some tests; splits into several runs when the encrypted run is too big for one. */
-export async function dispatchRuns({ repo, ref, token, key, baseUrl, app, retries, timeoutMs, tests }: any) {
+/**
+ * Starts the workflow for some tests; splits into several runs when the encrypted run is too big
+ * for one.
+ */
+export async function dispatchRuns({
+  repo,
+  ref,
+  token,
+  key,
+  baseUrl,
+  app,
+  retries,
+  timeoutMs,
+  tests,
+}: any) {
   const tag = () => `tf${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
   const chunks: any[] = [];
   let cur: any[] = [];
-  const fits = (list) => sealJson(key, { runId: 'x', baseUrl, app, retries, timeoutMs, tests: list }).length <= MAX_INPUT;
+  const fits = (list) =>
+    sealJson(key, { runId: 'x', baseUrl, app, retries, timeoutMs, tests: list }).length <=
+    MAX_INPUT;
   for (const t of tests) {
     if (fits([...cur, t])) {
       cur.push(t);
@@ -395,32 +483,55 @@ async function findRun(repo, token, r, workflow = WORKFLOW) {
     `repos/${repo}/actions/workflows/${workflow}/runs?event=workflow_dispatch&per_page=30&created=${encodeURIComponent(`>=${r.since}`)}`,
     { token },
   );
-  return (list?.workflow_runs || []).find((x) => String(x.display_title || x.name || '').includes(r.runId)) || null;
+  return (
+    (list?.workflow_runs || []).find((x) =>
+      String(x.display_title || x.name || '').includes(r.runId),
+    ) || null
+  );
 }
 /**
- * Checks one dispatched run once: { state: 'waiting'|'queued'|'in_progress'|'done'|'failed', url, results?, message? }.
+ * Checks one dispatched run once: { state: 'waiting'|'queued'|'in_progress'|'done'|'failed', url,
+ * results?, message? }.
  * When done, downloads and decrypts the results.
  */
-export async function checkRun({ repo, token, key, run, workflow = WORKFLOW, file = 'results.bin' }: any) {
+export async function checkRun({
+  repo,
+  token,
+  key,
+  run,
+  workflow = WORKFLOW,
+  file = 'results.bin',
+}: any) {
   const gr = run.ghRunId
     ? await gh('GET', `repos/${repo}/actions/runs/${run.ghRunId}`, { token })
     : await findRun(repo, token, run, workflow);
   if (!gr) return { state: 'waiting' };
   run.ghRunId = gr.id;
   run.url = gr.html_url;
-  if (gr.status !== 'completed') return { state: gr.status === 'in_progress' ? 'in_progress' : 'queued', url: gr.html_url };
+  if (gr.status !== 'completed')
+    return { state: gr.status === 'in_progress' ? 'in_progress' : 'queued', url: gr.html_url };
   const arts = await gh('GET', `repos/${repo}/actions/runs/${gr.id}/artifacts`, { token });
-  const art = (arts?.artifacts || []).find((a) => a.name === `ticketforge-${run.runId}` && !a.expired);
+  const art = (arts?.artifacts || []).find(
+    (a) => a.name === `ticketforge-${run.runId}` && !a.expired,
+  );
   if (!art)
     return {
       state: 'failed',
       url: gr.html_url,
       message: `The GitHub Actions run ${gr.conclusion === 'cancelled' ? 'was cancelled' : 'ended without results'} (${gr.conclusion}). Open it on GitHub for the log.`,
     };
-  const zip = await gh('GET', `repos/${repo}/actions/artifacts/${art.id}/zip`, { token, raw: true });
+  const zip = await gh('GET', `repos/${repo}/actions/artifacts/${art.id}/zip`, {
+    token,
+    raw: true,
+  });
   const files = unzipSync(new Uint8Array(zip));
   const bin = files[file];
-  if (!bin) return { state: 'failed', url: gr.html_url, message: 'The results file is missing from the GitHub Actions run.' };
+  if (!bin)
+    return {
+      state: 'failed',
+      url: gr.html_url,
+      message: 'The results file is missing from the GitHub Actions run.',
+    };
   let data;
   try {
     data = openJson(key, Buffer.from(bin));
@@ -428,8 +539,15 @@ export async function checkRun({ repo, token, key, run, workflow = WORKFLOW, fil
     return {
       state: 'failed',
       url: gr.html_url,
-      message: 'Couldn’t read the results: the repository’s run key doesn’t match. Run the setup again.',
+      message:
+        'Couldn’t read the results: the repository’s run key doesn’t match. Run the setup again.',
     };
   }
-  return { state: 'done', url: gr.html_url, results: data.results || [], data, conclusion: gr.conclusion };
+  return {
+    state: 'done',
+    url: gr.html_url,
+    results: data.results || [],
+    data,
+    conclusion: gr.conclusion,
+  };
 }

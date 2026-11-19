@@ -1,7 +1,8 @@
 'use client';
-// Rich-text comments (TipTap), like Jira: bold, italic, strike, code, lists, quotes, code blocks and links, with
-// Markdown-style shortcuts, plus file attachments (button, drag and drop, or paste). Saved comments keep the
-// TipTap document for display, a plain-text copy for search and exports, and their attachments.
+// Rich-text comments (TipTap), like Jira: bold, italic, strike, code, lists, quotes, code blocks
+// and links, with Markdown-style shortcuts, plus file attachments (button, drag and drop, or
+// paste). Saved comments keep the TipTap document for display, a plain-text copy for search and
+// exports, and their attachments.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -27,9 +28,11 @@ const extensions = (placeholder = '') => [
 ];
 const MAX_DOC = 200_000;
 
-const fmtBytes = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const fmtBytes = (n: number) =>
+  n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 const isImage = (m: string) => /^image\/(png|jpeg|gif|webp)$/.test(m);
-const fileUrl = (a: Attachment, download = false) => `/api/files/${a.id}/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
+const fileUrl = (a: Attachment, download = false) =>
+  `/api/files/${a.id}/${encodeURIComponent(a.name)}${download ? '?download=1' : ''}`;
 
 /** Plain text as a TipTap document (for comments written before rich text). */
 export function textToDoc(text: string) {
@@ -39,7 +42,12 @@ export function textToDoc(text: string) {
     content: paras.map((p) => ({
       type: 'paragraph',
       content: p
-        ? p.split('\n').flatMap((line, i) => [...(i ? [{ type: 'hardBreak' }] : []), ...(line ? [{ type: 'text', text: line }] : [])])
+        ? p
+            .split('\n')
+            .flatMap((line, i) => [
+              ...(i ? [{ type: 'hardBreak' }] : []),
+              ...(line ? [{ type: 'text', text: line }] : []),
+            ])
         : [],
     })),
   };
@@ -71,7 +79,13 @@ function Toolbar({
       editor.off('transaction', f);
     };
   }, [editor]);
-  const b = (label: string, active: boolean, run: () => void, content: React.ReactNode, key?: string) => (
+  const b = (
+    label: string,
+    active: boolean,
+    run: () => void,
+    content: React.ReactNode,
+    key?: string,
+  ) => (
     <button
       type="button"
       className={`ce-btn ${active ? 'on' : ''}`}
@@ -95,14 +109,22 @@ function Toolbar({
     }
     c()
       .extendMarkRange('link')
-      .setLink({ href: /^(https?:|mailto:)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}` })
+      .setLink({
+        href: /^(https?:|mailto:)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`,
+      })
       .run();
   };
   return (
     <div className="ce-bar" role="toolbar" aria-label="Formatting">
       {headings && (
         <>
-          {b('Heading', editor.isActive('heading', { level: 3 }), () => c().toggleHeading({ level: 3 }).run(), <b>H</b>, '⌘⌥3')}
+          {b(
+            'Heading',
+            editor.isActive('heading', { level: 3 }),
+            () => c().toggleHeading({ level: 3 }).run(),
+            <b>H</b>,
+            '⌘⌥3',
+          )}
           {b(
             'Subheading',
             editor.isActive('heading', { level: 4 }),
@@ -114,26 +136,77 @@ function Toolbar({
         </>
       )}
       {b('Bold', editor.isActive('bold'), () => c().toggleBold().run(), <b>B</b>, '⌘B')}
-      {b('Italic', editor.isActive('italic'), () => c().toggleItalic().run(), <i style={{ fontFamily: 'Georgia, serif' }}>I</i>, '⌘I')}
-      {b('Strikethrough', editor.isActive('strike'), () => c().toggleStrike().run(), <s>S</s>, '⌘⇧S')}
-      {b('Inline code', editor.isActive('code'), () => c().toggleCode().run(), <code>{'<>'}</code>, '⌘E')}
+      {b(
+        'Italic',
+        editor.isActive('italic'),
+        () => c().toggleItalic().run(),
+        <i style={{ fontFamily: 'Georgia, serif' }}>I</i>,
+        '⌘I',
+      )}
+      {b(
+        'Strikethrough',
+        editor.isActive('strike'),
+        () => c().toggleStrike().run(),
+        <s>S</s>,
+        '⌘⇧S',
+      )}
+      {b(
+        'Inline code',
+        editor.isActive('code'),
+        () => c().toggleCode().run(),
+        <code>{'<>'}</code>,
+        '⌘E',
+      )}
       <span className="ce-sep" />
-      {b('Bulleted list', editor.isActive('bulletList'), () => c().toggleBulletList().run(), <span>•≡</span>, '⌘⇧8')}
-      {b('Numbered list', editor.isActive('orderedList'), () => c().toggleOrderedList().run(), <span>1.</span>, '⌘⇧7')}
-      {b('Quote', editor.isActive('blockquote'), () => c().toggleBlockquote().run(), <span>❝</span>, '⌘⇧B')}
-      {b('Code block', editor.isActive('codeBlock'), () => c().toggleCodeBlock().run(), <code>{'{ }'}</code>, '⌘⌥C')}
+      {b(
+        'Bulleted list',
+        editor.isActive('bulletList'),
+        () => c().toggleBulletList().run(),
+        <span>•≡</span>,
+        '⌘⇧8',
+      )}
+      {b(
+        'Numbered list',
+        editor.isActive('orderedList'),
+        () => c().toggleOrderedList().run(),
+        <span>1.</span>,
+        '⌘⇧7',
+      )}
+      {b(
+        'Quote',
+        editor.isActive('blockquote'),
+        () => c().toggleBlockquote().run(),
+        <span>❝</span>,
+        '⌘⇧B',
+      )}
+      {b(
+        'Code block',
+        editor.isActive('codeBlock'),
+        () => c().toggleCodeBlock().run(),
+        <code>{'{ }'}</code>,
+        '⌘⌥C',
+      )}
       {b('Link', editor.isActive('link'), link, <Ico svg={I.link} />, '')}
       {onAttach && (
         <>
           <span className="ce-sep" />
-          {b(busy ? 'Uploading…' : 'Attach files', false, onAttach, busy ? <Spinner /> : <Ico svg={I.upload} />, '')}
+          {b(
+            busy ? 'Uploading…' : 'Attach files',
+            false,
+            onAttach,
+            busy ? <Spinner /> : <Ico svg={I.upload} />,
+            '',
+          )}
         </>
       )}
     </div>
   );
 }
 
-/** The comment box. `value` starts it (editing); onSave gets the document, its text and the attachments. */
+/**
+ * The comment box. `value` starts it (editing); onSave gets the document, its text and the
+ * attachments.
+ */
 export function CommentEditor({
   value,
   onSave,
@@ -179,7 +252,12 @@ export function CommentEditor({
     content: value?.doc || (value?.body ? textToDoc(value.body) : ''),
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
-      attributes: { class: 'ce-content rich', 'aria-label': 'Comment', role: 'textbox', 'aria-multiline': 'true' },
+      attributes: {
+        class: 'ce-content rich',
+        'aria-label': 'Comment',
+        role: 'textbox',
+        'aria-multiline': 'true',
+      },
       handleKeyDown: (_v, e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
           e.preventDefault();
@@ -249,7 +327,9 @@ export function CommentEditor({
         }
       }}
     >
-      {active && <Toolbar editor={editor} busy={busy > 0} onAttach={() => fileRef.current?.click()} />}
+      {active && (
+        <Toolbar editor={editor} busy={busy > 0} onAttach={() => fileRef.current?.click()} />
+      )}
       <EditorContent editor={editor} onClick={() => setActive(true)} />
       <input
         ref={fileRef}
@@ -262,7 +342,11 @@ export function CommentEditor({
         }}
       />
       {(files.length > 0 || busy > 0) && (
-        <Attachments files={files} uploading={busy} onRemove={(id) => setFiles((x) => x.filter((f) => f.id !== id))} />
+        <Attachments
+          files={files}
+          uploading={busy}
+          onRemove={(id) => setFiles((x) => x.filter((f) => f.id !== id))}
+        />
       )}
       {active && (
         <div className="ce-foot">
@@ -275,7 +359,8 @@ export function CommentEditor({
             </button>
           )}
           <span className="muted small ce-hint">
-            ⌘↩ to save · drop or paste files to attach · **bold**, _italic_, - list, &gt; quote, ``` code
+            ⌘↩ to save · drop or paste files to attach · **bold**, _italic_, - list, &gt; quote, ```
+            code
           </span>
         </div>
       )}
@@ -283,16 +368,22 @@ export function CommentEditor({
   );
 }
 
-// ---------------------------------------------------------------- rich text fields (issue descriptions)
-// The field's plain text stays the source of truth (exports, search, AI prompts read it). The formatted
-// document is saved beside it as { text, doc } and is only used while its text still matches, so a change
-// made elsewhere (Claude rewriting the description, an import) falls back to the plain text.
+// ---------------------------------------------------------------- rich text fields (issue
+// descriptions) The field's plain text stays the source of truth (exports, search, AI prompts read
+// it). The formatted document is saved beside it as { text, doc } and is only used while its text
+// still matches, so a change made elsewhere (Claude rewriting the description, an import) falls
+// back to the plain text.
 export type RichValue = { text: string; doc: Any };
 
-/** A TipTap document as readable plain text: blank lines between blocks, "- " and "1. " list markers, "> " quotes. */
+/**
+ * A TipTap document as readable plain text: blank lines between blocks, "- " and "1. " list
+ * markers, "> " quotes.
+ */
 export function docToText(doc: Any): string {
   const inline = (n: Any): string =>
-    (n.content || []).map((c: Any) => (c.type === 'text' ? c.text : c.type === 'hardBreak' ? '\n' : inline(c))).join('');
+    (n.content || [])
+      .map((c: Any) => (c.type === 'text' ? c.text : c.type === 'hardBreak' ? '\n' : inline(c)))
+      .join('');
   const item = (li: Any, marker: string) =>
     marker +
     (li.content || [])
@@ -329,9 +420,13 @@ export function docToText(doc: Any): string {
     .trim();
 }
 /** The document to show for a field: its saved formatting if still current, else its plain text. */
-const docFor = (text: string, rich?: RichValue | null) => (rich?.doc && rich.text === (text || '') ? rich.doc : textToDoc(text || ''));
+const docFor = (text: string, rich?: RichValue | null) =>
+  rich?.doc && rich.text === (text || '') ? rich.doc : textToDoc(text || '');
 
-/** A rich text input with a formatting toolbar. `ghost` hides the border and toolbar until it is focused. */
+/**
+ * A rich text input with a formatting toolbar. `ghost` hides the border and toolbar until it is
+ * focused.
+ */
 export function RichTextField({
   text,
   rich,
@@ -363,7 +458,14 @@ export function RichTextField({
     content: want,
     editable: !disabled,
     autofocus: autoFocus ? 'end' : false,
-    editorProps: { attributes: { class: 'ce-content rich', 'aria-label': ariaLabel, role: 'textbox', 'aria-multiline': 'true' } },
+    editorProps: {
+      attributes: {
+        class: 'ce-content rich',
+        'aria-label': ariaLabel,
+        role: 'textbox',
+        'aria-multiline': 'true',
+      },
+    },
     onUpdate: ({ editor: ed }) => {
       const doc = ed.getJSON();
       seen.current = JSON.stringify(doc);
@@ -372,7 +474,8 @@ export function RichTextField({
     onFocus: () => setFocused(true),
     onBlur: () => setFocused(false),
   });
-  // Follow changes made elsewhere (undo, Claude, another tab) without disturbing what is being typed here.
+  // Follow changes made elsewhere (undo, Claude, another tab) without disturbing what is being
+  // typed here.
   useEffect(() => {
     if (!editor || editor.isDestroyed || seen.current === wantJson) return;
     seen.current = wantJson;
@@ -389,7 +492,9 @@ export function RichTextField({
     );
   const showBar = !disabled && (!ghost || focused);
   return (
-    <div className={`ce rtf ${ghost ? 'ghost' : ''} ${focused ? 'active' : ''} ${disabled ? 'disabled' : ''}`}>
+    <div
+      className={`ce rtf ${ghost ? 'ghost' : ''} ${focused ? 'active' : ''} ${disabled ? 'disabled' : ''}`}
+    >
       {showBar && <Toolbar editor={editor} headings />}
       <EditorContent editor={editor} />
     </div>
@@ -400,16 +505,24 @@ export function RichTextField({
 export function CommentBody({ c }: { c: Any }) {
   const html = useMemo(() => {
     if (!c.doc) return null;
-    // Links whose address was refused (not web or mail) come out empty: show their text without a link.
+    // Links whose address was refused (not web or mail) come out empty: show their text without a
+    // link.
     try {
-      return generateHTML(c.doc, extensions()).replace(/<a\b[^>]*\bhref=""[^>]*>([\s\S]*?)<\/a>/g, '$1');
+      return generateHTML(c.doc, extensions()).replace(
+        /<a\b[^>]*\bhref=""[^>]*>([\s\S]*?)<\/a>/g,
+        '$1',
+      );
     } catch {
       return null;
     }
   }, [c.doc]);
   return (
     <>
-      {html !== null ? <div className="cbody rich" dangerouslySetInnerHTML={{ __html: html }} /> : <div className="cbody">{c.body}</div>}
+      {html !== null ? (
+        <div className="cbody rich" dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <div className="cbody">{c.body}</div>
+      )}
       {c.attachments?.length > 0 && <Attachments files={c.attachments} />}
     </>
   );
@@ -429,7 +542,11 @@ export function Attachments({
   const view = (f: Attachment) =>
     openModal(
       <Modal title={f.name} wide actions={[{ label: 'Close' }]}>
-        <img src={fileUrl(f)} alt={f.name} style={{ maxWidth: '100%', display: 'block', margin: '0 auto' }} />
+        <img
+          src={fileUrl(f)}
+          alt={f.name}
+          style={{ maxWidth: '100%', display: 'block', margin: '0 auto' }}
+        />
         <p className="small" style={{ margin: '8px 0 0' }}>
           <a href={fileUrl(f, true)}>Download</a> · {fmtBytes(f.bytes)}
         </p>
@@ -441,11 +558,20 @@ export function Attachments({
         <div className="att-imgs">
           {images.map((f) => (
             <div key={f.id} className="att-img">
-              <button type="button" onClick={() => view(f)} title={`${f.name} · ${fmtBytes(f.bytes)}`}>
+              <button
+                type="button"
+                onClick={() => view(f)}
+                title={`${f.name} · ${fmtBytes(f.bytes)}`}
+              >
                 <img src={fileUrl(f)} alt={f.name} loading="lazy" />
               </button>
               {onRemove && (
-                <button type="button" className="att-x" aria-label={`Remove ${f.name}`} onClick={() => onRemove(f.id)}>
+                <button
+                  type="button"
+                  className="att-x"
+                  aria-label={`Remove ${f.name}`}
+                  onClick={() => onRemove(f.id)}
+                >
                   ×
                 </button>
               )}
@@ -468,7 +594,12 @@ export function Attachments({
               </a>
               <span className="muted small">{fmtBytes(f.bytes)}</span>
               {onRemove && (
-                <button type="button" className="att-x inline" aria-label={`Remove ${f.name}`} onClick={() => onRemove(f.id)}>
+                <button
+                  type="button"
+                  className="att-x inline"
+                  aria-label={`Remove ${f.name}`}
+                  onClick={() => onRemove(f.id)}
+                >
                   ×
                 </button>
               )}

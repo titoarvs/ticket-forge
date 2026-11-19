@@ -1,11 +1,15 @@
 // Finds a web app's page routes from its source code, for Test automation → App setup.
-// File-based routing: Next.js (app/ and pages/), SvelteKit, Nuxt, Remix / React Router framework mode, Astro,
-// TanStack Router / TanStack Start (src/routes, checked against its generated routeTree.gen.ts).
-// Router config: React Router (JSX and objects), Vue Router, Angular. Server: Laravel, Django, Rails.
+// File-based routing: Next.js (app/ and pages/), SvelteKit, Nuxt, Remix / React Router framework
+// mode, Astro, TanStack Router / TanStack Start (src/routes, checked against its generated
+// routeTree.gen.ts).
+// Router config: React Router (JSX and objects), Vue Router, Angular. Server: Laravel, Django,
+// Rails.
 // Dynamic segments become :params, e.g. /orders/:id. API routes are left out.
 
 const join = (...parts) =>
-  `/${parts.filter((p) => p !== null && p !== undefined && p !== '').join('/')}`.replace(/\/{2,}/g, '/').replace(/(.)\/$/, '$1');
+  `/${parts.filter((p) => p !== null && p !== undefined && p !== '').join('/')}`
+    .replace(/\/{2,}/g, '/')
+    .replace(/(.)\/$/, '$1');
 const isApi = (p) => /^\/api(\/|$)/.test(p);
 
 /** A readable page name from a path: /orders/:id → "Orders (id)". */
@@ -16,7 +20,9 @@ export function nameForPath(p, hint) {
       .replace(/[-_]+/g, ' ')
       .replace(/^\w/, (c) => c.toUpperCase());
   const segs = p.split('/').filter(Boolean);
-  const words = segs.filter((s) => !s.startsWith(':')).map((s) => s.replace(/[-_]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase()));
+  const words = segs
+    .filter((s) => !s.startsWith(':'))
+    .map((s) => s.replace(/[-_]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase()));
   const params = segs.filter((s) => s.startsWith(':')).map((s) => s.slice(1).replace(/[*?]/g, ''));
   const base = words.length ? words.join(' › ') : 'Home';
   return params.length ? `${base} (${params.join(', ')})` : base;
@@ -24,7 +30,10 @@ export function nameForPath(p, hint) {
 export const paramsOf = (p) => (p.match(/:(\w+)/g) || []).map((s) => s.slice(1));
 
 // ---------------------------------------------------------------- file-based routers
-/** [id] → :id, [...slug] → :slug*, [[...slug]] / [[id]] → optional, (group) → nothing. null = not a route. */
+/**
+ * [id] → :id, [...slug] → :slug*, [[...slug]] / [[id]] → optional, (group) → nothing. null = not a
+ * route.
+ */
 function bracketSeg(s) {
   let m;
   if (/^\(.*\)$/.test(s)) return ''; // route group
@@ -35,7 +44,10 @@ function bracketSeg(s) {
   if ((m = s.match(/^\[(\w+)(=\w+)?\]$/))) return `:${m[1]}`;
   return s;
 }
-function fileRoutes(files, { prefix, match, framework, skipSeg = () => false, last = (f) => f }: any) {
+function fileRoutes(
+  files,
+  { prefix, match, framework, skipSeg = () => false, last = (f) => f }: any,
+) {
   const out: any[] = [];
   for (const f of files) {
     if (!f.startsWith(prefix) || !match(f)) continue;
@@ -51,7 +63,8 @@ const nextApp = (files, root) =>
     fileRoutes(files, {
       prefix,
       framework: 'Next.js (app)',
-      match: (f) => /\/page\.(t|j)sx?$|\/page\.mdx?$|^page\.(t|j)sx?$/.test(f.slice(prefix.length - 1)),
+      match: (f) =>
+        /\/page\.(t|j)sx?$|\/page\.mdx?$|^page\.(t|j)sx?$/.test(f.slice(prefix.length - 1)),
       skipSeg: (s) => s.startsWith('_') || /^\(\.{1,3}\)/.test(s) || s === 'api',
       last: (f) => f.replace(/(^|\/)page\.[a-z]+$/, ''),
     }),
@@ -63,7 +76,9 @@ const nextPages = (files, root) =>
       framework: 'Next.js (pages)',
       match: (f) =>
         /\.(t|j)sx?$|\.mdx$/.test(f) &&
-        !/(^|\/)_(app|document|error)\.|(^|\/)(404|500)\.|\.(test|spec|d)\.[tj]sx?$/.test(f.slice(prefix.length)),
+        !/(^|\/)_(app|document|error)\.|(^|\/)(404|500)\.|\.(test|spec|d)\.[tj]sx?$/.test(
+          f.slice(prefix.length),
+        ),
       skipSeg: (s) => s === 'api' || s.startsWith('_'),
       last: (f) => f.replace(/\.[a-z]+$/, '').replace(/(^|\/)index$/, ''),
     }),
@@ -118,15 +133,17 @@ function remix(files, root) {
       return s.replace(/_$/, '').replace(/\[(.*?)\]/g, '$1');
     });
     const p = join(...segs);
-    if (!isApi(p) && !/\.(xml|txt|json)$/.test(p)) out.push({ path: p, file: f, framework: 'Remix / React Router' });
+    if (!isApi(p) && !/\.(xml|txt|json)$/.test(p))
+      out.push({ path: p, file: f, framework: 'Remix / React Router' });
   }
   return out;
 }
 
 // ---------------------------------------------------------------- config-based routers
 /**
- * Walks object literals ({ path: 'x', children: [...] }) as used by Vue Router, Angular and React Router's
- * object config, joining children to their parent's path. Skips strings and comments while scanning.
+ * Walks object literals ({ path: 'x', children: [...] }) as used by Vue Router, Angular and React
+ * Router's object config, joining children to their parent's path. Skips strings and comments while
+ * scanning.
  */
 export function objectRoutes(text) {
   const out: any[] = [];
@@ -173,7 +190,13 @@ export function objectRoutes(text) {
       const t = top();
       stack.push({
         t: 'arr',
-        base: pendingChildren ? (pendingChildren.full ?? pendingChildren.base ?? '') : t ? (t.t === 'arr' ? t.base : '') : '',
+        base: pendingChildren
+          ? (pendingChildren.full ?? pendingChildren.base ?? '')
+          : t
+            ? t.t === 'arr'
+              ? t.base
+              : ''
+            : '',
       });
       pendingChildren = null;
       i++;
@@ -181,7 +204,14 @@ export function objectRoutes(text) {
     }
     if (c === '}' || c === ']') {
       const f = stack.pop();
-      if (f?.t === 'obj' && f.base !== null && f.path !== null && !f.redirect && f.path !== '**' && !f.path.includes('*'))
+      if (
+        f?.t === 'obj' &&
+        f.base !== null &&
+        f.path !== null &&
+        !f.redirect &&
+        f.path !== '**' &&
+        !f.path.includes('*')
+      )
         out.push({ path: f.full, name: f.name });
       i++;
       continue;
@@ -256,10 +286,16 @@ export function jsxRoutes(text) {
   return out;
 }
 
-/** Laravel routes/web.php: Route::get('/orders', …), Route::view(…), Route::resource('photos', …), prefix groups. */
+/**
+ * Laravel routes/web.php: Route::get('/orders', …), Route::view(…), Route::resource('photos', …),
+ * prefix groups.
+ */
 function laravelRoutes(text) {
   const out: any[] = [];
-  const conv = (p) => join(...p.split('/').map((s) => s.replace(/^\{(\w+)\?\}$/, ':$1?').replace(/^\{(\w+)\}$/, ':$1')));
+  const conv = (p) =>
+    join(
+      ...p.split('/').map((s) => s.replace(/^\{(\w+)\?\}$/, ':$1?').replace(/^\{(\w+)\}$/, ':$1')),
+    );
   const prefixes: any[] = []; // { prefix, depth }
   let depth = 0;
   const tokens =
@@ -291,7 +327,12 @@ function laravelRoutes(text) {
     }
     if (m[4]) {
       const b = join(...pre, m[4]);
-      out.push({ path: conv(b) }, { path: `${conv(b)}/create` }, { path: `${conv(b)}/:id` }, { path: `${conv(b)}/:id/edit` });
+      out.push(
+        { path: conv(b) },
+        { path: `${conv(b)}/create` },
+        { path: `${conv(b)}/:id` },
+        { path: `${conv(b)}/:id/edit` },
+      );
     }
   }
   return out;
@@ -300,13 +341,18 @@ function laravelRoutes(text) {
 function djangoRoutes(files) {
   const includes: Map<any, any> = new Map(); // 'shop.urls' → 'shop/'
   for (const f of files)
-    for (const m of f.text.matchAll(/path\(\s*['"]([^'"]*)['"]\s*,\s*include\(\s*['"]([\w.]+)['"]/g)) includes.set(m[2], m[1]);
+    for (const m of f.text.matchAll(
+      /path\(\s*['"]([^'"]*)['"]\s*,\s*include\(\s*['"]([\w.]+)['"]/g,
+    ))
+      includes.set(m[2], m[1]);
   const out: any[] = [];
   for (const f of files) {
     const mod = f.file.replace(/\.py$/, '').split('/').join('.');
     const prefix = [...includes.entries()].find(([k]) => mod.endsWith(k))?.[1] || '';
     for (const m of f.text.matchAll(/(?<![\w.])path\(\s*['"]([^'"]*)['"]\s*,\s*(?!include)/g)) {
-      const p = join(...`${prefix}${m[1]}`.split('/').map((s) => s.replace(/^<(?:\w+:)?(\w+)>$/, ':$1')));
+      const p = join(
+        ...`${prefix}${m[1]}`.split('/').map((s) => s.replace(/^<(?:\w+:)?(\w+)>$/, ':$1')),
+      );
       if (!isApi(p) && !p.startsWith('/admin')) out.push({ path: p, file: f.file });
     }
   }
@@ -332,7 +378,10 @@ const HIDDEN_DIR = /(^|\/)\.[^/]+\//;
 export const skipPath = (f) => SKIP_DIRS.test(f) || HIDDEN_DIR.test(f);
 
 // ---------------------------------------------------------------- TanStack Router (file-based)
-/** One TanStack route segment: $id → :id, {-$v} → :v?, $ → :splat*, _layout / (group) / index / route → nothing. */
+/**
+ * One TanStack route segment: $id → :id, {-$v} → :v?, $ → :splat*, _layout / (group) / index /
+ * route → nothing.
+ */
 function tanstackSeg(s, isLast) {
   let m;
   if (/^\(.*\)$/.test(s)) return '';
@@ -353,11 +402,14 @@ const tanstackPath = (p) =>
       .map((s, i, a) => tanstackSeg(s, i === a.length - 1)),
   );
 export function tanstackRoutes(files, root, genText = '') {
-  const dir = [`${root}src/routes/`, `${root}app/routes/`].find((d) => files.some((f) => f.startsWith(d)));
+  const dir = [`${root}src/routes/`, `${root}app/routes/`].find((d) =>
+    files.some((f) => f.startsWith(d)),
+  );
   if (!dir) return [];
   const byPath: Map<any, any> = new Map();
   for (const f of files) {
-    if (!f.startsWith(dir) || !/\.(t|j)sx?$/.test(f) || /\.(test|spec|d)\.[tj]sx?$/.test(f)) continue;
+    if (!f.startsWith(dir) || !/\.(t|j)sx?$/.test(f) || /\.(test|spec|d)\.[tj]sx?$/.test(f))
+      continue;
     const rel = f
       .slice(dir.length)
       .replace(/\.(t|j)sx?$/, '')
@@ -383,7 +435,8 @@ export function tanstackRoutes(files, root, genText = '') {
 }
 
 /**
- * files: every file path in the code base (relative, '/'-separated). read(path) returns a file's text.
+ * files: every file path in the code base (relative, '/'-separated). read(path) returns a file's
+ * text.
  * Returns { routes: [{ path, name, file, framework, params }], frameworks, roots }.
  */
 export async function scanCodebase(files, read) {
@@ -415,7 +468,11 @@ export async function scanCodebase(files, read) {
       /* no package.json */
     }
     const has = (n) => Object.keys(deps).some((d) => d === n || d.startsWith(`${n}/`));
-    const mine = files.filter((f) => f.startsWith(root) && !roots.some((r) => r !== root && r.startsWith(root) && f.startsWith(r)));
+    const mine = files.filter(
+      (f) =>
+        f.startsWith(root) &&
+        !roots.some((r) => r !== root && r.startsWith(root) && f.startsWith(r)),
+    );
     if (has('next')) {
       add(nextApp(mine, root), 'Next.js (app)');
       add(nextPages(mine, root), 'Next.js (pages)');
@@ -423,7 +480,11 @@ export async function scanCodebase(files, read) {
     if (has('@sveltejs/kit')) add(sveltekit(mine, root), 'SvelteKit');
     if (has('nuxt') || has('nuxt3')) add(nuxt(mine, root), 'Nuxt');
     if (has('astro')) add(astro(mine, root), 'Astro');
-    if (has('@tanstack/react-router') || has('@tanstack/react-start') || has('@tanstack/solid-router')) {
+    if (
+      has('@tanstack/react-router') ||
+      has('@tanstack/react-start') ||
+      has('@tanstack/solid-router')
+    ) {
       let gen = '';
       const genFile = mine.find((f) => /(^|\/)routeTree\.gen\.[tj]s$/.test(f));
       if (genFile) {
@@ -435,7 +496,10 @@ export async function scanCodebase(files, read) {
       }
       add(tanstackRoutes(mine, root, gen), 'TanStack Router');
     }
-    if (has('@remix-run') || (has('@react-router') && mine.some((f) => f.startsWith(`${root}app/routes/`))))
+    if (
+      has('@remix-run') ||
+      (has('@react-router') && mine.some((f) => f.startsWith(`${root}app/routes/`)))
+    )
       add(remix(mine, root), 'Remix / React Router');
     // Router config in source files
     const want: any[] = [];
@@ -458,9 +522,22 @@ export async function scanCodebase(files, read) {
         } catch {
           continue;
         }
-        if (want.includes('react') && /<Route\b/.test(text)) add(jsxRoutes(text), 'React Router', f);
-        if (/\b(createBrowserRouter|createHashRouter|createRouter|RouterModule|Routes\s*=|routes\s*[:=])/.test(text)) {
-          add(objectRoutes(text), want.includes('vue') ? 'Vue Router' : want.includes('angular') ? 'Angular' : 'React Router', f);
+        if (want.includes('react') && /<Route\b/.test(text))
+          add(jsxRoutes(text), 'React Router', f);
+        if (
+          /\b(createBrowserRouter|createHashRouter|createRouter|RouterModule|Routes\s*=|routes\s*[:=])/.test(
+            text,
+          )
+        ) {
+          add(
+            objectRoutes(text),
+            want.includes('vue')
+              ? 'Vue Router'
+              : want.includes('angular')
+                ? 'Angular'
+                : 'React Router',
+            f,
+          );
         }
       }
     }

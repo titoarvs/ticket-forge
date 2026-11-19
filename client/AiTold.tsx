@@ -1,6 +1,7 @@
 'use client';
-// Administration → Generation → What the AI is told: the exact instructions for each kind of generation, shown
-// as readable sections (role, team standards, generation guide) or as the exact text, with its size.
+// Administration → Generation → What the AI is told: the exact instructions for each kind of
+// generation, shown as readable sections (role, team standards, generation guide) or as the exact
+// text, with its size.
 import { useState } from 'react';
 import { copyText, type Any } from './core';
 import { Ico, I } from './ui';
@@ -58,22 +59,38 @@ export function AiTold({ prompts }: { prompts: Any }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3>What the AI is told</h3>
           <p className="sub" style={{ marginBottom: 12 }}>
-            The exact instructions sent with every request, built from the rules and guide on this page. Unsaved changes show here as you
-            edit.
+            The exact instructions sent with every request, built from the rules and guide on this
+            page. Unsaved changes show here as you edit.
           </p>
         </div>
         <div className="seg" role="tablist" aria-label="View">
-          <button role="tab" aria-selected={!exact} className={!exact ? 'on' : ''} onClick={() => setExact(false)}>
+          <button
+            role="tab"
+            aria-selected={!exact}
+            className={!exact ? 'on' : ''}
+            onClick={() => setExact(false)}
+          >
             Readable
           </button>
-          <button role="tab" aria-selected={exact} className={exact ? 'on' : ''} onClick={() => setExact(true)}>
+          <button
+            role="tab"
+            aria-selected={exact}
+            className={exact ? 'on' : ''}
+            onClick={() => setExact(true)}
+          >
             Exact text
           </button>
         </div>
       </div>
       <div className="told-tabs" role="tablist" aria-label="Kind of generation">
         {KINDS.map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={kind === k} className={`told-tab ${kind === k ? 'on' : ''}`} onClick={() => setKind(k)}>
+          <button
+            key={k}
+            role="tab"
+            aria-selected={kind === k}
+            className={`told-tab ${kind === k ? 'on' : ''}`}
+            onClick={() => setKind(k)}
+          >
             <b>{label}</b>
             <span>{tokens(prompts[k].text).toLocaleString()} tokens</span>
           </button>
@@ -87,7 +104,8 @@ export function AiTold({ prompts }: { prompts: Any }) {
         <>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
             <span className="muted small">
-              {p.text.length.toLocaleString()} characters · about {tokens(p.text).toLocaleString()} tokens
+              {p.text.length.toLocaleString()} characters · about {tokens(p.text).toLocaleString()}{' '}
+              tokens
             </span>
             <button className="btn sm subtle" onClick={() => copyText(p.text)}>
               <Ico svg={I.copy} />
@@ -130,8 +148,8 @@ export function AiTold({ prompts }: { prompts: Any }) {
             )}
             {kind !== 'automation' && (
               <p className="muted small" style={{ margin: '8px 0 0' }}>
-                Also checked in code after generation: story points snap to the scale, only allowed ticket types, labels trimmed, the
-                test-case count and title prefix.
+                Also checked in code after generation: story points snap to the scale, only allowed
+                ticket types, labels trimmed, the test-case count and title prefix.
               </p>
             )}
           </section>
@@ -140,10 +158,16 @@ export function AiTold({ prompts }: { prompts: Any }) {
               <span className="told-n">3</span>
               <b>Generation guide</b>
               <span className="muted small">
-                {p.guide ? `${p.guide.name} · ${p.guide.chars.toLocaleString()} characters · reference context` : 'Not used here'}
+                {p.guide
+                  ? `${p.guide.name} · ${p.guide.chars.toLocaleString()} characters · reference context`
+                  : 'Not used here'}
               </span>
               {p.guide && (
-                <button className="btn sm subtle" style={{ marginLeft: 'auto' }} onClick={() => setGuideOpen(!guideOpen)}>
+                <button
+                  className="btn sm subtle"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => setGuideOpen(!guideOpen)}
+                >
                   {guideOpen ? 'Hide' : 'Show'} guide
                 </button>
               )}
@@ -155,7 +179,8 @@ export function AiTold({ prompts }: { prompts: Any }) {
                 </div>
               ) : (
                 <p className="muted small" style={{ margin: 0 }}>
-                  Added after the standards. Where the guide and the standards disagree, the standards win.
+                  Added after the standards. Where the guide and the standards disagree, the
+                  standards win.
                 </p>
               )
             ) : (

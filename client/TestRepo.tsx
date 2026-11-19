@@ -1,10 +1,12 @@
 'use client';
 // Test management, in the style of Xray for Jira. Saved on the project as `testRepo`:
-//   Tests       reusable test definitions (steps: action / data / expected), in folders, linked to any number of issues
-//   Test Plans  sets of tests for a goal (an epic, a sprint, a release), with progress
-//   Executions  runs of tests: each test and each step Passed / Failed / Blocked, with comments, evidence and defects
-//   Coverage    per issue: OK (all its tests pass), NOK (one fails), Not run, Uncovered
-// Issues show their tests in the issue panel (TestsSection). Existing test cases on issues can be imported.
+//   Tests reusable test definitions (steps: action / data / expected), in folders, linked to any
+//   number of issues Test Plans sets of tests for a goal (an epic, a sprint, a release), with
+//   progress Executions runs of tests: each test and each step Passed / Failed / Blocked, with
+//   comments, evidence and defects Coverage per issue: OK (all its tests pass), NOK (one fails),
+//   Not run, Uncovered
+// Issues show their tests in the issue panel (TestsSection). Existing test cases on issues can be
+// imported.
 import { useState, type ReactNode } from 'react';
 import {
   S,
@@ -46,12 +48,20 @@ const STATUS_LABEL: Record<string, string> = {
   BLOCKED: 'Blocked',
 };
 const TEST_TYPES = ['Manual', 'Automated', 'Cucumber', 'Exploratory'];
-export const repo = (p: Any = P()) => p.testRepo || { seq: { t: 0, tp: 0, te: 0 }, folders: [], tests: [], plans: [], executions: [] };
+export const repo = (p: Any = P()) =>
+  p.testRepo || { seq: { t: 0, tp: 0, te: 0 }, folders: [], tests: [], plans: [], executions: [] };
 /** Changes the repository inside one undo step and save. */
 const edit = (fn: (r: Any, p: Any) => void, tag?: string) =>
   mutate(
     (pp: Any) => {
-      pp.testRepo = { seq: { t: 0, tp: 0, te: 0 }, folders: [], tests: [], plans: [], executions: [], ...(pp.testRepo || {}) };
+      pp.testRepo = {
+        seq: { t: 0, tp: 0, te: 0 },
+        folders: [],
+        tests: [],
+        plans: [],
+        executions: [],
+        ...(pp.testRepo || {}),
+      };
       pp.testRepo.seq = { t: 0, tp: 0, te: 0, ...(pp.testRepo.seq || {}) };
       fn(pp.testRepo, pp);
     },
@@ -63,10 +73,11 @@ const nextKey = (r: Any, p: Any, kind: 't' | 'tp' | 'te') => {
 };
 const canEdit = () => can('test.run') || can('issue.edit');
 
-// ---------------------------------------------------------------- review workflow (Xray / BrowserStack style)
-// Draft → Ready for review → Approved (or Needs update) · Deprecated. Editing an Approved test makes a new version
-// (the old one is kept) and sends it back to Draft. Settings (Test management → Workflow): only Approved tests in plans
-// and executions; the approver must not be the person who last changed the test.
+// ---------------------------------------------------------------- review workflow (Xray /
+// BrowserStack style) Draft → Ready for review → Approved (or Needs update) · Deprecated. Editing
+// an Approved test makes a new version (the old one is kept) and sends it back to Draft. Settings
+// (Test management → Workflow): only Approved tests in plans and executions; the approver must not
+// be the person who last changed the test.
 export const WF = ['Draft', 'Ready for review', 'Approved', 'Needs update', 'Deprecated'];
 const WF_CLS: Record<string, string> = {
   Draft: 'wf-draft',
@@ -77,11 +88,18 @@ const WF_CLS: Record<string, string> = {
 };
 /** Tests from before the workflow existed count as Approved. */
 const wfOf = (t: Any) => (WF.includes(t?.status) ? t.status : 'Approved');
-export const WfLoz = ({ t }: { t: Any }) => <span className={`wf-loz ${WF_CLS[wfOf(t)]}`}>{wfOf(t)}</span>;
-const wfSettings = (p: Any = P()) => ({ requireApproval: false, fourEyes: true, ...(repo(p).settings || {}) });
+export const WfLoz = ({ t }: { t: Any }) => (
+  <span className={`wf-loz ${WF_CLS[wfOf(t)]}`}>{wfOf(t)}</span>
+);
+const wfSettings = (p: Any = P()) => ({
+  requireApproval: false,
+  fourEyes: true,
+  ...(repo(p).settings || {}),
+});
 const canReview = () => can('issue.edit');
 /** Tests that may go into plans and executions under the current settings. */
-const plannable = (t: Any, p: Any = P()) => wfOf(t) !== 'Deprecated' && (!wfSettings(p).requireApproval || wfOf(t) === 'Approved');
+const plannable = (t: Any, p: Any = P()) =>
+  wfOf(t) !== 'Deprecated' && (!wfSettings(p).requireApproval || wfOf(t) === 'Approved');
 const CONTENT = ['title', 'type', 'preconditions', 'steps', 'gherkin'];
 const snapshot = (t: Any) => ({
   version: t.version || 1,
@@ -94,14 +112,23 @@ const snapshot = (t: Any) => ({
   gherkin: t.gherkin || '',
   status: wfOf(t),
 });
-/** Workflow actions: submit · approve · changes · deprecate · restore. Returns an error message when not allowed. */
+/**
+ * Workflow actions: submit · approve · changes · deprecate · restore. Returns an error message when
+ * not allowed.
+ */
 export function wfAction(testId: string, action: string, comment = ''): string | null {
   const p = P();
   const t0 = repo(p).tests.find((x: Any) => x.id === testId);
   if (!t0) return 'That test is gone.';
   const st = wfOf(t0);
-  if ((action === 'approve' || action === 'changes') && !canReview()) return 'Approving tests needs the Edit issues permission.';
-  if (action === 'approve' && wfSettings(p).fourEyes && (t0.updatedBy || t0.createdBy) === me() && !S.user?.isOwner)
+  if ((action === 'approve' || action === 'changes') && !canReview())
+    return 'Approving tests needs the Edit issues permission.';
+  if (
+    action === 'approve' &&
+    wfSettings(p).fourEyes &&
+    (t0.updatedBy || t0.createdBy) === me() &&
+    !S.user?.isOwner
+  )
     return 'Someone other than the last editor must approve it (four-eyes rule in Test management → Workflow).';
   if (action === 'changes' && !comment.trim()) return 'Say what needs to change.';
   const next: Record<string, string> = {
@@ -125,7 +152,15 @@ export function wfAction(testId: string, action: string, comment = ''): string |
     t.status = next[action];
     t.reviews = [
       ...(t.reviews || []),
-      { at: nowIso(), by: me(), action, from: st, to: next[action], comment: comment.trim().slice(0, 1000), version: t.version || 1 },
+      {
+        at: nowIso(),
+        by: me(),
+        action,
+        from: st,
+        to: next[action],
+        comment: comment.trim().slice(0, 1000),
+        version: t.version || 1,
+      },
     ];
     if (action === 'approve') {
       t.approvedBy = me();
@@ -141,11 +176,16 @@ export function latestRun(testId: string, p: Any = P(), env = ''): Any | null {
     .executions.filter((e: Any) => !env || (e.environment || '') === env)
     .map((e: Any) => ({ e, run: e.runs?.[testId] }))
     .filter((x: Any) => x.run && x.run.status !== 'TODO')
-    .sort((a: Any, b: Any) => String(b.run.at || b.e.createdAt).localeCompare(String(a.run.at || a.e.createdAt)));
+    .sort((a: Any, b: Any) =>
+      String(b.run.at || b.e.createdAt).localeCompare(String(a.run.at || a.e.createdAt)),
+    );
   return runs[0] ? { ...runs[0].run, execution: runs[0].e } : null;
 }
-const latestStatus = (testId: string, p?: Any, env = '') => latestRun(testId, p, env)?.status || 'TODO';
-/** The environments executions ran in (staging, production, Chrome…), for per-environment status. */
+const latestStatus = (testId: string, p?: Any, env = '') =>
+  latestRun(testId, p, env)?.status || 'TODO';
+/**
+ * The environments executions ran in (staging, production, Chrome…), for per-environment status.
+ */
 const environmentsOf = (p: Any = P()) =>
   [
     ...new Set(
@@ -160,13 +200,28 @@ export function coverageOf(ticketId: string, p: Any = P(), env = '') {
   if (!tests.length) return { status: 'UNCOVERED', tests };
   const st = tests.map((t: Any) => latestStatus(t.id, p, env));
   return {
-    status: st.includes('FAILED') ? 'NOK' : st.includes('BLOCKED') ? 'NOK' : st.every((x: string) => x === 'PASSED') ? 'OK' : 'NOTRUN',
+    status: st.includes('FAILED')
+      ? 'NOK'
+      : st.includes('BLOCKED')
+        ? 'NOK'
+        : st.every((x: string) => x === 'PASSED')
+          ? 'OK'
+          : 'NOTRUN',
     tests,
   };
 }
-const COV_LABEL: Record<string, string> = { OK: 'OK', NOK: 'NOK', NOTRUN: 'Not run', UNCOVERED: 'Uncovered' };
-export const RunLoz = ({ s }: { s: string }) => <span className={`xr-st xr-${String(s).toLowerCase()}`}>{STATUS_LABEL[s] || s}</span>;
-export const CovLoz = ({ s }: { s: string }) => <span className={`xr-cov xr-cov-${s.toLowerCase()}`}>{COV_LABEL[s]}</span>;
+const COV_LABEL: Record<string, string> = {
+  OK: 'OK',
+  NOK: 'NOK',
+  NOTRUN: 'Not run',
+  UNCOVERED: 'Uncovered',
+};
+export const RunLoz = ({ s }: { s: string }) => (
+  <span className={`xr-st xr-${String(s).toLowerCase()}`}>{STATUS_LABEL[s] || s}</span>
+);
+export const CovLoz = ({ s }: { s: string }) => (
+  <span className={`xr-cov xr-cov-${s.toLowerCase()}`}>{COV_LABEL[s]}</span>
+);
 function counts(statuses: string[]) {
   const c: Record<string, number> = { PASSED: 0, FAILED: 0, BLOCKED: 0, EXECUTING: 0, TODO: 0 };
   for (const s of statuses) c[s] = (c[s] || 0) + 1;
@@ -177,9 +232,18 @@ function StatusBar({ statuses }: { statuses: string[] }) {
   const c = counts(statuses);
   const n = statuses.length || 1;
   return (
-    <span className="xr-bar" title={RUN_STATUS.map((s) => `${STATUS_LABEL[s]}: ${c[s] || 0}`).join(' · ')}>
+    <span
+      className="xr-bar"
+      title={RUN_STATUS.map((s) => `${STATUS_LABEL[s]}: ${c[s] || 0}`).join(' · ')}
+    >
       {(['PASSED', 'FAILED', 'BLOCKED', 'EXECUTING', 'TODO'] as const).map((s) =>
-        c[s] ? <i key={s} className={`xr-${s.toLowerCase()}`} style={{ width: `${(c[s] / n) * 100}%` }} /> : null,
+        c[s] ? (
+          <i
+            key={s}
+            className={`xr-${s.toLowerCase()}`}
+            style={{ width: `${(c[s] / n) * 100}%` }}
+          />
+        ) : null,
       )}
     </span>
   );
@@ -211,12 +275,18 @@ export function TestManagement() {
   const allSt = r.tests.map((t: Any) => latestStatus(t.id));
   const c = counts(allSt);
   const issues = p.tickets.filter((t: Any) => !isSub(t));
-  const covered = issues.filter((t: Any) => r.tests.some((x: Any) => x.issueIds?.includes(t.id))).length;
+  const covered = issues.filter((t: Any) =>
+    r.tests.some((x: Any) => x.issueIds?.includes(t.id)),
+  ).length;
   return (
     <>
       <Header
         title="Test management"
-        sub={<span className="muted small">Reusable tests, plans and executions, linked to your issues</span>}
+        sub={
+          <span className="muted small">
+            Reusable tests, plans and executions, linked to your issues
+          </span>
+        }
         right={
           canEdit() && (
             <>
@@ -230,7 +300,11 @@ export function TestManagement() {
                 <button
                   className="btn ai"
                   disabled={!repo(p).tests.length}
-                  title={repo(p).tests.length ? 'The AI picks the tests for a goal from the repository' : 'Add or import tests first'}
+                  title={
+                    repo(p).tests.length
+                      ? 'The AI picks the tests for a goal from the repository'
+                      : 'Add or import tests first'
+                  }
                   onClick={() => openModal(<AiPlanModal />)}
                 >
                   <Ico svg={I.sparkle} />
@@ -238,7 +312,10 @@ export function TestManagement() {
                 </button>
               )}
               {tab === 'plans' && (
-                <button className="btn primary" onClick={() => openModal(<PlanModal plan={null} />)}>
+                <button
+                  className="btn primary"
+                  onClick={() => openModal(<PlanModal plan={null} />)}
+                >
                   <Ico svg={I.plus} />
                   New test plan
                 </button>
@@ -250,7 +327,11 @@ export function TestManagement() {
                 </button>
               )}
               {can('project.settings') && (
-                <button className="btn subtle" onClick={() => openModal(<WorkflowModal />)} title="Review workflow rules">
+                <button
+                  className="btn subtle"
+                  onClick={() => openModal(<WorkflowModal />)}
+                  title="Review workflow rules"
+                >
                   <Ico svg={I.settings} />
                   Workflow
                 </button>
@@ -317,9 +398,12 @@ export function TestManagement() {
           >
             <Ico svg={icon} />
             {l}
-            {k === 'reviews' && r.tests.filter((t: Any) => wfOf(t) === 'Ready for review').length > 0 && (
-              <span className="count bad">{r.tests.filter((t: Any) => wfOf(t) === 'Ready for review').length}</span>
-            )}
+            {k === 'reviews' &&
+              r.tests.filter((t: Any) => wfOf(t) === 'Ready for review').length > 0 && (
+                <span className="count bad">
+                  {r.tests.filter((t: Any) => wfOf(t) === 'Ready for review').length}
+                </span>
+              )}
           </button>
         ))}
       </div>
@@ -339,7 +423,8 @@ function Repository() {
   const [folder, setFolder] = useState<string>('all');
   const [q, setQ] = useState('');
   const [newFolder, setNewFolder] = useState<string | null>(null);
-  // Epics view (default): the tree follows the backlog — epic → its issues — from the issues each test covers.
+  // Epics view (default): the tree follows the backlog — epic → its issues — from the issues each
+  // test covers.
   const [mode, setModeState] = useState<string>(() => {
     try {
       return localStorage.getItem('tf.repoMode') || 'epics';
@@ -377,7 +462,11 @@ function Repository() {
   const list = r.tests
     .filter(inFolder)
     .filter((t: Any) => (!wf ? wfOf(t) !== 'Deprecated' : wf === 'all' || wfOf(t) === wf))
-    .filter((t: Any) => !q.trim() || `${t.key} ${t.title} ${t.labels?.join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()));
+    .filter(
+      (t: Any) =>
+        !q.trim() ||
+        `${t.key} ${t.title} ${t.labels?.join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()),
+    );
   const tree = (parentId: string | null, depth: number): ReactNode =>
     r.folders
       .filter((f: Any) => (f.parentId || null) === parentId)
@@ -415,11 +504,16 @@ function Repository() {
       ...p.epics.map((e: Any) => ({ id: e.id, label: `${e.key} ${e.title}`, color: e.color })),
       { id: 'none', label: 'No epic', color: '' },
     ]
-      .map((e: Any) => ({ ...e, tests: r.tests.filter((t: Any) => (t.issueIds || []).length && epicsOf(t).has(e.id)) }))
+      .map((e: Any) => ({
+        ...e,
+        tests: r.tests.filter((t: Any) => (t.issueIds || []).length && epicsOf(t).has(e.id)),
+      }))
       .filter((e: Any) => e.tests.length);
     return rows.map((e: Any) => {
       const issues = p.tickets.filter(
-        (x: Any) => (e.id === 'none' ? !x.epicId : x.epicId === e.id) && r.tests.some((t: Any) => t.issueIds?.includes(x.id)),
+        (x: Any) =>
+          (e.id === 'none' ? !x.epicId : x.epicId === e.id) &&
+          r.tests.some((t: Any) => t.issueIds?.includes(x.id)),
       );
       const isOpen = open[e.id] ?? folder === `epic:${e.id}`;
       return (
@@ -441,7 +535,11 @@ function Repository() {
                 setOpen({ ...open, [e.id]: true });
               }}
             >
-              {e.color ? <span className="xr-swatch" style={{ background: e.color }} /> : <Ico svg={I.epic} />}
+              {e.color ? (
+                <span className="xr-swatch" style={{ background: e.color }} />
+              ) : (
+                <Ico svg={I.epic} />
+              )}
               <span>{e.label}</span>
               <span className="count">{e.tests.length}</span>
             </button>
@@ -458,14 +556,19 @@ function Repository() {
                 <span>
                   <b className="key">{x.key}</b> {x.title}
                 </span>
-                <span className="count">{r.tests.filter((t: Any) => t.issueIds?.includes(x.id)).length}</span>
+                <span className="count">
+                  {r.tests.filter((t: Any) => t.issueIds?.includes(x.id)).length}
+                </span>
               </button>
             ))}
         </div>
       );
     });
   };
-  /** Rebuilds the folders to match the epics: one folder per epic, each test in the folder of its (first) issue's epic. */
+  /**
+   * Rebuilds the folders to match the epics: one folder per epic, each test in the folder of its
+   * (first) issue's epic.
+   */
   const sortIntoEpicFolders = () =>
     openModal(
       <Confirm
@@ -484,7 +587,10 @@ function Repository() {
               return f.id;
             };
             for (const t of rr.tests) {
-              const ep = pp.epics.find((e: Any) => e.id === pp.tickets.find((x: Any) => x.id === (t.issueIds || [])[0])?.epicId);
+              const ep = pp.epics.find(
+                (e: Any) =>
+                  e.id === pp.tickets.find((x: Any) => x.id === (t.issueIds || [])[0])?.epicId,
+              );
               const id = folderFor(ep ? `${ep.key} ${ep.title}` : 'No epic');
               if (t.folderId !== id) {
                 t.folderId = id;
@@ -492,10 +598,16 @@ function Repository() {
               }
             }
             // epic folders in backlog order, then the rest
-            const order = new Map<string, number>(pp.epics.map((e: Any, i: number) => [`${e.key} ${e.title}`, i] as [string, number]));
-            rr.folders.sort((a: Any, b: Any) => (order.get(a.name) ?? 1e6) - (order.get(b.name) ?? 1e6));
+            const order = new Map<string, number>(
+              pp.epics.map((e: Any, i: number) => [`${e.key} ${e.title}`, i] as [string, number]),
+            );
+            rr.folders.sort(
+              (a: Any, b: Any) => (order.get(a.name) ?? 1e6) - (order.get(b.name) ?? 1e6),
+            );
           });
-          toast(`${moved} test${moved === 1 ? '' : 's'} moved into epic folders.`, 'ok', { title: 'Repository organized' });
+          toast(`${moved} test${moved === 1 ? '' : 's'} moved into epic folders.`, 'ok', {
+            title: 'Repository organized',
+          });
         }}
       />,
     );
@@ -503,7 +615,12 @@ function Repository() {
     <div className="xr-repo">
       <aside className="xr-tree">
         <div className="xr-mode" role="tablist" aria-label="Organize by">
-          <button role="tab" aria-selected={mode === 'epics'} className={mode === 'epics' ? 'on' : ''} onClick={() => setMode('epics')}>
+          <button
+            role="tab"
+            aria-selected={mode === 'epics'}
+            className={mode === 'epics' ? 'on' : ''}
+            onClick={() => setMode('epics')}
+          >
             Epics
           </button>
           <button
@@ -515,7 +632,10 @@ function Repository() {
             Folders
           </button>
         </div>
-        <button className={`xr-folder ${folder === 'all' ? 'on' : ''}`} onClick={() => setFolder('all')}>
+        <button
+          className={`xr-folder ${folder === 'all' ? 'on' : ''}`}
+          onClick={() => setFolder('all')}
+        >
           <Ico svg={I.test} />
           <span>All tests</span>
           <span className="count">{r.tests.length}</span>
@@ -524,14 +644,23 @@ function Repository() {
           <>
             {epicTree()}
             {r.tests.some((t: Any) => !(t.issueIds || []).length) && (
-              <button className={`xr-folder ${folder === 'unlinked' ? 'on' : ''}`} onClick={() => setFolder('unlinked')}>
+              <button
+                className={`xr-folder ${folder === 'unlinked' ? 'on' : ''}`}
+                onClick={() => setFolder('unlinked')}
+              >
                 <Ico svg={I.doc} />
                 <span>Not linked to an issue</span>
-                <span className="count">{r.tests.filter((t: Any) => !(t.issueIds || []).length).length}</span>
+                <span className="count">
+                  {r.tests.filter((t: Any) => !(t.issueIds || []).length).length}
+                </span>
               </button>
             )}
             {canEdit() && r.tests.length > 0 && (
-              <button className="btn sm subtle" onClick={sortIntoEpicFolders} title="Make the folders match the epics">
+              <button
+                className="btn sm subtle"
+                onClick={sortIntoEpicFolders}
+                title="Make the folders match the epics"
+              >
                 <Ico svg={I.folder} />
                 Sort into epic folders
               </button>
@@ -540,7 +669,10 @@ function Repository() {
         )}
         {mode === 'folders' && tree(null, 0)}
         {mode === 'folders' && (
-          <button className={`xr-folder ${folder === 'none' ? 'on' : ''}`} onClick={() => setFolder('none')}>
+          <button
+            className={`xr-folder ${folder === 'none' ? 'on' : ''}`}
+            onClick={() => setFolder('none')}
+          >
             <Ico svg={I.doc} />
             <span>Not in a folder</span>
             <span className="count">{r.tests.filter((t: Any) => !t.folderId).length}</span>
@@ -600,8 +732,19 @@ function Repository() {
       </aside>
       <section className="xr-list">
         <div className="toolbar">
-          <TF search sx={{ width: 260, maxWidth: '100%' }} placeholder="Search tests" value={q} onChange={(e) => setQ(e.target.value)} />
-          <SF filter value={wf} onChange={(e) => setWf(e.target.value)} aria-label="Workflow status">
+          <TF
+            search
+            sx={{ width: 260, maxWidth: '100%' }}
+            placeholder="Search tests"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <SF
+            filter
+            value={wf}
+            onChange={(e) => setWf(e.target.value)}
+            aria-label="Workflow status"
+          >
             <MenuItem value="">Active (not deprecated)</MenuItem>
             {WF.map((x) => (
               <MenuItem key={x} value={x}>
@@ -636,13 +779,19 @@ function Repository() {
             Export CSV
           </button>
           {canEdit() && (
-            <button className="btn sm subtle" onClick={() => openModal(<CsvImportModal folderId={cur?.id || null} />)}>
+            <button
+              className="btn sm subtle"
+              onClick={() => openModal(<CsvImportModal folderId={cur?.id || null} />)}
+            >
               <Ico svg={I.upload} />
               Import CSV
             </button>
           )}
           {canEdit() && (
-            <button className="btn sm" onClick={() => openModal(<ImportModal folderId={cur?.id || null} />)}>
+            <button
+              className="btn sm"
+              onClick={() => openModal(<ImportModal folderId={cur?.id || null} />)}
+            >
               <Ico svg={I.upload} />
               Import from issues
             </button>
@@ -691,16 +840,23 @@ function Repository() {
                         .filter(Boolean)
                         .slice(0, 3)
                         .map((x: Any) => (
-                          <button key={x.id} className="link-btn key small" onClick={() => openDrawer('issue', x.id)}>
+                          <button
+                            key={x.id}
+                            className="link-btn key small"
+                            onClick={() => openDrawer('issue', x.id)}
+                          >
                             {x.key}
                           </button>
                         ))}
-                      {(t.issueIds || []).length > 3 ? <span className="muted small"> +{t.issueIds.length - 3}</span> : null}
+                      {(t.issueIds || []).length > 3 ? (
+                        <span className="muted small"> +{t.issueIds.length - 3}</span>
+                      ) : null}
                     </td>
                     <td>
                       {lr ? (
                         <>
-                          <RunLoz s={lr.status} /> <span className="muted small">{lr.execution.key}</span>
+                          <RunLoz s={lr.status} />{' '}
+                          <span className="muted small">{lr.execution.key}</span>
                         </>
                       ) : (
                         <span className="muted small">Not run</span>
@@ -725,7 +881,10 @@ function Repository() {
                     New test
                   </button>
                   {!r.tests.length && (
-                    <button className="btn" onClick={() => openModal(<ImportModal folderId={null} />)}>
+                    <button
+                      className="btn"
+                      onClick={() => openModal(<ImportModal folderId={null} />)}
+                    >
                       <Ico svg={I.upload} />
                       Import from issues
                     </button>
@@ -751,8 +910,12 @@ function ImportModal({ folderId }: { folderId: string | null }) {
   const p = P();
   const r = repo(p);
   const done = new Set(r.tests.map((t: Any) => t.source?.tcId).filter(Boolean));
-  const issues = p.tickets.filter((t: Any) => (t.testCases || []).some((c: Any) => !done.has(c.id)));
-  const [pick, setPick] = useState<Record<string, boolean>>(() => Object.fromEntries(issues.map((t: Any) => [t.id, true])));
+  const issues = p.tickets.filter((t: Any) =>
+    (t.testCases || []).some((c: Any) => !done.has(c.id)),
+  );
+  const [pick, setPick] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(issues.map((t: Any) => [t.id, true])),
+  );
   const [byEpic, setByEpic] = useState(!folderId);
   const n = issues
     .filter((t: Any) => pick[t.id])
@@ -774,12 +937,14 @@ function ImportModal({ folderId }: { folderId: string | null }) {
       for (const t of pp.tickets.filter((x: Any) => pick[x.id])) {
         for (const c of t.testCases || []) {
           if (done.has(c.id)) continue;
-          const steps = (Array.isArray(c.steps) ? c.steps : c.steps ? [c.steps] : []).map((s: string, i: number, all: string[]) => ({
-            id: uid(),
-            action: s,
-            data: '',
-            expected: i === all.length - 1 ? c.expected || '' : '',
-          }));
+          const steps = (Array.isArray(c.steps) ? c.steps : c.steps ? [c.steps] : []).map(
+            (s: string, i: number, all: string[]) => ({
+              id: uid(),
+              action: s,
+              data: '',
+              expected: i === all.length - 1 ? c.expected || '' : '',
+            }),
+          );
           rr.tests.push({
             id: uid(),
             key: nextKey(rr, pp, 't'),
@@ -800,27 +965,50 @@ function ImportModal({ folderId }: { folderId: string | null }) {
       }
     });
     closeModal();
-    toast(`${made} test${made === 1 ? '' : 's'} added to the repository, each linked to its issue.`, 'ok', { title: 'Tests imported' });
+    toast(
+      `${made} test${made === 1 ? '' : 's'} added to the repository, each linked to its issue.`,
+      'ok',
+      { title: 'Tests imported' },
+    );
   };
   return (
     <Modal
       title="Import test cases from issues"
       wide
-      actions={[{ label: 'Cancel' }, { label: `Import ${n} test${n === 1 ? '' : 's'}`, kind: 'primary', disabled: !n, onClick: go }]}
+      actions={[
+        { label: 'Cancel' },
+        {
+          label: `Import ${n} test${n === 1 ? '' : 's'}`,
+          kind: 'primary',
+          disabled: !n,
+          onClick: go,
+        },
+      ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Each test case on the picked issues becomes a reusable test in the repository, linked to its issue (its steps and expected result
-        carry over). The issues keep their own test cases. Test cases imported before are skipped.
+        Each test case on the picked issues becomes a reusable test in the repository, linked to its
+        issue (its steps and expected result carry over). The issues keep their own test cases. Test
+        cases imported before are skipped.
       </p>
-      <CB label="One folder per epic" checked={byEpic} onChange={(e: Any) => setByEpic(e.target.checked)} />
+      <CB
+        label="One folder per epic"
+        checked={byEpic}
+        onChange={(e: Any) => setByEpic(e.target.checked)}
+      />
       <div className="split-list">
         {issues.map((t: Any) => (
           <label key={t.id} className={`split-row ${pick[t.id] ? '' : 'off'}`}>
-            <CB checked={Boolean(pick[t.id])} onChange={() => setPick({ ...pick, [t.id]: !pick[t.id] })} aria-label={`Import ${t.key}`} />
+            <CB
+              checked={Boolean(pick[t.id])}
+              onChange={() => setPick({ ...pick, [t.id]: !pick[t.id] })}
+              aria-label={`Import ${t.key}`}
+            />
             <TypeIcon type={t.type} />
             <span className="key">{t.key}</span>
             <span className="split-title">{t.title}</span>
-            <span className="muted small">{t.testCases.filter((c: Any) => !done.has(c.id)).length} test cases</span>
+            <span className="muted small">
+              {t.testCases.filter((c: Any) => !done.has(c.id)).length} test cases
+            </span>
           </label>
         ))}
         {!issues.length && (
@@ -847,10 +1035,13 @@ function Reviews() {
     if (err) toast(err, 'err');
     else {
       setNotes({ ...notes, [t.id]: '' });
-      toast(`${t.key}: ${a === 'approve' ? 'approved' : a === 'changes' ? 'sent back for changes' : 'submitted for review'}`);
+      toast(
+        `${t.key}: ${a === 'approve' ? 'approved' : a === 'changes' ? 'sent back for changes' : 'submitted for review'}`,
+      );
     }
   };
-  const submitted = (t: Any) => [...(t.reviews || [])].reverse().find((x: Any) => x.action === 'submit');
+  const submitted = (t: Any) =>
+    [...(t.reviews || [])].reverse().find((x: Any) => x.action === 'submit');
   const row = (t: Any, kind: string) => (
     <div key={t.id} className="wf-row">
       <div className="wf-main">
@@ -926,7 +1117,9 @@ function Reviews() {
       {waiting.length ? (
         waiting.map((t: Any) => row(t, 'waiting'))
       ) : (
-        <p className="muted small">Nothing waiting. Tests appear here when someone submits them for review.</p>
+        <p className="muted small">
+          Nothing waiting. Tests appear here when someone submits them for review.
+        </p>
       )}
       {back.length > 0 && (
         <>
@@ -975,14 +1168,17 @@ function WorkflowModal() {
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Like Xray and BrowserStack Test Management: tests are written as Drafts, reviewed, and approved before they count. Editing an
-        approved test makes a new version and sends it back to review; earlier versions are kept.
+        Like Xray and BrowserStack Test Management: tests are written as Drafts, reviewed, and
+        approved before they count. Editing an approved test makes a new version and sends it back
+        to review; earlier versions are kept.
       </p>
       <CB
         label={
           <>
             <b>Only Approved tests in plans and executions</b>
-            <div className="muted small">Drafts and tests waiting for review can’t be planned or run until approved.</div>
+            <div className="muted small">
+              Drafts and tests waiting for review can’t be planned or run until approved.
+            </div>
           </>
         }
         checked={v.requireApproval}
@@ -992,7 +1188,9 @@ function WorkflowModal() {
         label={
           <>
             <b>Four-eyes approval</b>
-            <div className="muted small">Whoever last changed a test can’t approve it (the owner can).</div>
+            <div className="muted small">
+              Whoever last changed a test can’t approve it (the owner can).
+            </div>
           </>
         }
         checked={v.fourEyes}
@@ -1006,7 +1204,15 @@ function WorkflowModal() {
 export function openTest(test: Any | null, folderId?: string | null, issueId?: string) {
   openModal(<TestModal test={test} folderId={folderId || null} issueId={issueId} />);
 }
-function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: string | null; issueId?: string }) {
+function TestModal({
+  test,
+  folderId,
+  issueId,
+}: {
+  test: Any | null;
+  folderId: string | null;
+  issueId?: string;
+}) {
   const p = P();
   const r = repo(p);
   const [d, setD] = useState<Any>(() =>
@@ -1027,7 +1233,10 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
   const [improving, setImproving] = useState(false);
   const [ask, setAsk] = useState('');
   const ed = canEdit();
-  /** The AI rewrites the draft to the company's test standard (or as asked); nothing is saved until Save. */
+  /**
+   * The AI rewrites the draft to the company's test standard (or as asked); nothing is saved until
+   * Save.
+   */
   const improve = async () => {
     if (!d.title.trim()) {
       toast('Give the test a title first.', 'err');
@@ -1037,7 +1246,11 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
     try {
       const out = await api(`/api/projects/${p.id}/testrepo-ai`, {
         method: 'POST',
-        body: aiBody({ action: 'improve', test: { ...d, key: test?.key }, instruction: ask.trim() }),
+        body: aiBody({
+          action: 'improve',
+          test: { ...d, key: test?.key },
+          instruction: ask.trim(),
+        }),
       });
       setD({
         ...d,
@@ -1045,7 +1258,9 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
         steps: (out.test.steps || []).map((st: Any) => ({ id: uid(), ...st })),
         labels: out.test.labels?.length ? out.test.labels : d.labels,
       });
-      toast(out.changes || 'Rewritten to your test standard. Review, then save.', 'ok', { title: 'Test improved' });
+      toast(out.changes || 'Rewritten to your test standard. Review, then save.', 'ok', {
+        title: 'Test improved',
+      });
       setAsk('');
     } catch (e: Any) {
       toast(`Couldn’t improve the test: ${e.message}`, 'err');
@@ -1067,17 +1282,27 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
       toast('Give the test a title.', 'err');
       return;
     }
-    const clean = { ...d, title: d.title.trim(), steps: d.steps.filter((s: Any) => s.action.trim() || s.expected.trim()) };
+    const clean = {
+      ...d,
+      title: d.title.trim(),
+      steps: d.steps.filter((s: Any) => s.action.trim() || s.expected.trim()),
+    };
     edit((rr, pp) => {
       if (test) {
         const i = rr.tests.findIndex((x: Any) => x.id === test.id);
         if (i >= 0) {
           const old = rr.tests[i];
-          const changed = CONTENT.some((k) => JSON.stringify(old[k] ?? '') !== JSON.stringify(clean[k] ?? ''));
+          const changed = CONTENT.some(
+            (k) => JSON.stringify(old[k] ?? '') !== JSON.stringify(clean[k] ?? ''),
+          );
           // Changing an approved test makes a new version: the approved one is kept in its history.
           const bump =
             changed && wfOf(old) === 'Approved'
-              ? { version: (old.version || 1) + 1, versions: [...(old.versions || []), snapshot(old)].slice(-15), status: 'Draft' }
+              ? {
+                  version: (old.version || 1) + 1,
+                  versions: [...(old.versions || []), snapshot(old)].slice(-15),
+                  status: 'Draft',
+                }
               : {};
           rr.tests[i] = { ...old, ...clean, ...bump, updatedAt: nowIso(), updatedBy: me() };
         }
@@ -1118,9 +1343,13 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
   const live = test ? repo().tests.find((x: Any) => x.id === test.id) || test : null;
   const [showV, setShowV] = useState<number | null>(null);
   const runs = test
-    ? r.executions.filter((e: Any) => e.runs?.[test.id]).sort((a: Any, b: Any) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    ? r.executions
+        .filter((e: Any) => e.runs?.[test.id])
+        .sort((a: Any, b: Any) => String(b.createdAt).localeCompare(String(a.createdAt)))
     : [];
-  const issues = (d.issueIds || []).map((id: string) => p.tickets.find((x: Any) => x.id === id)).filter(Boolean);
+  const issues = (d.issueIds || [])
+    .map((id: string) => p.tickets.find((x: Any) => x.id === id))
+    .filter(Boolean);
   return (
     <Modal
       title={test ? `${test.key} · ${test.title}` : 'New test'}
@@ -1157,7 +1386,9 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
             ]
           : []),
         { label: 'Cancel' },
-        ...(ed ? [{ label: test ? 'Save' : 'Create test', kind: 'primary' as const, onClick: save }] : []),
+        ...(ed
+          ? [{ label: test ? 'Save' : 'Create test', kind: 'primary' as const, onClick: save }]
+          : []),
       ]}
     >
       {live && (
@@ -1165,7 +1396,9 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
           <WfLoz t={live} />
           <span className="muted small">
             Version {live.version || 1}
-            {live.approvedBy && wfOf(live) === 'Approved' ? ` · approved by ${live.approvedBy} ${ago(live.approvedAt)}` : ''}
+            {live.approvedBy && wfOf(live) === 'Approved'
+              ? ` · approved by ${live.approvedBy} ${ago(live.approvedAt)}`
+              : ''}
           </span>
           <span className="spacer" />
           {ed && ['Draft', 'Needs update'].includes(wfOf(live)) && (
@@ -1184,7 +1417,11 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
             </>
           )}
           {canReview() && ['Draft', 'Needs update'].includes(wfOf(live)) && (
-            <button className="btn sm subtle" onClick={() => act('approve')} title="Approve without a separate review">
+            <button
+              className="btn sm subtle"
+              onClick={() => act('approve')}
+              title="Approve without a separate review"
+            >
               Approve
             </button>
           )}
@@ -1203,7 +1440,11 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
               bare
               className="wf-note"
               value={note}
-              placeholder={wfOf(live) === 'Ready for review' ? 'Review comment (needed to request changes)' : 'Comment (optional)'}
+              placeholder={
+                wfOf(live) === 'Ready for review'
+                  ? 'Review comment (needed to request changes)'
+                  : 'Comment (optional)'
+              }
               onChange={(e) => setNote(e.target.value)}
             />
           )}
@@ -1213,7 +1454,8 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
         <div className="warn-banner small" style={{ marginBottom: 10 }}>
           <Ico svg={I.warn} />
           <span>
-            <b>{live.reviews.slice(-1)[0].by} asked for changes:</b> {live.reviews.slice(-1)[0].comment}
+            <b>{live.reviews.slice(-1)[0].by} asked for changes:</b>{' '}
+            {live.reviews.slice(-1)[0].comment}
           </span>
         </div>
       )}
@@ -1240,7 +1482,11 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
         </label>
         <label className="field">
           <span>Folder</span>
-          <SF disabled={!ed} value={d.folderId || ''} onChange={(e) => set('folderId', e.target.value || null)}>
+          <SF
+            disabled={!ed}
+            value={d.folderId || ''}
+            onChange={(e) => set('folderId', e.target.value || null)}
+          >
             <MenuItem value="">Not in a folder</MenuItem>
             {r.folders.map((f: Any) => (
               <MenuItem key={f.id} value={f.id}>
@@ -1371,7 +1617,13 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
                   </td>
                   {ed && (
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="icon-btn" disabled={i === 0} title="Move up" aria-label="Move step up" onClick={() => move(i, -1)}>
+                      <button
+                        className="icon-btn"
+                        disabled={i === 0}
+                        title="Move up"
+                        aria-label="Move step up"
+                        onClick={() => move(i, -1)}
+                      >
                         <Ico svg={I.up} />
                       </button>
                       <button
@@ -1403,7 +1655,12 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
             </tbody>
           </table>
           {ed && (
-            <button className="btn sm subtle" onClick={() => set('steps', [...d.steps, { id: uid(), action: '', data: '', expected: '' }])}>
+            <button
+              className="btn sm subtle"
+              onClick={() =>
+                set('steps', [...d.steps, { id: uid(), action: '', data: '', expected: '' }])
+              }
+            >
               <Ico svg={I.plus} />
               Add step
             </button>
@@ -1441,7 +1698,8 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
             filter
             value={addIssue}
             onChange={(e) => {
-              if (e.target.value) set('issueIds', [...new Set([...(d.issueIds || []), e.target.value])]);
+              if (e.target.value)
+                set('issueIds', [...new Set([...(d.issueIds || []), e.target.value])]);
               setAddIssue('');
             }}
             aria-label="Link an issue"
@@ -1468,9 +1726,13 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
                   <span className="muted">
                     {' '}
                     · {e.runs[test.id].by || '—'}
-                    {e.runs[test.id].at ? ` · ${new Date(e.runs[test.id].at).toLocaleString()}` : ''}
+                    {e.runs[test.id].at
+                      ? ` · ${new Date(e.runs[test.id].at).toLocaleString()}`
+                      : ''}
                   </span>
-                  {e.runs[test.id].comment && <div className="muted">“{e.runs[test.id].comment}”</div>}
+                  {e.runs[test.id].comment && (
+                    <div className="muted">“{e.runs[test.id].comment}”</div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1512,13 +1774,18 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
                     <span className="muted">
                       · {x.status} · {x.by || '—'} · {ago(x.at)}
                     </span>{' '}
-                    <button className="link-btn small" onClick={() => setShowV(showV === x.version ? null : x.version)}>
+                    <button
+                      className="link-btn small"
+                      onClick={() => setShowV(showV === x.version ? null : x.version)}
+                    >
                       {showV === x.version ? 'Hide' : 'View'}
                     </button>
                     {showV === x.version && (
                       <div className="wf-version">
                         <b>{x.title}</b>
-                        {x.preconditions && <div className="muted">Preconditions: {x.preconditions}</div>}
+                        {x.preconditions && (
+                          <div className="muted">Preconditions: {x.preconditions}</div>
+                        )}
                         {x.gherkin ? (
                           <pre>{x.gherkin}</pre>
                         ) : (
@@ -1544,7 +1811,9 @@ function TestModal({ test, folderId, issueId }: { test: Any | null; folderId: st
                                 steps: (x.steps || []).map((s: Any) => ({ ...s, id: uid() })),
                                 gherkin: x.gherkin,
                               });
-                              toast(`Version ${x.version} loaded into the editor: save to make it the current version.`);
+                              toast(
+                                `Version ${x.version} loaded into the editor: save to make it the current version.`,
+                              );
                             }}
                           >
                             Restore this version
@@ -1589,7 +1858,10 @@ function Plans() {
           )
         }
       >
-        <p>A test plan groups the tests for a goal (an epic, a sprint, a release) and shows how far its executions got.</p>
+        <p>
+          A test plan groups the tests for a goal (an epic, a sprint, a release) and shows how far
+          its executions got.
+        </p>
       </EmptyState>
     );
   return (
@@ -1620,7 +1892,8 @@ function Plans() {
             </div>
             <StatusBar statuses={st} />
             <div className="small">
-              {c.PASSED} passed · {c.FAILED} failed · {c.BLOCKED} blocked · {c.TODO + c.EXECUTING} to do
+              {c.PASSED} passed · {c.FAILED} failed · {c.BLOCKED} blocked · {c.TODO + c.EXECUTING}{' '}
+              to do
             </div>
           </div>
         );
@@ -1631,8 +1904,14 @@ function Plans() {
 /** A test's latest result within a plan's executions. */
 function latestPlanStatus(pl: Any, testId: string) {
   const runs = repo()
-    .executions.filter((e: Any) => e.planId === pl.id && e.runs?.[testId] && e.runs[testId].status !== 'TODO')
-    .sort((a: Any, b: Any) => String(b.runs[testId].at || b.createdAt).localeCompare(String(a.runs[testId].at || a.createdAt)));
+    .executions.filter(
+      (e: Any) => e.planId === pl.id && e.runs?.[testId] && e.runs[testId].status !== 'TODO',
+    )
+    .sort((a: Any, b: Any) =>
+      String(b.runs[testId].at || b.createdAt).localeCompare(
+        String(a.runs[testId].at || a.createdAt),
+      ),
+    );
   return runs[0]?.runs[testId].status || 'TODO';
 }
 function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
@@ -1651,18 +1930,24 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
           }
         : { title: '', description: '', epicId: '', sprintId: '', testIds: [] },
   );
-  const why: Record<string, string> = Object.fromEntries((draft?.tests || []).map((x: Any) => [x.id, x.why]));
+  const why: Record<string, string> = Object.fromEntries(
+    (draft?.tests || []).map((x: Any) => [x.id, x.why]),
+  );
   const [folder, setFolder] = useState(draft ? 'picked' : 'all');
   const ed = canEdit();
   // With an AI draft, its picks come first, in its order (most important first).
-  const order = new Map<string, number>((draft?.tests || []).map((x: Any, i: number) => [x.id, i] as [string, number]));
+  const order = new Map<string, number>(
+    (draft?.tests || []).map((x: Any, i: number) => [x.id, i] as [string, number]),
+  );
   const pool0 = r.tests
     .filter((t: Any) => plannable(t, p) || d.testIds.includes(t.id))
     .filter(
       (t: Any) =>
         folder === 'all' ||
         (folder === 'epic'
-          ? (t.issueIds || []).some((id: string) => p.tickets.find((x: Any) => x.id === id)?.epicId === d.epicId)
+          ? (t.issueIds || []).some(
+              (id: string) => p.tickets.find((x: Any) => x.id === id)?.epicId === d.epicId,
+            )
           : t.folderId === folder),
     );
   const pool =
@@ -1672,7 +1957,12 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
           .sort((a: Any, b: Any) => (order.get(a.id) ?? 1e6) - (order.get(b.id) ?? 1e6))
       : [...pool0].sort((a: Any, b: Any) => (order.get(a.id) ?? 1e6) - (order.get(b.id) ?? 1e6));
   const toggle = (id: string) =>
-    setD({ ...d, testIds: d.testIds.includes(id) ? d.testIds.filter((x: string) => x !== id) : [...d.testIds, id] });
+    setD({
+      ...d,
+      testIds: d.testIds.includes(id)
+        ? d.testIds.filter((x: string) => x !== id)
+        : [...d.testIds, id],
+    });
   const save = (thenRun = false) => {
     if (!d.title.trim()) {
       toast('Give the plan a title.', 'err');
@@ -1685,7 +1975,14 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
         rr.plans[i] = { ...rr.plans[i], ...d, title: d.title.trim() };
         saved = rr.plans[i];
       } else {
-        saved = { ...d, title: d.title.trim(), id: uid(), key: nextKey(rr, pp, 'tp'), createdAt: nowIso(), createdBy: me() };
+        saved = {
+          ...d,
+          title: d.title.trim(),
+          id: uid(),
+          key: nextKey(rr, pp, 'tp'),
+          createdAt: nowIso(),
+          createdBy: me(),
+        };
         rr.plans.push(saved);
       }
     });
@@ -1732,7 +2029,12 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
         ...(ed
           ? [
               { label: 'Save', onClick: () => save(false) },
-              { label: 'Save and run', kind: 'primary' as const, disabled: !d.testIds.length, onClick: () => save(true) },
+              {
+                label: 'Save and run',
+                kind: 'primary' as const,
+                disabled: !d.testIds.length,
+                onClick: () => save(true),
+              },
             ]
           : []),
       ]}
@@ -1750,7 +2052,11 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
         </label>
         <label className="field">
           <span>Epic (optional)</span>
-          <SF disabled={!ed} value={d.epicId || ''} onChange={(e) => setD({ ...d, epicId: e.target.value })}>
+          <SF
+            disabled={!ed}
+            value={d.epicId || ''}
+            onChange={(e) => setD({ ...d, epicId: e.target.value })}
+          >
             <MenuItem value="">None</MenuItem>
             {p.epics.map((e: Any) => (
               <MenuItem key={e.id} value={e.id}>
@@ -1761,7 +2067,11 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
         </label>
         <label className="field">
           <span>Sprint (optional)</span>
-          <SF disabled={!ed} value={d.sprintId || ''} onChange={(e) => setD({ ...d, sprintId: e.target.value })}>
+          <SF
+            disabled={!ed}
+            value={d.sprintId || ''}
+            onChange={(e) => setD({ ...d, sprintId: e.target.value })}
+          >
             <MenuItem value="">None</MenuItem>
             {p.sprints.map((s: Any) => (
               <MenuItem key={s.id} value={s.id}>
@@ -1772,13 +2082,23 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
         </label>
         <label className="field" style={{ gridColumn: '1 / -1' }}>
           <span>Description</span>
-          <TA disabled={!ed} rows={2} value={d.description || ''} onChange={(e) => setD({ ...d, description: e.target.value })} />
+          <TA
+            disabled={!ed}
+            rows={2}
+            value={d.description || ''}
+            onChange={(e) => setD({ ...d, description: e.target.value })}
+          />
         </label>
       </div>
       <div className="row split-tools">
         <b className="small">Tests in the plan ({d.testIds.length})</b>
         <span className="spacer" />
-        <SF filter value={folder} onChange={(e) => setFolder(e.target.value)} aria-label="Show tests from">
+        <SF
+          filter
+          value={folder}
+          onChange={(e) => setFolder(e.target.value)}
+          aria-label="Show tests from"
+        >
           {draft && <MenuItem value="picked">Picked by the AI ({draft.tests.length})</MenuItem>}
           <MenuItem value="all">All tests</MenuItem>
           {d.epicId && <MenuItem value="epic">Tests covering the epic’s issues</MenuItem>}
@@ -1791,7 +2111,9 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
         {ed && (
           <button
             className="btn sm subtle"
-            onClick={() => setD({ ...d, testIds: [...new Set([...d.testIds, ...pool.map((t: Any) => t.id)])] })}
+            onClick={() =>
+              setD({ ...d, testIds: [...new Set([...d.testIds, ...pool.map((t: Any) => t.id)])] })
+            }
           >
             Add all shown ({pool.length})
           </button>
@@ -1800,7 +2122,12 @@ function PlanModal({ plan, draft }: { plan: Any | null; draft?: Any }) {
       <div className="split-list">
         {pool.map((t: Any) => (
           <label key={t.id} className={`split-row ${d.testIds.includes(t.id) ? '' : 'off'}`}>
-            <CB disabled={!ed} checked={d.testIds.includes(t.id)} onChange={() => toggle(t.id)} aria-label={`Include ${t.key}`} />
+            <CB
+              disabled={!ed}
+              checked={d.testIds.includes(t.id)}
+              onChange={() => toggle(t.id)}
+              aria-label={`Include ${t.key}`}
+            />
             <span className="key">{t.key}</span>
             <span className="split-title">
               {t.title}
@@ -1861,14 +2188,22 @@ function AiPlanModal() {
   const [busy, setBusy] = useState(false);
   const go = async () => {
     setBusy(true);
-    const task = startTask('Building a test plan with AI', { detail: PLAN_KINDS.find(([k]) => k === kind)?.[1], kind: 'ai' });
+    const task = startTask('Building a test plan with AI', {
+      detail: PLAN_KINDS.find(([k]) => k === kind)?.[1],
+      kind: 'ai',
+    });
     try {
       const out = await api(`/api/projects/${p.id}/testplan`, {
         method: 'POST',
         body: aiBody({ kind, goal, epicIds, sprintId, maxTests: max }),
       });
       task.finish(`${out.tests.length} tests picked`);
-      openModal(<PlanModal plan={null} draft={{ ...out, epicId: epicIds.length === 1 ? epicIds[0] : '', sprintId }} />);
+      openModal(
+        <PlanModal
+          plan={null}
+          draft={{ ...out, epicId: epicIds.length === 1 ? epicIds[0] : '', sprintId }}
+        />,
+      );
       toast(
         `The AI picked ${out.tests.length} of ${out.considered} tests${out.gaps.length ? ` and found ${out.gaps.length} gap${out.gaps.length > 1 ? 's' : ''}` : ''}. Review, then save.`,
         'ok',
@@ -1879,21 +2214,39 @@ function AiPlanModal() {
       setBusy(false);
     }
   };
-  const blocked = (kind === 'custom' && !goal.trim()) || (kind === 'sprint' && !sprintId) || (kind === 'feature' && !epicIds.length);
+  const blocked =
+    (kind === 'custom' && !goal.trim()) ||
+    (kind === 'sprint' && !sprintId) ||
+    (kind === 'feature' && !epicIds.length);
   return (
     <Modal
       title="Build a test plan with AI"
       wide
-      actions={[{ label: 'Cancel' }, { label: busy ? 'Building…' : 'Build plan', kind: 'ai', disabled: busy || blocked, onClick: go }]}
+      actions={[
+        { label: 'Cancel' },
+        {
+          label: busy ? 'Building…' : 'Build plan',
+          kind: 'ai',
+          disabled: busy || blocked,
+          onClick: go,
+        },
+      ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        The AI reads your {repo(p).tests.length} tests: what they check, their priority, the issues they cover and those issues’ status, and
-        their latest results. It picks the ones that fit, riskiest first, says why for each, and lists issues in scope that no test covers.
-        You review it in the plan editor before anything is saved.
+        The AI reads your {repo(p).tests.length} tests: what they check, their priority, the issues
+        they cover and those issues’ status, and their latest results. It picks the ones that fit,
+        riskiest first, says why for each, and lists issues in scope that no test covers. You review
+        it in the plan editor before anything is saved.
       </p>
       <div className="upd-modes" role="radiogroup" aria-label="Kind of plan">
         {PLAN_KINDS.map(([k, l, dsc]) => (
-          <button key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
+          <button
+            key={k}
+            role="radio"
+            aria-checked={kind === k}
+            className={kind === k ? 'on' : ''}
+            onClick={() => setKind(k)}
+          >
             <b>{l}</b>
             <span className="muted small">{dsc}</span>
           </button>
@@ -1907,9 +2260,15 @@ function AiPlanModal() {
             multiple
             displayEmpty
             renderValue={(v: Any) =>
-              v.length ? v.map((id: string) => p.epics.find((e: Any) => e.id === id)?.key).join(', ') : 'All epics'
+              v.length
+                ? v.map((id: string) => p.epics.find((e: Any) => e.id === id)?.key).join(', ')
+                : 'All epics'
             }
-            onChange={(e: Any) => setEpicIds(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+            onChange={(e: Any) =>
+              setEpicIds(
+                typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value,
+              )
+            }
           >
             {p.epics.map((e: Any) => (
               <MenuItem key={e.id} value={e.id}>
@@ -1987,7 +2346,13 @@ function createExecution({
       runs: Object.fromEntries(
         testIds.map((id) => [
           id,
-          { status: 'TODO', version: rr.tests.find((x: Any) => x.id === id)?.version || 1, steps: {}, comment: '', defectIds: [] },
+          {
+            status: 'TODO',
+            version: rr.tests.find((x: Any) => x.id === id)?.version || 1,
+            steps: {},
+            comment: '',
+            defectIds: [],
+          },
         ]),
       ),
       createdAt: nowIso(),
@@ -2018,7 +2383,9 @@ function NewExecutionModal() {
           onClick: () => {
             closeModal();
             createExecution({
-              title: title.trim() || `${pl ? pl.title : 'All tests'} — ${new Date().toLocaleDateString()}`,
+              title:
+                title.trim() ||
+                `${pl ? pl.title : 'All tests'} — ${new Date().toLocaleDateString()}`,
               planId: pl?.id || null,
               testIds: ids,
               environment: env.trim(),
@@ -2048,17 +2415,28 @@ function NewExecutionModal() {
       </label>
       <label className="field">
         <span>Test environment (optional)</span>
-        <TF value={env} placeholder="e.g. staging, production, Chrome" onChange={(e) => setEnv(e.target.value)} />
+        <TF
+          value={env}
+          placeholder="e.g. staging, production, Chrome"
+          onChange={(e) => setEnv(e.target.value)}
+        />
         {environmentsOf().length > 0 && (
           <div className="row" style={{ gap: 4, marginTop: 4 }}>
             {environmentsOf().map((x) => (
-              <button key={x} type="button" className={`chip-btn ${env === x ? 'on' : ''}`} onClick={() => setEnv(x)}>
+              <button
+                key={x}
+                type="button"
+                className={`chip-btn ${env === x ? 'on' : ''}`}
+                onClick={() => setEnv(x)}
+              >
                 {x}
               </button>
             ))}
           </div>
         )}
-        <small className="muted">Results are also tracked per environment (Coverage → environment).</small>
+        <small className="muted">
+          Results are also tracked per environment (Coverage → environment).
+        </small>
       </label>
     </Modal>
   );
@@ -2082,11 +2460,14 @@ function Executions() {
         }
       >
         <p>
-          An execution runs a set of tests (usually a plan’s) and records each one as Passed, Failed or Blocked, step by step, with defects.
+          An execution runs a set of tests (usually a plan’s) and records each one as Passed, Failed
+          or Blocked, step by step, with defects.
         </p>
       </EmptyState>
     );
-  const list = [...r.executions].sort((a: Any, b: Any) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const list = [...r.executions].sort((a: Any, b: Any) =>
+    String(b.createdAt).localeCompare(String(a.createdAt)),
+  );
   return (
     <table className="tbl">
       <thead>
@@ -2126,14 +2507,18 @@ function Executions() {
   );
 }
 
-export const openExecution = (id: string, testId?: string) => openModal(<ExecutionModal id={id} startAt={testId} />);
+export const openExecution = (id: string, testId?: string) =>
+  openModal(<ExecutionModal id={id} startAt={testId} />);
 function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
   useStore(); // a dialog doesn't redraw with the page: follow the project so results show as they're marked
   const p = P();
   const r = repo(p);
   const e = r.executions.find((x: Any) => x.id === id);
   const [cur, setCur] = useState<string | null>(
-    startAt || e?.testIds.find((t: string) => e.runs?.[t]?.status !== 'PASSED') || e?.testIds[0] || null,
+    startAt ||
+      e?.testIds.find((t: string) => e.runs?.[t]?.status !== 'PASSED') ||
+      e?.testIds[0] ||
+      null,
   );
   const [picked, setPicked] = useState<string[]>([]);
   /** Bulk update of the selected runs (result and/or assignee). */
@@ -2163,13 +2548,24 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
     );
   const ed = canEdit();
   const test = r.tests.find((t: Any) => t.id === cur);
-  const run = cur ? e.runs?.[cur] || { status: 'TODO', steps: {}, comment: '', defectIds: [] } : null;
+  const run = cur
+    ? e.runs?.[cur] || { status: 'TODO', steps: {}, comment: '', defectIds: [] }
+    : null;
   const setRun = (patch: Any, tag?: string) =>
     edit((rr) => {
       const ex = rr.executions.find((x: Any) => x.id === id);
       if (!ex || !cur) return;
       ex.runs = ex.runs || {};
-      ex.runs[cur] = { status: 'TODO', steps: {}, comment: '', defectIds: [], ...(ex.runs[cur] || {}), ...patch, at: nowIso(), by: me() };
+      ex.runs[cur] = {
+        status: 'TODO',
+        steps: {},
+        comment: '',
+        defectIds: [],
+        ...(ex.runs[cur] || {}),
+        ...patch,
+        at: nowIso(),
+        by: me(),
+      };
     }, tag);
   const setStep = (stepId: string, st: string) => {
     const steps = { ...(run.steps || {}), [stepId]: st };
@@ -2177,8 +2573,12 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
   };
   const createDefect = () => {
     if (!test) return;
-    const failed = (test.steps || []).map((s: Any, i: number) => ({ s, i, st: run.steps?.[s.id] })).filter((x: Any) => x.st === 'FAILED');
-    const linked = (test.issueIds || []).map((x: string) => p.tickets.find((t: Any) => t.id === x)).filter(Boolean);
+    const failed = (test.steps || [])
+      .map((s: Any, i: number) => ({ s, i, st: run.steps?.[s.id] }))
+      .filter((x: Any) => x.st === 'FAILED');
+    const linked = (test.issueIds || [])
+      .map((x: string) => p.tickets.find((t: Any) => t.id === x))
+      .filter(Boolean);
     let bug: Any = null;
     mutate((pp: Any) => {
       bug = newTicket({
@@ -2186,7 +2586,10 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
         priority: test.priority === 'High' ? 'High' : 'Medium',
         epicId: linked[0]?.epicId || null,
         labels: ['defect'],
-        title: `${test.title}: fails${failed[0] ? ` at step ${failed[0].i + 1}` : ''}`.slice(0, 120),
+        title: `${test.title}: fails${failed[0] ? ` at step ${failed[0].i + 1}` : ''}`.slice(
+          0,
+          120,
+        ),
         description: [
           `Found while running ${test.key} in ${e.key} (${e.title})${e.environment ? ` on ${e.environment}` : ''}.`,
           test.preconditions && `Preconditions: ${test.preconditions}`,
@@ -2203,12 +2606,19 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
       }
       logEvent(bug, `defect from ${test.key} in ${e.key}`, 'Test management');
       const ex = pp.testRepo.executions.find((x: Any) => x.id === id);
-      ex.runs[cur!] = { ...ex.runs[cur!], defectIds: [...(ex.runs[cur!]?.defectIds || []), bug.id] };
+      ex.runs[cur!] = {
+        ...ex.runs[cur!],
+        defectIds: [...(ex.runs[cur!]?.defectIds || []), bug.id],
+      };
     });
-    toast(`${bug.key} created and linked to the run${linked.length ? ` and to ${linked.map((x: Any) => x.key).join(', ')}` : ''}.`, 'ok', {
-      title: 'Defect created',
-      action: { label: 'Open', onClick: () => openDrawer('issue', bug.id) },
-    });
+    toast(
+      `${bug.key} created and linked to the run${linked.length ? ` and to ${linked.map((x: Any) => x.key).join(', ')}` : ''}.`,
+      'ok',
+      {
+        title: 'Defect created',
+        action: { label: 'Open', onClick: () => openDrawer('issue', bug.id) },
+      },
+    );
   };
   const st = e.testIds.map((t: string) => e.runs?.[t]?.status || 'TODO');
   const idx = e.testIds.indexOf(cur || '');
@@ -2245,8 +2655,8 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
       <div className="xr-exec-head">
         <StatusBar statuses={st} />
         <span className="small muted">
-          {counts(st).PASSED} passed · {counts(st).FAILED} failed · {counts(st).BLOCKED} blocked · {counts(st).TODO + counts(st).EXECUTING}{' '}
-          to do{e.environment ? ` · ${e.environment}` : ''}
+          {counts(st).PASSED} passed · {counts(st).FAILED} failed · {counts(st).BLOCKED} blocked ·{' '}
+          {counts(st).TODO + counts(st).EXECUTING} to do{e.environment ? ` · ${e.environment}` : ''}
         </span>
         <span className="spacer" />
         {ed && (
@@ -2291,7 +2701,8 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
             filter
             value=""
             onChange={(ev) => {
-              if (ev.target.value) bulk({ assignee: ev.target.value === '-' ? '' : ev.target.value });
+              if (ev.target.value)
+                bulk({ assignee: ev.target.value === '-' ? '' : ev.target.value });
             }}
             aria-label="Assign"
           >
@@ -2321,7 +2732,11 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
                       type="checkbox"
                       aria-label={`Select ${t.key}`}
                       checked={picked.includes(tid)}
-                      onChange={() => setPicked(picked.includes(tid) ? picked.filter((x) => x !== tid) : [...picked, tid])}
+                      onChange={() =>
+                        setPicked(
+                          picked.includes(tid) ? picked.filter((x) => x !== tid) : [...picked, tid],
+                        )
+                      }
                     />
                   )}
                   <button onClick={() => setCur(tid)}>
@@ -2350,7 +2765,9 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
           })}
           {ed && e.testIds.length > 1 && (
             <li className="xr-selall">
-              <button onClick={() => setPicked(picked.length === e.testIds.length ? [] : [...e.testIds])}>
+              <button
+                onClick={() => setPicked(picked.length === e.testIds.length ? [] : [...e.testIds])}
+              >
                 {picked.length === e.testIds.length ? 'Select none' : 'Select all'}
               </button>
             </li>
@@ -2379,7 +2796,12 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
                     </MenuItem>
                   ))}
                 </SF>
-                <SF disabled={!ed} value={run.status} onChange={(ev) => setRun({ status: ev.target.value })} aria-label="Result">
+                <SF
+                  disabled={!ed}
+                  value={run.status}
+                  onChange={(ev) => setRun({ status: ev.target.value })}
+                  aria-label="Result"
+                >
                   {RUN_STATUS.map((s) => (
                     <MenuItem key={s} value={s}>
                       {STATUS_LABEL[s]}
@@ -2476,10 +2898,18 @@ function ExecutionModal({ id, startAt }: { id: string; startAt?: string }) {
                   </button>
                 )}
                 <span className="spacer" />
-                <button className="btn sm subtle" disabled={idx <= 0} onClick={() => setCur(e.testIds[idx - 1])}>
+                <button
+                  className="btn sm subtle"
+                  disabled={idx <= 0}
+                  onClick={() => setCur(e.testIds[idx - 1])}
+                >
                   Previous
                 </button>
-                <button className="btn sm primary" disabled={idx >= e.testIds.length - 1} onClick={() => setCur(e.testIds[idx + 1])}>
+                <button
+                  className="btn sm primary"
+                  disabled={idx >= e.testIds.length - 1}
+                  onClick={() => setCur(e.testIds[idx + 1])}
+                >
                   Next test
                 </button>
               </div>
@@ -2502,7 +2932,9 @@ function Coverage() {
     .filter((t: Any) => !isSub(t) && (!epic || t.epicId === epic))
     .map((t: Any) => ({ t, ...coverageOf(t.id, p, env) }))
     .filter((x: Any) => !only || x.status === only);
-  const all = p.tickets.filter((t: Any) => !isSub(t) && (!epic || t.epicId === epic)).map((t: Any) => coverageOf(t.id, p, env).status);
+  const all = p.tickets
+    .filter((t: Any) => !isSub(t) && (!epic || t.epicId === epic))
+    .map((t: Any) => coverageOf(t.id, p, env).status);
   const n = (s: string) => all.filter((x: string) => x === s).length;
   return (
     <>
@@ -2526,12 +2958,20 @@ function Coverage() {
           </SF>
         )}
         {(['OK', 'NOK', 'NOTRUN', 'UNCOVERED'] as const).map((s) => (
-          <button key={s} className={`xr-covfilter ${only === s ? 'on' : ''}`} onClick={() => setOnly(only === s ? '' : s)}>
+          <button
+            key={s}
+            className={`xr-covfilter ${only === s ? 'on' : ''}`}
+            onClick={() => setOnly(only === s ? '' : s)}
+          >
             <CovLoz s={s} /> {n(s)}
           </button>
         ))}
         <span className="spacer" />
-        <button className="btn sm" onClick={() => exportTraceability(epic, env)} title="Requirement → test → latest run → defects, as CSV">
+        <button
+          className="btn sm"
+          onClick={() => exportTraceability(epic, env)}
+          title="Requirement → test → latest run → defects, as CSV"
+        >
           <Ico svg={I.download} />
           Traceability report
         </button>
@@ -2577,7 +3017,10 @@ function Coverage() {
 }
 
 // ---------------------------------------------------------------- the issue panel: its tests
-/** Issue panel → Tests: the repository tests that cover this issue, their latest results, and linking. */
+/**
+ * Issue panel → Tests: the repository tests that cover this issue, their latest results, and
+ * linking.
+ */
 export function TestsSection({ t }: { t: Any }) {
   const p = P();
   const r = repo(p);
@@ -2634,7 +3077,11 @@ export function TestsSection({ t }: { t: Any }) {
                 </button>
                 <span className="split-title">{x.title}</span>
                 {lr ? (
-                  <button className="link-btn small" title={`In ${lr.execution.key}`} onClick={() => openExecution(lr.execution.id, x.id)}>
+                  <button
+                    className="link-btn small"
+                    title={`In ${lr.execution.key}`}
+                    onClick={() => openExecution(lr.execution.id, x.id)}
+                  >
                     <RunLoz s={lr.status} />
                   </button>
                 ) : (
@@ -2661,14 +3108,16 @@ export function TestsSection({ t }: { t: Any }) {
         </div>
       ) : (
         <p className="muted small">
-          No repository tests cover this issue yet. Link one, create one, or import this issue’s test cases in Test management.
+          No repository tests cover this issue yet. Link one, create one, or import this issue’s
+          test cases in Test management.
         </p>
       )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------- import / export / reports (Xray & BrowserStack style)
+// ---------------------------------------------------------------- import / export / reports (Xray
+// & BrowserStack style)
 const csvCell = (v: Any) => {
   const s = String(v ?? '');
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -2744,7 +3193,15 @@ export function exportTestsCsv(tests: Any[]) {
       .join(' ');
   const lines = [CSV_HEAD.join(',')];
   for (const t of tests) {
-    const base = [t.key, t.title, t.type, t.priority, (t.labels || []).join(' '), folder(t.folderId), t.preconditions || ''];
+    const base = [
+      t.key,
+      t.title,
+      t.type,
+      t.priority,
+      (t.labels || []).join(' '),
+      folder(t.folderId),
+      t.preconditions || '',
+    ];
     const steps = t.type === 'Cucumber' || !(t.steps || []).length ? [null] : t.steps;
     steps.forEach((st: Any, i: number) =>
       lines.push(
@@ -2769,7 +3226,8 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
   const [rows, setRows] = useState<string[][] | null>(null);
   const [name, setName] = useState('');
   const head = rows?.[0]?.map((h) => h.trim().toLowerCase()) || [];
-  const col = (...names: string[]) => head.findIndex((h) => names.some((n) => h === n || h.includes(n)));
+  const col = (...names: string[]) =>
+    head.findIndex((h) => names.some((n) => h === n || h.includes(n)));
   const ci = {
     key: col('test key', 'key', 'id'),
     title: col('summary', 'title', 'test case', 'name'),
@@ -2795,8 +3253,13 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
         cur = {
           srcKey: g(ci.key),
           title,
-          type: TEST_TYPES.find((x) => x.toLowerCase() === g(ci.type).toLowerCase()) || (g(ci.gherkin) ? 'Cucumber' : 'Manual'),
-          priority: ['High', 'Medium', 'Low'].find((x) => x.toLowerCase() === g(ci.priority).toLowerCase()) || 'Medium',
+          type:
+            TEST_TYPES.find((x) => x.toLowerCase() === g(ci.type).toLowerCase()) ||
+            (g(ci.gherkin) ? 'Cucumber' : 'Manual'),
+          priority:
+            ['High', 'Medium', 'Low'].find(
+              (x) => x.toLowerCase() === g(ci.priority).toLowerCase(),
+            ) || 'Medium',
           labels: g(ci.labels)
             .split(/[\s,;]+/)
             .filter(Boolean),
@@ -2811,7 +3274,12 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
         out.push(cur);
       }
       if (cur && (g(ci.action) || g(ci.expected)))
-        cur.steps.push({ id: uid(), action: g(ci.action), data: g(ci.data), expected: g(ci.expected) });
+        cur.steps.push({
+          id: uid(),
+          action: g(ci.action),
+          data: g(ci.data),
+          expected: g(ci.expected),
+        });
     }
     return out;
   })();
@@ -2829,7 +3297,9 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
         return f.id;
       };
       for (const t of tests) {
-        const issueIds = t.issues.map((k: string) => pp.tickets.find((x: Any) => x.key === k)?.id).filter(Boolean);
+        const issueIds = t.issues
+          .map((k: string) => pp.tickets.find((x: Any) => x.key === k)?.id)
+          .filter(Boolean);
         linked += issueIds.length;
         rr.tests.push({
           id: uid(),
@@ -2851,9 +3321,13 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
       }
     });
     closeModal();
-    toast(`${made} test${made === 1 ? '' : 's'} imported${linked ? `, ${linked} issue link${linked === 1 ? '' : 's'}` : ''}.`, 'ok', {
-      title: 'CSV imported',
-    });
+    toast(
+      `${made} test${made === 1 ? '' : 's'} imported${linked ? `, ${linked} issue link${linked === 1 ? '' : 's'}` : ''}.`,
+      'ok',
+      {
+        title: 'CSV imported',
+      },
+    );
   };
   return (
     <Modal
@@ -2861,13 +3335,20 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
       wide
       actions={[
         { label: 'Cancel' },
-        { label: `Import ${tests.length} test${tests.length === 1 ? '' : 's'}`, kind: 'primary', disabled: !tests.length, onClick: go },
+        {
+          label: `Import ${tests.length} test${tests.length === 1 ? '' : 's'}`,
+          kind: 'primary',
+          disabled: !tests.length,
+          onClick: go,
+        },
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Works with exports from Xray, BrowserStack Test Management, TestRail and this app: one row per step, with columns like{' '}
-        <i>Summary / Title</i>, <i>Action</i>, <i>Data</i>, <i>Expected Result</i>, <i>Priority</i>, <i>Labels</i>, <i>Folder</i>,{' '}
-        <i>Preconditions</i>, <i>Gherkin</i> and <i>Issues</i> (issue keys to link). Rows with the same title continue the same test.
+        Works with exports from Xray, BrowserStack Test Management, TestRail and this app: one row
+        per step, with columns like <i>Summary / Title</i>, <i>Action</i>, <i>Data</i>,{' '}
+        <i>Expected Result</i>, <i>Priority</i>, <i>Labels</i>, <i>Folder</i>, <i>Preconditions</i>,{' '}
+        <i>Gherkin</i> and <i>Issues</i> (issue keys to link). Rows with the same title continue the
+        same test.
       </p>
       <label className="btn">
         <Ico svg={I.upload} />
@@ -2885,7 +3366,11 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
           }}
         />
       </label>
-      {rows && ci.title < 0 && <p className="warn-text small">No Summary / Title column found. Columns: {rows[0].join(', ')}</p>}
+      {rows && ci.title < 0 && (
+        <p className="warn-text small">
+          No Summary / Title column found. Columns: {rows[0].join(', ')}
+        </p>
+      )}
       {tests.length > 0 && (
         <div className="split-list" style={{ marginTop: 10 }}>
           {tests.slice(0, 200).map((t: Any, i: number) => (
@@ -2893,7 +3378,8 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
               <span className="key">{t.srcKey || '—'}</span>
               <span className="split-title">{t.title}</span>
               <span className="muted small">
-                {t.type} · {t.steps.length} steps{t.issues.length ? ` · ${t.issues.join(', ')}` : ''}
+                {t.type} · {t.steps.length} steps
+                {t.issues.length ? ` · ${t.issues.join(', ')}` : ''}
               </span>
             </div>
           ))}
@@ -2903,7 +3389,10 @@ function CsvImportModal({ folderId }: { folderId: string | null }) {
   );
 }
 
-/** Traceability (requirement → test → latest run → defects), as CSV — the report Xray and BrowserStack both provide. */
+/**
+ * Traceability (requirement → test → latest run → defects), as CSV — the report Xray and
+ * BrowserStack both provide.
+ */
 function exportTraceability(epicId: string, env: string) {
   const p = P();
   const lines = [
@@ -2927,7 +3416,13 @@ function exportTraceability(epicId: string, env: string) {
   for (const t of p.tickets.filter((x: Any) => !isSub(x) && (!epicId || x.epicId === epicId))) {
     const cov = coverageOf(t.id, p, env);
     const epic = p.epics.find((e: Any) => e.id === t.epicId);
-    const base = [t.key, t.title, t.status, epic ? `${epic.key} ${epic.title}` : '', COV_LABEL[cov.status]];
+    const base = [
+      t.key,
+      t.title,
+      t.status,
+      epic ? `${epic.key} ${epic.title}` : '',
+      COV_LABEL[cov.status],
+    ];
     if (!cov.tests.length) {
       lines.push([...base, '', '', '', '', '', '', '', '', ''].map(csvCell).join(','));
       continue;
@@ -2956,11 +3451,17 @@ function exportTraceability(epicId: string, env: string) {
       );
     }
   }
-  download(`${p.key}-traceability${env ? `-${env}` : ''}-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+  download(
+    `${p.key}-traceability${env ? `-${env}` : ''}-${new Date().toISOString().slice(0, 10)}.csv`,
+    lines.join('\n'),
+  );
   toast('Traceability report downloaded');
 }
 
-/** JUnit XML (Playwright, Jest, pytest, Cypress, Maven…) → results in an execution. A testcase matches a test by key in its name, else by title. */
+/**
+ * JUnit XML (Playwright, Jest, pytest, Cypress, Maven…) → results in an execution. A testcase
+ * matches a test by key in its name, else by title.
+ */
 function importJunit(execId: string, xml: string, file: string) {
   let doc: Document;
   try {
@@ -3043,8 +3544,9 @@ function importJunit(execId: string, xml: string, file: string) {
 }
 
 /**
- * TicketForge's own Playwright runs feed the repository: a result for an issue test case that was imported as a
- * repository test lands in that day's "Automated runs" execution (per environment), like BrowserStack Automate → TM.
+ * TicketForge's own Playwright runs feed the repository: a result for an issue test case that was
+ * imported as a repository test lands in that day's "Automated runs" execution (per environment),
+ * like BrowserStack Automate → TM.
  * Call inside a mutate with the project being changed.
  */
 export function recordAutomationResult(pp: Any, ticket: Any, tc: Any, result: Any, baseUrl = '') {
@@ -3059,7 +3561,9 @@ export function recordAutomationResult(pp: Any, ticket: Any, tc: Any, result: An
     /* no URL */
   }
   const day = new Date().toISOString().slice(0, 10);
-  let ex = rr.executions.find((x: Any) => x.automation && x.day === day && (x.environment || '') === env);
+  let ex = rr.executions.find(
+    (x: Any) => x.automation && x.day === day && (x.environment || '') === env,
+  );
   if (!ex) {
     rr.seq = { t: 0, tp: 0, te: 0, ...(rr.seq || {}) };
     ex = {
@@ -3096,7 +3600,8 @@ export function recordAutomationResult(pp: Any, ticket: Any, tc: Any, result: An
   }
 }
 
-// ---------------------------------------------------------------- AI: write repository tests for issues
+// ---------------------------------------------------------------- AI: write repository tests for
+// issues
 function AiWriteModal({ scope, folderId }: { scope: string; folderId: string | null }) {
   const p = P();
   const r = repo(p);
@@ -3107,35 +3612,49 @@ function AiWriteModal({ scope, folderId }: { scope: string; folderId: string | n
       ? p.tickets.find((x: Any) => x.id === scope.slice(6))?.epicId || ''
       : '';
   const [epic, setEpic] = useState(initEpic);
-  const pool = p.tickets.filter((t: Any) => !isSub(t) && (!epic || (epic === 'none' ? !t.epicId : t.epicId === epic)));
+  const pool = p.tickets.filter(
+    (t: Any) => !isSub(t) && (!epic || (epic === 'none' ? !t.epicId : t.epicId === epic)),
+  );
   const [pick, setPick] = useState<Record<string, boolean>>(() =>
-    scope.startsWith('issue:') ? { [scope.slice(6)]: true } : Object.fromEntries(pool.map((t: Any) => [t.id, !covered(t.id)])),
+    scope.startsWith('issue:')
+      ? { [scope.slice(6)]: true }
+      : Object.fromEntries(pool.map((t: Any) => [t.id, !covered(t.id)])),
   );
   const [text, setText] = useState('');
   const chosen = pool.filter((t: Any) => pick[t.id]);
   const go = async () => {
     closeModal();
     const ctrl = new AbortController();
-    const task = startTask(`Writing tests for ${chosen.length} issue${chosen.length === 1 ? '' : 's'}`, {
-      total: chosen.length,
-      kind: 'ai',
-      cancel: () => ctrl.abort(),
-    });
+    const task = startTask(
+      `Writing tests for ${chosen.length} issue${chosen.length === 1 ? '' : 's'}`,
+      {
+        total: chosen.length,
+        kind: 'ai',
+        cancel: () => ctrl.abort(),
+      },
+    );
     try {
       const res = await api(`/api/projects/${p.id}/testrepo-ai`, {
         method: 'POST',
         raw: true,
         signal: ctrl.signal,
-        body: aiBody({ action: 'write', issueIds: chosen.map((t: Any) => t.id), instruction: text.trim() }),
+        body: aiBody({
+          action: 'write',
+          issueIds: chosen.map((t: Any) => t.id),
+          instruction: text.trim(),
+        }),
       });
       let out: Any = null;
       await readNdjson(res, (ev) => {
-        if (ev.type === 'progress') task.update({ detail: ev.message, done: ev.done, total: ev.total });
+        if (ev.type === 'progress')
+          task.update({ detail: ev.message, done: ev.done, total: ev.total });
         else if (ev.type === 'done') out = ev;
         else if (ev.type === 'error') throw new Error(ev.error);
       });
       if (!out) throw new Error('Nothing came back.');
-      task.finish(`${out.results.reduce((n: number, x: Any) => n + x.tests.length, 0)} tests written`);
+      task.finish(
+        `${out.results.reduce((n: number, x: Any) => n + x.tests.length, 0)} tests written`,
+      );
       openModal(<AiTestsReview results={out.results} folderId={folderId} />);
     } catch (e: Any) {
       if (e.name === 'AbortError') {
@@ -3159,9 +3678,10 @@ function AiWriteModal({ scope, folderId }: { scope: string; folderId: string | n
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        The AI writes reusable repository tests for each issue from its story and acceptance criteria, following your company’s test
-        standard (Administration → Generation → Test management), and skips what existing tests already cover. Issues without tests are
-        ticked. You review before anything is added.
+        The AI writes reusable repository tests for each issue from its story and acceptance
+        criteria, following your company’s test standard (Administration → Generation → Test
+        management), and skips what existing tests already cover. Issues without tests are ticked.
+        You review before anything is added.
       </p>
       <div className="row split-tools">
         <SF filter value={epic} onChange={(e) => setEpic(e.target.value)} aria-label="Epic">
@@ -3175,11 +3695,21 @@ function AiWriteModal({ scope, folderId }: { scope: string; folderId: string | n
         </SF>
         <button
           className="btn sm subtle"
-          onClick={() => setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, !covered(t.id)])) })}
+          onClick={() =>
+            setPick({
+              ...pick,
+              ...Object.fromEntries(pool.map((t: Any) => [t.id, !covered(t.id)])),
+            })
+          }
         >
           Tick uncovered ({pool.filter((t: Any) => !covered(t.id)).length})
         </button>
-        <button className="btn sm subtle" onClick={() => setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, false])) })}>
+        <button
+          className="btn sm subtle"
+          onClick={() =>
+            setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, false])) })
+          }
+        >
           None
         </button>
         <span className="spacer" />
@@ -3217,7 +3747,9 @@ function AiWriteModal({ scope, folderId }: { scope: string; folderId: string | n
 }
 function AiTestsReview({ results, folderId }: { results: Any[]; folderId: string | null }) {
   const [pick, setPick] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(results.flatMap((x) => x.tests.map((_: Any, i: number) => [`${x.ticketId}:${i}`, true]))),
+    Object.fromEntries(
+      results.flatMap((x) => x.tests.map((_: Any, i: number) => [`${x.ticketId}:${i}`, true])),
+    ),
   );
   const [open, setOpen] = useState<string | null>(null);
   const n = Object.values(pick).filter(Boolean).length;
@@ -3227,7 +3759,9 @@ function AiTestsReview({ results, folderId }: { results: Any[]; folderId: string
       for (const x of results) {
         const t = pp.tickets.find((y: Any) => y.id === x.ticketId);
         const ep = pp.epics.find((e: Any) => e.id === t?.epicId);
-        const epicFolder = ep ? rr.folders.find((f: Any) => f.name === `${ep.key} ${ep.title}`)?.id : null;
+        const epicFolder = ep
+          ? rr.folders.find((f: Any) => f.name === `${ep.key} ${ep.title}`)?.id
+          : null;
         x.tests.forEach((tc: Any, i: number) => {
           if (!pick[`${x.ticketId}:${i}`]) return;
           rr.tests.push({
@@ -3248,14 +3782,26 @@ function AiTestsReview({ results, folderId }: { results: Any[]; folderId: string
       }
     });
     closeModal();
-    toast(`${made} test${made === 1 ? '' : 's'} added to the repository, linked to their issues.`, 'ok', { title: 'Tests added' });
+    toast(
+      `${made} test${made === 1 ? '' : 's'} added to the repository, linked to their issues.`,
+      'ok',
+      { title: 'Tests added' },
+    );
   };
   return (
     <Modal
       title="Review the AI’s tests"
       wide
       persistent
-      actions={[{ label: 'Cancel' }, { label: `Add ${n} test${n === 1 ? '' : 's'}`, kind: 'primary', disabled: !n, onClick: apply }]}
+      actions={[
+        { label: 'Cancel' },
+        {
+          label: `Add ${n} test${n === 1 ? '' : 's'}`,
+          kind: 'primary',
+          disabled: !n,
+          onClick: apply,
+        },
+      ]}
     >
       <div className="sync-pane">
         {results.map((x) => (
@@ -3263,13 +3809,19 @@ function AiTestsReview({ results, folderId }: { results: Any[]; folderId: string
             <div className="pt-head">
               <span className="key">{x.key}</span>
               <b className="split-title">{x.title}</b>
-              <span className="muted small">{x.error ? <span className="warn-text">{x.error}</span> : `${x.tests.length} tests`}</span>
+              <span className="muted small">
+                {x.error ? <span className="warn-text">{x.error}</span> : `${x.tests.length} tests`}
+              </span>
             </div>
             {x.tests.map((tc: Any, i: number) => {
               const k = `${x.ticketId}:${i}`;
               return (
                 <div key={k} className={`sync-item pt-tc ${pick[k] ? '' : 'off'}`}>
-                  <CB checked={Boolean(pick[k])} onChange={() => setPick({ ...pick, [k]: !pick[k] })} aria-label="Include" />
+                  <CB
+                    checked={Boolean(pick[k])}
+                    onChange={() => setPick({ ...pick, [k]: !pick[k] })}
+                    aria-label="Include"
+                  />
                   <div className="sync-body">
                     <div>
                       <span className="loz">{tc.type}</span> <b>{tc.title}</b>{' '}
@@ -3278,8 +3830,15 @@ function AiTestsReview({ results, folderId }: { results: Any[]; folderId: string
                         {tc.labels?.length ? ` · ${tc.labels.join(', ')}` : ''}
                       </span>
                     </div>
-                    <button className="link-btn small" onClick={() => setOpen(open === k ? null : k)}>
-                      {open === k ? 'Hide' : tc.type === 'Cucumber' ? 'Show scenario' : `${tc.steps.length} steps`}
+                    <button
+                      className="link-btn small"
+                      onClick={() => setOpen(open === k ? null : k)}
+                    >
+                      {open === k
+                        ? 'Hide'
+                        : tc.type === 'Cucumber'
+                          ? 'Show scenario'
+                          : `${tc.steps.length} steps`}
                     </button>
                     {open === k &&
                       (tc.type === 'Cucumber' ? (

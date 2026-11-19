@@ -56,17 +56,23 @@ import {
   remoteDiff,
 } from '@/lib/remote-jobs';
 
-// ---------------------------------------------------------------- code jobs through the AI API and GitHub
-// Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code next to a checkout, so
-// code jobs ask your AI provider for the change and commit it through the GitHub API (lib/api-code.ts). On your
-// computer they run here with Claude Code, unless you switched to the API (the X-TF-Run-On header from the browser; see
-// runPlace in client/core.ts). A round runs after the response (after()), so it needs the longest time Vercel allows.
+// ---------------------------------------------------------------- code jobs through the AI API and
+// GitHub Deployed TicketForge (serverless, or opened from another computer) can't run Claude Code
+// next to a checkout, so code jobs ask your AI provider for the change and commit it through the
+// GitHub API (lib/api-code.ts). On your computer they run here with Claude Code, unless you
+// switched to the API (the X-TF-Run-On header from the browser; see runPlace in client/core.ts). A
+// round runs after the response (after()), so it needs the longest time Vercel allows.
 export const maxDuration = 300;
 const localHere = () => !SERVERLESS && Boolean((currentContext() as any).local);
 const remoteMode = (_project?: any) => !localHere() || (currentContext() as any).runOn === 'github';
 async function ghFor(project: any, dev: any) {
-  const token = (await getProjectSecret(project.id, 'githubToken')) || process.env.GITHUB_TOKEN || '';
-  if (!dev?.repo) throw new HttpError(400, 'Choose the GitHub repository first: Project settings → Code & GitHub → Repository.');
+  const token =
+    (await getProjectSecret(project.id, 'githubToken')) || process.env.GITHUB_TOKEN || '';
+  if (!dev?.repo)
+    throw new HttpError(
+      400,
+      'Choose the GitHub repository first: Project settings → Code & GitHub → Repository.',
+    );
   if (!token)
     throw new HttpError(
       400,
@@ -78,8 +84,9 @@ async function ghFor(project: any, dev: any) {
   return { token, ref: info.default_branch, defaultBranch: info.default_branch };
 }
 /**
- * The project brain for a code job (lib/brain.ts): the notes linked to the issue as a block for the prompt, and for jobs
- * on this computer the notes themselves as files in the worktree's .ticketforge/brain/ folder (never committed).
+ * The project brain for a code job (lib/brain.ts): the notes linked to the issue as a block for the
+ * prompt, and for jobs on this computer the notes themselves as files in the worktree's
+ * .ticketforge/brain/ folder (never committed).
  */
 async function brainFor(project: any, ticket: any, local: boolean) {
   const r: any = await brainForCode(project.id, ticket, { max: local ? 5000 : 7000 });
@@ -95,10 +102,14 @@ async function userOk(p: any, perms: string[]) {
   const user = await authed();
   store.requireAccess(user, p.id);
   const missing = perms.filter((x) => !store.has(user, x));
-  if (missing.length) throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
+  if (missing.length)
+    throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
   return user;
 }
-/** When the issue's current coding spec was generated (the "prior spec version" comparison looks at runs before it), or ''. */
+/**
+ * When the issue's current coding spec was generated (the "prior spec version" comparison looks at
+ * runs before it), or ''.
+ */
 async function specAtFor(projectId: string, ticketId: string) {
   const s = (await store.listSpecs(projectId)).specs.find((x: any) => x.ticketId === ticketId);
   return s?.generatedAt ? new Date(s.generatedAt).toISOString() : '';
@@ -110,27 +121,55 @@ const remoteDev = (project: any, side: string) =>
       : null
     : project.dev || {};
 /** The job as the browser gets it, with how many approvals the project asks for (TF-123). */
-const withApprovals = (project: any, pub: any) => pub && { ...pub, required: requiredApprovals(project) };
-// An issue whose code is finished doesn't get a second AI job (TF-123): open the existing one, or discard it to start over.
+const withApprovals = (project: any, pub: any) =>
+  pub && { ...pub, required: requiredApprovals(project) };
+// An issue whose code is finished doesn't get a second AI job (TF-123): open the existing one, or
+// discard it to start over.
 const FINISHED_CODE = ['review', 'pr', 'merged', 'committed'];
 const alreadyCoded = (ticket: any) =>
-  new HttpError(409, `${ticket.key} already has finished code. Open it from the issue to review it; discard it first to write new code.`);
-async function startRemoteFor(project: any, ticket: any, { side, user, instructions = '', agentId = '', context = '', ai }: any) {
+  new HttpError(
+    409,
+    `${ticket.key} already has finished code. Open it from the issue to review it; discard it first to write new code.`,
+  );
+async function startRemoteFor(
+  project: any,
+  ticket: any,
+  { side, user, instructions = '', agentId = '', context = '', ai }: any,
+) {
   const dev = remoteDev(project, side);
-  if ((await remoteJobsFor(project.id, ticket.id)).some((j: any) => (j.side || 'frontend') === side && FINISHED_CODE.includes(j.status)))
+  if (
+    (await remoteJobsFor(project.id, ticket.id)).some(
+      (j: any) => (j.side || 'frontend') === side && FINISHED_CODE.includes(j.status),
+    )
+  )
     throw alreadyCoded(ticket);
   if (!dev?.repo)
     throw new HttpError(
       400,
-      side === 'backend' ? 'Set the backend repository first.' : 'Choose the GitHub repository first (Project settings → Code & GitHub).',
+      side === 'backend'
+        ? 'Set the backend repository first.'
+        : 'Choose the GitHub repository first (Project settings → Code & GitHub).',
     );
   const gh = await ghFor(project, dev);
-  const id = agentId || (await requireRole(side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build'));
+  const id =
+    agentId ||
+    (await requireRole(side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build'));
   const brain = await brainFor(project, ticket, false);
-  const ctx = [context || [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n'), brain.text]
+  const ctx = [
+    context ||
+      [sideNote(project, ticket, side), issueContext(project, ticket)].filter(Boolean).join('\n\n'),
+    brain.text,
+  ]
     .filter(Boolean)
     .join('\n\n');
-  const task: any = await codeTask({ ticket, agentId: id, instructions, round: 1, context: ctx, dev });
+  const task: any = await codeTask({
+    ticket,
+    agentId: id,
+    instructions,
+    round: 1,
+    context: ctx,
+    dev,
+  });
   task.agentId = id;
   task.commitTitle = ticket.title;
   return publicRemote(
@@ -149,7 +188,10 @@ async function startRemoteFor(project: any, ticket: any, { side, user, instructi
     }),
   );
 }
-/** GET for remote jobs (job, diff, list, an issue's jobs). Returns null when the request isn't for them. */
+/**
+ * GET for remote jobs (job, diff, list, an issue's jobs). Returns null when the request isn't for
+ * them.
+ */
 async function remoteGet(p: any, sp: URLSearchParams) {
   const project: any = await store.getProject(p.id);
   const id = sp.get('jobId');
@@ -160,7 +202,9 @@ async function remoteGet(p: any, sp: URLSearchParams) {
     let j = await loadJob(id);
     if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
     if (sp.get('diff'))
-      return new Response(remoteDiff(j, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      return new Response(remoteDiff(j, sp.get('file') || ''), {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
     if (sp.get('compare')) {
       const target = compareTarget(sp.get('compare'));
       const dev = remoteDev(project, j.side);
@@ -176,19 +220,30 @@ async function remoteGet(p: any, sp: URLSearchParams) {
         stored: remoteDiff(j, ''),
       });
     }
-    if (['starting', 'queued', 'running'].includes(j.status)) j = await refreshJob(j).catch(() => j);
+    if (['starting', 'queued', 'running'].includes(j.status))
+      j = await refreshJob(j).catch(() => j);
     return withApprovals(project, publicRemote(j, Number(sp.get('since') || 0)));
   }
   if (sp.get('list')) {
     const jobs = await remoteJobsForProject(p.id);
     return {
-      jobs: jobs.map((j: any) => ({ ...publicRemote(j), log: undefined, last: j.log?.[j.log.length - 1]?.text || '' })),
-      queue: { running: jobs.filter((j: any) => ['queued', 'running'].includes(j.status)).length, waiting: 0, max: 'GitHub' },
+      jobs: jobs.map((j: any) => ({
+        ...publicRemote(j),
+        log: undefined,
+        last: j.log?.[j.log.length - 1]?.text || '',
+      })),
+      queue: {
+        running: jobs.filter((j: any) => ['queued', 'running'].includes(j.status)).length,
+        waiting: 0,
+        max: 'GitHub',
+      },
     };
   }
   const ticketId = String(sp.get('ticketId') || '');
   const all = ticketId ? await remoteJobsFor(p.id, ticketId) : [];
-  const newest = (side: string) => withApprovals(project, publicRemote(all.find((j: any) => (j.side || 'frontend') === side))) || null;
+  const newest = (side: string) =>
+    withApprovals(project, publicRemote(all.find((j: any) => (j.side || 'frontend') === side))) ||
+    null;
   const { agents } = await publicAgents();
   return {
     remote: true,
@@ -208,7 +263,10 @@ async function remoteGet(p: any, sp: URLSearchParams) {
 async function remotePost(req: Request, p: any, b: any) {
   const project: any = await store.getProject(p.id);
   const forJob = b.jobId && isRemoteId(b.jobId);
-  if (!forJob && !(remoteMode(project) && ['start', 'start-both', 'start-many'].includes(b.action))) {
+  if (
+    !forJob &&
+    !(remoteMode(project) && ['start', 'start-both', 'start-many'].includes(b.action))
+  ) {
     if (!localHere() && !['docx'].includes(b.action) && !b.prId)
       throw new HttpError(400, 'This works only for code jobs on your computer.');
     return undefined;
@@ -216,7 +274,9 @@ async function remotePost(req: Request, p: any, b: any) {
   if (b.action === 'start' || b.action === 'start-both' || b.action === 'start-many') {
     const user = await userOk(p, ['ai.use', 'issue.edit']);
     const ids: string[] =
-      b.action === 'start-many' ? (Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String).slice(0, 50) : [String(b.ticketId || '')];
+      b.action === 'start-many'
+        ? (Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String).slice(0, 50)
+        : [String(b.ticketId || '')];
     const started: any[] = [],
       skipped: any[] = [];
     for (const tid of ids) {
@@ -225,11 +285,15 @@ async function remotePost(req: Request, p: any, b: any) {
         skipped.push({ key: tid, reason: 'not saved yet' });
         continue;
       }
-      const both = remoteDev(project, 'backend') && (b.action === 'start-both' || ticket.layer === 'both');
+      const both =
+        remoteDev(project, 'backend') && (b.action === 'start-both' || ticket.layer === 'both');
       const sides = both
         ? ['backend', 'frontend']
         : [
-            b.side === 'backend' || (b.action === 'start-many' && ticket.layer === 'backend' && remoteDev(project, 'backend'))
+            b.side === 'backend' ||
+            (b.action === 'start-many' &&
+              ticket.layer === 'backend' &&
+              remoteDev(project, 'backend'))
               ? 'backend'
               : 'frontend',
           ];
@@ -251,15 +315,18 @@ async function remotePost(req: Request, p: any, b: any) {
       }
     }
     if (b.action === 'start') return started[0];
-    if (b.action === 'start-both') return { jobs: Object.fromEntries(started.map((j: any) => [j.side, j])), contract: '' };
+    if (b.action === 'start-both')
+      return { jobs: Object.fromEntries(started.map((j: any) => [j.side, j])), contract: '' };
     return { started, skipped, queue: { max: 'GitHub' } };
   }
-  // Approving and merging (TF-123): any member of the workspace who can open the project, no extra permission.
+  // Approving and merging (TF-123): any member of the workspace who can open the project, no extra
+  // permission.
   if (b.action === 'approve' || b.action === 'merge') {
     const member = await userOk(p, []);
     const job = await loadJob(String(b.jobId));
     if (!job || job.projectId !== p.id) throw new HttpError(404, 'That code job is gone.');
-    if (b.action === 'approve') return withApprovals(project, publicRemote(await approveRemote(job, member)));
+    if (b.action === 'approve')
+      return withApprovals(project, publicRemote(await approveRemote(job, member)));
     return withApprovals(
       project,
       publicRemote(
@@ -279,8 +346,13 @@ async function remotePost(req: Request, p: any, b: any) {
   if (b.action === 'cancel') return publicRemote(await cancelRemote(j));
   const gh = await ghFor(project, dev);
   if (b.action === 'follow') {
-    if (!store.has(user, 'ai.use')) throw new HttpError(403, 'You don’t have permission to do this (ai.use).');
-    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { id: j.ticketId, key: j.ticketKey, title: j.ticketKey };
+    if (!store.has(user, 'ai.use'))
+      throw new HttpError(403, 'You don’t have permission to do this (ai.use).');
+    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || {
+      id: j.ticketId,
+      key: j.ticketKey,
+      title: j.ticketKey,
+    };
     const task: any = await codeTask({
       ticket,
       agentId: j.agentId,
@@ -294,12 +366,22 @@ async function remotePost(req: Request, p: any, b: any) {
       .split('\n')[0]
       .slice(0, 80);
     return publicRemote(
-      await followRemote(j, { gh, task, user, text: String(b.text || '').slice(0, 4000), ai: aiOpts(b), defer: (fn: any) => after(fn) }),
+      await followRemote(j, {
+        gh,
+        task,
+        user,
+        text: String(b.text || '').slice(0, 4000),
+        ai: aiOpts(b),
+        defer: (fn: any) => after(fn),
+      }),
     );
   }
   if (b.action === 'discard') return publicRemote(await discardRemote(j, gh));
   if (b.action === 'prDraft') {
-    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { key: j.ticketKey, title: j.ticketKey };
+    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || {
+      key: j.ticketKey,
+      title: j.ticketKey,
+    };
     return writePrText({
       ticket,
       diff: String(j.diff || ''),
@@ -311,7 +393,10 @@ async function remotePost(req: Request, p: any, b: any) {
     });
   }
   if (b.action === 'pr') {
-    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || { key: j.ticketKey, title: j.ticketKey };
+    const ticket = project.tickets.find((t: any) => t.id === j.ticketId) || {
+      key: j.ticketKey,
+      title: j.ticketKey,
+    };
     const link = `${appUrl(req)}/p/${p.id}/backlog?issue=${encodeURIComponent(j.ticketId)}`;
     const body =
       String(b.body || '').trim() ||
@@ -339,8 +424,8 @@ async function remotePost(req: Request, p: any, b: any) {
   );
 }
 
-// Code generation and pull requests for an issue (local only): TicketForge agents (lib/agents.ts) run as Claude Code
-// agents in a git worktree of the project's repo.
+// Code generation and pull requests for an issue (local only): TicketForge agents (lib/agents.ts)
+// run as Claude Code agents in a git worktree of the project's repo.
 async function guard(p: any, perms: string[]) {
   const user = await authed();
   store.requireAccess(user, p.id);
@@ -350,13 +435,17 @@ async function guard(p: any, perms: string[]) {
       'Writing code needs TicketForge running on your computer (opened at localhost), next to the project’s local repository.',
     );
   const missing = perms.filter((x) => !store.has(user, x));
-  if (missing.length) throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
+  if (missing.length)
+    throw new HttpError(403, `You don't have permission to do this (${missing.join(', ')}).`);
   return user;
 }
 
-// The project's backend repository (Project settings → Code & GitHub): its own repo, pull/merge requests like the frontend.
+// The project's backend repository (Project settings → Code & GitHub): its own repo, pull/merge
+// requests like the frontend.
 const backendDev = (project: any) =>
-  project.devBackend?.enabled && project.devBackend?.localPath ? { draft: project.dev?.draft, ...project.devBackend } : null;
+  project.devBackend?.enabled && project.devBackend?.localPath
+    ? { draft: project.dev?.draft, ...project.devBackend }
+    : null;
 /** Tells the agent which half of the app this repository is, when the project has both. */
 function sideNote(project: any, ticket: any, side: string) {
   const be = backendDev(project);
@@ -369,7 +458,10 @@ function sideNote(project: any, ticket: any, side: string) {
   return `REPOSITORY: this is the FRONTEND of the project (${name(fe)}). Build only the user interface and its calls to the API. The backend is a separate repository (${name(be)}) handled by a separate job: don't implement server logic here; call the API as described${done ? '' : ' in the issue, and say in your summary which endpoints the UI expects'}.${done ? `\n\nThe backend part of this issue is already done (branch ${done.branch}). Its summary, including the API:\n${String(done.summary).slice(0, 6000)}` : ''}`;
 }
 
-/** Which of the project's repositories a linked pull/merge request belongs to: { side, dev } or null. */
+/**
+ * Which of the project's repositories a linked pull/merge request belongs to: { side, dev } or
+ * null.
+ */
 async function repoForPr(project: any, pr: any) {
   const norm = (x: string) =>
     String(x || '')
@@ -389,16 +481,24 @@ async function repoForPr(project: any, pr: any) {
 }
 
 /**
- * Starts the code job(s) for one issue: on the backend repository for Backend issues, on the frontend for the rest,
- * and on both in parallel for Frontend + Backend issues (with a shared API contract) when `both` or the issue says so.
+ * Starts the code job(s) for one issue: on the backend repository for Backend issues, on the
+ * frontend for the rest, and on both in parallel for Frontend + Backend issues (with a shared API
+ * contract) when `both` or the issue says so.
  */
-async function startForIssue(project: any, ticket: any, { both = false, instructions = '', user, ai, agentId = '' }: any) {
+async function startForIssue(
+  project: any,
+  ticket: any,
+  { both = false, instructions = '', user, ai, agentId = '' }: any,
+) {
   const be = backendDev(project),
     fe = project.dev?.localPath ? project.dev : null;
   const { agents } = await publicAgents();
-  // The chosen agent, else the project's agent for that repository (Administration → Agents → Default agents).
+  // The chosen agent, else the project's agent for that repository (Administration → Agents →
+  // Default agents).
   const pick = async (role: string) =>
-    agentId && agents.some((a: any) => a.id === agentId && a.enabled) ? agentId : requireRole(be ? role : 'build');
+    agentId && agents.some((a: any) => a.id === agentId && a.enabled)
+      ? agentId
+      : requireRole(be ? role : 'build');
   const brain = await brainFor(project, ticket, true);
   const ctx = [issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
   const coded = (s: string) => {
@@ -469,17 +569,21 @@ export const GET = api(async (req, p) => {
   await guard(p, []);
   const id = sp.get('jobId');
   if (id && sp.get('diff'))
-    return new Response(await jobDiff(id, sp.get('file') || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    return new Response(await jobDiff(id, sp.get('file') || ''), {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   if (id && sp.get('compare')) {
     // everyone with access to the project can review the changes (no extra permission)
     const j = getJob(id);
-    if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).');
+    if (!j || j.projectId !== p.id)
+      throw new HttpError(404, 'That code job is gone (the server restarted).');
     return compareJob(id, compareTarget(sp.get('compare')), await specAtFor(p.id, j.ticketId));
   }
   if (sp.get('list')) return { jobs: listJobs(p.id), queue: queueInfo() };
   if (id) {
     const j = getJob(id, Number(sp.get('since') || 0));
-    if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).');
+    if (!j || j.projectId !== p.id)
+      throw new HttpError(404, 'That code job is gone (the server restarted).');
     return j;
   }
   const { agents } = await publicAgents();
@@ -489,7 +593,9 @@ export const GET = api(async (req, p) => {
     job: jobForTicket(p.id, ticketId),
     jobs: jobsForTicket(p.id, ticketId),
     backend: Boolean(backendDev(project)),
-    agents: agents.filter((a: any) => (a.runner === 'code' && !a.broken) || a.id === 'review-panel'),
+    agents: agents.filter(
+      (a: any) => (a.runner === 'code' && !a.broken) || a.id === 'review-panel',
+    ),
     roles: {
       build: await agentForRole('build'),
       frontend: await agentForRole('frontend'),
@@ -500,8 +606,9 @@ export const GET = api(async (req, p) => {
 });
 
 /**
- * Before code jobs start on several issues: which of them touch the same files or modules (coding specs), collide with
- * code jobs already running or not merged, or are blocked by another selected issue, split into rounds (lib/parallel.ts).
+ * Before code jobs start on several issues: which of them touch the same files or modules (coding
+ * specs), collide with code jobs already running or not merged, or are blocked by another selected
+ * issue, split into rounds (lib/parallel.ts).
  * Works for jobs on this computer and through GitHub alike. Nothing starts here.
  */
 async function planParallelFor(p: any, b: any) {
@@ -509,9 +616,19 @@ async function planParallelFor(p: any, b: any) {
   const project: any = await store.getProject(p.id);
   const ids: string[] = (Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String).slice(0, 50);
   if (!ids.length) throw new HttpError(400, 'Choose at least one issue.');
-  const [{ specs }, remote] = await Promise.all([store.listSpecs(p.id), remoteJobsForProject(p.id).catch(() => [])]);
+  const [{ specs }, remote] = await Promise.all([
+    store.listSpecs(p.id),
+    remoteJobsForProject(p.id).catch(() => []),
+  ]);
   const jobs = [...(localHere() ? listJobs(p.id) : []), ...remote];
-  return checkParallel({ project, ticketIds: ids, specs, jobs, ai: aiOpts(b), smart: b.smart !== false });
+  return checkParallel({
+    project,
+    ticketIds: ids,
+    specs,
+    jobs,
+    ai: aiOpts(b),
+    smart: b.smart !== false,
+  });
 }
 
 export const POST = api(async (req, p) => {
@@ -521,7 +638,8 @@ export const POST = api(async (req, p) => {
   if (remote !== undefined) return remote;
   const own = (id: string) => {
     const j = getJob(id);
-    if (!j || j.projectId !== p.id) throw new HttpError(404, 'That code job is gone (the server restarted).');
+    if (!j || j.projectId !== p.id)
+      throw new HttpError(404, 'That code job is gone (the server restarted).');
     return j;
   };
   if (b.action === 'start') {
@@ -539,10 +657,16 @@ export const POST = api(async (req, p) => {
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
     const prev: any = jobForTicket(p.id, ticket.id, side);
-    if (prev && prev.kind !== 'pr-review' && FINISHED_CODE.includes(prev.status)) throw alreadyCoded(ticket);
-    const agentId = String(b.agentId || (await requireRole(side === 'backend' && backendDev(project) ? 'backend' : 'build')));
+    if (prev && prev.kind !== 'pr-review' && FINISHED_CODE.includes(prev.status))
+      throw alreadyCoded(ticket);
+    const agentId = String(
+      b.agentId ||
+        (await requireRole(side === 'backend' && backendDev(project) ? 'backend' : 'build')),
+    );
     const brain = await brainFor(project, ticket, true);
-    const context = [sideNote(project, ticket, side), issueContext(project, ticket), brain.text].filter(Boolean).join('\n\n');
+    const context = [sideNote(project, ticket, side), issueContext(project, ticket), brain.text]
+      .filter(Boolean)
+      .join('\n\n');
     return startJob({
       projectId: p.id,
       ticket,
@@ -555,18 +679,27 @@ export const POST = api(async (req, p) => {
       brainFiles: brain.files,
     });
   }
-  // Frontend + Backend issues, both at once: one API contract first (a few seconds), then both jobs in parallel.
+  // Frontend + Backend issues, both at once: one API contract first (a few seconds), then both jobs
+  // in parallel.
   if (b.action === 'start-both') {
     const user = await guard(p, ['ai.use', 'issue.edit']);
     const project = await store.getProject(p.id);
     if (!backendDev(project) || !project.dev?.localPath)
-      throw new HttpError(400, 'Building both at once needs the frontend and backend repositories in Project settings → Code & GitHub.');
+      throw new HttpError(
+        400,
+        'Building both at once needs the frontend and backend repositories in Project settings → Code & GitHub.',
+      );
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     if (!ticket) throw new HttpError(404, 'That issue isn’t saved yet. Try again in a moment.');
-    return startForIssue(project, ticket, { both: true, instructions: String(b.instructions || '').slice(0, 4000), user, ai: aiOpts(b) });
+    return startForIssue(project, ticket, {
+      both: true,
+      instructions: String(b.instructions || '').slice(0, 4000),
+      user,
+      ai: aiOpts(b),
+    });
   }
-  // Many issues at once: one job per issue (and per repository for Frontend + Backend issues). They run
-  // MAX_PARALLEL at a time; the rest wait in line.
+  // Many issues at once: one job per issue (and per repository for Frontend + Backend issues). They
+  // run MAX_PARALLEL at a time; the rest wait in line.
   if (b.action === 'start-many') {
     const user = await guard(p, ['ai.use', 'issue.edit']);
     const project = await store.getProject(p.id);
@@ -580,7 +713,8 @@ export const POST = api(async (req, p) => {
     const instructions = String(b.instructions || '').slice(0, 4000);
     const started: any[] = [],
       skipped: { key: string; reason: string }[] = [];
-    // All at once: API contracts are written in parallel; git setup takes turns per repository (lib/devagent.ts).
+    // All at once: API contracts are written in parallel; git setup takes turns per repository
+    // (lib/devagent.ts).
     await Promise.all(
       ids.map(async (id) => {
         const ticket = project.tickets.find((t: any) => t.id === id);
@@ -606,7 +740,9 @@ export const POST = api(async (req, p) => {
   if (b.action === 'coderabbit') {
     await guard(p, ['ai.use']);
     own(b.jobId);
-    return codeRabbitJob(b.jobId, { apiKey: (await getProjectSecret(p.id, 'coderabbitKey')) || '' });
+    return codeRabbitJob(b.jobId, {
+      apiKey: (await getProjectSecret(p.id, 'coderabbitKey')) || '',
+    });
   }
   if (b.action === 'docx') {
     // a read-only agent's report as a Word document
@@ -637,7 +773,8 @@ export const POST = api(async (req, p) => {
     own(b.jobId);
     return reviewJob(b.jobId, { panel: Boolean(b.panel), agent: String(b.agent || 'review') });
   }
-  // ---------------------------------------------------------------- pull requests: better text, and updating an open one
+  // ---------------------------------------------------------------- pull requests: better text,
+  // and updating an open one
   if (b.action === 'prDraft') {
     await guard(p, ['ai.use']);
     own(b.jobId);
@@ -661,18 +798,30 @@ export const POST = api(async (req, p) => {
     });
   }
   if (['update', 'describe', 'comments', 'prReview'].includes(b.action)) {
-    const user = await guard(p, b.action === 'comments' ? [] : b.action === 'prReview' ? ['ai.use'] : ['ai.use', 'issue.edit']);
+    const user = await guard(
+      p,
+      b.action === 'comments'
+        ? []
+        : b.action === 'prReview'
+          ? ['ai.use']
+          : ['ai.use', 'issue.edit'],
+    );
     const project = await store.getProject(p.id);
     const ticket = project.tickets.find((t: any) => t.id === b.ticketId);
     const pr = ticket?.prs?.find((x: any) => x.id === b.prId);
-    if (!ticket || !pr) throw new HttpError(404, 'That pull request isn’t linked to this issue any more.');
+    if (!ticket || !pr)
+      throw new HttpError(404, 'That pull request isn’t linked to this issue any more.');
     const where = await repoForPr(project, pr);
     if (!where)
       throw new HttpError(
         400,
         `${pr.repo} isn’t this project’s repository or its backend repository (Project settings → Code & GitHub), so it can’t be updated from here.`,
       );
-    if (!pr.branch) throw new HttpError(400, 'TicketForge doesn’t know this request’s branch yet. Click refresh on it first.');
+    if (!pr.branch)
+      throw new HttpError(
+        400,
+        'TicketForge doesn’t know this request’s branch yet. Click refresh on it first.',
+      );
     const target = {
       url: pr.url,
       number: pr.number,
@@ -681,8 +830,14 @@ export const POST = api(async (req, p) => {
       title: pr.title,
       provider: pr.provider,
     };
-    const tokens = { token: await getProjectSecret(p.id, 'githubToken'), gitlabToken: await getProjectSecret(p.id, 'gitlabToken') };
-    if (b.action === 'comments') return { comments: await reviewComments({ repoPath: where.dev.localPath, target, ...tokens }) };
+    const tokens = {
+      token: await getProjectSecret(p.id, 'githubToken'),
+      gitlabToken: await getProjectSecret(p.id, 'gitlabToken'),
+    };
+    if (b.action === 'comments')
+      return {
+        comments: await reviewComments({ repoPath: where.dev.localPath, target, ...tokens }),
+      };
     if (b.action === 'prReview')
       return startPrReview({
         projectId: p.id,
@@ -692,7 +847,9 @@ export const POST = api(async (req, p) => {
         user,
         side: where.side,
         agentId:
-          b.agent === 'ui-review' || /^custom-[a-z0-9-]+$/.test(String(b.agent || '')) ? String(b.agent) : await requireRole('review'),
+          b.agent === 'ui-review' || /^custom-[a-z0-9-]+$/.test(String(b.agent || ''))
+            ? String(b.agent)
+            : await requireRole('review'),
         focus: String(b.focus || '').slice(0, 1000),
       });
     if (b.action === 'describe')
@@ -705,7 +862,8 @@ export const POST = api(async (req, p) => {
         appLink: `${appUrl(req)}/p/${p.id}/backlog`,
         ai: aiOpts(b),
       });
-    // update: an agent works on the request's own branch; the person reviews, then pushes to the same request.
+    // update: an agent works on the request's own branch; the person reviews, then pushes to the
+    // same request.
     const mode = String(b.mode || 'prompt');
     let ask = String(b.prompt || '')
       .trim()
@@ -735,7 +893,12 @@ export const POST = api(async (req, p) => {
       dev: where.dev,
       instructions: ask,
       user,
-      agentId: String(b.agentId || (await requireRole(where.side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build'))),
+      agentId: String(
+        b.agentId ||
+          (await requireRole(
+            where.side === 'backend' && project.devBackend?.enabled ? 'backend' : 'build',
+          )),
+      ),
       context: [context, brain.text].filter(Boolean).join('\n\n'),
       side: where.side,
       target,
@@ -747,7 +910,10 @@ export const POST = api(async (req, p) => {
   if (b.action === 'commit') {
     await guard(p, ['issue.edit']);
     own(b.jobId);
-    return commitLocal(b.jobId, { title: String(b.title || ''), appLink: `${appUrl(req)}/p/${p.id}/backlog` });
+    return commitLocal(b.jobId, {
+      title: String(b.title || ''),
+      appLink: `${appUrl(req)}/p/${p.id}/backlog`,
+    });
   }
   if (b.action === 'cancel') {
     await guard(p, ['issue.edit']);

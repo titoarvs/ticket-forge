@@ -2,7 +2,8 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import nodemailer from 'nodemailer';
-// The sign-in system works with sessions, invites and users before anyone is signed in: system context.
+// The sign-in system works with sessions, invites and users before anyone is signed in: system
+// context.
 import { qs as q, txs as tx, authGen, currentWs, DEFAULT_WS } from './db';
 import { ALL, DEFAULT_ROLES } from './permissions';
 import { LEGAL_VERSIONS, ACCEPTED_DOCS } from './legal/versions';
@@ -45,16 +46,22 @@ export async function verifyPassword(pw, stored) {
   const [alg, n, salt, key] = String(stored).split('$');
   if (alg !== 'scrypt') return false;
   const want = Buffer.from(key, 'base64');
-  const got = await scrypt(pw, Buffer.from(salt, 'base64'), want.length, { N: Number(n), r: 8, p: 1 });
+  const got = await scrypt(pw, Buffer.from(salt, 'base64'), want.length, {
+    N: Number(n),
+    r: 8,
+    p: 1,
+  });
   return crypto.timingSafeEqual(want, got);
 }
 function checkPassword(pw) {
-  if (String(pw || '').length < 8) throw new HttpError(400, 'Use a password of at least 8 characters.');
+  if (String(pw || '').length < 8)
+    throw new HttpError(400, 'Use a password of at least 8 characters.');
 }
 
-// ---------------------------------------------------------------- workspaces
-// Everything about people (role, project access, owner, enabled) belongs to their membership of a workspace. The
-// workspace is the request's (see db.js currentWs); functions that run before anyone is signed in take it explicitly.
+// ---------------------------------------------------------------- workspaces Everything about
+// people (role, project access, owner, enabled) belongs to their membership of a workspace. The
+// workspace is the request's (see db.js currentWs); functions that run before anyone is signed in
+// take it explicitly.
 function needWs(ws = currentWs()) {
   if (!ws) throw new HttpError(500, 'No workspace for this request.');
   return ws;
@@ -64,9 +71,13 @@ const wsName = (n) =>
     .trim()
     .slice(0, 80);
 
-/** A new workspace with the starter roles and its owner as the first member (inside a transaction `x`). */
+/**
+ * A new workspace with the starter roles and its owner as the first member (inside a transaction
+ * `x`).
+ */
 async function insertWorkspace(x, { id, name, ownerId }: any) {
-  // Every new workspace starts on the free plan; a paid plan (and its trial) is started later from Billing.
+  // Every new workspace starts on the free plan; a paid plan (and its trial) is started later from
+  // Billing.
   await x.query("insert into workspaces (id, name, owner_id, plan) values ($1,$2,$3,'free')", [
     id,
     wsName(name) || 'My workspace',
@@ -81,14 +92,16 @@ async function insertWorkspace(x, { id, name, ownerId }: any) {
 /** A signed-in person creates another workspace, which they own. */
 export async function createWorkspace(user, { name }: any) {
   if (!wsName(name)) throw new HttpError(400, 'Give the workspace a name.');
-  const n = (await q('select count(*)::int n from workspaces where owner_id = $1', [user.id])).rows[0].n;
+  const n = (await q('select count(*)::int n from workspaces where owner_id = $1', [user.id]))
+    .rows[0].n;
   if (n >= 20) throw new HttpError(400, 'You already own 20 workspaces.');
   const id = `ws_${crypto.randomBytes(6).toString('hex')}`;
   await tx((x) => insertWorkspace(x, { id, name, ownerId: user.id }));
   return { id, name: wsName(name) };
 }
 export async function listMyWorkspaces(userId) {
-  // projects: how many this person can open there (all of them, or those on their access list or that they made).
+  // projects: how many this person can open there (all of them, or those on their access list or
+  // that they made).
   return (
     await q(
       `select w.id, w.name, w.plan, m.is_owner, r.name as role_name,
@@ -99,7 +112,14 @@ export async function listMyWorkspaces(userId) {
     where m.user_id = $1 and m.status = 'active' order by w.name, w.created_at`,
       [userId],
     )
-  ).rows.map((w) => ({ id: w.id, name: w.name, plan: w.plan, isOwner: w.is_owner, role: w.role_name, projects: w.projects }));
+  ).rows.map((w) => ({
+    id: w.id,
+    name: w.name,
+    plan: w.plan,
+    isOwner: w.is_owner,
+    role: w.role_name,
+    projects: w.projects,
+  }));
 }
 export async function renameWorkspace(actor, name) {
   if (!actor.is_owner) throw new HttpError(403, 'Only the workspace owner can rename it.');
@@ -116,17 +136,25 @@ async function seedRolesWith(x, ws) {
     );
   }
   // The system admin role always has every permission (new ones included).
-  await x.query('update roles set permissions = $1 where workspace_id = $2 and id = $3', [JSON.stringify(ALL), ws, 'admin']);
+  await x.query('update roles set permissions = $1 where workspace_id = $2 and id = $3', [
+    JSON.stringify(ALL),
+    ws,
+    'admin',
+  ]);
 }
-/** At start-up: the default workspace's roles, and every workspace's Administrator role gets new permissions. */
+/**
+ * At start-up: the default workspace's roles, and every workspace's Administrator role gets new
+ * permissions.
+ */
 export async function seedRoles() {
   await seedRolesWith({ query: q }, DEFAULT_WS);
   await q('update roles set permissions = $1 where id = $2', [JSON.stringify(ALL), 'admin']);
-  // Restoring issue versions is for admins and managers: give it once to the existing Project lead role (an admin
-  // can take it away again afterwards, so this runs only one time).
-  const seeded = await q("insert into app_meta (key, value) values ('perm_issue_restore', $1) on conflict (key) do nothing returning key", [
-    JSON.stringify({ at: new Date().toISOString() }),
-  ]);
+  // Restoring issue versions is for admins and managers: give it once to the existing Project lead
+  // role (an admin can take it away again afterwards, so this runs only one time).
+  const seeded = await q(
+    "insert into app_meta (key, value) values ('perm_issue_restore', $1) on conflict (key) do nothing returning key",
+    [JSON.stringify({ at: new Date().toISOString() })],
+  );
   if (seeded.rows[0])
     await q(
       `update roles set permissions = permissions || '["issue.restore"]'::jsonb where id = 'lead' and not permissions ? 'issue.restore'`,
@@ -150,7 +178,8 @@ export async function listRoles() {
   );
   return rows;
 }
-const roleExists = async (ws, id) => Boolean((await q('select 1 from roles where workspace_id=$1 and id=$2', [ws, id])).rows[0]);
+const roleExists = async (ws, id) =>
+  Boolean((await q('select 1 from roles where workspace_id=$1 and id=$2', [ws, id])).rows[0]);
 export async function saveRole({ id, name, description, permissions }: any) {
   const ws = needWs();
   const perms = [...new Set((permissions || []).filter((k) => ALL.includes(k)))];
@@ -159,23 +188,17 @@ export async function saveRole({ id, name, description, permissions }: any) {
     const { rows } = await q('select * from roles where workspace_id = $1 and id = $2', [ws, id]);
     if (!rows[0]) throw new HttpError(404, 'Role not found');
     if (rows[0].is_system) throw new HttpError(400, 'The Administrator role cannot be changed.');
-    await q('update roles set name=$3, description=$4, permissions=$5 where workspace_id=$1 and id=$2', [
-      ws,
-      id,
-      name.trim(),
-      description || '',
-      JSON.stringify(perms),
-    ]);
+    await q(
+      'update roles set name=$3, description=$4, permissions=$5 where workspace_id=$1 and id=$2',
+      [ws, id, name.trim(), description || '', JSON.stringify(perms)],
+    );
     return id;
   }
   const nid = newId();
-  await q('insert into roles (workspace_id, id, name, description, permissions) values ($1,$2,$3,$4,$5)', [
-    ws,
-    nid,
-    name.trim(),
-    description || '',
-    JSON.stringify(perms),
-  ]);
+  await q(
+    'insert into roles (workspace_id, id, name, description, permissions) values ($1,$2,$3,$4,$5)',
+    [ws, nid, name.trim(), description || '', JSON.stringify(perms)],
+  );
   return nid;
 }
 export async function deleteRole(id, replacement) {
@@ -186,12 +209,25 @@ export async function deleteRole(id, replacement) {
   if (replacement && !(await roleExists(ws, replacement))) throw new HttpError(400, 'Unknown role');
   await tx(async (t) => {
     if (replacement) {
-      await t.query('update workspace_members set role_id=$3 where workspace_id=$1 and role_id=$2', [ws, id, replacement]);
-      await t.query('update invites set role_id=$3 where workspace_id=$1 and role_id=$2', [ws, id, replacement]);
+      await t.query(
+        'update workspace_members set role_id=$3 where workspace_id=$1 and role_id=$2',
+        [ws, id, replacement],
+      );
+      await t.query('update invites set role_id=$3 where workspace_id=$1 and role_id=$2', [
+        ws,
+        id,
+        replacement,
+      ]);
     }
-    const used = await t.query('select count(*)::int n from workspace_members where workspace_id=$1 and role_id=$2', [ws, id]);
+    const used = await t.query(
+      'select count(*)::int n from workspace_members where workspace_id=$1 and role_id=$2',
+      [ws, id],
+    );
     if (used.rows[0].n) throw new HttpError(400, "Move this role's users to another role first.");
-    await t.query('delete from invites where workspace_id=$1 and role_id=$2 and accepted_at is null', [ws, id]);
+    await t.query(
+      'delete from invites where workspace_id=$1 and role_id=$2 and accepted_at is null',
+      [ws, id],
+    );
     await t.query('delete from roles where workspace_id=$1 and id=$2', [ws, id]);
   });
 }
@@ -214,7 +250,8 @@ export const publicUser = (u) =>
     workspaceId: u.workspace_id || null,
     workspaceName: u.workspace_name || null,
   };
-// A person as a member of a workspace: their account plus that membership (same field names as before workspaces).
+// A person as a member of a workspace: their account plus that membership (same field names as
+// before workspaces).
 const MEMBER_COLS = `u.id, u.email, u.name, u.password_hash, u.created_at, u.last_login_at, u.terms_version, u.privacy_version,
   u.terms_accepted_at, u.email_verified_at, case when u.status = 'active' then m.status else u.status end as status,
   m.role_id, m.project_access, m.is_owner, m.workspace_id, w.name as workspace_name, r.name as role_name, r.permissions`;
@@ -227,63 +264,92 @@ export async function userCount() {
 /** Someone as a member of the current workspace (or `ws`), or null. */
 export async function getUser(id, ws = currentWs()) {
   if (!ws) return getUserAny(id);
-  return (await q(`select ${MEMBER_COLS} from ${MEMBER_FROM} where m.user_id = $1 and m.workspace_id = $2`, [id, ws])).rows[0] || null;
+  return (
+    (
+      await q(
+        `select ${MEMBER_COLS} from ${MEMBER_FROM} where m.user_id = $1 and m.workspace_id = $2`,
+        [id, ws],
+      )
+    ).rows[0] || null
+  );
 }
-/** Someone in their first active workspace (after sign-in or a password reset), or null if they belong to none. */
+/**
+ * Someone in their first active workspace (after sign-in or a password reset), or null if they
+ * belong to none.
+ */
 export async function getUserAny(id) {
   return (
     (
-      await q(`select ${MEMBER_COLS} from ${MEMBER_FROM} where m.user_id = $1 order by (m.status = 'active') desc, m.created_at limit 1`, [
-        id,
-      ])
+      await q(
+        `select ${MEMBER_COLS} from ${MEMBER_FROM} where m.user_id = $1 order by (m.status = 'active') desc, m.created_at limit 1`,
+        [id],
+      )
     ).rows[0] || null
   );
 }
 export async function listUsers() {
   return (
-    await q(`select ${MEMBER_COLS} from ${MEMBER_FROM} where m.workspace_id = $1 order by m.is_owner desc, m.created_at`, [needWs()])
+    await q(
+      `select ${MEMBER_COLS} from ${MEMBER_FROM} where m.workspace_id = $1 order by m.is_owner desc, m.created_at`,
+      [needWs()],
+    )
   ).rows.map(publicUser);
 }
 
-// ---------------------------------------------------------------- consent (Terms of Use, Privacy Policy)
+// ---------------------------------------------------------------- consent (Terms of Use, Privacy
+// Policy)
 function needTerms(accept) {
-  if (accept !== true) throw new HttpError(400, 'Please read and accept the Terms of Use and Privacy Policy to continue.');
+  if (accept !== true)
+    throw new HttpError(
+      400,
+      'Please read and accept the Terms of Use and Privacy Policy to continue.',
+    );
 }
 async function writeAcceptance(x, userId, email, meta: any = {}) {
   for (const d of ACCEPTED_DOCS) {
-    await x.query('insert into legal_acceptances (user_id, email, doc, version, ip, user_agent) values ($1,$2,$3,$4,$5,$6)', [
-      userId,
-      email,
-      d,
-      LEGAL_VERSIONS[d].version,
-      String(meta.ip || '').slice(0, 64),
-      String(meta.userAgent || '').slice(0, 200),
-    ]);
+    await x.query(
+      'insert into legal_acceptances (user_id, email, doc, version, ip, user_agent) values ($1,$2,$3,$4,$5,$6)',
+      [
+        userId,
+        email,
+        d,
+        LEGAL_VERSIONS[d].version,
+        String(meta.ip || '').slice(0, 64),
+        String(meta.userAgent || '').slice(0, 200),
+      ],
+    );
   }
-  await x.query('update users set terms_version=$2, privacy_version=$3, terms_accepted_at=now() where id=$1', [
-    userId,
-    LEGAL_VERSIONS.terms.version,
-    LEGAL_VERSIONS.privacy.version,
-  ]);
+  await x.query(
+    'update users set terms_version=$2, privacy_version=$3, terms_accepted_at=now() where id=$1',
+    [userId, LEGAL_VERSIONS.terms.version, LEGAL_VERSIONS.privacy.version],
+  );
 }
 /** The documents this person still has to accept: never accepted, or a material change since. */
 export function legalNeeds(u) {
   if (!u) return [];
-  return ACCEPTED_DOCS.filter((d) => LEGAL_VERSIONS[d].material && (u[`${d}_version`] || '') !== LEGAL_VERSIONS[d].version);
+  return ACCEPTED_DOCS.filter(
+    (d) => LEGAL_VERSIONS[d].material && (u[`${d}_version`] || '') !== LEGAL_VERSIONS[d].version,
+  );
 }
 export const legalStatus = (u) => ({
   needs: legalNeeds(u),
   versions: Object.fromEntries(ACCEPTED_DOCS.map((d) => [d, LEGAL_VERSIONS[d].version])),
   acceptedAt: u?.terms_accepted_at || null,
 });
-/** A signed-in person accepts the current versions (after a change, or if they joined before consent existed). */
+/**
+ * A signed-in person accepts the current versions (after a change, or if they joined before consent
+ * existed).
+ */
 export async function recordAcceptance(u, { accept, ip, userAgent }: any = {}) {
   needTerms(accept);
   await tx((x) => writeAcceptance(x, u.id, u.email, { ip, userAgent }));
   return getUser(u.id);
 }
 
-export async function createOwner({ name, email, password, acceptTerms, company }: any, meta: any = {}) {
+export async function createOwner(
+  { name, email, password, acceptTerms, company }: any,
+  meta: any = {},
+) {
   email = normEmail(email);
   if (!String(name || '').trim()) throw new HttpError(400, 'Enter your name.');
   if (!isEmail(email)) throw new HttpError(400, 'Enter a valid email address.');
@@ -294,14 +360,10 @@ export async function createOwner({ name, email, password, acceptTerms, company 
   await tx(async (t) => {
     const n = (await t.query('select count(*)::int n from users')).rows[0].n;
     if (n) throw new HttpError(409, 'TicketForge is already set up. Sign in instead.');
-    await t.query('insert into users (id, email, name, password_hash, role_id, project_access, is_owner) values ($1,$2,$3,$4,$5,$6,true)', [
-      id,
-      email,
-      name.trim(),
-      hash,
-      'admin',
-      JSON.stringify('all'),
-    ]);
+    await t.query(
+      'insert into users (id, email, name, password_hash, role_id, project_access, is_owner) values ($1,$2,$3,$4,$5,$6,true)',
+      [id, email, name.trim(), hash, 'admin', JSON.stringify('all')],
+    );
     // The first account owns the default workspace (where data from before workspaces lives).
     if ((await t.query('select 1 from workspaces where id = $1', [DEFAULT_WS])).rows[0]) {
       await t.query('update workspaces set owner_id = $2 where id = $1', [DEFAULT_WS, id]);
@@ -310,7 +372,8 @@ export async function createOwner({ name, email, password, acceptTerms, company 
         on conflict (workspace_id, user_id) do update set role_id = 'admin', project_access = '"all"', is_owner = true`,
         [DEFAULT_WS, id],
       );
-    } else await insertWorkspace(t, { id: DEFAULT_WS, name: company || 'My workspace', ownerId: id });
+    } else
+      await insertWorkspace(t, { id: DEFAULT_WS, name: company || 'My workspace', ownerId: id });
     await writeAcceptance(t, id, email, meta);
   });
   return getUser(id, DEFAULT_WS);
@@ -318,36 +381,41 @@ export async function createOwner({ name, email, password, acceptTerms, company 
 
 export async function createSession(userId, userAgent = '', ws = null) {
   const t = token();
-  await q('insert into sessions (token_hash, user_id, expires_at, user_agent, workspace_id) values ($1,$2,$3,$4,$5)', [
-    sha(t),
-    userId,
-    new Date(Date.now() + SESSION_DAYS * 86400000),
-    String(userAgent).slice(0, 200),
-    ws,
-  ]);
+  await q(
+    'insert into sessions (token_hash, user_id, expires_at, user_agent, workspace_id) values ($1,$2,$3,$4,$5)',
+    [
+      sha(t),
+      userId,
+      new Date(Date.now() + SESSION_DAYS * 86400000),
+      String(userAgent).slice(0, 200),
+      ws,
+    ],
+  );
   await q('update users set last_login_at = now() where id = $1', [userId]);
   sweepExpired();
   return { token: t, maxAge: SESSION_DAYS * 86400 };
 }
-// Every sign-in adds a session row that stays after it expires; with many people the table (and its indexes) would grow
-// for good. Sign-ins also clear out expired ones: at most every 10 minutes per server, in batches, so a sweep never
-// locks many rows at once or slows the sign-in that triggered it (not awaited).
+// Every sign-in adds a session row that stays after it expires; with many people the table (and its
+// indexes) would grow for good. Sign-ins also clear out expired ones: at most every 10 minutes per
+// server, in batches, so a sweep never locks many rows at once or slows the sign-in that triggered
+// it (not awaited).
 const SWEEP_MS = 10 * 60000;
 const SWEEP_BATCH = 5000;
 const sweep = (globalThis.__tfSessionSweep ??= { at: 0 });
 function sweepExpired() {
   if (Date.now() - sweep.at < SWEEP_MS) return;
   sweep.at = Date.now();
-  q(`delete from sessions where token_hash in (select token_hash from sessions where expires_at < now() limit ${SWEEP_BATCH})`).catch(
-    () => {},
-  );
+  q(
+    `delete from sessions where token_hash in (select token_hash from sessions where expires_at < now() limit ${SWEEP_BATCH})`,
+  ).catch(() => {});
   q(
     `delete from password_resets where token_hash in (select token_hash from password_resets where expires_at < now() - interval '1 day' limit ${SWEEP_BATCH})`,
   ).catch(() => {});
 }
-// Every API request looks up who is signed in. Remember the answer briefly so a page load (several requests at
-// once) costs one database round trip, not one per request. Any change to users, roles, memberships or sessions
-// clears it at once (authGen); on servers with several copies, another copy's change shows within SESSION_CACHE_MS.
+// Every API request looks up who is signed in. Remember the answer briefly so a page load (several
+// requests at once) costs one database round trip, not one per request. Any change to users, roles,
+// memberships or sessions clears it at once (authGen); on servers with several copies, another
+// copy's change shows within SESSION_CACHE_MS.
 const SESSION_CACHE_MS = 15000;
 const sessionCache = (globalThis.__tfSessionCache ??= new Map());
 export async function sessionUser(t) {
@@ -356,8 +424,10 @@ export async function sessionUser(t) {
     now = Date.now(),
     gen = authGen();
   const hit = sessionCache.get(key);
-  if (hit && hit.gen === gen && now - hit.at < SESSION_CACHE_MS && (!hit.exp || hit.exp > now)) return hit.u;
-  // The session's workspace, or (none chosen, or no longer a member) the first workspace the person belongs to.
+  if (hit && hit.gen === gen && now - hit.at < SESSION_CACHE_MS && (!hit.exp || hit.exp > now))
+    return hit.u;
+  // The session's workspace, or (none chosen, or no longer a member) the first workspace the person
+  // belongs to.
   const { rows } = await q(
     `select ${MEMBER_COLS}, s.expires_at as session_expires from sessions s join users u on u.id = s.user_id
     join lateral (select * from workspace_members mm where mm.user_id = u.id and mm.status = 'active'
@@ -386,47 +456,58 @@ export async function destroySession(t) {
 /** Switch this sign-in to another workspace the person belongs to. */
 export async function switchWorkspace(t, user, ws) {
   const m = (
-    await q("select 1 from workspace_members where workspace_id=$1 and user_id=$2 and status='active'", [String(ws || ''), user.id])
+    await q(
+      "select 1 from workspace_members where workspace_id=$1 and user_id=$2 and status='active'",
+      [String(ws || ''), user.id],
+    )
   ).rows[0];
   if (!m) throw new HttpError(404, 'Workspace not found');
   await q('update sessions set workspace_id=$2 where token_hash=$1', [sha(String(t || '')), ws]);
 }
 
-// ---------------------------------------------------------------- API tokens (MCP clients)
-// A token acts as one person in one workspace, with that person's role at the time of each call (nothing about the role is
-// copied into the token). Only the hash is stored: the token itself is shown once, when it is made.
+// ---------------------------------------------------------------- API tokens (MCP clients) A token
+// acts as one person in one workspace, with that person's role at the time of each call (nothing
+// about the role is copied into the token). Only the hash is stored: the token itself is shown
+// once, when it is made.
 export const API_TOKEN_PREFIX = 'tfk_';
 const API_TOKEN_DEFAULT_DAYS = 90;
 const API_TOKEN_MAX_DAYS = 365;
 const API_TOKEN_MAX_ACTIVE = 20;
 
-/** Makes a token for the signed-in person (in their current workspace). Returns { token, id, name, expiresAt }; `token` is never shown again. */
+/**
+ * Makes a token for the signed-in person (in their current workspace). Returns { token, id, name,
+ * expiresAt }; `token` is never shown again.
+ */
 export async function createApiToken(user, { name, expiresInDays }: any = {}) {
   const label = String(name || '')
     .trim()
     .slice(0, 80);
-  if (!label) throw new HttpError(400, 'Give the token a name, for example the tool that will use it.');
+  if (!label)
+    throw new HttpError(400, 'Give the token a name, for example the tool that will use it.');
   const days = expiresInDays == null ? API_TOKEN_DEFAULT_DAYS : Number(expiresInDays);
   if (!Number.isInteger(days) || days < 1 || days > API_TOKEN_MAX_DAYS)
-    throw new HttpError(400, `Expiry must be a whole number of days from 1 to ${API_TOKEN_MAX_DAYS}.`);
+    throw new HttpError(
+      400,
+      `Expiry must be a whole number of days from 1 to ${API_TOKEN_MAX_DAYS}.`,
+    );
   const active = (
     await q(
       'select count(*)::int n from api_tokens where user_id = $1 and workspace_id = $2 and revoked_at is null and (expires_at is null or expires_at > now())',
       [user.id, user.workspace_id],
     )
   ).rows[0].n;
-  if (active >= API_TOKEN_MAX_ACTIVE) throw new HttpError(400, `You already have ${API_TOKEN_MAX_ACTIVE} active tokens. Revoke one first.`);
+  if (active >= API_TOKEN_MAX_ACTIVE)
+    throw new HttpError(
+      400,
+      `You already have ${API_TOKEN_MAX_ACTIVE} active tokens. Revoke one first.`,
+    );
   const raw = `${API_TOKEN_PREFIX}${token()}`;
   const id = newId();
   const expiresAt = new Date(Date.now() + days * 86400000);
-  await q('insert into api_tokens (id, token_hash, user_id, workspace_id, name, expires_at) values ($1,$2,$3,$4,$5,$6)', [
-    id,
-    sha(raw),
-    user.id,
-    user.workspace_id,
-    label,
-    expiresAt,
-  ]);
+  await q(
+    'insert into api_tokens (id, token_hash, user_id, workspace_id, name, expires_at) values ($1,$2,$3,$4,$5,$6)',
+    [id, sha(raw), user.id, user.workspace_id, label, expiresAt],
+  );
   return { token: raw, id, name: label, expiresAt };
 }
 /** The person's own tokens in this workspace (never the token itself). */
@@ -447,9 +528,9 @@ export async function revokeApiToken(user, id) {
   if (!done.rows[0]) throw new HttpError(404, 'Token not found');
 }
 /**
- * Who a token acts as: the person as a member of the token's workspace (so their role, permissions and project access are
- * read fresh on every call), or null when the token is unknown, revoked or expired, or the person or membership is no
- * longer active.
+ * Who a token acts as: the person as a member of the token's workspace (so their role, permissions
+ * and project access are read fresh on every call), or null when the token is unknown, revoked or
+ * expired, or the person or membership is no longer active.
  */
 export async function apiTokenUser(raw) {
   const t = String(raw || '');
@@ -471,14 +552,16 @@ export async function apiTokenUser(raw) {
   return r;
 }
 
-// Simple in-memory throttle for login / forgot-password. Keys (addresses, emails) whose attempts are all outside the
-// window are dropped once the map gets big, so a flood of different keys can't grow server memory without end.
+// Simple in-memory throttle for login / forgot-password. Keys (addresses, emails) whose attempts
+// are all outside the window are dropped once the map gets big, so a flood of different keys can't
+// grow server memory without end.
 const attempts: Map<any, any> = new Map();
 const ATTEMPT_KEYS_MAX = 20000;
 export function throttle(key, limit = 8, windowMs = 15 * 60000) {
   const now = Date.now();
   if (attempts.size >= ATTEMPT_KEYS_MAX) {
-    for (const [k, list] of attempts) if (!list.length || now - list[list.length - 1] >= windowMs) attempts.delete(k);
+    for (const [k, list] of attempts)
+      if (!list.length || now - list[list.length - 1] >= windowMs) attempts.delete(k);
     // Still full (a flood inside one window): forget the oldest tenth (Maps keep insertion order).
     if (attempts.size >= ATTEMPT_KEYS_MAX) {
       let n = ATTEMPT_KEYS_MAX / 10;
@@ -489,7 +572,8 @@ export function throttle(key, limit = 8, windowMs = 15 * 60000) {
     }
   }
   const list = (attempts.get(key) || []).filter((t) => now - t < windowMs);
-  if (list.length >= limit) throw new HttpError(429, 'Too many attempts. Wait a few minutes and try again.');
+  if (list.length >= limit)
+    throw new HttpError(429, 'Too many attempts. Wait a few minutes and try again.');
   list.push(now);
   attempts.set(key, list);
 }
@@ -499,10 +583,14 @@ export async function login(email, password) {
   const u = rows[0];
   const ok = u && (await verifyPassword(String(password || ''), u.password_hash));
   if (!ok) throw new HttpError(401, 'Email or password is incorrect.');
-  if (u.status !== 'active') throw new HttpError(403, 'This account is disabled. Ask an administrator to enable it.');
+  if (u.status !== 'active')
+    throw new HttpError(403, 'This account is disabled. Ask an administrator to enable it.');
   const m = await getUserAny(u.id);
   if (!m || m.status !== 'active')
-    throw new HttpError(403, 'Your account isn’t part of any workspace right now. Ask a workspace owner to invite you again.');
+    throw new HttpError(
+      403,
+      'Your account isn’t part of any workspace right now. Ask a workspace owner to invite you again.',
+    );
   return m;
 }
 
@@ -510,12 +598,22 @@ export async function updateUser(actor, id, { roleId, projectAccess, status, nam
   const ws = needWs();
   const u = await getUser(id, ws);
   if (!u) throw new HttpError(404, 'User not found');
-  if (u.is_owner && ((roleId && roleId !== 'admin') || status === 'disabled' || (projectAccess && projectAccess !== 'all')))
+  if (
+    u.is_owner &&
+    ((roleId && roleId !== 'admin') ||
+      status === 'disabled' ||
+      (projectAccess && projectAccess !== 'all'))
+  )
     throw new HttpError(400, 'The owner always keeps full access.');
-  if (id === actor.id && status === 'disabled') throw new HttpError(400, 'You cannot disable your own account.');
+  if (id === actor.id && status === 'disabled')
+    throw new HttpError(400, 'You cannot disable your own account.');
   if (roleId) {
     if (!(await roleExists(ws, roleId))) throw new HttpError(400, 'Unknown role');
-    await q('update workspace_members set role_id=$3 where workspace_id=$1 and user_id=$2', [ws, id, roleId]);
+    await q('update workspace_members set role_id=$3 where workspace_id=$1 and user_id=$2', [
+      ws,
+      id,
+      roleId,
+    ]);
   }
   if (projectAccess !== undefined)
     await q('update workspace_members set project_access=$3 where workspace_id=$1 and user_id=$2', [
@@ -529,12 +627,20 @@ export async function updateUser(actor, id, { roleId, projectAccess, status, nam
       id,
       status === 'disabled' ? 'disabled' : 'active',
     ]);
-    if (status === 'disabled') await q('delete from sessions where user_id=$1 and workspace_id=$2', [id, ws]);
+    if (status === 'disabled')
+      await q('delete from sessions where user_id=$1 and workspace_id=$2', [id, ws]);
   }
-  // A name belongs to the person's account; another workspace's admin may only change it if this is their only workspace.
+  // A name belongs to the person's account; another workspace's admin may only change it if this is
+  // their only workspace.
   if (name) {
-    const others = (await q('select count(*)::int n from workspace_members where user_id=$1 and workspace_id<>$2', [id, ws])).rows[0].n;
-    if (!others || id === actor.id) await q('update users set name=$2 where id=$1', [id, String(name).trim()]);
+    const others = (
+      await q(
+        'select count(*)::int n from workspace_members where user_id=$1 and workspace_id<>$2',
+        [id, ws],
+      )
+    ).rows[0].n;
+    if (!others || id === actor.id)
+      await q('update users set name=$2 where id=$1', [id, String(name).trim()]);
   }
   return publicUser(await getUser(id, ws));
 }
@@ -548,16 +654,20 @@ export async function deleteUser(actor, id) {
   await tx(async (t) => {
     await t.query('delete from workspace_members where workspace_id=$1 and user_id=$2', [ws, id]);
     await t.query('delete from sessions where user_id=$1 and workspace_id=$2', [id, ws]);
-    const left = (await t.query('select count(*)::int n from workspace_members where user_id=$1', [id])).rows[0].n;
+    const left = (
+      await t.query('select count(*)::int n from workspace_members where user_id=$1', [id])
+    ).rows[0].n;
     if (!left) await t.query('delete from users where id=$1', [id]);
   });
 }
 export async function changePassword(user, current, next) {
-  if (!(await verifyPassword(String(current || ''), user.password_hash))) throw new HttpError(400, 'Your current password is incorrect.');
+  if (!(await verifyPassword(String(current || ''), user.password_hash)))
+    throw new HttpError(400, 'Your current password is incorrect.');
   checkPassword(next);
   await q('update users set password_hash=$2 where id=$1', [user.id, await hashPassword(next)]);
 }
-const normAccess = (a) => (a === 'all' ? 'all' : [...new Set((Array.isArray(a) ? a : []).map(String))]);
+const normAccess = (a) =>
+  a === 'all' ? 'all' : [...new Set((Array.isArray(a) ? a : []).map(String))];
 
 // ---------------------------------------------------------------- invites
 export async function createInvites(actor, { emails, roleId, projectAccess, message }: any) {
@@ -587,10 +697,15 @@ export async function createInvites(actor, { emails, roleId, projectAccess, mess
   if (fresh) await checkLimit('members', fresh, ws); // people + pending invites, within the plan (SaaS)
   const out: any[] = [];
   for (const email of list) {
-    // People who already have an account (in another workspace) can be invited too: they join with their login.
+    // People who already have an account (in another workspace) can be invited too: they join with
+    // their login.
     if (
-      (await q('select 1 from workspace_members m join users u on u.id = m.user_id where m.workspace_id=$1 and u.email=$2', [ws, email]))
-        .rows[0]
+      (
+        await q(
+          'select 1 from workspace_members m join users u on u.id = m.user_id where m.workspace_id=$1 and u.email=$2',
+          [ws, email],
+        )
+      ).rows[0]
     ) {
       out.push({ email, error: 'Already a member of this workspace' });
       continue;
@@ -599,7 +714,8 @@ export async function createInvites(actor, { emails, roleId, projectAccess, mess
     const note = String(message || '').slice(0, 1000);
     const pending = await pendingOf(email);
     if (pending) {
-      // Inviting the same email again is a resend: refused during the cooldown and past the maximum.
+      // Inviting the same email again is a resend: refused during the cooldown and past the
+      // maximum.
       try {
         checkResend(pending);
         const t = token();
@@ -619,7 +735,8 @@ export async function createInvites(actor, { emails, roleId, projectAccess, mess
             INVITE_COOLDOWN_SECONDS,
           ],
         );
-        if (!rowCount) throw new HttpError(429, 'This invite was just sent. Try again in a minute.'); // a parallel request won
+        if (!rowCount)
+          throw new HttpError(429, 'This invite was just sent. Try again in a minute.'); // a parallel request won
         out.push({ id: pending.id, email, token: t });
       } catch (e) {
         if (!(e instanceof HttpError) || list.length === 1) throw e; // a single email fails the whole request
@@ -627,29 +744,48 @@ export async function createInvites(actor, { emails, roleId, projectAccess, mess
       }
       continue;
     }
-    await q('update invites set revoked_at = now() where workspace_id=$1 and email=$2 and accepted_at is null and revoked_at is null', [
-      ws,
-      email,
-    ]); // expired ones
+    await q(
+      'update invites set revoked_at = now() where workspace_id=$1 and email=$2 and accepted_at is null and revoked_at is null',
+      [ws, email],
+    ); // expired ones
     const t = token();
     const id = newId();
     await q(
       'insert into invites (id, workspace_id, email, role_id, project_access, message, token_hash, invited_by, expires_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-      [id, ws, email, roleId, access, note, sha(t), actor.id, new Date(Date.now() + INVITE_DAYS * 86400000)],
+      [
+        id,
+        ws,
+        email,
+        roleId,
+        access,
+        note,
+        sha(t),
+        actor.id,
+        new Date(Date.now() + INVITE_DAYS * 86400000),
+      ],
     );
     out.push({ id, email, token: t });
   }
   return out;
 }
-/** Throws 429 when an invite can't be sent again: the maximum is reached, or the cooldown hasn't passed (says how long to wait). */
+/**
+ * Throws 429 when an invite can't be sent again: the maximum is reached, or the cooldown hasn't
+ * passed (says how long to wait).
+ */
 function checkResend(inv) {
   if (inv.send_count >= INVITE_MAX_SENDS)
     throw new HttpError(
       429,
       `Invite limit reached: this invite has already been sent ${INVITE_MAX_SENDS} times. Revoke it and create a new one if the person still needs it.`,
     );
-  const wait = Math.ceil((new Date(inv.created_at).getTime() + INVITE_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000);
-  if (wait > 0) throw new HttpError(429, `This invite was sent recently. You can send it again in ${wait} second${wait === 1 ? '' : 's'}.`);
+  const wait = Math.ceil(
+    (new Date(inv.created_at).getTime() + INVITE_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000,
+  );
+  if (wait > 0)
+    throw new HttpError(
+      429,
+      `This invite was sent recently. You can send it again in ${wait} second${wait === 1 ? '' : 's'}.`,
+    );
 }
 export async function listInvites() {
   const { rows } = await q(
@@ -663,7 +799,10 @@ export async function listInvites() {
 export async function reissueInvite(id) {
   const ws = needWs();
   const cur = (
-    await q('select id, email, created_at, send_count from invites where id=$1 and workspace_id=$2 and accepted_at is null', [id, ws])
+    await q(
+      'select id, email, created_at, send_count from invites where id=$1 and workspace_id=$2 and accepted_at is null',
+      [id, ws],
+    )
   ).rows[0];
   if (!cur) throw new HttpError(404, 'Invite not found or already accepted');
   checkResend(cur);
@@ -672,13 +811,23 @@ export async function reissueInvite(id) {
   const { rowCount } = await q(
     `update invites set token_hash=$3, expires_at=$4, revoked_at=null, created_at=now(), send_count=send_count+1
     where id=$1 and workspace_id=$2 and accepted_at is null and send_count < $5 and created_at <= now() - ($6 * interval '1 second')`,
-    [id, ws, sha(t), new Date(Date.now() + INVITE_DAYS * 86400000), INVITE_MAX_SENDS, INVITE_COOLDOWN_SECONDS],
+    [
+      id,
+      ws,
+      sha(t),
+      new Date(Date.now() + INVITE_DAYS * 86400000),
+      INVITE_MAX_SENDS,
+      INVITE_COOLDOWN_SECONDS,
+    ],
   );
   if (!rowCount) throw new HttpError(429, 'This invite was just sent. Try again in a minute.');
   return { id, email: cur.email, token: t };
 }
 export async function revokeInvite(id) {
-  await q('update invites set revoked_at=now() where id=$1 and workspace_id=$2 and accepted_at is null', [id, needWs()]);
+  await q(
+    'update invites set revoked_at=now() where id=$1 and workspace_id=$2 and accepted_at is null',
+    [id, needWs()],
+  );
 }
 export async function markEmailed(id, ok) {
   await q('update invites set emailed=$2 where id=$1', [id, ok]);
@@ -692,9 +841,12 @@ async function inviteByToken(t) {
     [sha(String(t || ''))],
   );
   const i = rows[0];
-  if (!i || i.revoked_at) throw new HttpError(404, 'This invite link is not valid. Ask for a new invite.');
-  if (i.accepted_at) throw new HttpError(410, 'This invite has already been used. Sign in instead.');
-  if (new Date(i.expires_at) < new Date()) throw new HttpError(410, 'This invite has expired. Ask for a new one.');
+  if (!i || i.revoked_at)
+    throw new HttpError(404, 'This invite link is not valid. Ask for a new invite.');
+  if (i.accepted_at)
+    throw new HttpError(410, 'This invite has already been used. Sign in instead.');
+  if (new Date(i.expires_at) < new Date())
+    throw new HttpError(410, 'This invite has expired. Ask for a new one.');
   return i;
 }
 export async function inviteInfo(t) {
@@ -709,7 +861,10 @@ export async function inviteInfo(t) {
     existingAccount: existing,
   };
 }
-/** New people create their account; people who already have one confirm with their password and join. */
+/**
+ * New people create their account; people who already have one confirm with their password and
+ * join.
+ */
 export async function acceptInvite(t, { name, password, acceptTerms }: any, meta: any = {}) {
   const i = await inviteByToken(t);
   needTerms(acceptTerms);
@@ -728,14 +883,10 @@ export async function acceptInvite(t, { name, password, acceptTerms }: any, meta
   await tx(async (x) => {
     if (!existing) {
       id = newId();
-      await x.query('insert into users (id, email, name, password_hash, role_id, project_access) values ($1,$2,$3,$4,$5,$6)', [
-        id,
-        i.email,
-        name.trim(),
-        hash,
-        i.role_id,
-        JSON.stringify(i.project_access),
-      ]);
+      await x.query(
+        'insert into users (id, email, name, password_hash, role_id, project_access) values ($1,$2,$3,$4,$5,$6)',
+        [id, i.email, name.trim(), hash, i.role_id, JSON.stringify(i.project_access)],
+      );
     }
     await x.query(
       `insert into workspace_members (workspace_id, user_id, role_id, project_access) values ($1,$2,$3,$4)
@@ -748,15 +899,24 @@ export async function acceptInvite(t, { name, password, acceptTerms }: any, meta
   return getUser(id, i.workspace_id);
 }
 
-// ---------------------------------------------------------------- sign-up
-// SIGNUP_MODE (lib/platform.ts): closed = invite only; waitlist = people leave their details and an administrator
-// invites them; open = anyone creates an account and gets their own workspace (their company's isolated space).
+// ---------------------------------------------------------------- sign-up SIGNUP_MODE
+// (lib/platform.ts): closed = invite only; waitlist = people leave their details and an
+// administrator invites them; open = anyone creates an account and gets their own workspace (their
+// company's isolated space).
 // On a server with no accounts yet, sign-up creates the owner (the same as /setup).
-export async function signup({ name, email, password, company, note, acceptTerms, website }: any, meta: any = {}) {
+export async function signup(
+  { name, email, password, company, note, acceptTerms, website }: any,
+  meta: any = {},
+) {
   if (String(website || '').trim()) return { requested: true }; // a hidden field only bots fill in
-  if ((await userCount()) === 0) return { user: await createOwner({ name, email, password, acceptTerms, company }, meta) };
+  if ((await userCount()) === 0)
+    return { user: await createOwner({ name, email, password, acceptTerms, company }, meta) };
   const mode = signupMode();
-  if (mode === 'closed') throw new HttpError(403, 'Sign-up is by invitation only. Ask your administrator for an invite.');
+  if (mode === 'closed')
+    throw new HttpError(
+      403,
+      'Sign-up is by invitation only. Ask your administrator for an invite.',
+    );
   email = normEmail(email);
   if (!String(name || '').trim()) throw new HttpError(400, 'Enter your name.');
   if (!isEmail(email)) throw new HttpError(400, 'Enter a valid email address.');
@@ -769,18 +929,21 @@ export async function signup({ name, email, password, company, note, acceptTerms
     const ws = `ws_${crypto.randomBytes(6).toString('hex')}`;
     const hash = await hashPassword(password);
     await tx(async (x) => {
-      await x.query("insert into users (id, email, name, password_hash, role_id, project_access) values ($1,$2,$3,$4,'admin','\"all\"')", [
-        id,
-        email,
-        String(name).trim().slice(0, 120),
-        hash,
-      ]);
-      await insertWorkspace(x, { id: ws, name: company || `${String(name).trim().split(/\s+/)[0]}'s workspace`, ownerId: id });
+      await x.query(
+        "insert into users (id, email, name, password_hash, role_id, project_access) values ($1,$2,$3,$4,'admin','\"all\"')",
+        [id, email, String(name).trim().slice(0, 120), hash],
+      );
+      await insertWorkspace(x, {
+        id: ws,
+        name: company || `${String(name).trim().split(/\s+/)[0]}'s workspace`,
+        ownerId: id,
+      });
       await writeAcceptance(x, id, email, meta);
     });
     return { user: await getUser(id, ws) };
   }
-  // Waitlist: same answer whether or not the email already has an account or a request, so the form can't be used to find accounts.
+  // Waitlist: same answer whether or not the email already has an account or a request, so the form
+  // can't be used to find accounts.
   await q(
     `insert into signup_requests (id, email, name, company, note) values ($1,$2,$3,$4,$5)
     on conflict (email) do update set name = excluded.name, company = excluded.company, note = excluded.note`,
@@ -798,20 +961,32 @@ export async function signup({ name, email, password, company, note, acceptTerms
   );
   return { requested: true, mode };
 }
-// The waitlist belongs to whoever runs this TicketForge: the default workspace's owner (or a platform admin).
+// The waitlist belongs to whoever runs this TicketForge: the default workspace's owner (or a
+// platform admin).
 export async function listSignupRequests() {
-  return (await q('select id, email, name, company, note, status, created_at from signup_requests order by created_at desc limit 500'))
-    .rows;
+  return (
+    await q(
+      'select id, email, name, company, note, status, created_at from signup_requests order by created_at desc limit 500',
+    )
+  ).rows;
 }
 export async function setSignupRequest(id, status) {
-  if (!['pending', 'invited', 'declined'].includes(status)) throw new HttpError(400, 'Unknown status.');
+  if (!['pending', 'invited', 'declined'].includes(status))
+    throw new HttpError(400, 'Unknown status.');
   await q('update signup_requests set status=$2 where id=$1', [id, status]);
 }
 
 // ---------------------------------------------------------------- password resets
 /** True when the person also belongs to a workspace other than the current one. */
 export async function inOtherWorkspaces(userId) {
-  return Boolean((await q('select 1 from workspace_members where user_id=$1 and workspace_id<>$2 limit 1', [userId, needWs()])).rows[0]);
+  return Boolean(
+    (
+      await q('select 1 from workspace_members where user_id=$1 and workspace_id<>$2 limit 1', [
+        userId,
+        needWs(),
+      ])
+    ).rows[0],
+  );
 }
 export async function createReset(userId) {
   const t = token();
@@ -827,12 +1002,17 @@ export async function userByEmail(email) {
 }
 export async function resetPassword(t, password) {
   checkPassword(password);
-  const { rows } = await q('select * from password_resets where token_hash=$1', [sha(String(t || ''))]);
+  const { rows } = await q('select * from password_resets where token_hash=$1', [
+    sha(String(t || '')),
+  ]);
   const r = rows[0];
   if (!r || r.used_at || new Date(r.expires_at) < new Date())
     throw new HttpError(410, 'This reset link is invalid or has expired. Request a new one.');
   await tx(async (x) => {
-    await x.query('update users set password_hash=$2 where id=$1', [r.user_id, await hashPassword(password)]);
+    await x.query('update users set password_hash=$2 where id=$1', [
+      r.user_id,
+      await hashPassword(password),
+    ]);
     await x.query('update password_resets set used_at=now() where token_hash=$1', [r.token_hash]);
     await x.query('delete from sessions where user_id=$1', [r.user_id]);
   });
@@ -844,7 +1024,8 @@ function smtpPass() {
   return process.env.SMTP_HOST ? process.env.SMTP_PASS || '' : process.env.SENDGRID_API_KEY || '';
 }
 export function emailConfig() {
-  // SendGrid shortcut: SENDGRID_API_KEY (+ SENDGRID_FROM, SENDGRID_FROM_NAME) when no SMTP_HOST is set.
+  // SendGrid shortcut: SENDGRID_API_KEY (+ SENDGRID_FROM, SENDGRID_FROM_NAME) when no SMTP_HOST is
+  // set.
   if (!process.env.SMTP_HOST && process.env.SENDGRID_API_KEY) {
     const addr = process.env.SENDGRID_FROM || '';
     const name = process.env.SENDGRID_FROM_NAME || '';
@@ -864,7 +1045,9 @@ export function emailConfig() {
     configured: Boolean(host),
     host,
     port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : Number(process.env.SMTP_PORT) === 465,
+    secure: process.env.SMTP_SECURE
+      ? process.env.SMTP_SECURE === 'true'
+      : Number(process.env.SMTP_PORT) === 465,
     user: process.env.SMTP_USER || '',
     from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
     appUrl: process.env.APP_URL || '',
@@ -887,17 +1070,28 @@ function mailer() {
 }
 export async function sendMail({ to, subject, text, html }: any) {
   const m = mailer();
-  if (!m) return { sent: false, reason: 'Email is not configured (set SMTP_HOST and related settings).' };
+  if (!m)
+    return { sent: false, reason: 'Email is not configured (set SMTP_HOST and related settings).' };
   try {
-    const info = await m.sendMail({ from: emailConfig().from || 'TicketForge <no-reply@localhost>', to, subject, text, html });
-    if (emailConfig().host === 'json') console.log('[email:json]', info.message.toString().slice(0, 400));
+    const info = await m.sendMail({
+      from: emailConfig().from || 'TicketForge <no-reply@localhost>',
+      to,
+      subject,
+      text,
+      html,
+    });
+    if (emailConfig().host === 'json')
+      console.log('[email:json]', info.message.toString().slice(0, 400));
     return { sent: true };
   } catch (e) {
     return { sent: false, reason: e.message };
   }
 }
 const escHtml = (s) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
 export function emailLayout({ heading, intro, button, url, note }: any) {
   const html = `<!doctype html><html><body style="margin:0;background:#f7f8f9;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#172b4d">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">

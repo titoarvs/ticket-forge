@@ -1,7 +1,8 @@
-// Before each test run (Project settings → Database → Before each test run): reset or seed the Test database, so tests
-// start from known data. Either a SQL file from the repository, run in one transaction, or an npm script run in the
-// repository folder on this computer with DATABASE_URL set to the Test database. Only ever the Test database (or the
-// person's own): never Staging or Production.
+// Before each test run (Project settings → Database → Before each test run): reset or seed the Test
+// database, so tests start from known data. Either a SQL file from the repository, run in one
+// transaction, or an npm script run in the repository folder on this computer with DATABASE_URL set
+// to the Test database. Only ever the Test database (or the person's own): never Staging or
+// Production.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -33,7 +34,9 @@ async function readRepoFile(project: any, file: string) {
       /* not in this repository */
     }
   }
-  throw fail(`${file} wasn’t found in the project’s repository. Check the path in Project settings → Database.`);
+  throw fail(
+    `${file} wasn’t found in the project’s repository. Check the path in Project settings → Database.`,
+  );
 }
 
 function runNpm(dir: string, script: string, url: string, signal?: AbortSignal) {
@@ -72,7 +75,8 @@ function runNpm(dir: string, script: string, url: string, signal?: AbortSignal) 
 }
 
 /**
- * Runs the project's test setup step, reporting progress with emit({ type: 'phase', … }). Does nothing when none is set.
+ * Runs the project's test setup step, reporting progress with emit({ type: 'phase', … }). Does
+ * nothing when none is set.
  * Throws when the step fails, so tests don't run on half-prepared data.
  */
 export async function runTestSetup({
@@ -93,7 +97,8 @@ export async function runTestSetup({
     emit({
       type: 'phase',
       level: 'warn',
-      message: 'Before the tests: skipped, because the project has no Test database (Project settings → Database).',
+      message:
+        'Before the tests: skipped, because the project has no Test database (Project settings → Database).',
     });
     return;
   }
@@ -103,13 +108,17 @@ export async function runTestSetup({
     const sql = await readRepoFile(project, setup.value);
     if (!sql.trim()) throw fail(`${setup.value} is empty.`);
     await runScript(project.id, db.id, sql, user?.id).catch((e: any) => {
-      throw fail(`Before the tests: ${setup.value} failed on ${db.name}: ${hide(e.message, db.url)}`);
+      throw fail(
+        `Before the tests: ${setup.value} failed on ${db.name}: ${hide(e.message, db.url)}`,
+      );
     });
   } else {
     const dirs = await localRepoDirs(project);
     const dir = dirs.find((d) => {
       try {
-        return Boolean(JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8')).scripts?.[setup.value]);
+        return Boolean(
+          JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8')).scripts?.[setup.value],
+        );
       } catch {
         return false;
       }
@@ -124,5 +133,8 @@ export async function runTestSetup({
     emit({ type: 'phase', message: `Before the tests: npm run ${setup.value} on ${db.name}…` });
     await runNpm(dir, setup.value, db.url, signal);
   }
-  emit({ type: 'phase', message: `Before the tests: done in ${((Date.now() - started) / 1000).toFixed(1)}s.` });
+  emit({
+    type: 'phase',
+    message: `Before the tests: done in ${((Date.now() - started) / 1000).toFixed(1)}s.`,
+  });
 }

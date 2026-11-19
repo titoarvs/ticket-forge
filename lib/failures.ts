@@ -1,7 +1,8 @@
-// Failure analysis: when automated tests fail, the AI reads each failure (error, the script, the test case, the page it
-// ended on, browser logs) and writes a detailed note for the issue's comment: what failed, the likely cause, whether it's
-// a product bug or the test, the evidence, and what to do next. Uses the "failure" task, a light model tier by default
-// (Administration → AI → Model routing), so it costs little.
+// Failure analysis: when automated tests fail, the AI reads each failure (error, the script, the
+// test case, the page it ended on, browser logs) and writes a detailed note for the issue's
+// comment: what failed, the likely cause, whether it's a product bug or the test, the evidence, and
+// what to do next. Uses the "failure" task, a light model tier by default (Administration → AI →
+// Model routing), so it costs little.
 import { askJson } from './claude';
 import { contextBlock } from './appcontext';
 
@@ -17,7 +18,14 @@ export const CATEGORIES = {
   flaky: 'Flaky / timing',
   'needs-info': 'Needs a look',
 };
-const OWNER = { 'app-bug': 'developer', 'test-script': 'qa', 'test-data': 'qa', environment: 'devops', flaky: 'qa', 'needs-info': 'qa' };
+const OWNER = {
+  'app-bug': 'developer',
+  'test-script': 'qa',
+  'test-data': 'qa',
+  environment: 'devops',
+  flaky: 'qa',
+  'needs-info': 'qa',
+};
 
 const SYSTEM = `You are a senior QA automation engineer triaging failed Playwright end-to-end tests.
 For each failure, decide from the evidence whether the PRODUCT is wrong (it doesn't meet the test case / acceptance criteria),
@@ -81,8 +89,9 @@ function clean(a) {
 }
 
 /**
- * failures: [{ ticket, tc, result }] for ONE issue. Returns Map(tcId -> analysis). Failures without a script or that
- * were stopped get no analysis. Errors are swallowed: the plain report still goes out.
+ * failures: [{ ticket, tc, result }] for ONE issue. Returns Map(tcId -> analysis). Failures without
+ * a script or that were stopped get no analysis. Errors are swallowed: the plain report still goes
+ * out.
  */
 export async function analyzeFailures({ project, failures, ai = {} }: any) {
   const out: any = new Map();

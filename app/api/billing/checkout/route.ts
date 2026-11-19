@@ -11,10 +11,14 @@ function ownerCheckout(u: any) {
 export const GET = api(async (req) => {
   const u: any = await authed();
   ownerCheckout(u);
-  return checkoutOptions({ ws: u.workspace_id, planId: new URL(req.url).searchParams.get('plan') || '' });
+  return checkoutOptions({
+    ws: u.workspace_id,
+    planId: new URL(req.url).searchParams.get('plan') || '',
+  });
 });
 
-// Pay: returns the hosted checkout address of the chosen gateway for the chosen plan (nothing changes until it is paid).
+// Pay: returns the hosted checkout address of the chosen gateway for the chosen plan (nothing
+// changes until it is paid).
 export const POST = api(async (req) => {
   const u: any = await authed();
   ownerCheckout(u);

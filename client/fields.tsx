@@ -1,6 +1,6 @@
 'use client';
-// MUI-based form inputs used across the app. Props mirror native inputs (onChange/onBlur receive events)
-// so they drop in where <input>, <textarea> and <select> were used.
+// MUI-based form inputs used across the app. Props mirror native inputs (onChange/onBlur receive
+// events) so they drop in where <input>, <textarea> and <select> were used.
 import { Children, Fragment, cloneElement, isValidElement, useState, type ReactNode } from 'react';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
@@ -20,45 +20,78 @@ export { MenuItem };
 const ico = (svg: string) => <span className="ico" dangerouslySetInnerHTML={{ __html: svg }} />;
 
 // Looks: "ghost" = borderless until hover/focus (Jira inline edit), "title" = large ghost heading,
-// "bare" = no chrome (inside inline forms), "filter" = compact toolbar dropdown, "loz" = status pill.
+// "bare" = no chrome (inside inline forms), "filter" = compact toolbar dropdown, "loz" = status
+// pill.
 const ghost = {
   '& .MuiOutlinedInput-root': { backgroundColor: 'transparent' },
   '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
   '& .MuiOutlinedInput-root:hover': { backgroundColor: 'var(--hover)' },
   '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
   '& .MuiOutlinedInput-root.Mui-focused': { backgroundColor: 'var(--bg)' },
-  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--border-focus)' },
+  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'var(--border-focus)',
+  },
   '& .MuiOutlinedInput-root.Mui-disabled': { backgroundColor: 'transparent' },
-  '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
-  '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: 'var(--text)', color: 'var(--text)' },
+  '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'transparent',
+  },
+  '& .MuiInputBase-input.Mui-disabled': {
+    WebkitTextFillColor: 'var(--text)',
+    color: 'var(--text)',
+  },
 };
-const titleLook = { ...ghost, '& .MuiInputBase-root': { fontSize: 24, lineHeight: '28px', fontWeight: 500, ml: '-6px' } };
+const titleLook = {
+  ...ghost,
+  '& .MuiInputBase-root': { fontSize: 24, lineHeight: '28px', fontWeight: 500, ml: '-6px' },
+};
 const bare = {
-  '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': { backgroundColor: 'transparent' },
-  '& .MuiOutlinedInput-notchedOutline, & .Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
+  '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused':
+    { backgroundColor: 'transparent' },
+  '& .MuiOutlinedInput-notchedOutline, & .Mui-focused .MuiOutlinedInput-notchedOutline': {
+    border: 'none',
+  },
 };
-const mono = { '& .MuiInputBase-input': { fontFamily: 'var(--mono)', fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre', tabSize: 2 } };
+const mono = {
+  '& .MuiInputBase-input': {
+    fontFamily: 'var(--mono)',
+    fontSize: 12.5,
+    lineHeight: 1.55,
+    whiteSpace: 'pre',
+    tabSize: 2,
+  },
+};
 const filterLook = {
   width: 'auto',
   maxWidth: 200,
   minWidth: 0,
-  '& .MuiOutlinedInput-root': { backgroundColor: 'var(--bg-neutral)', fontWeight: 500, color: 'var(--text-subtle)' },
+  '& .MuiOutlinedInput-root': {
+    backgroundColor: 'var(--bg-neutral)',
+    fontWeight: 500,
+    color: 'var(--text-subtle)',
+  },
   '& .MuiOutlinedInput-root:hover': { backgroundColor: 'var(--bg-neutral-2)' },
-  '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
+  '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline':
+    { borderColor: 'transparent' },
 };
 const lozLook = {
   width: 'auto',
   minWidth: 0,
-  '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': {
-    backgroundColor: 'transparent',
-    color: 'inherit',
-    fontSize: 11,
-    fontWeight: 700,
-    textTransform: 'uppercase',
+  '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused':
+    {
+      backgroundColor: 'transparent',
+      color: 'inherit',
+      fontSize: 11,
+      fontWeight: 700,
+      textTransform: 'uppercase',
+    },
+  '& .MuiSelect-select': {
+    padding: '0 22px 0 6px !important',
+    minHeight: '20px !important',
+    lineHeight: '20px',
   },
-  '& .MuiSelect-select': { padding: '0 22px 0 6px !important', minHeight: '20px !important', lineHeight: '20px' },
   '& .MuiSelect-icon': { color: 'inherit', right: 2, fontSize: 18 },
-  '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
+  '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline':
+    { border: 'none' },
 };
 const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
   todo: { bg: 'var(--bg-neutral)', fg: 'var(--text)' },
@@ -69,14 +102,16 @@ const statusLook = (tone: string, color?: string) => {
   const c = color ? { bg: color, fg: readableOn(color) } : STATUS_TONE[tone] || STATUS_TONE.todo;
   return {
     width: 'auto',
-    '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused': {
-      backgroundColor: c.bg,
-      color: c.fg,
-      fontWeight: 600,
-      height: 32,
-    },
+    '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused':
+      {
+        backgroundColor: c.bg,
+        color: c.fg,
+        fontWeight: 600,
+        height: 32,
+      },
     '& .MuiSelect-icon': { color: c.fg },
-    '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
+    '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline':
+      { border: 'none' },
   };
 };
 // "&&" doubles the class so these looks win over the theme's default input styles.
@@ -117,7 +152,14 @@ function split(props: Any) {
     list: _list,
     ...rest
   } = props;
-  return { rest, search, html: { min, max, maxLength, readOnly, spellCheck, 'aria-label': ariaLabel, autoComplete }, rows, maxRows, sx };
+  return {
+    rest,
+    search,
+    html: { min, max, maxLength, readOnly, spellCheck, 'aria-label': ariaLabel, autoComplete },
+    rows,
+    maxRows,
+    sx,
+  };
 }
 
 /** Single-line text input (MUI TextField). */
@@ -168,29 +210,52 @@ const textOf = (n: Any): string =>
         ? textOf((n.props as Any).children)
         : '';
 const flatItems = (children: ReactNode): Any[] =>
-  Children.toArray(children).flatMap((c: Any) => (isValidElement(c) && c.type === Fragment ? flatItems((c.props as Any).children) : [c]));
+  Children.toArray(children).flatMap((c: Any) =>
+    isValidElement(c) && c.type === Fragment ? flatItems((c.props as Any).children) : [c],
+  );
 /** Dropdowns with at least this many choices get a search box at the top of their menu. */
 const SEARCH_MIN = 8;
 
 /**
- * Dropdown (MUI Select). Children are <MenuItem>s; an item with value "" acts as the placeholder/None.
- * With 8 or more choices (or searchable), the open menu starts with a search box: type to narrow the list, ↓ to move
- * into it, Enter to pick the first match. searchable={false} turns it off.
+ * Dropdown (MUI Select). Children are <MenuItem>s; an item with value "" acts as the
+ * placeholder/None.
+ * With 8 or more choices (or searchable), the open menu starts with a search box: type to narrow
+ * the list, ↓ to move into it, Enter to pick the first match. searchable={false} turns it off.
  */
 export function SF({ children, placeholder, className, searchable, ...props }: Any) {
-  // Select-only options go to the Select, never onto the TextField's root element (React warns about unknown
-  // DOM props like displayEmpty). Empty values always show, so displayEmpty is on for every dropdown.
-  const { displayEmpty: _de, renderValue, MenuProps, multiple, open, onOpen, onClose, autoWidth, ...own } = props;
+  // Select-only options go to the Select, never onto the TextField's root element (React warns
+  // about unknown DOM props like displayEmpty). Empty values always show, so displayEmpty is on for
+  // every dropdown.
+  const {
+    displayEmpty: _de,
+    renderValue,
+    MenuProps,
+    multiple,
+    open,
+    onOpen,
+    onClose,
+    autoWidth,
+    ...own
+  } = props;
   const { rest, html, sx } = split(own);
   const [q, setQ] = useState('');
   const items = flatItems(children);
   const choices = items.filter(
-    (c) => isValidElement(c) && c.type === MenuItem && (c.props as Any).value !== '' && (c.props as Any).value !== undefined,
+    (c) =>
+      isValidElement(c) &&
+      c.type === MenuItem &&
+      (c.props as Any).value !== '' &&
+      (c.props as Any).value !== undefined,
   );
   const canSearch = searchable ?? choices.length >= SEARCH_MIN;
   const qq = q.trim().toLowerCase();
-  // Items that don't match stay in the list (hidden and skipped), so the chosen value still shows in the field.
-  const hide = (c: Any) => cloneElement(c, { disabled: true, style: { ...((c.props as Any).style || {}), display: 'none' } });
+  // Items that don't match stay in the list (hidden and skipped), so the chosen value still shows
+  // in the field.
+  const hide = (c: Any) =>
+    cloneElement(c, {
+      disabled: true,
+      style: { ...((c.props as Any).style || {}), display: 'none' },
+    });
   const shown =
     !canSearch || !qq
       ? items
@@ -198,16 +263,27 @@ export function SF({ children, placeholder, className, searchable, ...props }: A
           if (!isValidElement(c)) return c;
           if (c.type !== MenuItem) return hide(c); // headings and dividers while searching
           const v = (c.props as Any).value;
-          return `${textOf((c.props as Any).children)} ${typeof v === 'string' ? v : ''}`.toLowerCase().includes(qq) ? c : hide(c);
+          return `${textOf((c.props as Any).children)} ${typeof v === 'string' ? v : ''}`
+            .toLowerCase()
+            .includes(qq)
+            ? c
+            : hide(c);
         });
-  const matches = qq ? shown.filter((c) => isValidElement(c) && c.type === MenuItem && !(c.props as Any).disabled).length : choices.length;
+  const matches = qq
+    ? shown.filter((c) => isValidElement(c) && c.type === MenuItem && !(c.props as Any).disabled)
+        .length
+    : choices.length;
   const firstOption = (el: HTMLElement) =>
-    [...(el.closest('ul')?.querySelectorAll<HTMLElement>('li[role="option"][tabindex]') || [])].find(
-      (li) => li.style.display !== 'none' && li.getAttribute('aria-disabled') !== 'true',
-    );
+    [
+      ...(el.closest('ul')?.querySelectorAll<HTMLElement>('li[role="option"][tabindex]') || []),
+    ].find((li) => li.style.display !== 'none' && li.getAttribute('aria-disabled') !== 'true');
   const search = canSearch ? (
     <ListSubheader key="__sf_search" className="sf-search">
-      <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onMouseUp={(e) => e.stopPropagation()}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseUp={(e) => e.stopPropagation()}
+      >
         <span className="sf-search-ic">{ico(I.search)}</span>
         <input
           autoFocus
@@ -252,7 +328,9 @@ export function SF({ children, placeholder, className, searchable, ...props }: A
             (placeholder
               ? (v: Any) =>
                   v === '' || v == null ? (
-                    <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>{placeholder}</span>
+                    <span style={{ color: props.filter ? 'inherit' : 'var(--text-subtlest)' }}>
+                      {placeholder}
+                    </span>
                   ) : undefined
               : undefined),
           ...(multiple !== undefined && { multiple }),
@@ -284,14 +362,26 @@ export const opts = (list: string[]) =>
 
 /** Checkbox (MUI). Pass `label` to render it with a label. */
 export function CB({ label, className: _c, ...props }: Any) {
-  const box = <Checkbox {...props} slotProps={{ input: { 'aria-label': props['aria-label'] } as Any }} />;
+  const box = (
+    <Checkbox {...props} slotProps={{ input: { 'aria-label': props['aria-label'] } as Any }} />
+  );
   return label ? <FormControlLabel control={box} label={label} /> : box;
 }
 /** Radio button with label (MUI). */
-export const RB = ({ label, ...props }: Any) => <FormControlLabel control={<Radio {...props} />} label={label} />;
+export const RB = ({ label, ...props }: Any) => (
+  <FormControlLabel control={<Radio {...props} />} label={label} />
+);
 
 /** Date input (MUI X DatePicker) working with "YYYY-MM-DD" strings. */
-export function DateF({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+export function DateF({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
   return (
     <DatePicker
       value={value ? dayjs(value) : null}
@@ -353,7 +443,10 @@ export function PeopleF({
           );
         return (
           <li key={key} {...p}>
-            <span className="avatar" style={{ background: hashColor(option), width: 20, height: 20, fontSize: 9 }}>
+            <span
+              className="avatar"
+              style={{ background: hashColor(option), width: 20, height: 20, fontSize: 9 }}
+            >
               {initials(option)}
             </span>
             {option}
@@ -361,7 +454,12 @@ export function PeopleF({
         );
       }}
       renderInput={(params) => (
-        <TextField {...params} placeholder={placeholder} autoFocus={autoFocus} sx={isGhost ? { '&&': ghost } : undefined} />
+        <TextField
+          {...params}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          sx={isGhost ? { '&&': ghost } : undefined}
+        />
       )}
     />
   );

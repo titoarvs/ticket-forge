@@ -1,12 +1,14 @@
 'use client';
-// UI references on a ticket: screenshots, HTML, PDF and other documents the AI reads when it writes the ticket.
-// The server keeps the file and reads its text, form fields and components; they are stored on the ticket
-// (`references`), shown here, and passed to AI generation.
+// UI references on a ticket: screenshots, HTML, PDF and other documents the AI reads when it writes
+// the ticket.
+// The server keeps the file and reads its text, form fields and components; they are stored on the
+// ticket (`references`), shown here, and passed to AI generation.
 import { useRef, useState } from 'react';
 import { P, api, mutate, toast, openModal, can, logEvent, type Any } from './core';
 import { Ico, I, Spinner, Confirm } from './ui';
 
-const fmtBytes = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const fmtBytes = (n: number) =>
+  n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 const isImage = (m: string) => /^image\/(png|jpeg|gif|webp)$/.test(m);
 const fileUrl = (r: Any) => `/api/files/${r.id}`;
 const NOTE_TONE: Any = { 'no-text': 'muted', failed: 'ref-err' };
@@ -50,14 +52,25 @@ function Reference({ t, r, edit }: { t: Any; r: Any; edit: boolean }) {
           });
           toast('Reference removed');
         }}
-        text={<>“{r.name}”, its preview and the text, fields and components read from it will be deleted from this ticket.</>}
+        text={
+          <>
+            “{r.name}”, its preview and the text, fields and components read from it will be deleted
+            from this ticket.
+          </>
+        }
       />,
     );
   return (
     <li className="ref">
       <div className="ref-head">
         {isImage(r.mime) ? (
-          <a href={fileUrl(r)} target="_blank" rel="noopener noreferrer" className="ref-thumb" title={`Open ${r.name}`}>
+          <a
+            href={fileUrl(r)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ref-thumb"
+            title={`Open ${r.name}`}
+          >
             <img src={fileUrl(r)} alt={`Preview of ${r.name}`} loading="lazy" />
           </a>
         ) : (
@@ -71,20 +84,35 @@ function Reference({ t, r, edit }: { t: Any; r: Any; edit: boolean }) {
           </a>
           <span className="muted small">
             {fmtBytes(r.bytes)}
-            {r.status === 'done' && ` · ${r.fields?.length || 0} fields · ${r.components?.length || 0} components`}
+            {r.status === 'done' &&
+              ` · ${r.fields?.length || 0} fields · ${r.components?.length || 0} components`}
           </span>
-          <button type="button" className="btn subtle ref-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button
+            type="button"
+            className="btn subtle ref-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
             {open ? 'Hide extracted data' : 'Show extracted data'}
           </button>
         </div>
         {edit && (
-          <button type="button" className="icon-btn" title="Remove reference" aria-label={`Remove ${r.name}`} onClick={remove}>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Remove reference"
+            aria-label={`Remove ${r.name}`}
+            onClick={remove}
+          >
             <Ico svg={I.trash} />
           </button>
         )}
       </div>
       {r.note && (
-        <p className={`small ${NOTE_TONE[r.status] || 'muted'}`} role={r.status === 'failed' ? 'alert' : undefined}>
+        <p
+          className={`small ${NOTE_TONE[r.status] || 'muted'}`}
+          role={r.status === 'failed' ? 'alert' : undefined}
+        >
           {r.note}
         </p>
       )}
@@ -134,7 +162,10 @@ export function ReferencesSection({ t }: { t: Any }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const r = await api(`/api/projects/${encodeURIComponent(P().id)}/references`, { method: 'POST', body: fd });
+      const r = await api(`/api/projects/${encodeURIComponent(P().id)}/references`, {
+        method: 'POST',
+        body: fd,
+      });
       mutate(() => {
         t.references = [...(t.references || []), r];
         logEvent(t, `attached the reference ${r.name}`);

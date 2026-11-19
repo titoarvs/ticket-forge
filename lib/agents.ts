@@ -1,11 +1,14 @@
-// TicketForge agents: one definition per job in the feature lifecycle (Prepare → Plan → Build → Review → Release).
-// Each agent says what it does, what it reads, what it produces, where it works and which workflow step it serves.
+// TicketForge agents: one definition per job in the feature lifecycle (Prepare → Plan → Build →
+// Review → Release).
+// Each agent says what it does, what it reads, what it produces, where it works and which workflow
+// step it serves.
 //
-// Agents with runner "code" run as real Claude Code agents (`claude -p --agents … --agent <id>`), the same way
-// Claude Code runs custom agents: their prompt is the agent's system prompt, their tool list is enforced by
-// Claude Code. Each run is one agent working on its own (no subagents: delegating made runs much slower and
-// lost the issue's context); a person chains them, e.g. Build, then Review. Agents with runner "document" write a document for an epic in
-// TicketForge (the Agent doc); runner "guide" agents walk a person through a manual step.
+// Agents with runner "code" run as real Claude Code agents (`claude -p --agents … --agent <id>`),
+// the same way Claude Code runs custom agents: their prompt is the agent's system prompt, their
+// tool list is enforced by Claude Code. Each run is one agent working on its own (no subagents:
+// delegating made runs much slower and lost the issue's context); a person chains them, e.g. Build,
+// then Review. Agents with runner "document" write a document for an epic in TicketForge (the Agent
+// doc); runner "guide" agents walk a person through a manual step.
 //
 // Administrators can turn agents on or off and set their model, effort and extra instructions in
 // Administration → Agents. Overrides are stored in app_meta under "agent_settings".
@@ -17,16 +20,22 @@ export const PHASES = ['Prepare', 'Plan', 'Build', 'Review', 'Test', 'General'];
 export const TEAMS = ['Product', 'Coding', 'Automation', 'UI/UX', 'QA', 'Delivery'];
 /** Lenses for the Review Panel: each one is a Review agent told to look only through it. */
 export const REVIEW_LENSES = [
-  { id: 'correctness', name: 'Correctness', focus: 'logic errors, edge cases, error handling, data integrity and regressions' },
+  {
+    id: 'correctness',
+    name: 'Correctness',
+    focus: 'logic errors, edge cases, error handling, data integrity and regressions',
+  },
   {
     id: 'security',
     name: 'Security',
-    focus: 'injection, authentication and authorization, secrets, unsafe input and output, dependency risk',
+    focus:
+      'injection, authentication and authorization, secrets, unsafe input and output, dependency risk',
   },
   {
     id: 'tests',
     name: 'Tests & acceptance',
-    focus: 'whether every acceptance criterion is met and proven by a test, and whether the tests would catch a broken implementation',
+    focus:
+      'whether every acceptance criterion is met and proven by a test, and whether the tests would catch a broken implementation',
   },
 ];
 export const WORKSPACES = {
@@ -427,7 +436,8 @@ affects, and the concrete fix. Skip nits that don't affect users.`,
     prompt: `You are a general Claude Code worker for TicketForge. Do exactly the task you are given in this repository.
 ${CODE_RULES}`,
   },
-  // ---------------------------------------------------------------- testing agents (Test automation)
+  // ---------------------------------------------------------------- testing agents (Test
+  // automation)
   {
     id: 'self-healing',
     name: 'Self-healing Agent',
@@ -438,7 +448,8 @@ ${CODE_RULES}`,
     step: null,
     runner: 'testing',
     use: 'heal',
-    summary: 'Repairs automated tests that broke because the page changed, not because the app is wrong.',
+    summary:
+      'Repairs automated tests that broke because the page changed, not because the app is wrong.',
     does: [
       'When a script fails on a locator, label, wait or step order, reads the page as it was at the failure.',
       'Rewrites the script with the right locators and re-runs it once.',
@@ -483,31 +494,31 @@ ${CODE_RULES}`,
     step: null,
     runner: 'testing',
     use: 'select',
-    summary: 'Picks the tests worth running now, so a run takes minutes instead of the whole suite.',
+    summary:
+      'Picks the tests worth running now, so a run takes minutes instead of the whole suite.',
     does: [
       'Reads what changed in the code since the last run, recently changed issues and recent failures.',
       'Ranks the automated tests by risk and picks the ones that cover the change, within your budget.',
       'Says why each test was picked and what was left out.',
     ],
-    inputs: ['Code changes (local repository)', 'Test cases with their last results', 'Recently changed issues'],
+    inputs: [
+      'Code changes (local repository)',
+      'Test cases with their last results',
+      'Recently changed issues',
+    ],
     output: 'A selection to run',
     where: 'Test automation → Smart selection',
   },
 ];
 export const CODE_AGENT_IDS = AGENTS.filter((a) => a.runner === 'code').map((a) => a.id);
 
-// ---------------------------------------------------------------- custom agents (Markdown with frontmatter)
-// An administrator describes an agent in plain words and the AI writes its Markdown rules, or pastes / imports a .md
-// file in the same format as Claude Code agent files:
-//   ---
-//   name: Migration Reviewer
-//   description: Reviews database migrations for safety
-//   runner: review            # code (edits in a worktree) · review (read-only on code) · document (writes a doc for an epic)
-//   model: sonnet             # optional: opus · sonnet · haiku
-//   effort: medium            # optional: low · medium · high · xhigh · max
-//   icon: 🗄️                  # optional
-//   ---
-//   The agent's instructions in Markdown…
+// ---------------------------------------------------------------- custom agents (Markdown with
+// frontmatter) An administrator describes an agent in plain words and the AI writes its Markdown
+// rules, or pastes / imports a .md file in the same format as Claude Code agent files:
+//   --- name: Migration Reviewer description: Reviews database migrations for safety runner: review
+//   # code (edits in a worktree) · review (read-only on code) · document (writes a doc for an epic)
+//   model: sonnet # optional: opus · sonnet · haiku effort: medium # optional: low · medium · high
+//   · xhigh · max icon: 🗄️ # optional --- The agent's instructions in Markdown…
 const CUSTOM_RUNNERS = {
   code: { runner: 'code', writes: true, workspace: 'worktree' },
   review: { runner: 'code', writes: false, workspace: 'readonly' },
@@ -530,7 +541,12 @@ export function parseAgentMd(md) {
     .trim();
   const m = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!m)
-    throw Object.assign(new Error('Start the file with a frontmatter block: --- name: … description: … runner: … ---'), { status: 400 });
+    throw Object.assign(
+      new Error(
+        'Start the file with a frontmatter block: --- name: … description: … runner: … ---',
+      ),
+      { status: 400 },
+    );
   const meta: any = {};
   for (const line of m[1].split('\n')) {
     const kv = line.match(/^\s*([a-zA-Z]+)\s*:\s*(.*?)\s*(#.*)?$/);
@@ -539,8 +555,13 @@ export function parseAgentMd(md) {
   const body = m[2].trim();
   if (!meta.name) throw Object.assign(new Error('The frontmatter needs a name.'), { status: 400 });
   if (!body || body.length < 40)
-    throw Object.assign(new Error('Write the agent’s instructions under the frontmatter (at least a few sentences).'), { status: 400 });
-  const kind = CUSTOM_RUNNERS[String(meta.runner || 'review').toLowerCase()] ? String(meta.runner || 'review').toLowerCase() : 'review';
+    throw Object.assign(
+      new Error('Write the agent’s instructions under the frontmatter (at least a few sentences).'),
+      { status: 400 },
+    );
+  const kind = CUSTOM_RUNNERS[String(meta.runner || 'review').toLowerCase()]
+    ? String(meta.runner || 'review').toLowerCase()
+    : 'review';
   return {
     name: meta.name.slice(0, 60),
     description: String(meta.description || '').slice(0, 300),
@@ -601,8 +622,16 @@ function customAgent(c) {
       .filter((l) => /^\s*[-*]\s+/.test(l))
       .slice(0, 4)
       .map((l) => l.replace(/^\s*[-*]\s+/, '').slice(0, 160)),
-    inputs: r.runner === 'document' ? ['The epic, its documents, issues and test results'] : ['The issue and the repository'],
-    output: r.runner === 'document' ? 'A Markdown document on the epic' : r.writes ? 'A diff to review' : 'Findings (read-only)',
+    inputs:
+      r.runner === 'document'
+        ? ['The epic, its documents, issues and test results']
+        : ['The issue and the repository'],
+    output:
+      r.runner === 'document'
+        ? 'A Markdown document on the epic'
+        : r.writes
+          ? 'A diff to review'
+          : 'Findings (read-only)',
     where,
     model: d.model || 'sonnet',
     effort: d.effort || 'medium',
@@ -622,9 +651,11 @@ async function allAgents() {
 }
 
 // ---------------------------------------------------------------- roles: which agent does each job
-// Code jobs ask for a role, not a fixed agent, so the built-in agents can be removed and custom ones take over.
-// An administrator picks the agent per role (Administration → Agents → Default agents); otherwise the built-in agent
-// of that name when it's there, otherwise the first enabled agent of the right kind (edits code / read-only).
+// Code jobs ask for a role, not a fixed agent, so the built-in agents can be removed and custom
+// ones take over.
+// An administrator picks the agent per role (Administration → Agents → Default agents); otherwise
+// the built-in agent of that name when it's there, otherwise the first enabled agent of the right
+// kind (edits code / read-only).
 export const ROLES = {
   build: { label: 'Write code', writes: true, builtIn: 'build' },
   frontend: { label: 'Frontend repository', writes: true, builtIn: 'frontend', fallback: 'build' },
@@ -711,7 +742,8 @@ function clean(o: any = {}) {
     if (typeof s.enabled === 'boolean') v.enabled = s.enabled;
     if (MODELS.includes(s.model)) v.model = s.model;
     if (EFFORTS.includes(s.effort)) v.effort = s.effort;
-    if (typeof s.instructions === 'string' && s.instructions.trim()) v.instructions = s.instructions.slice(0, 4000);
+    if (typeof s.instructions === 'string' && s.instructions.trim())
+      v.instructions = s.instructions.slice(0, 4000);
     if (Object.keys(v).length) out[a.id] = v;
   }
   return out;
@@ -742,7 +774,9 @@ export async function getAgentSettings({ fresh = false }: any = {}) {
   C.at = Date.now();
   return C.v;
 }
-const cleanRemoved = (list) => [...new Set((Array.isArray(list) ? list : []).filter((id) => AGENTS.some((a) => a.id === id)))];
+const cleanRemoved = (list) => [
+  ...new Set((Array.isArray(list) ? list : []).filter((id) => AGENTS.some((a) => a.id === id))),
+];
 const cleanRoles = (o) =>
   Object.fromEntries(
     Object.entries<any>(o && typeof o === 'object' ? o : {}).filter(
@@ -779,7 +813,8 @@ export async function saveCustomAgent(actor, { id, md }: any) {
   let cid = id && list.some((c) => c.id === id) ? id : `custom-${slug(d.name)}`;
   if (!id) {
     let n = 2;
-    while (list.some((c) => c.id === cid) || AGENTS.some((a) => a.id === cid)) cid = `custom-${slug(d.name)}-${n++}`;
+    while (list.some((c) => c.id === cid) || AGENTS.some((a) => a.id === cid))
+      cid = `custom-${slug(d.name)}-${n++}`;
   }
   const i = list.findIndex((c) => c.id === cid);
   if (i >= 0) list[i] = { id: cid, md };
@@ -823,11 +858,17 @@ export async function resolveAgent(id) {
     instructions: o.instructions || '',
   };
 }
-/** The catalog for the browser: definitions plus overrides (prompts included, so admins see what each agent is told). */
+/**
+ * The catalog for the browser: definitions plus overrides (prompts included, so admins see what
+ * each agent is told).
+ */
 export async function publicAgents() {
   const s = await getAgentSettings({ fresh: true });
   return {
-    agents: [...AGENTS.filter((a) => !s.removed.includes(a.id)), ...(s.custom || []).map(customAgent)].map((a) => {
+    agents: [
+      ...AGENTS.filter((a) => !s.removed.includes(a.id)),
+      ...(s.custom || []).map(customAgent),
+    ].map((a) => {
       const o = s.agents[a.id] || {};
       return {
         ...a,
@@ -861,7 +902,12 @@ export async function publicAgents() {
       await Promise.all(
         Object.keys(ROLES).map(async (k) => [
           k,
-          { label: ROLES[k].label, writes: ROLES[k].writes, chosen: s.roles?.[k] || '', agent: await agentForRole(k) },
+          {
+            label: ROLES[k].label,
+            writes: ROLES[k].writes,
+            chosen: s.roles?.[k] || '',
+            agent: await agentForRole(k),
+          },
         ]),
       ),
     ),
@@ -898,10 +944,17 @@ export async function claudeAgentsJson({ notes = '', checkTool = '' }: any = {})
 /** Throws when an administrator turned the agent off. */
 export async function ensureAgent(id) {
   const a = await resolveAgent(id);
-  if (!a.enabled) throw Object.assign(new Error(`The ${a.name} agent is turned off in Administration → Agents.`), { status: 400 });
+  if (!a.enabled)
+    throw Object.assign(
+      new Error(`The ${a.name} agent is turned off in Administration → Agents.`),
+      { status: 400 },
+    );
   return a;
 }
-/** The administrator's extra instructions for an agent, as a block to add to a system prompt ('' when none). */
+/**
+ * The administrator's extra instructions for an agent, as a block to add to a system prompt (''
+ * when none).
+ */
 export async function agentInstructions(id) {
   let a;
   try {
@@ -909,5 +962,7 @@ export async function agentInstructions(id) {
   } catch {
     return '';
   }
-  return a.instructions ? `\n\nInstructions from your team's administrator for the ${a.name} agent:\n${a.instructions}` : '';
+  return a.instructions
+    ? `\n\nInstructions from your team's administrator for the ${a.name} agent:\n${a.instructions}`
+    : '';
 }

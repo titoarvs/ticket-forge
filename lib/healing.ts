@@ -1,7 +1,8 @@
-// Self-healing Agent: when an automated test fails because the page changed (a renamed button, a moved field, a new
-// step, a missing wait on an assertion), it reads the page as it was at the failure and rewrites the script. The caller
-// re-runs the healed script once and keeps it only if it passes. Real product bugs are never "healed": the agent must
-// not change what the test proves (its assertions on the expected result).
+// Self-healing Agent: when an automated test fails because the page changed (a renamed button, a
+// moved field, a new step, a missing wait on an assertion), it reads the page as it was at the
+// failure and rewrites the script. The caller re-runs the healed script once and keeps it only if
+// it passes. Real product bugs are never "healed": the agent must not change what the test proves
+// (its assertions on the expected result).
 import { askJson } from './claude';
 import { agentInstructions } from './agents';
 import { contextBlock } from './appcontext';

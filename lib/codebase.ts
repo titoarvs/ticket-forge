@@ -1,5 +1,6 @@
 // Reads a web app's code for route scanning: a folder on this computer, or a GitHub repository.
-// Only file names and the few router files needed are read; nothing is stored or sent anywhere else.
+// Only file names and the few router files needed are read; nothing is stored or sent anywhere
+// else.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -67,10 +68,15 @@ function parseRepo(spec) {
 
 const gh: any = (args) =>
   new Promise((resolve, reject) => {
-    execFile('gh', args, { timeout: 30000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    execFile('gh', args, { timeout: 30000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout) =>
+      err ? reject(err) : resolve(stdout),
+    );
   });
 
-/** A GitHub repository. Auth: the project's token, GITHUB_TOKEN, the signed-in `gh` CLI, or public access. */
+/**
+ * A GitHub repository. Auth: the project's token, GITHUB_TOKEN, the signed-in `gh` CLI, or public
+ * access.
+ */
 export async function githubReader(spec, { branch: wantBranch, token }: any = {}) {
   const { owner, repo, branch: urlBranch, sub } = parseRepo(spec);
   const tok = token || process.env.GITHUB_TOKEN || '';
@@ -86,21 +92,30 @@ export async function githubReader(spec, { branch: wantBranch, token }: any = {}
       }
     }
     const res = await fetch(`https://api.github.com/${p}`, {
-      headers: { 'User-Agent': 'TicketForge', Accept: 'application/vnd.github+json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
+      headers: {
+        'User-Agent': 'TicketForge',
+        Accept: 'application/vnd.github+json',
+        ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+      },
       signal: AbortSignal.timeout(30000),
     });
     if (res.status === 404)
       throw fail(
         `GitHub couldn’t find ${owner}/${repo}. If it’s private, add a GitHub token for this project (or sign in with the gh CLI).`,
       );
-    if (res.status === 401) throw fail('GitHub rejected the token. Check it, or remove it to use public access.');
+    if (res.status === 401)
+      throw fail('GitHub rejected the token. Check it, or remove it to use public access.');
     if (res.status === 403 || res.status === 429)
-      throw fail('GitHub’s rate limit was reached. Add a GitHub token for this project, or try again later.');
+      throw fail(
+        'GitHub’s rate limit was reached. Add a GitHub token for this project, or try again later.',
+      );
     if (!res.ok) throw fail(`GitHub error ${res.status}.`);
     return res.json();
   };
   const branch = wantBranch || urlBranch || (await api(`repos/${owner}/${repo}`)).default_branch;
-  const tree = await api(`repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+  const tree = await api(
+    `repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+  );
   const prefix = sub ? `${sub.replace(/\/+$/, '')}/` : '';
   const files = (tree.tree || [])
     .filter((e) => e.type === 'blob' && e.path.startsWith(prefix))

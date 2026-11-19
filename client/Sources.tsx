@@ -1,7 +1,7 @@
 'use client';
-// Source documents: the document the project was created from, plus every document or description added later
-// (Add feature with AI, or attached for reference). Read them formatted or as plain text, search inside them,
-// and see the epics and issues each one produced.
+// Source documents: the document the project was created from, plus every document or description
+// added later (Add feature with AI, or attached for reference). Read them formatted or as plain
+// text, search inside them, and see the epics and issues each one produced.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   S,
@@ -59,7 +59,8 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 const looksMarkdown = (s: string) => /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|\|.+\|)/m.test(s);
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const fmtBytes = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const fmtBytes = (n: number) =>
+  n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
 /** Extracted text laid out as a page: Markdown formatting when present, otherwise paragraphs. Lines that a PDF
  *  broke mid-sentence are joined back up. */
@@ -77,11 +78,19 @@ function TextPage({ text }: { text: string }) {
   return (
     <>
       {paras.map((ls, i) => {
-        const heading = ls.length === 1 && ls[0].length < 70 && !/[.,;:]$/.test(ls[0]) && /^[A-Z0-9]/.test(ls[0]);
+        const heading =
+          ls.length === 1 && ls[0].length < 70 && !/[.,;:]$/.test(ls[0]) && /^[A-Z0-9]/.test(ls[0]);
         if (heading) return <h3 key={i}>{ls[0]}</h3>;
         const out: React.ReactNode[] = [];
         ls.forEach((l, j) => {
-          if (j) out.push(/[.:;!?]$/.test(ls[j - 1]) || /^([-•*]|\d+[.)])\s/.test(l) ? <br key={`b${j}`} /> : ' ');
+          if (j)
+            out.push(
+              /[.:;!?]$/.test(ls[j - 1]) || /^([-•*]|\d+[.)])\s/.test(l) ? (
+                <br key={`b${j}`} />
+              ) : (
+                ' '
+              ),
+            );
           out.push(l);
         });
         return <p key={i}>{out}</p>;
@@ -201,8 +210,13 @@ function AddDocModal() {
             if (d) d.file = meta;
           }),
         )
-        .catch(() => toast('The document was added, but its original file couldn’t be kept.', 'err'));
-    if (thenFeature) openModal(<FeatureModal initialDoc={{ filename: doc.name, text: doc.text }} sourceId={doc.id} />);
+        .catch(() =>
+          toast('The document was added, but its original file couldn’t be kept.', 'err'),
+        );
+    if (thenFeature)
+      openModal(
+        <FeatureModal initialDoc={{ filename: doc.name, text: doc.text }} sourceId={doc.id} />,
+      );
   };
   const ok = text.trim().length > 0;
   return (
@@ -211,13 +225,19 @@ function AddDocModal() {
       wide
       actions={[
         { label: 'Cancel' },
-        { label: 'Add and plan work with AI', kind: 'ai', onClick: () => save(true), disabled: !ok, hidden: !can('ai.use') },
+        {
+          label: 'Add and plan work with AI',
+          kind: 'ai',
+          onClick: () => save(true),
+          disabled: !ok,
+          hidden: !can('ai.use'),
+        },
         { label: 'Add document', kind: 'primary', onClick: () => save(false), disabled: !ok },
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Keep supporting documents with the project: change requests, specs, meeting notes. You can plan new epics and issues from one now or
-        later.
+        Keep supporting documents with the project: change requests, specs, meeting notes. You can
+        plan new epics and issues from one now or later.
       </p>
       <input
         ref={fileRef}
@@ -244,11 +264,20 @@ function AddDocModal() {
       </span>
       <label className="field" style={{ marginTop: 12 }}>
         <span>Name</span>
-        <TF value={name} placeholder="e.g. Change request 12 — loyalty points" onChange={(e) => setName(e.target.value)} />
+        <TF
+          value={name}
+          placeholder="e.g. Change request 12 — loyalty points"
+          onChange={(e) => setName(e.target.value)}
+        />
       </label>
       <label className="field">
         <span>Text</span>
-        <TA value={text} rows={12} placeholder="Paste the document text…" onChange={(e) => setText(e.target.value)} />
+        <TA
+          value={text}
+          rows={12}
+          placeholder="Paste the document text…"
+          onChange={(e) => setText(e.target.value)}
+        />
       </label>
       {ok && (
         <p className="muted small" style={{ margin: 0 }}>
@@ -275,12 +304,17 @@ export function Sources() {
   const canAdd = can('issue.create');
   const canEdit = can('project.settings') || can('issue.create');
 
-  const hits = useMemo(() => (q && sel ? (sel.text.match(new RegExp(escapeRe(q), 'gi')) || []).length : 0), [q, sel]);
+  const hits = useMemo(
+    () => (q && sel ? (sel.text.match(new RegExp(escapeRe(q), 'gi')) || []).length : 0),
+    [q, sel],
+  );
   useEffect(() => {
     setHit(0);
   }, [q, sel?.id]);
   useEffect(() => {
-    bodyRef.current?.querySelector(`mark[data-hit="${hit}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    bodyRef.current
+      ?.querySelector(`mark[data-hit="${hit}"]`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [hit, q, sel?.id]);
 
   const select = (id: string) => {
@@ -329,8 +363,8 @@ export function Sources() {
           }
         >
           <p>
-            This project was created without a requirements document. Documents you import with <b>Add feature with AI</b> or add here are
-            kept on this page.
+            This project was created without a requirements document. Documents you import with{' '}
+            <b>Add feature with AI</b> or add here are kept on this page.
           </p>
         </EmptyState>
       </>
@@ -340,7 +374,11 @@ export function Sources() {
   const isDocx = Boolean(sel.file && /wordprocessingml/.test(sel.file.mime));
   const print = () => {
     if (isPdf) {
-      window.open(`/api/files/${sel.file!.id}/${encodeURIComponent(sel.file!.name)}`, '_blank', 'noopener');
+      window.open(
+        `/api/files/${sel.file!.id}/${encodeURIComponent(sel.file!.name)}`,
+        '_blank',
+        'noopener',
+      );
       return;
     }
     if (isDocx) {
@@ -501,7 +539,14 @@ export function Sources() {
               {canAdd && can('ai.use') && (
                 <button
                   className="btn ai sm"
-                  onClick={() => openModal(<FeatureModal initialDoc={{ filename: sel.name, text: sel.text }} sourceId={sel.id} />)}
+                  onClick={() =>
+                    openModal(
+                      <FeatureModal
+                        initialDoc={{ filename: sel.name, text: sel.text }}
+                        sourceId={sel.id}
+                      />,
+                    )
+                  }
                   title="Plan more epics and issues from this document"
                 >
                   <Ico svg={I.sparkle} />
@@ -518,10 +563,20 @@ export function Sources() {
               </button>
               {canEdit && sel.kind !== 'original' && (
                 <>
-                  <button className="icon-btn" title="Rename" aria-label="Rename document" onClick={rename}>
+                  <button
+                    className="icon-btn"
+                    title="Rename"
+                    aria-label="Rename document"
+                    onClick={rename}
+                  >
                     <Ico svg={I.pencil} />
                   </button>
-                  <button className="icon-btn" title="Remove" aria-label="Remove document" onClick={remove}>
+                  <button
+                    className="icon-btn"
+                    title="Remove"
+                    aria-label="Remove document"
+                    onClick={remove}
+                  >
                     <Ico svg={I.trash} />
                   </button>
                 </>
@@ -540,7 +595,11 @@ export function Sources() {
                 <div className="row" style={{ gap: 6, marginBottom: 6 }}>
                   <span className="muted small">Epics</span>
                   {epics.map((e: Any) => (
-                    <button key={e.id} className="src-chip" onClick={() => openDrawer('epic', e.id)}>
+                    <button
+                      key={e.id}
+                      className="src-chip"
+                      onClick={() => openDrawer('epic', e.id)}
+                    >
                       <Swatch color={e.color} />
                       {e.title}
                     </button>
@@ -571,7 +630,8 @@ export function Sources() {
               )}
               {(sel.issueIds || []).length > issues.length && (
                 <p className="muted small" style={{ margin: '4px 0 0' }}>
-                  {(sel.issueIds || []).length - issues.length} issue(s) from this document were deleted since.
+                  {(sel.issueIds || []).length - issues.length} issue(s) from this document were
+                  deleted since.
                 </p>
               )}
               {[
@@ -630,7 +690,12 @@ export function Sources() {
                 <Ico svg={I.doc} />
                 Document
               </button>
-              <button role="radio" aria-checked={mode === 'text'} className={mode === 'text' ? 'on' : ''} onClick={() => setMode('text')}>
+              <button
+                role="radio"
+                aria-checked={mode === 'text'}
+                className={mode === 'text' ? 'on' : ''}
+                onClick={() => setMode('text')}
+              >
                 Text
               </button>
             </div>
@@ -660,10 +725,18 @@ export function Sources() {
             )}
             {q && hits > 1 && (
               <>
-                <button className="icon-btn" aria-label="Previous match" onClick={() => setHit((h) => (h - 1 + hits) % hits)}>
+                <button
+                  className="icon-btn"
+                  aria-label="Previous match"
+                  onClick={() => setHit((h) => (h - 1 + hits) % hits)}
+                >
                   <Ico svg={I.up} />
                 </button>
-                <button className="icon-btn" aria-label="Next match" onClick={() => setHit((h) => (h + 1) % hits)}>
+                <button
+                  className="icon-btn"
+                  aria-label="Next match"
+                  onClick={() => setHit((h) => (h + 1) % hits)}
+                >
                   <Ico svg={I.down} />
                 </button>
               </>
@@ -705,7 +778,11 @@ export function Sources() {
               <span>
                 Original file: <b>{sel.file.name}</b> · {fmtBytes(sel.file.bytes)}
               </span>
-              <a href={`/api/files/${sel.file.id}/${encodeURIComponent(sel.file.name)}`} target="_blank" rel="noopener noreferrer">
+              <a
+                href={`/api/files/${sel.file.id}/${encodeURIComponent(sel.file.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Open
               </a>
               <a href={`/api/files/${sel.file.id}?download=1`}>Download</a>
@@ -720,9 +797,14 @@ export function Sources() {
             <div className="src-file small muted">
               <Ico svg={I.doc} />
               <span>
-                Showing the document’s text as a page. Have the original PDF or Word file? Attach it to see it exactly as written.
+                Showing the document’s text as a page. Have the original PDF or Word file? Attach it
+                to see it exactly as written.
               </span>
-              <button className="btn sm" disabled={attaching} onClick={() => attachRef.current?.click()}>
+              <button
+                className="btn sm"
+                disabled={attaching}
+                onClick={() => attachRef.current?.click()}
+              >
                 {attaching ? (
                   <>
                     <Spinner />

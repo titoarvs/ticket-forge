@@ -1,7 +1,8 @@
 'use client';
 // Test automation: "Sync with the repository" (lib/reposync.ts) and the Playwright run settings.
-// Sync reads the project's local repository: its pages, what changed since the last sync, the test cases those changes
-// affect, and features already delivered. Everything comes back as a review; nothing changes until you apply it.
+// Sync reads the project's local repository: its pages, what changed since the last sync, the test
+// cases those changes affect, and features already delivered. Everything comes back as a review;
+// nothing changes until you apply it.
 import { useState } from 'react';
 import {
   S,
@@ -36,23 +37,31 @@ const doneStatus = () => P().workflow.find((w: Any) => w.category === 'done')?.n
 const stepsOf = (s: Any) => (Array.isArray(s) ? s : s ? [String(s)] : []);
 let running = false;
 
-// ---------------------------------------------------------------- sync card (Test automation → App setup)
+// ---------------------------------------------------------------- sync card (Test automation → App
+// setup)
 /** Repository sync, unless the owner locked it (Administration → Features). */
 export function RepoSyncCard() {
   if (!feat('reposync'))
     return (
       <p className="muted small" style={{ margin: 0 }}>
-        <b>Repository sync is locked.</b> {S.user?.isOwner ? 'Unlock it in Administration → Features.' : 'The owner locked this feature.'}
+        <b>Repository sync is locked.</b>{' '}
+        {S.user?.isOwner
+          ? 'Unlock it in Administration → Features.'
+          : 'The owner locked this feature.'}
       </p>
     );
   return <RepoSyncCardInner />;
 }
 function RepoSyncCardInner() {
   const p = P();
-  const dir = p.dev?.localPath || (appSetup(p).source?.kind === 'folder' ? appSetup(p).source.location : '');
+  const dir =
+    p.dev?.localPath || (appSetup(p).source?.kind === 'folder' ? appSetup(p).source.location : '');
   const last = p.automation?.repoSync;
   const canRun = can('project.settings');
-  const [opts, setOpts] = useState({ testCases: can('ai.use'), backlog: can('ai.use') && can('issue.create') });
+  const [opts, setOpts] = useState({
+    testCases: can('ai.use'),
+    backlog: can('ai.use') && can('issue.create'),
+  });
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const run = async () => {
@@ -64,9 +73,18 @@ function RepoSyncCardInner() {
     setBusy(true);
     setLog([]);
     const ctrl = new AbortController();
-    const task = startTask('Syncing with the repository', { detail: dir, kind: 'test', cancel: () => ctrl.abort() });
+    const task = startTask('Syncing with the repository', {
+      detail: dir,
+      kind: 'test',
+      cancel: () => ctrl.abort(),
+    });
     try {
-      const res = await api(`/api/projects/${p.id}/reposync`, { method: 'POST', raw: true, signal: ctrl.signal, body: aiBody(opts) });
+      const res = await api(`/api/projects/${p.id}/reposync`, {
+        method: 'POST',
+        raw: true,
+        signal: ctrl.signal,
+        body: aiBody(opts),
+      });
       let out: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'progress') {
@@ -97,7 +115,11 @@ function RepoSyncCardInner() {
     setBusy(true);
     setLog([]);
     const ctrl = new AbortController();
-    const task = startTask('Writing test cases from the code', { detail: dir, kind: 'test', cancel: () => ctrl.abort() });
+    const task = startTask('Writing test cases from the code', {
+      detail: dir,
+      kind: 'test',
+      cancel: () => ctrl.abort(),
+    });
     try {
       const res = await api(`/api/projects/${p.id}/reposync`, {
         method: 'POST',
@@ -108,7 +130,10 @@ function RepoSyncCardInner() {
       let out: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'progress') {
-          setLog((l) => [...l.filter((x) => !/^Reading .* and writing its test cases/.test(x)), ev.message]);
+          setLog((l) => [
+            ...l.filter((x) => !/^Reading .* and writing its test cases/.test(x)),
+            ev.message,
+          ]);
           const m = ev.message.match(/(\d+)\/(\d+)$/);
           task.update({
             detail: ev.message.replace(/ \d+\/\d+$/, '').replace(/…$/, ''),
@@ -118,7 +143,9 @@ function RepoSyncCardInner() {
         else if (ev.type === 'error') throw new Error(ev.error);
       });
       if (!out) throw new Error('Nothing came back.');
-      task.finish(`${out.pages.reduce((n: number, x: Any) => n + x.testCases.length, 0)} test cases ready to review`);
+      task.finish(
+        `${out.pages.reduce((n: number, x: Any) => n + x.testCases.length, 0)} test cases ready to review`,
+      );
       openModal(<PageTestsReview r={out} />);
     } catch (e: Any) {
       if (e.name === 'AbortError') {
@@ -139,7 +166,11 @@ function RepoSyncCardInner() {
     setBusy(true);
     setLog([]);
     const ctrl = new AbortController();
-    const task = startTask('Finding built features', { detail: dir, kind: 'ai', cancel: () => ctrl.abort() });
+    const task = startTask('Finding built features', {
+      detail: dir,
+      kind: 'ai',
+      cancel: () => ctrl.abort(),
+    });
     try {
       const res = await api(`/api/projects/${p.id}/reposync`, {
         method: 'POST',
@@ -160,7 +191,9 @@ function RepoSyncCardInner() {
         else if (ev.type === 'error') throw new Error(ev.error);
       });
       if (!out) throw new Error('Nothing came back.');
-      task.finish(`${out.epics.reduce((n: number, e: Any) => n + e.features.length, 0)} features in ${out.epics.length} epics`);
+      task.finish(
+        `${out.epics.reduce((n: number, e: Any) => n + e.features.length, 0)} features in ${out.epics.length} epics`,
+      );
       openModal(<FeatureMapReview r={out} />);
     } catch (e: Any) {
       if (e.name === 'AbortError') {
@@ -222,8 +255,8 @@ function RepoSyncCardInner() {
             <b>Sync changes</b>
           </div>
           <p className="muted small">
-            Adds new pages, finds the pages that changed since the last sync, and proposes the test-case updates and backlog changes that
-            follow.
+            Adds new pages, finds the pages that changed since the last sync, and proposes the
+            test-case updates and backlog changes that follow.
           </p>
           <div className="rt-opts">
             <CB
@@ -258,11 +291,17 @@ function RepoSyncCardInner() {
             <b>Find built features</b>
           </div>
           <p className="muted small">
-            Reads the <b>code</b>: every page’s screens, actions and fields, the API endpoints and data models
-            {P().devBackend?.enabled ? ' (frontend and backend)' : ''}. Organizes what’s built into <b>epics</b>, as {doneStatus()} issues.
-            Documents and history only help name things; nothing is added from them alone.
+            Reads the <b>code</b>: every page’s screens, actions and fields, the API endpoints and
+            data models
+            {P().devBackend?.enabled ? ' (frontend and backend)' : ''}. Organizes what’s built into{' '}
+            <b>epics</b>, as {doneStatus()} issues. Documents and history only help name things;
+            nothing is added from them alone.
           </p>
-          <button className="btn ai sm" disabled={!dir || !aiOk || !can('issue.create') || busy} onClick={findFeatures}>
+          <button
+            className="btn ai sm"
+            disabled={!dir || !aiOk || !can('issue.create') || busy}
+            onClick={findFeatures}
+          >
             <Ico svg={I.sparkle} />
             Find built features
           </button>
@@ -273,9 +312,14 @@ function RepoSyncCardInner() {
             <b>Test cases from the code</b>
           </div>
           <p className="muted small">
-            Writes test cases for every existing page from its code, using its real labels and messages, on the issue each page implements.
+            Writes test cases for every existing page from its code, using its real labels and
+            messages, on the issue each page implements.
           </p>
-          <button className="btn ai sm" disabled={!dir || !aiOk || !can('issue.edit') || busy} onClick={writeTests}>
+          <button
+            className="btn ai sm"
+            disabled={!dir || !aiOk || !can('issue.edit') || busy}
+            onClick={writeTests}
+          >
             <Ico svg={I.sparkle} />
             Write test cases
           </button>
@@ -292,7 +336,8 @@ function RepoSyncCardInner() {
         </ol>
       )}
       <p className="muted small repo-note">
-        Everything is read on this computer and comes back as a review: nothing changes until you apply it.
+        Everything is read on this computer and comes back as a review: nothing changes until you
+        apply it.
       </p>
     </div>
   );
@@ -308,16 +353,28 @@ export function FeatureMapReview({ r }: { r: Any }) {
     (f.existingId && isDone(P().tickets.find((t: Any) => t.id === f.existingId) || {}));
   const cur = (f: Any) => P().tickets.find((t: Any) => t.id === f.existingId);
   // Done, already in an epic and already sized: nothing to change.
-  const settled = (f: Any) => isDoneF(f) && (f.existingEpicId || cur(f)?.epicId) && (cur(f)?.storyPoints != null || !f.storyPoints);
+  const settled = (f: Any) =>
+    isDoneF(f) &&
+    (f.existingEpicId || cur(f)?.epicId) &&
+    (cur(f)?.storyPoints != null || !f.storyPoints);
   const [pick, setPick] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(r.epics.flatMap((e: Any, ei: number) => e.features.map((f: Any, fi: number) => [key(ei, fi), !settled(f)]))),
+    Object.fromEntries(
+      r.epics.flatMap((e: Any, ei: number) =>
+        e.features.map((f: Any, fi: number) => [key(ei, fi), !settled(f)]),
+      ),
+    ),
   );
   const [open, setOpen] = useState<string | null>(null);
   const [closed, setClosed] = useState<Record<number, boolean>>({});
   const all = r.epics.flatMap((e: Any) => e.features);
   const chosen = Object.values(pick).filter(Boolean).length;
   const setEpic = (ei: number, v: boolean) =>
-    setPick({ ...pick, ...Object.fromEntries(r.epics[ei].features.map((f: Any, fi: number) => [key(ei, fi), v && !settled(f)])) });
+    setPick({
+      ...pick,
+      ...Object.fromEntries(
+        r.epics[ei].features.map((f: Any, fi: number) => [key(ei, fi), v && !settled(f)]),
+      ),
+    });
   const apply = () => {
     let newEpics = 0,
       created = 0,
@@ -355,7 +412,11 @@ export function FeatureMapReview({ r }: { r: Any }) {
             } // size issues that had none
             if (!isDoneF(f)) {
               setField(t, 'status', done, 'Repository sync');
-              logEvent(t, `marked ${done}: already built (${f.sources.slice(0, 3).join(', ') || 'found in the code'})`, 'Repository sync');
+              logEvent(
+                t,
+                `marked ${done}: already built (${f.sources.slice(0, 3).join(', ') || 'found in the code'})`,
+                'Repository sync',
+              );
               marked++;
             }
           } else {
@@ -395,7 +456,10 @@ export function FeatureMapReview({ r }: { r: Any }) {
         .filter(Boolean)
         .join(' · ') + '.',
       'ok',
-      { title: 'Backlog organized', action: { label: 'Open Epics', onClick: () => S.nav(`/p/${P().id}/epics`) } },
+      {
+        title: 'Backlog organized',
+        action: { label: 'Open Epics', onClick: () => S.nav(`/p/${P().id}/epics`) },
+      },
     );
   };
   return (
@@ -407,7 +471,9 @@ export function FeatureMapReview({ r }: { r: Any }) {
         { label: 'Cancel' },
         {
           label: (() => {
-            const sel = r.epics.flatMap((e: Any, ei: number) => e.features.filter((_: Any, fi: number) => pick[key(ei, fi)]));
+            const sel = r.epics.flatMap((e: Any, ei: number) =>
+              e.features.filter((_: Any, fi: number) => pick[key(ei, fi)]),
+            );
             const nNew = sel.filter((f: Any) => !f.existingId).length;
             return nNew === sel.length
               ? `Add ${nNew} ticket${nNew === 1 ? '' : 's'}`
@@ -423,22 +489,25 @@ export function FeatureMapReview({ r }: { r: Any }) {
     >
       <div className="sync-sum">
         <span>
-          <Ico svg={I.pr} /> <b>{r.repo.branch}</b> at <code>{String(r.repo.head).slice(0, 7)}</code>
+          <Ico svg={I.pr} /> <b>{r.repo.branch}</b> at{' '}
+          <code>{String(r.repo.head).slice(0, 7)}</code>
         </span>
         <span>
           {r.code ? (
             <>
-              From the code: {r.code.pages} pages, {r.code.endpoints} endpoints, {r.code.models} data models
+              From the code: {r.code.pages} pages, {r.code.endpoints} endpoints, {r.code.models}{' '}
+              data models
               {r.code.backend ? ' (with the backend)' : ''}
             </>
           ) : (
             <>Read {r.pages} pages</>
           )}{' '}
-          · hints from {r.docs.length} .md file{r.docs.length === 1 ? '' : 's'} and {r.commits} commits
+          · hints from {r.docs.length} .md file{r.docs.length === 1 ? '' : 's'} and {r.commits}{' '}
+          commits
         </span>
         <span>
-          {all.length} small tickets · {new Set(all.map((f: Any) => f.group || f.title)).size} features · {r.epics.length} epics (
-          {r.epics.filter((e: Any) => e.isNew).length} new)
+          {all.length} small tickets · {new Set(all.map((f: Any) => f.group || f.title)).size}{' '}
+          features · {r.epics.length} epics ({r.epics.filter((e: Any) => e.isNew).length} new)
         </span>
       </div>
       <div className="sync-pane">
@@ -465,21 +534,31 @@ export function FeatureMapReview({ r }: { r: Any }) {
                   <TypeIconEpic />
                   {e.epicKey && <span className="key">{e.epicKey}</span>}
                   <b>{e.title}</b>
-                  <span className={`pg-badge ${e.isNew ? 'dyn' : ''}`}>{e.isNew ? 'New epic' : 'Existing epic'}</span>
+                  <span className={`pg-badge ${e.isNew ? 'dyn' : ''}`}>
+                    {e.isNew ? 'New epic' : 'Existing epic'}
+                  </span>
                 </button>
                 <span className="muted small fm-sum">
-                  {new Set(e.features.map((f: Any) => f.group || f.title)).size} features · {e.features.length} tickets ·{' '}
-                  {e.features.reduce((x: number, f: Any) => x + (f.storyPoints || 0), 0)} pts · {n} selected
+                  {new Set(e.features.map((f: Any) => f.group || f.title)).size} features ·{' '}
+                  {e.features.length} tickets ·{' '}
+                  {e.features.reduce((x: number, f: Any) => x + (f.storyPoints || 0), 0)} pts · {n}{' '}
+                  selected
                 </span>
               </div>
-              {e.description && !closed[ei] && <p className="muted small fm-desc">{e.description}</p>}
-              {e.error && <p className="warn-text small fm-desc">Couldn’t write the details: {e.error}</p>}
+              {e.description && !closed[ei] && (
+                <p className="muted small fm-desc">{e.description}</p>
+              )}
+              {e.error && (
+                <p className="warn-text small fm-desc">Couldn’t write the details: {e.error}</p>
+              )}
               {!closed[ei] &&
                 e.features.map((f: Any, fi: number) => {
                   const k = key(ei, fi);
                   const g = f.group || f.title;
                   const size = e.features.filter((x: Any) => (x.group || x.title) === g).length;
-                  const head = size > 1 && g !== (fi > 0 ? e.features[fi - 1].group || e.features[fi - 1].title : null);
+                  const head =
+                    size > 1 &&
+                    g !== (fi > 0 ? e.features[fi - 1].group || e.features[fi - 1].title : null);
                   return (
                     <div key={k}>
                       {head && (
@@ -488,7 +567,9 @@ export function FeatureMapReview({ r }: { r: Any }) {
                           <span className="muted"> · split into {size} tickets</span>
                         </div>
                       )}
-                      <div className={`sync-item pt-tc fm-ticket ${size > 1 ? 'in-group' : ''} ${pick[k] ? '' : 'off'}`}>
+                      <div
+                        className={`sync-item pt-tc fm-ticket ${size > 1 ? 'in-group' : ''} ${pick[k] ? '' : 'off'}`}
+                      >
                         <CB
                           checked={Boolean(pick[k])}
                           disabled={settled(f)}
@@ -510,7 +591,9 @@ export function FeatureMapReview({ r }: { r: Any }) {
                                 {f.existingKey} ·{' '}
                                 {[
                                   !(f.existingEpicId || cur(f)?.epicId) && 'move into this epic',
-                                  cur(f)?.storyPoints == null && f.storyPoints && `size ${f.storyPoints} pts`,
+                                  cur(f)?.storyPoints == null &&
+                                    f.storyPoints &&
+                                    `size ${f.storyPoints} pts`,
                                 ]
                                   .filter(Boolean)
                                   .join(' · ')}
@@ -524,8 +607,13 @@ export function FeatureMapReview({ r }: { r: Any }) {
                             )}
                           </div>
                           {!f.existingKey && (
-                            <button className="link-btn small" onClick={() => setOpen(open === k ? null : k)}>
-                              {open === k ? 'Hide details' : `${f.acceptanceCriteria.length} acceptance criteria`}
+                            <button
+                              className="link-btn small"
+                              onClick={() => setOpen(open === k ? null : k)}
+                            >
+                              {open === k
+                                ? 'Hide details'
+                                : `${f.acceptanceCriteria.length} acceptance criteria`}
                             </button>
                           )}
                           {open === k && (
@@ -578,8 +666,8 @@ export function FeatureMapReview({ r }: { r: Any }) {
               ))}
             </ul>
             <p className="muted small" style={{ margin: 0 }}>
-              If one is really built, it may live in a repository TicketForge doesn’t read: set the backend repository in Project settings →
-              Code & GitHub, then run this again.
+              If one is really built, it may live in a repository TicketForge doesn’t read: set the
+              backend repository in Project settings → Code & GitHub, then run this again.
             </p>
           </details>
         )}
@@ -603,9 +691,14 @@ function SyncReview({ r }: { r: Any }) {
   const changedPages = r.pages.filter((pg: Any) => pg.changedFiles.length);
   const gone = a.pages.filter((pg: Any) => pg.fromCode && !inCode.has(pg.path));
   const [tab, setTab] = useState(() =>
-    r.tests.updates.length || r.tests.additions.length ? 'tests' : r.built.done.length || r.built.newIssues.length ? 'backlog' : 'pages',
+    r.tests.updates.length || r.tests.additions.length
+      ? 'tests'
+      : r.built.done.length || r.built.newIssues.length
+        ? 'backlog'
+        : 'pages',
   );
-  const on = (list: Any[], key: (x: Any) => string, init = true) => Object.fromEntries(list.map((x) => [key(x), init]));
+  const on = (list: Any[], key: (x: Any) => string, init = true) =>
+    Object.fromEntries(list.map((x) => [key(x), init]));
   const [pick, setPick] = useState<Record<string, boolean>>(() => ({
     ...on(newPages, (x) => `page:${x.path}`),
     ...on(gone, (x) => `gone:${x.id}`, false),
@@ -616,7 +709,8 @@ function SyncReview({ r }: { r: Any }) {
   }));
   const [open, setOpen] = useState<string | null>(null);
   const tog = (k: string) => setPick({ ...pick, [k]: !pick[k] });
-  const n = (prefix: string) => Object.entries(pick).filter(([k, v]) => v && k.startsWith(prefix)).length;
+  const n = (prefix: string) =>
+    Object.entries(pick).filter(([k, v]) => v && k.startsWith(prefix)).length;
   const total = Object.values(pick).filter(Boolean).length;
   const done = doneStatus();
   const epicName = (id: string) => p.epics.find((e: Any) => e.id === id)?.title || '';
@@ -630,16 +724,33 @@ function SyncReview({ r }: { r: Any }) {
       created = 0;
     mutate((pp: Any) => {
       // Pages
-      pp.automation.app = { pages: [], roles: [], login: {}, notes: '', ...(pp.automation.app || {}) };
+      pp.automation.app = {
+        pages: [],
+        roles: [],
+        login: {},
+        notes: '',
+        ...(pp.automation.app || {}),
+      };
       const x = pp.automation.app;
       x.pages = x.pages
         .filter((pg: Any) => !(pg.fromCode && pick[`gone:${pg.id}`]))
         .map((pg: Any) =>
-          files.has(pg.path) ? { ...pg, file: files.get(pg.path) || pg.file, missing: false } : pg.fromCode ? { ...pg, missing: true } : pg,
+          files.has(pg.path)
+            ? { ...pg, file: files.get(pg.path) || pg.file, missing: false }
+            : pg.fromCode
+              ? { ...pg, missing: true }
+              : pg,
         );
       for (const pg of newPages)
         if (pick[`page:${pg.path}`]) {
-          x.pages.push({ id: uid(), name: pg.name, path: pg.path, description: '', fromCode: true, file: pg.file });
+          x.pages.push({
+            id: uid(),
+            name: pg.name,
+            path: pg.path,
+            description: '',
+            fromCode: true,
+            file: pg.file,
+          });
           pagesAdded++;
         }
       pp.automation.repoSync = {
@@ -657,7 +768,11 @@ function SyncReview({ r }: { r: Any }) {
         const tc = t?.testCases.find((c: Any) => c.id === u.tcId);
         if (!tc) continue;
         Object.assign(tc, u.after, { script: '', status: 'Not run', lastRun: null });
-        logEvent(t, `updated test case “${u.after.title}” after code changes: ${u.why}`, 'Repository sync');
+        logEvent(
+          t,
+          `updated test case “${u.after.title}” after code changes: ${u.why}`,
+          'Repository sync',
+        );
         tcs++;
       }
       for (const ad of r.tests.additions) {
@@ -665,7 +780,11 @@ function SyncReview({ r }: { r: Any }) {
         const t = pp.tickets.find((y: Any) => y.id === ad.ticketId);
         if (!t) continue;
         t.testCases.push({ ...newTest(), ...ad.tc });
-        logEvent(t, `added test case “${ad.tc.title}” for new behaviour: ${ad.why}`, 'Repository sync');
+        logEvent(
+          t,
+          `added test case “${ad.tc.title}” for new behaviour: ${ad.why}`,
+          'Repository sync',
+        );
         tcsAdded++;
       }
       // Backlog: delivered work
@@ -674,7 +793,11 @@ function SyncReview({ r }: { r: Any }) {
         const t = pp.tickets.find((y: Any) => y.id === d.ticketId);
         if (!t) continue;
         setField(t, 'status', done, 'Repository sync');
-        logEvent(t, `marked ${done}: delivered in the repository (${d.evidence})`, 'Repository sync');
+        logEvent(
+          t,
+          `marked ${done}: delivered in the repository (${d.evidence})`,
+          'Repository sync',
+        );
         closed++;
       }
       for (const ni of r.built.newIssues) {
@@ -709,12 +832,17 @@ function SyncReview({ r }: { r: Any }) {
       'ok',
       {
         title: 'Repository synced',
-        action: created || closed ? { label: 'Open backlog', onClick: () => S.nav(`/p/${P().id}/backlog`) } : undefined,
+        action:
+          created || closed
+            ? { label: 'Open backlog', onClick: () => S.nav(`/p/${P().id}/backlog`) }
+            : undefined,
       },
     );
   };
 
-  const Box = ({ k }: { k: string }) => <CB checked={Boolean(pick[k])} onChange={() => tog(k)} aria-label="Include" />;
+  const Box = ({ k }: { k: string }) => (
+    <CB checked={Boolean(pick[k])} onChange={() => tog(k)} aria-label="Include" />
+  );
   const TABS: [string, string, number][] = [
     ['tests', 'Test cases', r.tests.updates.length + r.tests.additions.length],
     ['backlog', 'Already built', r.built.done.length + r.built.newIssues.length],
@@ -727,12 +855,17 @@ function SyncReview({ r }: { r: Any }) {
       persistent
       actions={[
         { label: 'Cancel' },
-        { label: total ? `Apply ${total} change${total > 1 ? 's' : ''}` : 'Mark as synced', kind: 'primary', onClick: apply },
+        {
+          label: total ? `Apply ${total} change${total > 1 ? 's' : ''}` : 'Mark as synced',
+          kind: 'primary',
+          onClick: apply,
+        },
       ]}
     >
       <div className="sync-sum">
         <span>
-          <Ico svg={I.pr} /> <b>{r.repo.branch}</b> at <code>{String(r.repo.head).slice(0, 7)}</code>
+          <Ico svg={I.pr} /> <b>{r.repo.branch}</b> at{' '}
+          <code>{String(r.repo.head).slice(0, 7)}</code>
         </span>
         <span>
           {r.pages.length} pages · {r.repo.frameworks.join(', ') || 'no router found'}
@@ -748,7 +881,13 @@ function SyncReview({ r }: { r: Any }) {
       </div>
       <div className="sync-tabs" role="tablist">
         {TABS.map(([k, l, c]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            className={tab === k ? 'on' : ''}
+            onClick={() => setTab(k)}
+          >
             {l} <span className="count">{c}</span>
           </button>
         ))}
@@ -763,7 +902,9 @@ function SyncReview({ r }: { r: Any }) {
           )}
           {!r.tests.updates.length && !r.tests.additions.length && !r.tests.error && (
             <p className="muted small">
-              {changedPages.length ? 'The changes don’t affect any test case.' : 'No page changed since the last sync.'}
+              {changedPages.length
+                ? 'The changes don’t affect any test case.'
+                : 'No page changed since the last sync.'}
             </p>
           )}
           {r.tests.updates.length > 0 && (
@@ -776,10 +917,14 @@ function SyncReview({ r }: { r: Any }) {
               <Box k={`upd:${u.tcId}`} />
               <div className="sync-body">
                 <div>
-                  <span className="key">{u.ref}</span> <b>{u.after.title}</b> <span className="muted small">· {u.ticketKey}</span>
+                  <span className="key">{u.ref}</span> <b>{u.after.title}</b>{' '}
+                  <span className="muted small">· {u.ticketKey}</span>
                 </div>
                 <div className="muted small">{u.why}</div>
-                <button className="link-btn small" onClick={() => setOpen(open === u.tcId ? null : u.tcId)}>
+                <button
+                  className="link-btn small"
+                  onClick={() => setOpen(open === u.tcId ? null : u.tcId)}
+                >
                   {open === u.tcId ? 'Hide changes' : 'Show changes'}
                 </button>
                 {open === u.tcId && (
@@ -815,7 +960,8 @@ function SyncReview({ r }: { r: Any }) {
           ))}
           {r.tests.additions.length > 0 && (
             <h4 className="sync-h">
-              Add {n('add:')} new test case{r.tests.additions.length > 1 ? 's' : ''} for new behaviour
+              Add {n('add:')} new test case{r.tests.additions.length > 1 ? 's' : ''} for new
+              behaviour
             </h4>
           )}
           {r.tests.additions.map((ad: Any) => {
@@ -825,7 +971,8 @@ function SyncReview({ r }: { r: Any }) {
                 <Box k={k} />
                 <div className="sync-body">
                   <div>
-                    <span className="loz">{ad.tc.type}</span> <b>{ad.tc.title}</b> <span className="muted small">· {ad.ticketKey}</span>
+                    <span className="loz">{ad.tc.type}</span> <b>{ad.tc.title}</b>{' '}
+                    <span className="muted small">· {ad.ticketKey}</span>
                   </div>
                   <div className="muted small">{ad.why}</div>
                 </div>
@@ -847,11 +994,15 @@ function SyncReview({ r }: { r: Any }) {
           )}
           {r.built.done.length > 0 && (
             <h4 className="sync-h">
-              Mark {n('done:')} issue{r.built.done.length > 1 ? 's' : ''} as {done}: delivered in the code
+              Mark {n('done:')} issue{r.built.done.length > 1 ? 's' : ''} as {done}: delivered in
+              the code
             </h4>
           )}
           {r.built.done.map((d: Any) => (
-            <div key={d.ticketId} className={`sync-item ${pick[`done:${d.ticketId}`] ? '' : 'off'}`}>
+            <div
+              key={d.ticketId}
+              className={`sync-item ${pick[`done:${d.ticketId}`] ? '' : 'off'}`}
+            >
               <Box k={`done:${d.ticketId}`} />
               <div className="sync-body">
                 <div>
@@ -868,7 +1019,8 @@ function SyncReview({ r }: { r: Any }) {
           ))}
           {r.built.newIssues.length > 0 && (
             <h4 className="sync-h">
-              Add {n('new:')} delivered feature{r.built.newIssues.length > 1 ? 's' : ''} to the backlog as {done}
+              Add {n('new:')} delivered feature{r.built.newIssues.length > 1 ? 's' : ''} to the
+              backlog as {done}
             </h4>
           )}
           {r.built.newIssues.map((ni: Any) => (
@@ -880,7 +1032,9 @@ function SyncReview({ r }: { r: Any }) {
                   <span className="muted small">
                     · {ni.type}
                     {ni.epicId ? ` · ${epicName(ni.epicId)}` : ' · no epic'}
-                    {ni.acceptanceCriteria.length ? ` · ${ni.acceptanceCriteria.length} acceptance criteria` : ''}
+                    {ni.acceptanceCriteria.length
+                      ? ` · ${ni.acceptanceCriteria.length} acceptance criteria`
+                      : ''}
                   </span>
                 </div>
                 {ni.userStory && (
@@ -928,14 +1082,16 @@ function SyncReview({ r }: { r: Any }) {
             </div>
           ))}
           <h4 className="sync-h">
-            Changed since {r.repo.baseNote.replace(/^since /, '')}: {changedPages.length} page{changedPages.length === 1 ? '' : 's'}
+            Changed since {r.repo.baseNote.replace(/^since /, '')}: {changedPages.length} page
+            {changedPages.length === 1 ? '' : 's'}
           </h4>
           <ul className="sync-changed small">
             {changedPages.map((pg: Any) => (
               <li key={pg.path}>
                 <code>{pg.path}</code>{' '}
                 <span className="muted">
-                  {pg.changedFiles.length} file{pg.changedFiles.length > 1 ? 's' : ''}: {pg.changedFiles.slice(0, 4).join(', ')}
+                  {pg.changedFiles.length} file{pg.changedFiles.length > 1 ? 's' : ''}:{' '}
+                  {pg.changedFiles.slice(0, 4).join(', ')}
                   {pg.changedFiles.length > 4 ? '…' : ''}
                 </span>
               </li>
@@ -944,7 +1100,8 @@ function SyncReview({ r }: { r: Any }) {
           </ul>
           {r.repo.sharedChanged?.length > 0 && (
             <p className="muted small">
-              Shared files changed too (used by most pages, so not pinned on one): {r.repo.sharedChanged.slice(0, 6).join(', ')}
+              Shared files changed too (used by most pages, so not pinned on one):{' '}
+              {r.repo.sharedChanged.slice(0, 6).join(', ')}
               {r.repo.sharedChanged.length > 6 ? '…' : ''}
             </p>
           )}
@@ -954,7 +1111,8 @@ function SyncReview({ r }: { r: Any }) {
   );
 }
 
-// ---------------------------------------------------------------- Playwright run settings (Test automation → Settings)
+// ---------------------------------------------------------------- Playwright run settings (Test
+// automation → Settings)
 const RUN_DEFAULTS = {
   retries: 1,
   testTimeoutSec: 90,
@@ -980,7 +1138,13 @@ export function RunSettingsCard() {
   const set = (k: string, v: Any) =>
     mutate(
       (pp: Any) => {
-        pp.automation.app = { pages: [], roles: [], login: {}, notes: '', ...(pp.automation.app || {}) };
+        pp.automation.app = {
+          pages: [],
+          roles: [],
+          login: {},
+          notes: '',
+          ...(pp.automation.app || {}),
+        };
         pp.automation.app.run = { ...RUN_DEFAULTS, ...(pp.automation.app.run || {}), [k]: v };
       },
       { tag: `run.${k}` },
@@ -998,7 +1162,9 @@ export function RunSettingsCard() {
       <small className="muted">{help}</small>
     </label>
   );
-  const isDefault = JSON.stringify({ ...RUN_DEFAULTS, ...(p.automation?.app?.run || {}) }) === JSON.stringify(RUN_DEFAULTS);
+  const isDefault =
+    JSON.stringify({ ...RUN_DEFAULTS, ...(p.automation?.app?.run || {}) }) ===
+    JSON.stringify(RUN_DEFAULTS);
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="row" style={{ alignItems: 'baseline' }}>
@@ -1018,12 +1184,17 @@ export function RunSettingsCard() {
         )}
       </div>
       <p className="sub">
-        How Playwright runs each test. Retries catch one-off network hiccups; a test that only passes on a retry is marked <b>flaky</b>.
+        How Playwright runs each test. Retries catch one-off network hiccups; a test that only
+        passes on a retry is marked <b>flaky</b>.
       </p>
       <div className="grid3">
         <label className="field">
           <span>Retries when a test fails</span>
-          <SF disabled={!ed} value={rs.retries} onChange={(e) => set('retries', Number(e.target.value))}>
+          <SF
+            disabled={!ed}
+            value={rs.retries}
+            onChange={(e) => set('retries', Number(e.target.value))}
+          >
             {[0, 1, 2, 3].map((x) => (
               <MenuItem key={x} value={x}>
                 {x === 0 ? 'No retries' : `${x} retr${x === 1 ? 'y' : 'ies'}`}
@@ -1032,7 +1203,13 @@ export function RunSettingsCard() {
           </SF>
           <small className="muted">Each retry starts a fresh browser.</small>
         </label>
-        {numF('testTimeoutSec', 'Time limit per test (s)', 'The whole script, sign-in included.', 15, 600)}
+        {numF(
+          'testTimeoutSec',
+          'Time limit per test (s)',
+          'The whole script, sign-in included.',
+          15,
+          600,
+        )}
         <label className="field">
           <span>Screen</span>
           <SF disabled={!ed} value={rs.device} onChange={(e) => set('device', e.target.value)}>
@@ -1044,17 +1221,45 @@ export function RunSettingsCard() {
           </SF>
           <small className="muted">Phone and tablet also turn on touch.</small>
         </label>
-        {numF('actionTimeoutSec', 'Wait for a click or fill (s)', 'How long to wait for an element.', 2, 120)}
-        {numF('navTimeoutSec', 'Wait for a page to load (s)', 'Slow staging servers need more.', 5, 180)}
-        {numF('expectTimeoutSec', 'Wait for a check to pass (s)', 'For expect(…) assertions.', 2, 120)}
+        {numF(
+          'actionTimeoutSec',
+          'Wait for a click or fill (s)',
+          'How long to wait for an element.',
+          2,
+          120,
+        )}
+        {numF(
+          'navTimeoutSec',
+          'Wait for a page to load (s)',
+          'Slow staging servers need more.',
+          5,
+          180,
+        )}
+        {numF(
+          'expectTimeoutSec',
+          'Wait for a check to pass (s)',
+          'For expect(…) assertions.',
+          2,
+          120,
+        )}
         <label className="field">
           <span>Language (locale)</span>
-          <TF disabled={!ed} value={rs.locale} placeholder="en-PH" onChange={(e) => set('locale', e.target.value.trim())} />
+          <TF
+            disabled={!ed}
+            value={rs.locale}
+            placeholder="en-PH"
+            onChange={(e) => set('locale', e.target.value.trim())}
+          />
           <small className="muted">Dates and numbers format like this.</small>
         </label>
         <label className="field">
           <span>Time zone</span>
-          <TF disabled={!ed} value={rs.timezoneId} placeholder="Asia/Manila" onChange={(e) => set('timezoneId', e.target.value.trim())} />
+          <TF
+            disabled={!ed}
+            value={rs.timezoneId}
+            placeholder="Asia/Manila"
+            onChange={(e) => set('timezoneId', e.target.value.trim())}
+          />
           <small className="muted">Cut-offs and dates use this zone.</small>
         </label>
         <div className="field">
@@ -1077,15 +1282,20 @@ export function RunSettingsCard() {
   );
 }
 
-// ---------------------------------------------------------------- test cases for the existing pages (from their code)
-/** Adds reviewed page test cases to their issues; pages with no issue get a new one, Done (delivered work). */
+// ---------------------------------------------------------------- test cases for the existing
+// pages (from their code)
+/**
+ * Adds reviewed page test cases to their issues; pages with no issue get a new one, Done (delivered
+ * work).
+ */
 export function applyPageTests(pages: Any[], picked: (pageIdx: number, tcIdx: number) => boolean) {
   const done = doneStatus();
   let added = 0,
     created = 0;
   const touched = new Set<string>();
   mutate((pp: Any) => {
-    const roleId = (name?: string) => (pp.automation?.app?.roles || []).find((r: Any) => r.name === name)?.id;
+    const roleId = (name?: string) =>
+      (pp.automation?.app?.roles || []).find((r: Any) => r.name === name)?.id;
     const newByTitle = new Map<string, Any>();
     pages.forEach((pg: Any, pi: number) => {
       const tcs = pg.testCases.filter((_: Any, ti: number) => picked(pi, ti));
@@ -1113,10 +1323,18 @@ export function applyPageTests(pages: Any[], picked: (pageIdx: number, tcIdx: nu
       if (!t) return;
       for (const tc of tcs) {
         const { runAsName, ...rest } = tc;
-        t.testCases.push({ ...newTest(), ...rest, ...(roleId(runAsName) ? { roleId: roleId(runAsName) } : {}) });
+        t.testCases.push({
+          ...newTest(),
+          ...rest,
+          ...(roleId(runAsName) ? { roleId: roleId(runAsName) } : {}),
+        });
         added++;
       }
-      logEvent(t, `added ${tcs.length} test case${tcs.length > 1 ? 's' : ''} written from the code of ${pg.path}`, 'Repository sync');
+      logEvent(
+        t,
+        `added ${tcs.length} test case${tcs.length > 1 ? 's' : ''} written from the code of ${pg.path}`,
+        'Repository sync',
+      );
       touched.add(t.key);
     });
   });
@@ -1127,21 +1345,31 @@ function PageTestsReview({ r }: { r: Any }) {
   const pages = r.pages.filter((pg: Any) => pg.testCases.length || pg.error);
   const skipped = r.pages.filter((pg: Any) => !pg.testCases.length && !pg.error);
   const [pick, setPick] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(r.pages.flatMap((pg: Any, pi: number) => pg.testCases.map((_: Any, ti: number) => [`${pi}:${ti}`, true]))),
+    Object.fromEntries(
+      r.pages.flatMap((pg: Any, pi: number) =>
+        pg.testCases.map((_: Any, ti: number) => [`${pi}:${ti}`, true]),
+      ),
+    ),
   );
   const [open, setOpen] = useState<string | null>(null);
   const idx = (pg: Any) => r.pages.indexOf(pg);
   const total = Object.values(pick).filter(Boolean).length;
   const all = r.pages.reduce((n: number, pg: Any) => n + pg.testCases.length, 0);
   const setPage = (pi: number, v: boolean) =>
-    setPick({ ...pick, ...Object.fromEntries(r.pages[pi].testCases.map((_: Any, ti: number) => [`${pi}:${ti}`, v])) });
+    setPick({
+      ...pick,
+      ...Object.fromEntries(r.pages[pi].testCases.map((_: Any, ti: number) => [`${pi}:${ti}`, v])),
+    });
   const apply = () => {
     const res = applyPageTests(r.pages, (pi, ti) => Boolean(pick[`${pi}:${ti}`]));
     closeModal();
     toast(
       `${res.added} test case${res.added === 1 ? '' : 's'} added to ${res.issues} issue${res.issues === 1 ? '' : 's'}${res.created ? `, including ${res.created} new ${doneStatus()} issue${res.created > 1 ? 's' : ''} for pages that had none` : ''}. Run them from Test automation; scripts are written on the first run.`,
       'ok',
-      { title: 'Test cases added', action: { label: 'Open Test automation', onClick: () => S.nav(`/p/${P().id}/automation`) } },
+      {
+        title: 'Test cases added',
+        action: { label: 'Open Test automation', onClick: () => S.nav(`/p/${P().id}/automation`) },
+      },
     );
   };
   return (
@@ -1151,12 +1379,18 @@ function PageTestsReview({ r }: { r: Any }) {
       persistent
       actions={[
         { label: 'Cancel' },
-        { label: `Add ${total} test case${total === 1 ? '' : 's'}`, kind: 'primary', disabled: !total, onClick: apply },
+        {
+          label: `Add ${total} test case${total === 1 ? '' : 's'}`,
+          kind: 'primary',
+          disabled: !total,
+          onClick: apply,
+        },
       ]}
     >
       <div className="sync-sum">
         <span>
-          <Ico svg={I.pr} /> <b>{r.repo.branch}</b> at <code>{String(r.repo.head).slice(0, 7)}</code>
+          <Ico svg={I.pr} /> <b>{r.repo.branch}</b> at{' '}
+          <code>{String(r.repo.head).slice(0, 7)}</code>
         </span>
         <span>
           {all} test cases for {pages.length} pages, written from their code
@@ -1208,7 +1442,11 @@ function PageTestsReview({ r }: { r: Any }) {
                 const k = `${pi}:${ti}`;
                 return (
                   <div key={k} className={`sync-item pt-tc ${pick[k] ? '' : 'off'}`}>
-                    <CB checked={Boolean(pick[k])} onChange={() => setPick({ ...pick, [k]: !pick[k] })} aria-label="Include" />
+                    <CB
+                      checked={Boolean(pick[k])}
+                      onChange={() => setPick({ ...pick, [k]: !pick[k] })}
+                      aria-label="Include"
+                    />
                     <div className="sync-body">
                       <div>
                         <span className="loz">{tc.type}</span> <b>{tc.title}</b>{' '}
@@ -1217,7 +1455,10 @@ function PageTestsReview({ r }: { r: Any }) {
                           {tc.runAsName ? ` · as ${tc.runAsName}` : ''}
                         </span>
                       </div>
-                      <button className="link-btn small" onClick={() => setOpen(open === k ? null : k)}>
+                      <button
+                        className="link-btn small"
+                        onClick={() => setOpen(open === k ? null : k)}
+                      >
                         {open === k ? 'Hide steps' : `${tc.steps.length} steps`}
                       </button>
                       {open === k && (
@@ -1246,7 +1487,8 @@ function PageTestsReview({ r }: { r: Any }) {
         })}
         {skipped.length > 0 && (
           <p className="muted small">
-            Nothing to test: {skipped.map((pg: Any) => `${pg.path}${pg.note ? ` (${pg.note})` : ''}`).join(' · ')}
+            Nothing to test:{' '}
+            {skipped.map((pg: Any) => `${pg.path}${pg.note ? ` (${pg.note})` : ''}`).join(' · ')}
           </p>
         )}
       </div>

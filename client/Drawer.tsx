@@ -50,7 +50,19 @@ import {
   releases,
   release,
 } from './core';
-import { Ico, I, TypeIcon, PriorityIcon, Avatar, StatusLoz, Swatch, Menu, Confirm, EmptyState, AiRunPicker } from './ui';
+import {
+  Ico,
+  I,
+  TypeIcon,
+  PriorityIcon,
+  Avatar,
+  StatusLoz,
+  Swatch,
+  Menu,
+  Confirm,
+  EmptyState,
+  AiRunPicker,
+} from './ui';
 import {
   openDrawer,
   runTicketAi,
@@ -85,7 +97,9 @@ import { useAutoTour } from './tour';
 import { CodeChip, finishedCode } from './codeStatus';
 
 const prCls = (s: string) =>
-  (({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' }) as Any)[s] || 'pr-open';
+  (({ Open: 'pr-open', Merged: 'pr-merged', Declined: 'pr-declined', Draft: 'pr-draft' }) as Any)[
+    s
+  ] || 'pr-open';
 const close = () => {
   S.drawer = null;
   S.full = false;
@@ -100,7 +114,12 @@ function Head({ crumb, menu }: { crumb: React.ReactNode; menu: React.ReactNode }
       <Menu
         id="drawer"
         button={
-          <button className="icon-btn" title="More actions" aria-label="More actions" onClick={() => setMenu('drawer')}>
+          <button
+            className="icon-btn"
+            title="More actions"
+            aria-label="More actions"
+            onClick={() => setMenu('drawer')}
+          >
             <Ico svg={I.more} />
           </button>
         }
@@ -124,7 +143,15 @@ function Head({ crumb, menu }: { crumb: React.ReactNode; menu: React.ReactNode }
     </div>
   );
 }
-const Crumb = ({ type, keyText, onClick }: { type: string; keyText: string; onClick?: () => void }) => (
+const Crumb = ({
+  type,
+  keyText,
+  onClick,
+}: {
+  type: string;
+  keyText: string;
+  onClick?: () => void;
+}) => (
   <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
     <TypeIcon type={type} />
     {onClick ? (
@@ -157,14 +184,18 @@ export function Drawer() {
 
 const DRAWER_MIN = 380;
 /** Widest the panel may be: leave room for the list beside it. */
-const drawerMax = (el: HTMLElement) => Math.max(DRAWER_MIN, (el.parentElement?.clientWidth || window.innerWidth) - 360);
+const drawerMax = (el: HTMLElement) =>
+  Math.max(DRAWER_MIN, (el.parentElement?.clientWidth || window.innerWidth) - 360);
 const setDrawerW = (w: number | null) => {
   S.drawerW = w;
   saveUi();
   emit();
 };
 
-/** Drag the panel's left edge to resize it; double-click resets. Arrow keys work too when it has focus. */
+/**
+ * Drag the panel's left edge to resize it; double-click resets. Arrow keys work too when it has
+ * focus.
+ */
 function ResizeHandle() {
   const start = (ev: React.PointerEvent<HTMLDivElement>) => {
     if (ev.button !== 0) return;
@@ -197,7 +228,12 @@ function ResizeHandle() {
     ev.preventDefault();
     const aside = ev.currentTarget.parentElement as HTMLElement;
     const step = ev.shiftKey ? 80 : 20;
-    setDrawerW(Math.min(drawerMax(aside), Math.max(DRAWER_MIN, aside.offsetWidth + (ev.key === 'ArrowLeft' ? step : -step))));
+    setDrawerW(
+      Math.min(
+        drawerMax(aside),
+        Math.max(DRAWER_MIN, aside.offsetWidth + (ev.key === 'ArrowLeft' ? step : -step)),
+      ),
+    );
   };
   return (
     <div
@@ -227,7 +263,10 @@ function IssuePanel({ t }: { t: Any }) {
     .filter((n: number) => !t.testCases.some((tc: Any) => (tc.acRef || []).includes(n)));
   const sprints = p.sprints.filter((s: Any) => s.state !== 'closed' || s.id === t.sprintId);
   const linkGroups = Object.keys(LINK_TYPES)
-    .map((type) => ({ type, items: t.links.filter((l: Any) => l.type === type && ticket(l.targetId)) }))
+    .map((type) => ({
+      type,
+      items: t.links.filter((l: Any) => l.type === type && ticket(l.targetId)),
+    }))
     .filter((g) => g.items.length);
   const field = (k: string, v: Any) => mutate(() => setField(t, k, v), { tag: `t.${k}${t.id}` });
   const setAc = (i: number, v: string) =>
@@ -250,9 +289,10 @@ function IssuePanel({ t }: { t: Any }) {
     S.actTab === 'history'
       ? history.map((h) => ({ kind: 'h', at: h.at, h }))
       : S.actTab === 'all'
-        ? [...comments.map((c) => ({ kind: 'c', at: c.at, c })), ...history.map((h) => ({ kind: 'h', at: h.at, h }))].sort((a, b) =>
-            b.at.localeCompare(a.at),
-          )
+        ? [
+            ...comments.map((c) => ({ kind: 'c', at: c.at, c })),
+            ...history.map((h) => ({ kind: 'h', at: h.at, h })),
+          ].sort((a, b) => b.at.localeCompare(a.at))
         : comments.map((c) => ({ kind: 'c', at: c.at, c }));
 
   return (
@@ -268,7 +308,11 @@ function IssuePanel({ t }: { t: Any }) {
             )}
             {parent && (
               <>
-                <Crumb type={parent.type} keyText={parent.key} onClick={() => openDrawer('issue', parent.id)} />
+                <Crumb
+                  type={parent.type}
+                  keyText={parent.key}
+                  onClick={() => openDrawer('issue', parent.id)}
+                />
                 <span className="sep">/</span>
               </>
             )}
@@ -367,9 +411,13 @@ function IssuePanel({ t }: { t: Any }) {
                 <div className="mh">AI</div>
                 <button onClick={() => runTicketAi(t, 'ac')}>Improve acceptance criteria</button>
                 <button onClick={() => runTicketAi(t, 'tests')}>Regenerate test cases</button>
-                {!isSub(t) && <button onClick={() => runTicketAi(t, 'split')}>Split into smaller issues</button>}
+                {!isSub(t) && (
+                  <button onClick={() => runTicketAi(t, 'split')}>Split into smaller issues</button>
+                )}
                 <hr />
-                <button onClick={() => openModal(<AskModal t={t} />)}>Ask AI to change this issue…</button>
+                <button onClick={() => openModal(<AskModal t={t} />)}>
+                  Ask AI to change this issue…
+                </button>
               </Menu>
               <AiRunPicker compact />
             </>
@@ -460,7 +508,14 @@ function IssuePanel({ t }: { t: Any }) {
               {t.acceptanceCriteria.map((a: string, i: number) => (
                 <div key={i} className="ac">
                   <span className="ac-n">AC{i + 1}</span>
-                  <TA ghost rows={1} style={{ minHeight: 32 }} disabled={!edit} value={a} onChange={(ev) => setAc(i, ev.target.value)} />
+                  <TA
+                    ghost
+                    rows={1}
+                    style={{ minHeight: 32 }}
+                    disabled={!edit}
+                    value={a}
+                    onChange={(ev) => setAc(i, ev.target.value)}
+                  />
                   {edit && (
                     <span className="ops">
                       <button
@@ -505,7 +560,9 @@ function IssuePanel({ t }: { t: Any }) {
                   )}
                 </div>
               ))}
-              {!t.acceptanceCriteria.length && <p className="muted small">No acceptance criteria yet.</p>}
+              {!t.acceptanceCriteria.length && (
+                <p className="muted small">No acceptance criteria yet.</p>
+              )}
             </div>
 
             <ReferencesSection t={t} />
@@ -533,13 +590,18 @@ function IssuePanel({ t }: { t: Any }) {
                 </div>
                 {kids.length > 0 && (
                   <>
-                    <div className="row small muted" style={{ marginBottom: 6, flexWrap: 'nowrap' }}>
+                    <div
+                      className="row small muted"
+                      style={{ marginBottom: 6, flexWrap: 'nowrap' }}
+                    >
                       <ProgBar
                         done={kids.filter(isDone).length}
                         prog={kids.filter((k: Any) => catOf(k.status) === 'inprogress').length}
                         total={kids.length}
                       />
-                      <span style={{ whiteSpace: 'nowrap' }}>{Math.round((kids.filter(isDone).length / kids.length) * 100)}% done</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>
+                        {Math.round((kids.filter(isDone).length / kids.length) * 100)}% done
+                      </span>
                     </div>
                     <div className="rows">
                       {kids.map((k: Any) => (
@@ -600,7 +662,9 @@ function IssuePanel({ t }: { t: Any }) {
                     </button>
                   </div>
                 )}
-                {!kids.length && !S.subForm && <p className="muted small">Break this issue into smaller pieces of work.</p>}
+                {!kids.length && !S.subForm && (
+                  <p className="muted small">Break this issue into smaller pieces of work.</p>
+                )}
               </div>
             )}
 
@@ -659,7 +723,12 @@ function IssuePanel({ t }: { t: Any }) {
               ))}
               {S.linkForm && (
                 <div className="inline-form" style={{ flexWrap: 'wrap' }}>
-                  <SF bare aria-label="Link type" value={link.type} onChange={(ev) => setLink({ ...link, type: ev.target.value })}>
+                  <SF
+                    bare
+                    aria-label="Link type"
+                    value={link.type}
+                    onChange={(ev) => setLink({ ...link, type: ev.target.value })}
+                  >
                     {opts(Object.keys(LINK_TYPES))}
                   </SF>
                   <SF
@@ -689,7 +758,10 @@ function IssuePanel({ t }: { t: Any }) {
                       });
                       S.linkForm = false;
                       emit();
-                      toast(ok ? `${t.key} ${link.type} ${target.key}` : 'That link already exists.', ok ? 'ok' : 'err');
+                      toast(
+                        ok ? `${t.key} ${link.type} ${target.key}` : 'That link already exists.',
+                        ok ? 'ok' : 'err',
+                      );
                     }}
                   >
                     Link
@@ -705,7 +777,11 @@ function IssuePanel({ t }: { t: Any }) {
                   </button>
                 </div>
               )}
-              {!t.links.length && !S.linkForm && <p className="muted small">Show which issues block, duplicate or relate to this one.</p>}
+              {!t.links.length && !S.linkForm && (
+                <p className="muted small">
+                  Show which issues block, duplicate or relate to this one.
+                </p>
+              )}
             </div>
 
             <div className="sec">
@@ -753,14 +829,19 @@ function IssuePanel({ t }: { t: Any }) {
               {uncovered.length > 0 && t.testCases.length > 0 && (
                 <div className="warn-banner">
                   <Ico svg={I.warn} />
-                  <span>Not covered by any test case: {uncovered.map((n: number) => `AC${n}`).join(', ')}</span>
+                  <span>
+                    Not covered by any test case:{' '}
+                    {uncovered.map((n: number) => `AC${n}`).join(', ')}
+                  </span>
                 </div>
               )}
               {t.testCases.map((tc: Any, i: number) => (
                 <TestCase key={tc.id} t={t} tc={tc} i={i} />
               ))}
               {!t.testCases.length && (
-                <p className="muted small">No test cases yet. Use “Regenerate test cases” to let Claude write them.</p>
+                <p className="muted small">
+                  No test cases yet. Use “Regenerate test cases” to let Claude write them.
+                </p>
               )}
             </div>
 
@@ -775,7 +856,11 @@ function IssuePanel({ t }: { t: Any }) {
                   <div className="tools">
                     {/* TF-123: finished code is shown, not rewritten; every member who can open the issue can review and approve it */}
                     {feat('code') && codeReady() && finishedCode(t) && (
-                      <button className="btn sm" onClick={() => openCode(t)} title="Review the code, approve it and merge the pull request">
+                      <button
+                        className="btn sm"
+                        onClick={() => openCode(t)}
+                        title="Review the code, approve it and merge the pull request"
+                      >
                         <Ico svg={I.pr} />
                         View code
                       </button>
@@ -849,7 +934,11 @@ function IssuePanel({ t }: { t: Any }) {
                   )}
                   {edit && (
                     <>
-                      <button className="icon-btn" title="Refresh status" onClick={() => refreshPr(t, r.id)}>
+                      <button
+                        className="icon-btn"
+                        title="Refresh status"
+                        onClick={() => refreshPr(t, r.id)}
+                      >
                         <Ico svg={I.refresh} />
                       </button>
                       <button
@@ -913,7 +1002,9 @@ function IssuePanel({ t }: { t: Any }) {
                 </div>
               )}
               {!t.prs.length && !S.prForm && (
-                <p className="muted small">Link the pull requests that implement this issue to track their status here.</p>
+                <p className="muted small">
+                  Link the pull requests that implement this issue to track their status here.
+                </p>
               )}
             </div>
 
@@ -972,7 +1063,12 @@ function IssuePanel({ t }: { t: Any }) {
                     <div className="composer" data-tour="composer">
                       <Avatar name={me()} size={32} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <CommentEditor key={t.id} compactUntilFocus placeholder="Add a comment…" onSave={(v) => saveComment(t, v)} />
+                        <CommentEditor
+                          key={t.id}
+                          compactUntilFocus
+                          placeholder="Add a comment…"
+                          onSave={(v) => saveComment(t, v)}
+                        />
                       </div>
                     </div>
                   )}
@@ -1021,7 +1117,9 @@ function IssuePanel({ t }: { t: Any }) {
                             <>
                               {a.c.system ? <AutoBody c={a.c} t={t} /> : <CommentBody c={a.c} />}
                               {!a.c.system &&
-                                (a.c.authorId ? a.c.authorId === S.user?.id : a.c.author === me()) &&
+                                (a.c.authorId
+                                  ? a.c.authorId === S.user?.id
+                                  : a.c.author === me()) &&
                                 can('issue.comment') && (
                                   <div className="row small" style={{ gap: 10, marginTop: 2 }}>
                                     <a
@@ -1045,7 +1143,9 @@ function IssuePanel({ t }: { t: Any }) {
                                             text="The comment is removed from the issue."
                                             onYes={() =>
                                               mutate(() => {
-                                                t.comments = t.comments.filter((x: Any) => x.id !== a.c.id);
+                                                t.comments = t.comments.filter(
+                                                  (x: Any) => x.id !== a.c.id,
+                                                );
                                               })
                                             }
                                           />,
@@ -1064,7 +1164,8 @@ function IssuePanel({ t }: { t: Any }) {
                       <div key={a.h.id} className="hist">
                         <Avatar name={a.h.author} size={24} />
                         <div>
-                          <b>{a.h.author}</b> {historyText(a.h)} <span className="muted small">{ago(a.h.at)}</span>
+                          <b>{a.h.author}</b> {historyText(a.h)}{' '}
+                          <span className="muted small">{ago(a.h.at)}</span>
                           {a.h.from !== undefined && (
                             <div className="hist-change">
                               <span>{a.h.from}</span> → <span>{a.h.to}</span>
@@ -1164,7 +1265,11 @@ function IssuePanel({ t }: { t: Any }) {
                 <span className="label">Priority</span>
                 <span className="with-icon">
                   <PriorityIcon p={t.priority} />
-                  <SF disabled={!edit} value={t.priority} onChange={(ev) => field('priority', ev.target.value)}>
+                  <SF
+                    disabled={!edit}
+                    value={t.priority}
+                    onChange={(ev) => field('priority', ev.target.value)}
+                  >
                     {opts(PRIORITIES)}
                   </SF>
                 </span>
@@ -1175,7 +1280,9 @@ function IssuePanel({ t }: { t: Any }) {
                   disabled={!edit}
                   value={t.storyPoints ?? ''}
                   placeholder="None"
-                  onChange={(ev) => field('storyPoints', ev.target.value === '' ? null : Number(ev.target.value))}
+                  onChange={(ev) =>
+                    field('storyPoints', ev.target.value === '' ? null : Number(ev.target.value))
+                  }
                 />
                 <span className="label">Implementation</span>
                 <SF
@@ -1192,7 +1299,8 @@ function IssuePanel({ t }: { t: Any }) {
                 <span className="label">Sprint</span>
                 {isSub(t) ? (
                   <span className="muted" style={{ padding: '6px 8px' }}>
-                    {sprint(t.sprintId)?.name || 'None'} <span className="small">(from parent)</span>
+                    {sprint(t.sprintId)?.name || 'None'}{' '}
+                    <span className="small">(from parent)</span>
                   </span>
                 ) : (
                   <SF
@@ -1204,7 +1312,11 @@ function IssuePanel({ t }: { t: Any }) {
                     {sprints.map((s: Any) => (
                       <MenuItem key={s.id} value={s.id}>
                         {s.name}
-                        {s.state === 'active' ? ' (active)' : s.state === 'closed' ? ' (closed)' : ''}
+                        {s.state === 'active'
+                          ? ' (active)'
+                          : s.state === 'closed'
+                            ? ' (closed)'
+                            : ''}
                       </MenuItem>
                     ))}
                   </SF>
@@ -1221,7 +1333,10 @@ function IssuePanel({ t }: { t: Any }) {
                         v.length ? (
                           <span className="fixv">
                             {v.map((id: string) => (
-                              <span key={id} className={`label-chip ${release(id)?.status === 'released' ? 'rel-done' : ''}`}>
+                              <span
+                                key={id}
+                                className={`label-chip ${release(id)?.status === 'released' ? 'rel-done' : ''}`}
+                              >
                                 {release(id)?.name}
                               </span>
                             ))}
@@ -1233,7 +1348,10 @@ function IssuePanel({ t }: { t: Any }) {
                       onChange={(ev: Any) => field('fixVersions', ev.target.value)}
                     >
                       {releases()
-                        .filter((r: Any) => r.status !== 'archived' || (t.fixVersions || []).includes(r.id))
+                        .filter(
+                          (r: Any) =>
+                            r.status !== 'archived' || (t.fixVersions || []).includes(r.id),
+                        )
                         .map((r: Any) => (
                           <MenuItem key={r.id} value={r.id}>
                             {r.name}
@@ -1290,7 +1408,11 @@ function IssuePanel({ t }: { t: Any }) {
                     <span className="label">Issue type</span>
                     <span className="with-icon">
                       <TypeIcon type={t.type} />
-                      <SF disabled={!edit} value={t.type} onChange={(ev) => field('type', ev.target.value)}>
+                      <SF
+                        disabled={!edit}
+                        value={t.type}
+                        onChange={(ev) => field('type', ev.target.value)}
+                      >
                         {opts(TYPES)}
                       </SF>
                     </span>
@@ -1368,7 +1490,9 @@ const CAT_CLS: Record<string, string> = {
   'needs-info': 'info',
 };
 const OWNER_TXT: Record<string, string> = { developer: 'Developer', qa: 'QA', devops: 'DevOps' };
-/** The AI's failure analysis on one failed test: what broke, why, the evidence and what to do next. */
+/**
+ * The AI's failure analysis on one failed test: what broke, why, the evidence and what to do next.
+ */
 function FailAnalysis({ a, t, tcId, title }: { a: Any; t: Any; tcId: string; title: string }) {
   const [more, setMore] = useState(false);
   const tc = t.testCases.find((x: Any) => x.id === tcId);
@@ -1384,7 +1508,8 @@ function FailAnalysis({ a, t, tcId, title }: { a: Any; t: Any; tcId: string; tit
         a.cause && `Likely cause: ${a.cause}`,
         a.evidence?.length && `Evidence:\n${a.evidence.map((e: string) => `- ${e}`).join('\n')}`,
         a.fix && `Fix: ${a.fix}`,
-        a.nextSteps?.length && `Next steps:\n${a.nextSteps.map((x: string, i: number) => `${i + 1}. ${x}`).join('\n')}`,
+        a.nextSteps?.length &&
+          `Next steps:\n${a.nextSteps.map((x: string, i: number) => `${i + 1}. ${x}`).join('\n')}`,
       ]
         .filter(Boolean)
         .join('\n\n'),
@@ -1473,27 +1598,42 @@ function FailAnalysis({ a, t, tcId, title }: { a: Any; t: Any; tcId: string; tit
         <button className="link-btn small" onClick={report}>
           Copy as bug report
         </button>
-        {tc && ['test-script', 'test-data', 'flaky'].includes(a.category) && can('test.run') && can('ai.use') && (
-          <button className="link-btn small" onClick={() => runTests([{ t, tc }], { regenerate: true })}>
-            Rewrite the script and re-run
-          </button>
-        )}
+        {tc &&
+          ['test-script', 'test-data', 'flaky'].includes(a.category) &&
+          can('test.run') &&
+          can('ai.use') && (
+            <button
+              className="link-btn small"
+              onClick={() => runTests([{ t, tc }], { regenerate: true })}
+            >
+              Rewrite the script and re-run
+            </button>
+          )}
       </div>
     </div>
   );
 }
 
-/** An automated test-run comment, made readable: a pass/fail summary, then each test with its error and screenshot. */
+/**
+ * An automated test-run comment, made readable: a pass/fail summary, then each test with its error
+ * and screenshot.
+ */
 function AutoBody({ c, t }: { c: Any; t: Any }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   // Older comments only listed failures.
-  const results: Any[] = c.results || (c.failures || []).map((f: Any) => ({ ...f, status: 'Fail' }));
+  const results: Any[] =
+    c.results || (c.failures || []).map((f: Any) => ({ ...f, status: 'Fail' }));
   const failed = results.filter((r) => r.status !== 'Pass');
   const passed = results.length - failed.length;
   const ok = !failed.length;
   const mention = !ok && (c.body.match(/^@(.+?) \d+ (?:of \d+ )?automated/) || [])[1];
   const total = c.durationMs || results.reduce((n, r) => n + (r.durationMs || 0), 0);
-  const rerun = () => runTests(failed.map((r) => ({ t, tc: t.testCases.find((x: Any) => x.id === r.tcId) })).filter((x) => x.tc));
+  const rerun = () =>
+    runTests(
+      failed
+        .map((r) => ({ t, tc: t.testCases.find((x: Any) => x.id === r.tcId) }))
+        .filter((x) => x.tc),
+    );
   return (
     <div className={`run-card ${ok ? 'pass' : 'fail'}`}>
       <div className="run-head">
@@ -1559,7 +1699,13 @@ function AutoBody({ c, t }: { c: Any; t: Any }) {
                         e.preventDefault();
                         S.openTc.add(r.tcId);
                         emit();
-                        setTimeout(() => document.getElementById(`tc-${r.tcId}`)?.scrollIntoView({ block: 'center' }), 50);
+                        setTimeout(
+                          () =>
+                            document
+                              .getElementById(`tc-${r.tcId}`)
+                              ?.scrollIntoView({ block: 'center' }),
+                          50,
+                        );
                       }}
                     >
                       {r.key}
@@ -1573,26 +1719,44 @@ function AutoBody({ c, t }: { c: Any; t: Any }) {
                   </span>
                 </div>
               </div>
-              {bad && r.analysis && <FailAnalysis a={r.analysis} t={t} tcId={r.tcId} title={`${r.key} ${r.title}`} />}
+              {bad && r.analysis && (
+                <FailAnalysis a={r.analysis} t={t} tcId={r.tcId} title={`${r.key} ${r.title}`} />
+              )}
               {bad && (
                 <div className="run-err">
                   <code className="run-err-1">{first || 'Failed'}</code>
                   {more && (
-                    <button className="link-btn small" onClick={() => setOpen({ ...open, [r.tcId]: !open[r.tcId] })}>
+                    <button
+                      className="link-btn small"
+                      onClick={() => setOpen({ ...open, [r.tcId]: !open[r.tcId] })}
+                    >
                       {open[r.tcId] ? 'Hide details' : 'Details'}
                     </button>
                   )}
                   {open[r.tcId] && (
                     <>
-                      {String(r.error || '').length > first.length && <pre className="run-err-full">{r.error}</pre>}
+                      {String(r.error || '').length > first.length && (
+                        <pre className="run-err-full">{r.error}</pre>
+                      )}
                       {r.screenshot && (
                         <button
                           className="run-shot"
                           onClick={() =>
-                            openModal(<ShotModal url={r.screenshot} title={`${r.key} ${r.title}`} error={r.error} at={c.at} />)
+                            openModal(
+                              <ShotModal
+                                url={r.screenshot}
+                                title={`${r.key} ${r.title}`}
+                                error={r.error}
+                                at={c.at}
+                              />,
+                            )
                           }
                         >
-                          <img src={r.screenshot} alt={`Screenshot when ${r.key} failed`} loading="lazy" />
+                          <img
+                            src={r.screenshot}
+                            alt={`Screenshot when ${r.key} failed`}
+                            loading="lazy"
+                          />
                         </button>
                       )}
                     </>
@@ -1631,12 +1795,22 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
       <div
         className={`tc-h ${open ? '' : 'closed'}`}
         onClick={(ev) => {
-          if (!(ev.target as HTMLElement).closest('input,select,button,.MuiInputBase-root,.MuiMenuItem-root,.MuiBackdrop-root')) toggle();
+          if (
+            !(ev.target as HTMLElement).closest(
+              'input,select,button,.MuiInputBase-root,.MuiMenuItem-root,.MuiBackdrop-root',
+            )
+          )
+            toggle();
         }}
       >
         <Ico svg={I.chevron} />
         <span className="key">{tcKey(t, i)}</span>
-        <TF aria-label="Test case title" disabled={!edit} value={tc.title} onChange={(ev) => set('title', ev.target.value)} />
+        <TF
+          aria-label="Test case title"
+          disabled={!edit}
+          value={tc.title}
+          onChange={(ev) => set('title', ev.target.value)}
+        />
         {running ? (
           <span className="spinner" style={{ color: 'var(--brand)' }} title="Running" />
         ) : tc.script ? (
@@ -1645,7 +1819,12 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
           </span>
         ) : null}
         {can('test.run') && (
-          <button className="icon-btn" title="Run automated test" disabled={S.autoRun?.running} onClick={() => runTests([{ t, tc }])}>
+          <button
+            className="icon-btn"
+            title="Run automated test"
+            disabled={S.autoRun?.running}
+            onClick={() => runTests([{ t, tc }])}
+          >
             <Ico svg={I.play} />
           </button>
         )}
@@ -1671,7 +1850,11 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
             </label>
             <label className="field">
               <span>Priority</span>
-              <SF disabled={!edit} value={tc.priority} onChange={(ev) => set('priority', ev.target.value)}>
+              <SF
+                disabled={!edit}
+                value={tc.priority}
+                onChange={(ev) => set('priority', ev.target.value)}
+              >
                 {opts(['High', 'Medium', 'Low'])}
               </SF>
             </label>
@@ -1695,7 +1878,11 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
             </label>
             <label className="field">
               <span>Run as</span>
-              <SF disabled={!edit} value={tc.roleId || ''} onChange={(ev) => set('roleId', ev.target.value || null)}>
+              <SF
+                disabled={!edit}
+                value={tc.roleId || ''}
+                onChange={(ev) => set('roleId', ev.target.value || null)}
+              >
                 <MenuItem value="">Not signed in</MenuItem>
                 {(P().automation?.app?.roles || [])
                   .filter((r: Any) => r.name)
@@ -1704,9 +1891,10 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
                       {r.name}
                     </MenuItem>
                   ))}
-                {tc.roleId && !(P().automation?.app?.roles || []).some((r: Any) => r.id === tc.roleId) && (
-                  <MenuItem value={tc.roleId}>Removed role</MenuItem>
-                )}
+                {tc.roleId &&
+                  !(P().automation?.app?.roles || []).some((r: Any) => r.id === tc.roleId) && (
+                    <MenuItem value={tc.roleId}>Removed role</MenuItem>
+                  )}
               </SF>
             </label>
           </div>
@@ -1738,7 +1926,12 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
           </label>
           <label className="field">
             <span>Expected result</span>
-            <TA style={{ minHeight: 32 }} disabled={!edit} value={tc.expected} onChange={(ev) => set('expected', ev.target.value)} />
+            <TA
+              style={{ minHeight: 32 }}
+              disabled={!edit}
+              value={tc.expected}
+              onChange={(ev) => set('expected', ev.target.value)}
+            />
           </label>
           {r && (
             <div className={`run-box ${tCls(r.status)}`}>
@@ -1766,7 +1959,8 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
           )}
           <details className="script-box">
             <summary className="small">
-              <Ico svg={I.bot} /> Automation script {!tc.script && <span className="muted">(written by Claude on first run)</span>}
+              <Ico svg={I.bot} /> Automation script{' '}
+              {!tc.script && <span className="muted">(written by Claude on first run)</span>}
             </summary>
             <TA
               mono
@@ -1779,7 +1973,10 @@ function TestCase({ t, tc, i }: { t: Any; tc: Any; i: number }) {
             />
             {can('test.run') && can('ai.use') && (
               <div className="row" style={{ marginTop: 6 }}>
-                <button className="btn sm" onClick={() => runTests([{ t, tc }], { regenerate: true })}>
+                <button
+                  className="btn sm"
+                  onClick={() => runTests([{ t, tc }], { regenerate: true })}
+                >
                   <Ico svg={I.sparkle} />
                   Rewrite with Claude and run
                 </button>
@@ -1830,7 +2027,10 @@ function EpicPanel({ e }: { e: Any }) {
         crumb={<Crumb type="Epic" keyText={e.key} />}
         menu={
           ed ? (
-            <button style={{ color: 'var(--danger)' }} onClick={() => openModal(<DeleteEpicModal ep={e} />)}>
+            <button
+              style={{ color: 'var(--danger)' }}
+              onClick={() => openModal(<DeleteEpicModal ep={e} />)}
+            >
               <Ico svg={I.trash} />
               Delete epic
             </button>
@@ -1866,13 +2066,20 @@ function EpicPanel({ e }: { e: Any }) {
             </button>
           )}
           {can('issue.create') && can('ai.use') && (
-            <button className="btn ai" onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}>
+            <button
+              className="btn ai"
+              onClick={() => openModal(<NewWithClaudeModal epicId={e.id} />)}
+            >
               <Ico svg={I.sparkle} />
               Write issue with Claude
             </button>
           )}
           {can('issue.create') && can('ai.use') && feat('split') && (
-            <button className="btn" onClick={() => openSplitIssues(e.id)} title="Split this epic’s issues into smaller ones">
+            <button
+              className="btn"
+              onClick={() => openSplitIssues(e.id)}
+              title="Split this epic’s issues into smaller ones"
+            >
               <Ico svg={I.subtask} />
               Split issues
             </button>
@@ -1929,7 +2136,8 @@ function EpicPanel({ e }: { e: Any }) {
             <h3>Dates</h3>
             {range?.derived && (
               <span className="muted small" style={{ marginLeft: 'auto' }}>
-                Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} – {fmtDate(`${range.end}T00:00:00`)}
+                Estimated from sprints: {fmtDate(`${range.start}T00:00:00`)} –{' '}
+                {fmtDate(`${range.end}T00:00:00`)}
               </span>
             )}
           </div>
@@ -1939,7 +2147,9 @@ function EpicPanel({ e }: { e: Any }) {
               <DateF
                 disabled={!ed}
                 value={e.startDate || ''}
-                onChange={(v) => setEpicDates(e, v, e.dueDate && v && e.dueDate < v ? v : e.dueDate || '')}
+                onChange={(v) =>
+                  setEpicDates(e, v, e.dueDate && v && e.dueDate < v ? v : e.dueDate || '')
+                }
               />
             </label>
             <label className="field">
@@ -1947,7 +2157,9 @@ function EpicPanel({ e }: { e: Any }) {
               <DateF
                 disabled={!ed}
                 value={e.dueDate || ''}
-                onChange={(v) => setEpicDates(e, e.startDate && v && e.startDate > v ? v : e.startDate || '', v)}
+                onChange={(v) =>
+                  setEpicDates(e, e.startDate && v && e.startDate > v ? v : e.startDate || '', v)
+                }
               />
             </label>
           </div>
@@ -1976,7 +2188,8 @@ function EpicPanel({ e }: { e: Any }) {
                   height: 24,
                   borderRadius: 4,
                   background: c,
-                  boxShadow: c === e.color ? '0 0 0 2px var(--bg), 0 0 0 4px var(--border-focus)' : 'none',
+                  boxShadow:
+                    c === e.color ? '0 0 0 2px var(--bg), 0 0 0 4px var(--border-focus)' : 'none',
                 }}
               />
             ))}

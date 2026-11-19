@@ -1,14 +1,20 @@
 // Pull-request lookup for the Development panel.
-// GitHub: uses the `gh` CLI when it is signed in (works for private repos), otherwise the public API.
+// GitHub: uses the `gh` CLI when it is signed in (works for private repos), otherwise the public
+// API.
 // GitLab / Bitbucket / others: parsed from the URL only.
 import { execFile } from 'node:child_process';
 
 const run: any = (cmd, args) =>
   new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 15000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    execFile(cmd, args, { timeout: 15000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) =>
+      err ? reject(err) : resolve(stdout),
+    );
   });
 
-/** GitHub API JSON: through the signed-in `gh` CLI (private repos, higher limits), else the public API. null on failure. */
+/**
+ * GitHub API JSON: through the signed-in `gh` CLI (private repos, higher limits), else the public
+ * API. null on failure.
+ */
 async function ghJson(path) {
   try {
     return JSON.parse(await run('gh', ['api', path]));
@@ -20,7 +26,9 @@ async function ghJson(path) {
       headers: {
         'User-Agent': 'TicketForge',
         Accept: 'application/vnd.github+json',
-        ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+        ...(process.env.GITHUB_TOKEN
+          ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+          : {}),
       },
     });
     return res.ok ? await res.json() : null;
@@ -54,7 +62,10 @@ function summarizeChecks(items) {
     items: items.slice(0, 25),
   };
 }
-/** Size, reviews, checks, conflicts and the description of a GitHub pull request (best effort: missing parts are left out). */
+/**
+ * Size, reviews, checks, conflicts and the description of a GitHub pull request (best effort:
+ * missing parts are left out).
+ */
 async function githubDetails(owner, repo, number, pr) {
   const out: any = {
     size: {
@@ -79,10 +90,13 @@ async function githubDetails(owner, repo, number, pr) {
   const reviews = await ghJson(`repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`);
   if (Array.isArray(reviews)) {
     const last: Map<any, any> = new Map();
-    for (const r of reviews) if (r.user?.login && r.state !== 'COMMENTED' && r.state !== 'PENDING') last.set(r.user.login, r.state);
+    for (const r of reviews)
+      if (r.user?.login && r.state !== 'COMMENTED' && r.state !== 'PENDING')
+        last.set(r.user.login, r.state);
     const users = [...last].map(([login, state]) => ({
       login,
-      state: state === 'APPROVED' ? 'approved' : state === 'CHANGES_REQUESTED' ? 'changes' : 'dismissed',
+      state:
+        state === 'APPROVED' ? 'approved' : state === 'CHANGES_REQUESTED' ? 'changes' : 'dismissed',
     }));
     const approved = users.filter((u) => u.state === 'approved').length,
       changes = users.filter((u) => u.state === 'changes').length;
@@ -90,13 +104,22 @@ async function githubDetails(owner, repo, number, pr) {
       approved,
       changes,
       users,
-      state: changes ? 'changes' : approved ? 'approved' : out.reviewers.length ? 'pending' : 'none',
+      state: changes
+        ? 'changes'
+        : approved
+          ? 'approved'
+          : out.reviewers.length
+            ? 'pending'
+            : 'none',
     };
   }
   if (pr.state === 'open' && pr.head?.sha) {
     const items: any[] = [];
-    const runs = await ghJson(`repos/${owner}/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`);
-    for (const c of runs?.check_runs || []) items.push({ name: c.name, state: CHECK_STATE(c), url: c.html_url || c.details_url || '' });
+    const runs = await ghJson(
+      `repos/${owner}/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`,
+    );
+    for (const c of runs?.check_runs || [])
+      items.push({ name: c.name, state: CHECK_STATE(c), url: c.html_url || c.details_url || '' });
     const st = await ghJson(`repos/${owner}/${repo}/commits/${pr.head.sha}/status`);
     for (const c of st?.statuses || [])
       items.push({
@@ -118,7 +141,8 @@ function githubStatus(pr) {
 
 export async function prInfo(rawUrl, { gitlabToken = '' }: any = {}) {
   const url = String(rawUrl || '').trim();
-  if (!/^https?:\/\//i.test(url)) throw new Error('Enter a full pull request URL starting with https://');
+  if (!/^https?:\/\//i.test(url))
+    throw new Error('Enter a full pull request URL starting with https://');
 
   const gh = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
   if (gh) {
@@ -154,16 +178,26 @@ export async function prInfo(rawUrl, { gitlabToken = '' }: any = {}) {
   const gl = url.match(/^https?:\/\/([^/]*gitlab[^/]*)\/(.+?)\/-\/merge_requests\/(\d+)/i);
   if (gl) {
     const [, host, repo, iid] = gl;
-    // GitLab's API: needs a token for private projects (Project settings → Code & GitHub → Backend repository, or GITLAB_TOKEN).
+    // GitLab's API: needs a token for private projects (Project settings → Code & GitHub → Backend
+    // repository, or GITLAB_TOKEN).
     const tok = gitlabToken || process.env.GITLAB_TOKEN || '';
     try {
-      const res = await fetch(`https://${host}/api/v4/projects/${encodeURIComponent(repo)}/merge_requests/${iid}`, {
-        headers: { 'User-Agent': 'TicketForge', ...(tok ? { 'PRIVATE-TOKEN': tok } : {}) },
-      });
+      const res = await fetch(
+        `https://${host}/api/v4/projects/${encodeURIComponent(repo)}/merge_requests/${iid}`,
+        {
+          headers: { 'User-Agent': 'TicketForge', ...(tok ? { 'PRIVATE-TOKEN': tok } : {}) },
+        },
+      );
       if (res.ok) {
         const mr = await res.json();
         const status =
-          mr.state === 'merged' ? 'Merged' : mr.state === 'closed' ? 'Declined' : mr.draft || mr.work_in_progress ? 'Draft' : 'Open';
+          mr.state === 'merged'
+            ? 'Merged'
+            : mr.state === 'closed'
+              ? 'Declined'
+              : mr.draft || mr.work_in_progress
+                ? 'Draft'
+                : 'Open';
         const pipe = mr.head_pipeline?.status || mr.pipeline?.status || '';
         const pstate = !pipe
           ? null
@@ -190,7 +224,9 @@ export async function prInfo(rawUrl, { gitlabToken = '' }: any = {}) {
           size: {
             additions: null,
             deletions: null,
-            files: mr.changes_count ? Number(String(mr.changes_count).replace(/\D/g, '')) || null : null,
+            files: mr.changes_count
+              ? Number(String(mr.changes_count).replace(/\D/g, '')) || null
+              : null,
             commits: null,
           },
           comments: mr.user_notes_count || 0,
@@ -205,9 +241,19 @@ export async function prInfo(rawUrl, { gitlabToken = '' }: any = {}) {
             approved: mr.upvotes || 0,
             changes: mr.downvotes || 0,
             users: [],
-            state: mr.downvotes ? 'changes' : mr.upvotes ? 'approved' : reviewers.length ? 'pending' : 'none',
+            state: mr.downvotes
+              ? 'changes'
+              : mr.upvotes
+                ? 'approved'
+                : reviewers.length
+                  ? 'pending'
+                  : 'none',
           },
-          ...(pstate && { checks: summarizeChecks([{ name: 'Pipeline', state: pstate, url: mr.head_pipeline?.web_url || '' }]) }),
+          ...(pstate && {
+            checks: summarizeChecks([
+              { name: 'Pipeline', state: pstate, url: mr.head_pipeline?.web_url || '' },
+            ]),
+          }),
           body: clipBody(mr.description),
         };
       }
@@ -237,5 +283,13 @@ export async function prInfo(rawUrl, { gitlabToken = '' }: any = {}) {
       fetched: false,
     };
 
-  return { url, provider: 'Link', repo: new URL(url).host, number: null, title: url, status: 'Open', fetched: false };
+  return {
+    url,
+    provider: 'Link',
+    repo: new URL(url).host,
+    number: null,
+    title: url,
+    status: 'Open',
+    fetched: false,
+  };
 }

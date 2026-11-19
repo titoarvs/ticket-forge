@@ -1,10 +1,19 @@
 'use client';
-// Coding specs: one AI coding prompt per ticket of an epic, with its acceptance criteria and the files or modules it is
-// expected to touch. Specs that touch the same file or module are flagged, and the project's setting blocks or warns when
-// they are marked ready. AI-produced changes linked to a spec are accepted only after a required reviewer approves them.
+// Coding specs: one AI coding prompt per ticket of an epic, with its acceptance criteria and the
+// files or modules it is expected to touch. Specs that touch the same file or module are flagged,
+// and the project's setting blocks or warns when they are marked ready. AI-produced changes linked
+// to a spec are accepted only after a required reviewer approves them.
 import { useCallback, useEffect, useState } from 'react';
 import { S, P, ago, can, toast, openModal, mutate, type Any } from './core';
-import { listSpecs, generateSpecs, markSpecsReady, linkSpecChange, approveSpecChange, acceptSpecChange, listPeople } from './api/specs';
+import {
+  listSpecs,
+  generateSpecs,
+  markSpecsReady,
+  linkSpecChange,
+  approveSpecChange,
+  acceptSpecChange,
+  listPeople,
+} from './api/specs';
 import { Ico, I, Modal, EmptyState, ErrorState, Loading, Sk, Spinner } from './ui';
 import { TF, SF, CB, MenuItem } from './fields';
 
@@ -14,7 +23,10 @@ export const openSpecs = (epic: Any) => openModal(<SpecsModal epic={epic} />);
 /** "PR-2 and PR-3 both touch lib/store.ts": the tickets and the file or module they share. */
 function OverlapLine({ o }: { o: Any }) {
   const keys: string[] = o.specs.map((s: Any) => s.key || s.ticketId);
-  const who = keys.length === 2 ? `${keys[0]} and ${keys[1]} both` : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]} all`;
+  const who =
+    keys.length === 2
+      ? `${keys[0]} and ${keys[1]} both`
+      : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]} all`;
   return (
     <li>
       {who} touch <code>{o.target}</code> ({o.kind}
@@ -25,7 +37,11 @@ function OverlapLine({ o }: { o: Any }) {
 
 function SpecsModal({ epic }: { epic: Any }) {
   const pid = P()?.id;
-  const [state, setState] = useState<{ loading: boolean; error: Any; data: Any }>({ loading: true, error: null, data: null });
+  const [state, setState] = useState<{ loading: boolean; error: Any; data: Any }>({
+    loading: true,
+    error: null,
+    data: null,
+  });
   const [busy, setBusy] = useState('');
   const [people, setPeople] = useState<Any[]>([]);
   const [cfg, setCfg] = useState<Any>({ overlapMode: 'block', reviewers: [] });
@@ -64,7 +80,9 @@ function SpecsModal({ epic }: { epic: Any }) {
     run('generate', async () => {
       const d = await generateSpecs(pid, epic.id);
       setState({ loading: false, error: null, data: d });
-      toast(`${d.specs.length} coding spec${d.specs.length === 1 ? '' : 's'} generated for ${epic.title}.`);
+      toast(
+        `${d.specs.length} coding spec${d.specs.length === 1 ? '' : 's'} generated for ${epic.title}.`,
+      );
     });
   const ready = (ids: string[]) =>
     run('ready', async () => {
@@ -74,10 +92,16 @@ function SpecsModal({ epic }: { epic: Any }) {
           `Marked ready with ${r.warnings.length} overlap${r.warnings.length === 1 ? '' : 's'}: ${r.warnings.map((o: Any) => `${o.specs.map((s: Any) => s.key).join(' + ')} on ${o.target}`).join('; ')}`,
           'warn',
         );
-      else toast(ids.length === 1 ? 'Spec marked ready for coding.' : `${ids.length} specs marked ready for coding.`);
+      else
+        toast(
+          ids.length === 1
+            ? 'Spec marked ready for coding.'
+            : `${ids.length} specs marked ready for coding.`,
+        );
       await load();
     });
-  // Settings are a project section saved like the other project settings (Project settings permission).
+  // Settings are a project section saved like the other project settings (Project settings
+  // permission).
   const saveCfg = (next: Any) => {
     setCfg(next);
     mutate(
@@ -133,10 +157,15 @@ function SpecsModal({ epic }: { epic: Any }) {
         <>
           <div className="row" style={{ justifyContent: 'space-between', margin: '8px 0' }}>
             <span className="muted small">
-              {specs.length} spec{specs.length === 1 ? '' : 's'} · {specs.length - drafts.length} ready
+              {specs.length} spec{specs.length === 1 ? '' : 's'} · {specs.length - drafts.length}{' '}
+              ready
             </span>
             {canEdit && (
-              <button className="btn sm" disabled={!drafts.length || !!busy} onClick={() => ready(drafts.map((s) => s.ticketId))}>
+              <button
+                className="btn sm"
+                disabled={!drafts.length || !!busy}
+                onClick={() => ready(drafts.map((s) => s.ticketId))}
+              >
                 {busy === 'ready' && <Spinner />}Mark all ready
               </button>
             )}
@@ -161,13 +190,18 @@ function SpecsModal({ epic }: { epic: Any }) {
           <summary className="small">Settings: overlaps and required reviewers</summary>
           <label className="field">
             <span>When specs overlap</span>
-            <SF value={cfg.overlapMode} onChange={(e: Any) => saveCfg({ ...cfg, overlapMode: e.target.value })}>
+            <SF
+              value={cfg.overlapMode}
+              onChange={(e: Any) => saveCfg({ ...cfg, overlapMode: e.target.value })}
+            >
               <MenuItem value="block">Block: don’t allow marking them ready</MenuItem>
               <MenuItem value="warn">Warn: mark them ready and show the overlap</MenuItem>
             </SF>
           </label>
           <div className="field">
-            <span>Required reviewers (one must approve before AI-produced changes are accepted)</span>
+            <span>
+              Required reviewers (one must approve before AI-produced changes are accepted)
+            </span>
             {people.map((u) => (
               <CB
                 key={u.id}
@@ -177,7 +211,9 @@ function SpecsModal({ epic }: { epic: Any }) {
                 onChange={(ev: Any) =>
                   saveCfg({
                     ...cfg,
-                    reviewers: ev.target.checked ? [...cfg.reviewers, u.id] : cfg.reviewers.filter((x: string) => x !== u.id),
+                    reviewers: ev.target.checked
+                      ? [...cfg.reviewers, u.id]
+                      : cfg.reviewers.filter((x: string) => x !== u.id),
                   })
                 }
               />
@@ -209,7 +245,10 @@ function SpecsModal({ epic }: { epic: Any }) {
   );
 }
 
-/** One ticket's spec: acceptance criteria, files and modules, the prompt, and the AI-produced changes linked to it. */
+/**
+ * One ticket's spec: acceptance criteria, files and modules, the prompt, and the AI-produced
+ * changes linked to it.
+ */
 function SpecRow({
   s,
   canEdit,
@@ -332,12 +371,18 @@ function SpecRow({
                     : 'Waiting for a required reviewer'}
               </span>
               {c.status !== 'accepted' && isReviewer && (
-                <button className="btn sm subtle" onClick={() => act(() => approveSpecChange(pid, c.id), 'Approved.')}>
+                <button
+                  className="btn sm subtle"
+                  onClick={() => act(() => approveSpecChange(pid, c.id), 'Approved.')}
+                >
                   Approve as reviewer
                 </button>
               )}
               {c.status !== 'accepted' && canEdit && (
-                <button className="btn sm" onClick={() => act(() => acceptSpecChange(pid, c.id), 'Changes accepted.')}>
+                <button
+                  className="btn sm"
+                  onClick={() => act(() => acceptSpecChange(pid, c.id), 'Changes accepted.')}
+                >
                   Accept changes
                 </button>
               )}
@@ -347,8 +392,18 @@ function SpecRow({
         {!s.changes.length && <p className="muted small">None linked yet.</p>}
         {canEdit && s.status === 'ready' && (
           <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
-            <TF size="small" label="Branch, pull request or commit" value={ref} onChange={(e: Any) => setRef(e.target.value)} />
-            <TF size="small" label="Summary (optional)" value={summary} onChange={(e: Any) => setSummary(e.target.value)} />
+            <TF
+              size="small"
+              label="Branch, pull request or commit"
+              value={ref}
+              onChange={(e: Any) => setRef(e.target.value)}
+            />
+            <TF
+              size="small"
+              label="Summary (optional)"
+              value={summary}
+              onChange={(e: Any) => setSummary(e.target.value)}
+            />
             <button
               className="btn sm"
               disabled={!ref.trim()}

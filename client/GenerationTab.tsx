@@ -1,5 +1,6 @@
 'use client';
-// Administration → Generation: the team's standard for generated tickets, test cases and automation scripts.
+// Administration → Generation: the team's standard for generated tickets, test cases and automation
+// scripts.
 // Every generation follows these rules; the defaults give consistent, direct results.
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -18,15 +19,34 @@ const REASONING: [string, string, string][] = [
     'No extended thinking. The AI follows these rules directly: quickest, most predictable results. Recommended.',
   ],
   ['balanced', 'Balanced', 'Some thinking for unusual or complex documents.'],
-  ['thorough', 'Thorough', 'Thinks deeply before answering. Slower and uses more of your AI usage or credits.'],
+  [
+    'thorough',
+    'Thorough',
+    'Thinks deeply before answering. Slower and uses more of your AI usage or credits.',
+  ],
 ];
 
-/** Corporate test standards: picking one fills the Test management fields (each can then be changed). */
+/**
+ * Corporate test standards: picking one fills the Test management fields (each can then be
+ * changed).
+ */
 const TM_STANDARDS: [string, string, string][] = [
-  ['istqb', 'ISTQB', 'Formal test cases: preconditions, numbered steps, expected result per step, test data.'],
-  ['xray', 'Xray for Jira', 'Step tables (action · data · expected) on every test, linked to requirements.'],
+  [
+    'istqb',
+    'ISTQB',
+    'Formal test cases: preconditions, numbered steps, expected result per step, test data.',
+  ],
+  [
+    'xray',
+    'Xray for Jira',
+    'Step tables (action · data · expected) on every test, linked to requirements.',
+  ],
   ['bdd', 'BDD (Cucumber)', 'Gherkin scenarios in business language: Given · When · Then.'],
-  ['browserstack', 'BrowserStack TM', 'Concise step tests with tags; expected result on the last step.'],
+  [
+    'browserstack',
+    'BrowserStack TM',
+    'Concise step tests with tags; expected result on the last step.',
+  ],
   ['custom', 'Company standard', 'Your own rules: change any field below.'],
 ];
 const TM_PRESETS: Record<string, Any> = {
@@ -76,7 +96,11 @@ export function GenerationTab() {
   const [busy, setBusy] = useState('');
   const [, setPreview] = useState<Any>(null);
   const [prompts, setPrompts] = useState<Any>(null);
-  const [sec, setSec] = useSection('tf.adminGenSec', ['general', 'tickets', 'tests', 'testmgmt', 'documents', 'prompts'], 'general');
+  const [sec, setSec] = useSection(
+    'tf.adminGenSec',
+    ['general', 'tickets', 'tests', 'testmgmt', 'documents', 'prompts'],
+    'general',
+  );
   const timer = useRef<Any>(null);
   const load = async () => {
     setErr(null);
@@ -154,7 +178,14 @@ export function GenerationTab() {
     return (
       <span className="muted small gen-def">
         {' '}
-        · default {Array.isArray(dv) ? dv.join(', ') : typeof dv === 'boolean' ? (dv ? 'on' : 'off') : String(dv || 'none')}
+        · default{' '}
+        {Array.isArray(dv)
+          ? dv.join(', ')
+          : typeof dv === 'boolean'
+            ? dv
+              ? 'on'
+              : 'off'
+            : String(dv || 'none')}
       </span>
     );
   };
@@ -164,10 +195,16 @@ export function GenerationTab() {
         {label}
         {def(path)}
       </span>
-      <TF type="number" value={get(path)} slotProps={{ htmlInput: { min, max } }} onChange={(e) => set(path, Number(e.target.value))} />
+      <TF
+        type="number"
+        value={get(path)}
+        slotProps={{ htmlInput: { min, max } }}
+        onChange={(e) => set(path, Number(e.target.value))}
+      />
     </label>
   );
-  // Test management: editing any field after picking a corporate standard makes it the company's own ("custom").
+  // Test management: editing any field after picking a corporate standard makes it the company's
+  // own ("custom").
   const setTm = (k: string, v: Any) =>
     setR((x: Any) => ({
       ...x,
@@ -175,7 +212,9 @@ export function GenerationTab() {
         ...x.testmgmt,
         [k]: v,
         standard:
-          TM_PRESETS[x.testmgmt.standard] && TM_PRESETS[x.testmgmt.standard][k] !== undefined && TM_PRESETS[x.testmgmt.standard][k] !== v
+          TM_PRESETS[x.testmgmt.standard] &&
+          TM_PRESETS[x.testmgmt.standard][k] !== undefined &&
+          TM_PRESETS[x.testmgmt.standard][k] !== v
             ? 'custom'
             : x.testmgmt.standard,
       },
@@ -186,7 +225,12 @@ export function GenerationTab() {
         {label}
         {def(`testmgmt.${k}`)}
       </span>
-      <TF type="number" value={r.testmgmt[k]} slotProps={{ htmlInput: { min, max } }} onChange={(e) => setTm(k, Number(e.target.value))} />
+      <TF
+        type="number"
+        value={r.testmgmt[k]}
+        slotProps={{ htmlInput: { min, max } }}
+        onChange={(e) => setTm(k, Number(e.target.value))}
+      />
     </label>
   );
   const check = (path: string, label: string) => (
@@ -234,8 +278,10 @@ export function GenerationTab() {
     );
   const scaleText = (r.tickets.pointScale || []).join(', ');
 
-  const changed = (keys: string[]) => keys.some((k) => JSON.stringify(r[k]) !== JSON.stringify(data.rules[k]));
-  const dot = (keys: string[]) => (changed(keys) ? <span className="gen-dot" title="Unsaved changes" /> : null);
+  const changed = (keys: string[]) =>
+    keys.some((k) => JSON.stringify(r[k]) !== JSON.stringify(data.rules[k]));
+  const dot = (keys: string[]) =>
+    changed(keys) ? <span className="gen-dot" title="Unsaved changes" /> : null;
   const items = [
     {
       key: 'general',
@@ -244,7 +290,13 @@ export function GenerationTab() {
       icon: I.sparkle,
       badge: dot(['reasoning', 'stickToDocument', 'custom']),
     },
-    { key: 'tickets', label: 'Tickets', hint: 'Titles, criteria, points, types', icon: I.backlog, badge: dot(['tickets']) },
+    {
+      key: 'tickets',
+      label: 'Tickets',
+      hint: 'Titles, criteria, points, types',
+      icon: I.backlog,
+      badge: dot(['tickets']),
+    },
     {
       key: 'tests',
       label: 'Test cases & scripts',
@@ -252,9 +304,20 @@ export function GenerationTab() {
       icon: I.test,
       badge: dot(['tests', 'automation']),
     },
-    { key: 'testmgmt', label: 'Test management', hint: 'Corporate test standard', icon: I.check, badge: dot(['testmgmt']) },
+    {
+      key: 'testmgmt',
+      label: 'Test management',
+      hint: 'Corporate test standard',
+      icon: I.check,
+      badge: dot(['testmgmt']),
+    },
     { key: 'documents', label: 'Documents', hint: 'The generation guide', icon: I.doc },
-    { key: 'prompts', label: 'What the AI is told', hint: 'Preview of every prompt', icon: I.summary },
+    {
+      key: 'prompts',
+      label: 'What the AI is told',
+      hint: 'Preview of every prompt',
+      icon: I.summary,
+    },
   ];
   return (
     <div className="gen sec-layout">
@@ -265,8 +328,8 @@ export function GenerationTab() {
             <div className="card wide">
               <h3>How the AI works</h3>
               <p className="sub">
-                These rules apply to everyone’s generation: new projects from documents, Enhance, acceptance criteria, test cases, splitting
-                issues and automation scripts.
+                These rules apply to everyone’s generation: new projects from documents, Enhance,
+                acceptance criteria, test cases, splitting issues and automation scripts.
               </p>
               <div className="gen-reason">
                 {REASONING.map(([k, label, desc]) => (
@@ -328,7 +391,10 @@ export function GenerationTab() {
                 {num('tickets.titleMaxWords', 'Title: at most (words)', 3, 30)}
                 <label className="field">
                   <span>Acceptance criteria format{def('tickets.acFormat')}</span>
-                  <SF value={r.tickets.acFormat} onChange={(e) => set('tickets.acFormat', e.target.value)}>
+                  <SF
+                    value={r.tickets.acFormat}
+                    onChange={(e) => set('tickets.acFormat', e.target.value)}
+                  >
                     <MenuItem value="gwt">Given / When / Then</MenuItem>
                     <MenuItem value="checklist">Checklist of testable statements</MenuItem>
                   </SF>
@@ -354,7 +420,10 @@ export function GenerationTab() {
                 </label>
                 <label className="field">
                   <span>Split tickets bigger than{def('tickets.maxPoints')}</span>
-                  <SF value={r.tickets.maxPoints} onChange={(e) => set('tickets.maxPoints', Number(e.target.value))}>
+                  <SF
+                    value={r.tickets.maxPoints}
+                    onChange={(e) => set('tickets.maxPoints', Number(e.target.value))}
+                  >
                     {(r.tickets.pointScale || []).map((n: number) => (
                       <MenuItem key={n} value={n}>
                         {n} points
@@ -364,7 +433,10 @@ export function GenerationTab() {
                 </label>
                 <label className="field">
                   <span>Default priority{def('tickets.defaultPriority')}</span>
-                  <SF value={r.tickets.defaultPriority} onChange={(e) => set('tickets.defaultPriority', e.target.value)}>
+                  <SF
+                    value={r.tickets.defaultPriority}
+                    onChange={(e) => set('tickets.defaultPriority', e.target.value)}
+                  >
                     {['Highest', 'High', 'Medium', 'Low'].map((p) => (
                       <MenuItem key={p} value={p}>
                         {p}
@@ -438,12 +510,17 @@ export function GenerationTab() {
             <div className="card">
               <h3>Automation scripts</h3>
               <div className="gen-checks">
-                {check('automation.roleLocators', 'Prefer user-facing locators (role, label, text) over CSS')}
+                {check(
+                  'automation.roleLocators',
+                  'Prefer user-facing locators (role, label, text) over CSS',
+                )}
                 {check('automation.noHardWaits', 'No fixed waits; rely on assertions')}
                 {check('automation.oneFlow', 'Script only the flow the test case describes')}
               </div>
               <label className="field" style={{ marginTop: 8 }}>
-                <span>Prefix for test data the scripts create{def('automation.testDataPrefix')}</span>
+                <span>
+                  Prefix for test data the scripts create{def('automation.testDataPrefix')}
+                </span>
                 <TF
                   value={r.automation.testDataPrefix}
                   placeholder="e.g. QA (leave empty for none)"
@@ -459,8 +536,8 @@ export function GenerationTab() {
             <div className="card wide">
               <h3>Test management</h3>
               <p className="sub">
-                How the AI writes repository tests and builds test plans (Test management). Start from a corporate standard, then change any
-                field to match your company’s.
+                How the AI writes repository tests and builds test plans (Test management). Start
+                from a corporate standard, then change any field to match your company’s.
               </p>
               <div className="tm-std" role="radiogroup" aria-label="Corporate standard">
                 {TM_STANDARDS.map(([k, l, dsc]) => (
@@ -469,7 +546,12 @@ export function GenerationTab() {
                     role="radio"
                     aria-checked={r.testmgmt.standard === k}
                     className={r.testmgmt.standard === k ? 'on' : ''}
-                    onClick={() => setR((x: Any) => ({ ...x, testmgmt: { ...x.testmgmt, ...(TM_PRESETS[k] || {}), standard: k } }))}
+                    onClick={() =>
+                      setR((x: Any) => ({
+                        ...x,
+                        testmgmt: { ...x.testmgmt, ...(TM_PRESETS[k] || {}), standard: k },
+                      }))
+                    }
                   >
                     <b>{l}</b>
                     <span className="muted small">{dsc}</span>
@@ -482,7 +564,9 @@ export function GenerationTab() {
                   <SF value={r.testmgmt.format} onChange={(e) => setTm('format', e.target.value)}>
                     <MenuItem value="steps">Step tables (action · data · expected)</MenuItem>
                     <MenuItem value="gherkin">Gherkin scenarios (BDD)</MenuItem>
-                    <MenuItem value="both">Both: Gherkin for user behaviour, steps for the rest</MenuItem>
+                    <MenuItem value="both">
+                      Both: Gherkin for user behaviour, steps for the rest
+                    </MenuItem>
                   </SF>
                 </label>
                 <label className="field">
@@ -503,7 +587,10 @@ export function GenerationTab() {
                 {r.testmgmt.format !== 'steps' && (
                   <label className="field">
                     <span>Gherkin style{def('testmgmt.gherkinStyle')}</span>
-                    <SF value={r.testmgmt.gherkinStyle} onChange={(e) => setTm('gherkinStyle', e.target.value)}>
+                    <SF
+                      value={r.testmgmt.gherkinStyle}
+                      onChange={(e) => setTm('gherkinStyle', e.target.value)}
+                    >
                       <MenuItem value="declarative">Declarative: business language</MenuItem>
                       <MenuItem value="imperative">Imperative: UI actions</MenuItem>
                     </SF>
@@ -519,14 +606,23 @@ export function GenerationTab() {
                 </label>
               </div>
               <div className="gen-checks">
-                {r.testmgmt.format !== 'gherkin' && check('testmgmt.expectedEveryStep', 'An expected result on every step')}
-                {r.testmgmt.format !== 'gherkin' && check('testmgmt.testData', 'Test data in its own column, never inside the action')}
+                {r.testmgmt.format !== 'gherkin' &&
+                  check('testmgmt.expectedEveryStep', 'An expected result on every step')}
+                {r.testmgmt.format !== 'gherkin' &&
+                  check(
+                    'testmgmt.testData',
+                    'Test data in its own column, never inside the action',
+                  )}
                 {check('testmgmt.preconditions', 'Preconditions on every test')}
               </div>
               <div className="gen-grid two">
                 <label className="field">
                   <span>Priority rule{def('testmgmt.priorityRule')}</span>
-                  <TA rows={2} value={r.testmgmt.priorityRule} onChange={(e) => setTm('priorityRule', e.target.value)} />
+                  <TA
+                    rows={2}
+                    value={r.testmgmt.priorityRule}
+                    onChange={(e) => setTm('priorityRule', e.target.value)}
+                  />
                 </label>
                 <label className="field">
                   <span>Test plan rules{def('testmgmt.planRules')}</span>
@@ -571,7 +667,8 @@ export function GenerationTab() {
               'Unsaved changes'
             ) : data.meta ? (
               <>
-                Saved{data.meta.updatedBy ? ` by ${data.meta.updatedBy}` : ''} {ago(data.meta.updatedAt)}
+                Saved{data.meta.updatedBy ? ` by ${data.meta.updatedBy}` : ''}{' '}
+                {ago(data.meta.updatedAt)}
               </>
             ) : (
               'Using the default rules'

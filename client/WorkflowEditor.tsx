@@ -1,8 +1,22 @@
 'use client';
-// Project settings → Workflow: the statuses (board columns) and, like Jira, which status can move to which.
+// Project settings → Workflow: the statuses (board columns) and, like Jira, which status can move
+// to which.
 import { useState } from 'react';
 import Popover from '@mui/material/Popover';
-import { P, CATEGORIES, can, mutate, setField, openModal, toast, uid, emit, statusColor, wCls, type Any } from './core';
+import {
+  P,
+  CATEGORIES,
+  can,
+  mutate,
+  setField,
+  openModal,
+  toast,
+  uid,
+  emit,
+  statusColor,
+  wCls,
+  type Any,
+} from './core';
 import { Ico, I, Confirm, SetCard } from './ui';
 import { SF, TF, CB, MenuItem } from './fields';
 
@@ -20,7 +34,10 @@ function stepByStep(wf: Any[]) {
   });
 }
 
-/** The workflow as a diagram: statuses in board order; forward moves arc above, backward moves below. */
+/**
+ * The workflow as a diagram: statuses in board order; forward moves arc above, backward moves
+ * below.
+ */
 function FlowDiagram({ wf, free }: { wf: Any[]; free: boolean }) {
   const cx = (i: number) => PAD + i * (NODE_W + GAP) + NODE_W / 2;
   const edges: { a: number; b: number }[] = [];
@@ -31,7 +48,8 @@ function FlowDiagram({ wf, free }: { wf: Any[]; free: boolean }) {
         if (j >= 0 && j !== i) edges.push({ a: i, b: j });
       }),
     );
-  const lift = (a: number, b: number) => (Math.abs(b - a) === 1 ? 0 : 22 + (Math.abs(b - a) - 2) * 16);
+  const lift = (a: number, b: number) =>
+    Math.abs(b - a) === 1 ? 0 : 22 + (Math.abs(b - a) - 2) * 16;
   const up = Math.max(0, ...edges.filter((e) => e.b > e.a).map((e) => lift(e.a, e.b)));
   const down = Math.max(0, ...edges.filter((e) => e.b < e.a).map((e) => lift(e.a, e.b)));
   const anyH = !free && wf.some((w) => w.fromAny) ? 26 : 0;
@@ -66,7 +84,15 @@ function FlowDiagram({ wf, free }: { wf: Any[]; free: boolean }) {
     >
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
         <defs>
-          <marker id="wf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <marker
+            id="wf-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto-start-reverse"
+          >
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
           </marker>
         </defs>
@@ -76,7 +102,12 @@ function FlowDiagram({ wf, free }: { wf: Any[]; free: boolean }) {
           </text>
         )}
         {edges.map((e, k) => (
-          <path key={k} d={path(e)} className={`wf-edge ${e.b > e.a ? 'fwd' : 'back'}`} markerEnd="url(#wf-arrow)" />
+          <path
+            key={k}
+            d={path(e)}
+            className={`wf-edge ${e.b > e.a ? 'fwd' : 'back'}`}
+            markerEnd="url(#wf-arrow)"
+          />
         ))}
         {wf.map((w, i) => (
           <g key={w.id}>
@@ -85,11 +116,26 @@ function FlowDiagram({ wf, free }: { wf: Any[]; free: boolean }) {
                 <text x={cx(i)} y={top - up - 12} textAnchor="middle">
                   ALL
                 </text>
-                <path d={`M${cx(i)},${top - up - 7} L${cx(i)},${top - 3}`} markerEnd="url(#wf-arrow)" />
+                <path
+                  d={`M${cx(i)},${top - up - 7} L${cx(i)},${top - 3}`}
+                  markerEnd="url(#wf-arrow)"
+                />
               </g>
             )}
-            <rect x={cx(i) - NODE_W / 2} y={top} width={NODE_W} height={NODE_H} rx={6} className={`wf-node c-${w.category} ${wCls(w)}`} />
-            <text x={cx(i)} y={top + NODE_H / 2 + 4} textAnchor="middle" className={`wf-label c-${w.category} ${wCls(w)}`}>
+            <rect
+              x={cx(i) - NODE_W / 2}
+              y={top}
+              width={NODE_W}
+              height={NODE_H}
+              rx={6}
+              className={`wf-node c-${w.category} ${wCls(w)}`}
+            />
+            <text
+              x={cx(i)}
+              y={top + NODE_H / 2 + 4}
+              textAnchor="middle"
+              className={`wf-label c-${w.category} ${wCls(w)}`}
+            >
               {short(w.name.toUpperCase())}
             </text>
             <title>{w.name}</title>
@@ -108,7 +154,10 @@ export function WorkflowSettings() {
   const counts = (name: string) => p.tickets.filter((t: Any) => t.status === name).length;
 
   const renameStatus = (i: number, name: string) => {
-    if (!name || wf.some((x: Any, j: number) => j !== i && x.name.toLowerCase() === name.toLowerCase())) {
+    if (
+      !name ||
+      wf.some((x: Any, j: number) => j !== i && x.name.toLowerCase() === name.toLowerCase())
+    ) {
       toast('Status names must be unique and not empty.', 'err');
       emit();
       return;
@@ -170,9 +219,13 @@ export function WorkflowSettings() {
   const toggle = (from: Any, to: Any) =>
     mutate(() => {
       const has = (from.next || []).includes(to.id);
-      from.next = has ? from.next.filter((id: string) => id !== to.id) : [...(from.next || []), to.id];
+      from.next = has
+        ? from.next.filter((id: string) => id !== to.id)
+        : [...(from.next || []), to.id];
     });
-  const stuck = free ? [] : wf.filter((w) => !(w.next || []).length && !wf.some((x) => x.fromAny && x.id !== w.id));
+  const stuck = free
+    ? []
+    : wf.filter((w) => !(w.next || []).length && !wf.some((x) => x.fromAny && x.id !== w.id));
 
   return (
     <>
@@ -213,7 +266,11 @@ export function WorkflowSettings() {
               {wf.map((w: Any, i: number) => (
                 <tr key={w.id}>
                   <td>
-                    <CommitName disabled={!ed} value={w.name} onCommit={(v) => renameStatus(i, v)} />
+                    <CommitName
+                      disabled={!ed}
+                      value={w.name}
+                      onCommit={(v) => renameStatus(i, v)}
+                    />
                   </td>
                   <td>
                     <StatusColorPicker w={w} disabled={!ed} />
@@ -247,7 +304,10 @@ export function WorkflowSettings() {
                       onChange={(e) =>
                         mutate(
                           () => {
-                            const v = e.target.value === '' ? null : Math.max(0, Math.round(Number(e.target.value)));
+                            const v =
+                              e.target.value === ''
+                                ? null
+                                : Math.max(0, Math.round(Number(e.target.value)));
                             if (v) w.wip = v;
                             else delete w.wip;
                           },
@@ -312,8 +372,9 @@ export function WorkflowSettings() {
           </button>
         )}
         <p className="muted small set-note">
-          Color: how the status looks on issues, the backlog and the board. Default uses its category’s color. Column limit: the board
-          column turns red when it holds more issues than this. Leave empty for no limit.
+          Color: how the status looks on issues, the backlog and the board. Default uses its
+          category’s color. Column limit: the board column turns red when it holds more issues than
+          this. Leave empty for no limit.
         </p>
       </SetCard>
 
@@ -327,10 +388,22 @@ export function WorkflowSettings() {
         }
         right={
           <div className="seg" role="radiogroup" aria-label="Transitions">
-            <button role="radio" aria-checked={free} className={free ? 'on' : ''} disabled={!ed} onClick={() => setMode('free')}>
+            <button
+              role="radio"
+              aria-checked={free}
+              className={free ? 'on' : ''}
+              disabled={!ed}
+              onClick={() => setMode('free')}
+            >
               Any to any
             </button>
-            <button role="radio" aria-checked={!free} className={!free ? 'on' : ''} disabled={!ed} onClick={() => setMode('custom')}>
+            <button
+              role="radio"
+              aria-checked={!free}
+              className={!free ? 'on' : ''}
+              disabled={!ed}
+              onClick={() => setMode('custom')}
+            >
               Custom
             </button>
           </div>
@@ -350,7 +423,9 @@ export function WorkflowSettings() {
                   onClick={() =>
                     mutate((pp) =>
                       pp.workflow.forEach((w: Any) => {
-                        w.next = pp.workflow.filter((x: Any) => x.id !== w.id).map((x: Any) => x.id);
+                        w.next = pp.workflow
+                          .filter((x: Any) => x.id !== w.id)
+                          .map((x: Any) => x.id);
                         w.fromAny = false;
                       }),
                     )
@@ -439,8 +514,9 @@ export function WorkflowSettings() {
             </div>
             {stuck.length > 0 && (
               <p className="small wf-warn">
-                <Ico svg={I.warn} /> {stuck.map((w) => `“${w.name}”`).join(', ')} {stuck.length === 1 ? 'has' : 'have'} no way out: issues
-                there can’t move to any other status.
+                <Ico svg={I.warn} /> {stuck.map((w) => `“${w.name}”`).join(', ')}{' '}
+                {stuck.length === 1 ? 'has' : 'have'} no way out: issues there can’t move to any
+                other status.
               </p>
             )}
           </>
@@ -450,7 +526,15 @@ export function WorkflowSettings() {
   );
 }
 
-function CommitName({ value, onCommit, disabled }: { value: string; onCommit: (v: string) => void; disabled?: boolean }) {
+function CommitName({
+  value,
+  onCommit,
+  disabled,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+  disabled?: boolean;
+}) {
   return (
     <TF
       key={value}

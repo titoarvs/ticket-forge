@@ -1,12 +1,13 @@
-// Project brain: an Obsidian-compatible knowledge vault of Markdown notes linked with [[wikilinks]], so the AI (and the
-// Claude Code agents) always start from the project's context. One note per thing TicketForge knows (the project, its
-// epics, issues, releases, source documents, open questions, the app context and the
-// repository profile), rebuilt automatically whenever the project changes. People add their own notes too; a refresh
-// never touches those.
+// Project brain: an Obsidian-compatible knowledge vault of Markdown notes linked with
+// [[wikilinks]], so the AI (and the Claude Code agents) always start from the project's context.
+// One note per thing TicketForge knows (the project, its epics, issues, releases, source documents,
+// open questions, the app context and the repository profile), rebuilt automatically whenever the
+// project changes. People add their own notes too; a refresh never touches those.
 //
-// Stored in the database (brain_notes, brain_state) per project, so the RLS policies of the project's workspace apply
-// (lib/db.ts). Generated notes are deterministic: the same project gives the same notes, so a refresh only writes what
-// changed and the AI context block stays the same text from one call to the next.
+// Stored in the database (brain_notes, brain_state) per project, so the RLS policies of the
+// project's workspace apply (lib/db.ts). Generated notes are deterministic: the same project gives
+// the same notes, so a refresh only writes what changed and the AI context block stays the same
+// text from one call to the next.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -97,9 +98,11 @@ const words = (s) =>
     .filter((w) => !STOP.has(w))
     .map(stem);
 
-// ---------------------------------------------------------------- building the notes from the project
+// ---------------------------------------------------------------- building the notes from the
+// project
 const catOf = (p, status) =>
-  (p.workflow || []).find((w) => w.name === status)?.category || (/done|closed|resolved/i.test(String(status)) ? 'done' : 'todo');
+  (p.workflow || []).find((w) => w.name === status)?.category ||
+  (/done|closed|resolved/i.test(String(status)) ? 'done' : 'todo');
 const isSub = (t) => t?.type === 'Sub-task' || Boolean(t?.parentId);
 /** The issues whose words overlap the text most (for open questions). */
 function related(text, issues, n = 6, min = 2) {
@@ -113,14 +116,18 @@ function related(text, issues, n = 6, min = 2) {
       return { t, s };
     })
     .filter((x) => x.s >= min)
-    .sort((a, b) => b.s - a.s || String(a.t.key).localeCompare(String(b.t.key), undefined, { numeric: true }))
+    .sort(
+      (a, b) =>
+        b.s - a.s || String(a.t.key).localeCompare(String(b.t.key), undefined, { numeric: true }),
+    )
     .slice(0, n)
     .map((x) => x.t);
 }
 
 /**
- * All generated notes of a project: [{ id, type, key, ref, title, status, tags, body, updated }]. `id` is the note's
- * path in the vault without ".md"; its last part (the file name) is what [[wikilinks]] point to, so it's unique.
+ * All generated notes of a project: [{ id, type, key, ref, title, status, tags, body, updated }].
+ * `id` is the note's path in the vault without ".md"; its last part (the file name) is what
+ * [[wikilinks]] point to, so it's unique.
  */
 export function buildNotes(p) {
   const notes: any[] = [];
@@ -171,7 +178,8 @@ export function buildNotes(p) {
     const f = fileOf.get(`${kind}:${id}`);
     return f ? wl(safeName(f), label) : label || '';
   };
-  const tLink = (t, withTitle = true) => link('t', t.id, withTitle ? `${t.key || ''} ${t.title || ''}`.trim() : t.key);
+  const tLink = (t, withTitle = true) =>
+    link('t', t.id, withTitle ? `${t.key || ''} ${t.title || ''}`.trim() : t.key);
   const eLink = (e) => link('e', e.id, `${e.key || ''} ${e.title || ''}`.trim());
   const rLink = (r) => link('r', r.id, r.name);
   const epicIssues = (e) => top.filter((t) => t.epicId === e.id);
@@ -198,7 +206,8 @@ export function buildNotes(p) {
   for (const x of questions) x.issues = related(x.text || x.title, top, 5);
   questions.forEach((x) => reserve('q', x.ref, x.file));
   const questionsOf = (t) => questions.filter((x) => x.issues.includes(t));
-  const releasesOf = (t) => (t.fixVersions || []).map((v) => releases.find((r) => r.id === v)).filter(Boolean);
+  const releasesOf = (t) =>
+    (t.fixVersions || []).map((v) => releases.find((r) => r.id === v)).filter(Boolean);
   const list = (items) => items.map((x) => `- ${x}`).join('\n');
 
   // Index and overview
@@ -219,11 +228,22 @@ export function buildNotes(p) {
       : []),
     ...(p.sources || []),
   ];
-  sources.forEach((s) => reserve('s', s.id, `Source ${String(s.name || 'document').replace(/\.(md|markdown|txt|pdf|docx?|html?)$/i, '')}`));
+  sources.forEach((s) =>
+    reserve(
+      's',
+      s.id,
+      `Source ${String(s.name || 'document').replace(/\.(md|markdown|txt|pdf|docx?|html?)$/i, '')}`,
+    ),
+  );
   const ctxNote = p.appContext?.md ? 'App Context' : '';
   const repoNotes = [
     p.dev?.repoProfile?.markdown && ['Repository Profile', p.dev.repoProfile, 'frontend'],
-    p.devBackend?.enabled && p.devBackend?.repoProfile?.markdown && ['Backend Repository Profile', p.devBackend.repoProfile, 'backend'],
+    p.devBackend?.enabled &&
+      p.devBackend?.repoProfile?.markdown && [
+        'Backend Repository Profile',
+        p.devBackend.repoProfile,
+        'backend',
+      ],
   ].filter(Boolean);
   add({
     type: 'index',
@@ -315,7 +335,13 @@ See also [[Index]].`,
       key: e.key,
       ref: e.id,
       title: e.title,
-      status: !items.length ? 'Empty' : nDone === items.length ? 'Done' : nDone ? 'In progress' : 'To do',
+      status: !items.length
+        ? 'Empty'
+        : nDone === items.length
+          ? 'Done'
+          : nDone
+            ? 'In progress'
+            : 'To do',
       tags: [],
       updated: latest(items),
       body: `# ${e.key || ''} ${e.title}
@@ -339,7 +365,9 @@ ${flagged(items, (t) => `${tLink(t)} · ${t.status || ''}${t.type ? ` · ${t.typ
     const deps = (t.dependencies || []).map((d) => {
       const o =
         byTitle.get(String(d).trim().toLowerCase()) ||
-        tickets.find((x) => x.key && String(d).trim().toUpperCase() === String(x.key).toUpperCase());
+        tickets.find(
+          (x) => x.key && String(d).trim().toUpperCase() === String(x.key).toUpperCase(),
+        );
       return o && o !== t ? tLink(o) : String(d);
     });
     const links = (t.links || [])
@@ -349,11 +377,17 @@ ${flagged(items, (t) => `${tLink(t)} · ${t.status || ''}${t.type ? ` · ${t.typ
       })
       .filter(Boolean);
     const blockedBy = tickets.filter(
-      (x) => x !== t && (x.dependencies || []).some((d) => String(d).trim().toLowerCase() === String(t.title).trim().toLowerCase()),
+      (x) =>
+        x !== t &&
+        (x.dependencies || []).some(
+          (d) => String(d).trim().toLowerCase() === String(t.title).trim().toLowerCase(),
+        ),
     );
     const rels = releasesOf(t);
     const sprint = (p.sprints || []).find((s) => s.id === t.sprintId);
-    const comments = (t.comments || []).filter((c) => !c.system && String(c.text || '').trim()).slice(-5);
+    const comments = (t.comments || [])
+      .filter((c) => !c.system && String(c.text || '').trim())
+      .slice(-5);
     const tcs = t.testCases || [];
     const qs = questionsOf(t);
     add({
@@ -364,7 +398,9 @@ ${flagged(items, (t) => `${tLink(t)} · ${t.status || ''}${t.type ? ` · ${t.typ
       title: t.title,
       status: t.status,
       updated: t.updatedAt,
-      tags: [t.type, t.priority && `priority-${t.priority}`, t.layer, ...(t.labels || [])].filter(Boolean),
+      tags: [t.type, t.priority && `priority-${t.priority}`, t.layer, ...(t.labels || [])].filter(
+        Boolean,
+      ),
       body: `# ${t.key || ''} ${t.title}
 
 - **Type**: ${t.type || 'Story'}${t.priority ? ` · **Priority**: ${t.priority}` : ''}${t.storyPoints ? ` · **Points**: ${t.storyPoints}` : ''}
@@ -449,7 +485,9 @@ ${x.text && x.text !== x.title ? `${x.text}\n\n` : ''}- **Status**: ${x.status |
 // ---------------------------------------------------------------- links
 const LINK_RE = /!?\[\[([^\]|#\n]+)(?:#[^\]|\n]*)?(?:\|([^\]\n]*))?\]\]/g;
 /** The [[targets]] written in a note body (as written: file names, titles or paths). */
-export const linksIn = (body) => [...new Set([...String(body || '').matchAll(LINK_RE)].map((m) => m[1].trim()).filter(Boolean))];
+export const linksIn = (body) => [
+  ...new Set([...String(body || '').matchAll(LINK_RE)].map((m) => m[1].trim()).filter(Boolean)),
+];
 /** Resolves a wikilink target the way Obsidian does: path, file name, then title, alias or key. */
 function resolver(notes) {
   const by: Map<any, any> = new Map();
@@ -480,23 +518,51 @@ const G = (globalThis.__tfBrain ??= { index: new Map(), inflight: new Map() });
 const ROW =
   'id, kind, type, key, ref, title, status, tags, links, meta, body, hash, updated_by as "updatedBy", updated_at as "updatedAt", created_at as "createdAt"';
 async function state(projectId) {
-  return (await q('select version, rev, built_at as "builtAt", data from brain_state where project_id = $1', [projectId])).rows[0] || null;
+  return (
+    (
+      await q(
+        'select version, rev, built_at as "builtAt", data from brain_state where project_id = $1',
+        [projectId],
+      )
+    ).rows[0] || null
+  );
 }
-const noteHash = (n) => sha(JSON.stringify([n.type, n.key, n.ref, n.title, n.status, n.tags, n.body, n.updated || null, n.meta || {}]));
+const noteHash = (n) =>
+  sha(
+    JSON.stringify([
+      n.type,
+      n.key,
+      n.ref,
+      n.title,
+      n.status,
+      n.tags,
+      n.body,
+      n.updated || null,
+      n.meta || {},
+    ]),
+  );
 
 /**
- * Rebuilds the generated notes from the project: new and changed ones are written, ones for deleted things removed.
- * People's own notes (kind 'user') are never written here. Returns { version, written, removed, total }.
+ * Rebuilds the generated notes from the project: new and changed ones are written, ones for deleted
+ * things removed.
+ * People's own notes (kind 'user') are never written here. Returns { version, written, removed,
+ * total }.
  */
 export async function refreshBrain(projectId) {
   const p = await store.getProject(projectId);
   const notes = buildNotes(p);
   const out = await tx(async (t) => {
-    // The state row first: it serialises refreshes of one project (two servers, or two requests at once).
-    await t.query(`insert into brain_state (project_id, version, rev) values ($1, 0, 0) on conflict (project_id) do nothing`, [projectId]);
+    // The state row first: it serialises refreshes of one project (two servers, or two requests at
+    // once).
+    await t.query(
+      `insert into brain_state (project_id, version, rev) values ($1, 0, 0) on conflict (project_id) do nothing`,
+      [projectId],
+    );
     await t.query('select 1 from brain_state where project_id = $1 for update', [projectId]);
     const have = new Map(
-      (await t.query('select id, kind, hash from brain_notes where project_id = $1', [projectId])).rows.map((r) => [r.id, r]),
+      (
+        await t.query('select id, kind, hash from brain_notes where project_id = $1', [projectId])
+      ).rows.map((r) => [r.id, r]),
     );
     const rows: any[] = [];
     for (const n of notes) {
@@ -519,7 +585,9 @@ export async function refreshBrain(projectId) {
       });
     }
     const keep = new Set(notes.map((n) => n.id));
-    const gone = [...have.values()].filter((r: any) => r.kind === 'auto' && !keep.has(r.id)).map((r: any) => r.id);
+    const gone = [...have.values()]
+      .filter((r: any) => r.kind === 'auto' && !keep.has(r.id))
+      .map((r: any) => r.id);
     for (let i = 0; i < rows.length; i += 400) {
       await t.query(
         `insert into brain_notes (project_id, id, kind, type, key, ref, title, status, tags, links, body, hash, updated_at)
@@ -531,21 +599,32 @@ export async function refreshBrain(projectId) {
         [projectId, JSON.stringify(rows.slice(i, i + 400))],
       );
     }
-    if (gone.length) await t.query("delete from brain_notes where project_id = $1 and kind = 'auto' and id = any($2)", [projectId, gone]);
+    if (gone.length)
+      await t.query(
+        "delete from brain_notes where project_id = $1 and kind = 'auto' and id = any($2)",
+        [projectId, gone],
+      );
     const changed = rows.length || gone.length;
     const r = (
-      await t.query(`update brain_state set version = $2, built_at = now(), rev = rev + $3 where project_id = $1 returning rev`, [
-        projectId,
-        p.version,
-        changed ? 1 : 0,
-      ])
+      await t.query(
+        `update brain_state set version = $2, built_at = now(), rev = rev + $3 where project_id = $1 returning rev`,
+        [projectId, p.version, changed ? 1 : 0],
+      )
     ).rows[0];
-    return { version: p.version, rev: r.rev, written: rows.length, removed: gone.length, total: notes.length };
+    return {
+      version: p.version,
+      rev: r.rev,
+      written: rows.length,
+      removed: gone.length,
+      total: notes.length,
+    };
   });
   return out;
 }
 
-/** Makes sure the generated notes match the project's current version (a refresh when it changed). */
+/**
+ * Makes sure the generated notes match the project's current version (a refresh when it changed).
+ */
 export async function ensureBrain(projectId) {
   const v = await store.projectVersion(projectId);
   const st = await state(projectId);
@@ -565,15 +644,18 @@ const bump = (t, projectId) =>
   );
 
 /**
- * Every note of the project with its resolved links and backlinks, cached per brain revision (one small query to
- * check). { rev, notes, byId, resolve, out: Map id → ids, back: Map id → ids, terms }.
+ * Every note of the project with its resolved links and backlinks, cached per brain revision (one
+ * small query to check). { rev, notes, byId, resolve, out: Map id → ids, back: Map id → ids, terms
+ * }.
  */
 async function loadIndex(projectId) {
   const st = await ensureBrain(projectId);
   const rev = st?.rev ?? 0;
   const hit = G.index.get(projectId);
   if (hit && hit.rev === rev) return hit;
-  const notes = (await q(`select ${ROW} from brain_notes where project_id = $1 order by id`, [projectId])).rows;
+  const notes = (
+    await q(`select ${ROW} from brain_notes where project_id = $1 order by id`, [projectId])
+  ).rows;
   const resolve = resolver(notes);
   const byId = new Map(notes.map((n) => [n.id, n]));
   const out = new Map(),
@@ -664,7 +746,10 @@ export async function listNotes(projectId) {
     })),
   };
 }
-/** One note with its body, outgoing links and backlinks (and links that don't resolve to a note yet). */
+/**
+ * One note with its body, outgoing links and backlinks (and links that don't resolve to a note
+ * yet).
+ */
 export async function getNote(projectId, id) {
   const idx = await loadIndex(projectId);
   const n = idx.byId.get(id) || idx.byId.get(idx.resolve(id) || '');
@@ -687,20 +772,29 @@ export async function searchNotes(projectId, text) {
   return searchIdx(idx, text, { limit: 60 }).map((x) => x.id);
 }
 
-/** Creates or updates one of the person's own notes. Generated notes can't be edited (they'd be overwritten). */
+/**
+ * Creates or updates one of the person's own notes. Generated notes can't be edited (they'd be
+ * overwritten).
+ */
 export async function saveNote(projectId, note, user) {
   const title = String(note.title || '')
     .trim()
     .slice(0, 200);
   if (!title) throw new HttpError(400, 'Give the note a title.');
   const body = String(note.body ?? '').slice(0, MAX_BODY);
-  const type = NOTE_TYPES.includes(note.type) && !['index', 'project', 'context', 'repo'].includes(note.type) ? note.type : 'note';
-  const tags = tagsOf(Array.isArray(note.tags) ? note.tags : String(note.tags || '').split(/[,\s]+/)).slice(0, 20);
+  const type =
+    NOTE_TYPES.includes(note.type) && !['index', 'project', 'context', 'repo'].includes(note.type)
+      ? note.type
+      : 'note';
+  const tags = tagsOf(
+    Array.isArray(note.tags) ? note.tags : String(note.tags || '').split(/[,\s]+/),
+  ).slice(0, 20);
   const status = String(note.status || '').slice(0, 60);
   const idx = await loadIndex(projectId);
   let id = note.id ? String(note.id) : '';
   const cur = id ? idx.byId.get(id) : null;
-  if (id && !cur) throw new HttpError(404, 'That note was deleted. Copy your text and create it again.');
+  if (id && !cur)
+    throw new HttpError(404, 'That note was deleted. Copy your text and create it again.');
   if (cur && cur.kind !== 'user')
     throw new HttpError(
       409,
@@ -721,9 +815,16 @@ export async function saveNote(projectId, note, user) {
     while (names.has(file.toLowerCase())) file = `${safeName(title)} ${k++}`;
     id = `${folder}/${file}`;
   }
-  if (cur && note.baseUpdatedAt && new Date(cur.updatedAt).toISOString() !== new Date(note.baseUpdatedAt).toISOString()) {
+  if (
+    cur &&
+    note.baseUpdatedAt &&
+    new Date(cur.updatedAt).toISOString() !== new Date(note.baseUpdatedAt).toISOString()
+  ) {
     throw Object.assign(
-      new HttpError(409, `${cur.updatedBy || 'Someone'} changed this note since you opened it. Reload it, then make your change again.`),
+      new HttpError(
+        409,
+        `${cur.updatedBy || 'Someone'} changed this note since you opened it. Reload it, then make your change again.`,
+      ),
       { extra: { conflict: true } },
     );
   }
@@ -756,10 +857,10 @@ export async function saveNote(projectId, note, user) {
 }
 export async function deleteNote(projectId, id) {
   const r = await tx(async (t) => {
-    const x = await t.query("delete from brain_notes where project_id = $1 and id = $2 and kind = 'user' returning id", [
-      projectId,
-      String(id),
-    ]);
+    const x = await t.query(
+      "delete from brain_notes where project_id = $1 and id = $2 and kind = 'user' returning id",
+      [projectId, String(id)],
+    );
     if (x.rows[0]) await bump(t, projectId);
     return x.rows[0];
   });
@@ -793,15 +894,23 @@ const TYPE_RANK = {
   index: 11,
 };
 /**
- * The notes that matter for a task, as a compact Markdown block for the prompt. Starts at the notes of the issues and
- * epics the task is about, follows their links (and backlinks) one and two hops, then adds the notes whose words match
- * the task best. Deterministic (same project and task → same text), so cached answers and prompt caching keep working.
- * focus: { issueIds, epicIds, keys }; query: free text; max: characters; exclude: note types already in the prompt.
+ * The notes that matter for a task, as a compact Markdown block for the prompt. Starts at the notes
+ * of the issues and epics the task is about, follows their links (and backlinks) one and two hops,
+ * then adds the notes whose words match the task best. Deterministic (same project and task → same
+ * text), so cached answers and prompt caching keep working. focus: { issueIds, epicIds, keys };
+ * query: free text; max: characters; exclude: note types already in the prompt.
  * Returns { text, notes: [{ id, title, type, why }] }.
  */
 export async function brainContext(
   projectId,
-  { issueIds = [], epicIds = [], keys = [], query = '', max = 9000, exclude = ['context', 'index'] }: any = {},
+  {
+    issueIds = [],
+    epicIds = [],
+    keys = [],
+    query = '',
+    max = 9000,
+    exclude = ['context', 'index'],
+  }: any = {},
 ) {
   const idx = await loadIndex(projectId);
   if (!idx.notes.length) return { text: '', notes: [] };
@@ -813,13 +922,21 @@ export async function brainContext(
     [...ids]
       .map((id) => idx.byId.get(id))
       .filter(ok)
-      .sort((a, b) => (TYPE_RANK[a.type] ?? 9) - (TYPE_RANK[b.type] ?? 9) || a.id.localeCompare(b.id, undefined, { numeric: true }));
+      .sort(
+        (a, b) =>
+          (TYPE_RANK[a.type] ?? 9) - (TYPE_RANK[b.type] ?? 9) ||
+          a.id.localeCompare(b.id, undefined, { numeric: true }),
+      );
   const seeds = idx.notes.filter(
-    (n) => ok(n) && ((n.kind === 'auto' && n.ref && refs.has(n.ref)) || (n.key && keySet.has(n.key.toLowerCase()))),
+    (n) =>
+      ok(n) &&
+      ((n.kind === 'auto' && n.ref && refs.has(n.ref)) ||
+        (n.key && keySet.has(n.key.toLowerCase()))),
   );
   for (const n of seeds) pick.set(n.id, { why: 'the task is about it', depth: 0 });
   const near = (id) => [...(idx.out.get(id) || []), ...(idx.back.get(id) || [])];
-  // Hop 1: everything the focus notes link to or are linked from (an epic's issues are capped: siblings matter less).
+  // Hop 1: everything the focus notes link to or are linked from (an epic's issues are capped:
+  // siblings matter less).
   const hop1: Set<any> = new Set();
   for (const s of seeds) for (const id of near(s.id)) if (!pick.has(id)) hop1.add(id);
   let siblings = 0;
@@ -829,12 +946,19 @@ export async function brainContext(
   }
   // Hop 2: questions and people's notes two links away (not every issue of every epic).
   const hop2: Set<any> = new Set();
-  for (const [id, x] of [...pick]) if (x.depth === 1) for (const y of near(id)) if (!pick.has(y)) hop2.add(y);
+  for (const [id, x] of [...pick])
+    if (x.depth === 1) for (const y of near(id)) if (!pick.has(y)) hop2.add(y);
   for (const n of order(hop2))
-    if (['note', 'decision', 'question', 'doc'].includes(n.type)) pick.set(n.id, { why: 'two links away', depth: 2 });
+    if (['note', 'decision', 'question', 'doc'].includes(n.type))
+      pick.set(n.id, { why: 'two links away', depth: 2 });
   // Keyword match: what the task's words point at, beyond the links.
-  const text = [query, ...seeds.map((n) => `${n.title} ${String(n.body).slice(0, 3000)}`)].join('\n');
-  for (const r of searchIdx(idx, text, { limit: 8, skip: new Set([...pick.keys(), ...idx.notes.filter((n) => !ok(n)).map((n) => n.id)]) }))
+  const text = [query, ...seeds.map((n) => `${n.title} ${String(n.body).slice(0, 3000)}`)].join(
+    '\n',
+  );
+  for (const r of searchIdx(idx, text, {
+    limit: 8,
+    skip: new Set([...pick.keys(), ...idx.notes.filter((n) => !ok(n)).map((n) => n.id)]),
+  }))
     pick.set(r.id, { why: 'matches the task', depth: 3 });
   if (!pick.size) return { text: '', notes: [] };
   const BUDGET = [2600, 900, 450, 650];
@@ -870,14 +994,17 @@ export async function brainContext(
 }
 
 /**
- * The PROJECT BRAIN block for a prompt ('' when there's nothing to add, the brain is switched off or locked, or the
- * person can't open the project). Never throws: AI work goes on without it.
- * spec: { projectId?, issues?: [ticket], epics?: [epic], issueIds?, epicIds?, query?, max?, exclude? }
+ * The PROJECT BRAIN block for a prompt ('' when there's nothing to add, the brain is switched off
+ * or locked, or the person can't open the project). Never throws: AI work goes on without it. spec:
+ * { projectId?, issues?: [ticket], epics?: [epic], issueIds?, epicIds?, query?, max?, exclude? }
  */
 export async function brainBlock(spec: any = {}) {
   return (await brainPack(spec)).block;
 }
-/** brainBlock with the notes it chose: { block, notes: [{ id, title, type, why }] } (for the viewer's preview). */
+/**
+ * brainBlock with the notes it chose: { block, notes: [{ id, title, type, why }] } (for the
+ * viewer's preview).
+ */
 export async function brainPack(spec: any = {}) {
   const none = { block: '', notes: [] };
   try {
@@ -893,7 +1020,10 @@ export async function brainPack(spec: any = {}) {
       epics = (spec.epics || []).filter(Boolean);
     const query = [
       spec.query,
-      ...issues.map((t) => `${t.title || ''} ${t.userStory || ''} ${String(t.description || '').slice(0, 1500)}`),
+      ...issues.map(
+        (t) =>
+          `${t.title || ''} ${t.userStory || ''} ${String(t.description || '').slice(0, 1500)}`,
+      ),
       ...epics.map((e) => `${e.title || ''} ${String(e.description || '').slice(0, 800)}`),
     ]
       .filter(Boolean)
@@ -917,10 +1047,18 @@ export async function brainPack(spec: any = {}) {
   }
 }
 
-/** For code jobs: the context block plus the notes as files for the worktree's .ticketforge/brain/ folder. */
+/**
+ * For code jobs: the context block plus the notes as files for the worktree's .ticketforge/brain/
+ * folder.
+ */
 export async function brainForCode(projectId, ticket, { max = 7000 }: any = {}) {
   try {
-    const block = await brainBlock({ projectId, issues: [ticket], exclude: ['context', 'index', 'repo'], max });
+    const block = await brainBlock({
+      projectId,
+      issues: [ticket],
+      exclude: ['context', 'index', 'repo'],
+      max,
+    });
     if (!block) return { block: '', files: {} };
     const idx = await loadIndex(projectId);
     const r = await brainContext(projectId, {
@@ -932,7 +1070,10 @@ export async function brainForCode(projectId, ticket, { max = 7000 }: any = {}) 
     });
     const files: any = {};
     const ids = new Set(
-      [...r.notes.map((x) => x.id), ...idx.notes.filter((n) => ['project', 'context'].includes(n.type)).map((n) => n.id)].slice(0, 80),
+      [
+        ...r.notes.map((x) => x.id),
+        ...idx.notes.filter((n) => ['project', 'context'].includes(n.type)).map((n) => n.id),
+      ].slice(0, 80),
     );
     for (const id of ids) {
       const n = idx.byId.get(id);
@@ -946,7 +1087,8 @@ export async function brainForCode(projectId, ticket, { max = 7000 }: any = {}) 
   }
 }
 
-// ---------------------------------------------------------------- Obsidian: Markdown files, zip export and import
+// ---------------------------------------------------------------- Obsidian: Markdown files, zip
+// export and import
 const yamlStr = (s) => JSON.stringify(String(s ?? ''));
 /** A note as an Obsidian Markdown file: YAML frontmatter, then the body. */
 export function toMarkdown(n) {
@@ -956,7 +1098,10 @@ export function toMarkdown(n) {
   fm.push(`tags: [${(n.tags || []).map(yamlStr).join(', ')}]`);
   if (n.updatedAt) fm.push(`updated: ${new Date(n.updatedAt).toISOString()}`);
   for (const [k, v] of Object.entries<any>(n.meta || {}))
-    if (!['title', 'type', 'key', 'status', 'tags', 'updated', 'origin'].includes(k) && /^[\w-]{1,40}$/.test(k))
+    if (
+      !['title', 'type', 'key', 'status', 'tags', 'updated', 'origin'].includes(k) &&
+      /^[\w-]{1,40}$/.test(k)
+    )
       fm.push(`${k}: ${JSON.stringify(v)}`);
   fm.push(`origin: ${n.kind === 'user' ? 'user' : 'ticketforge'}`);
   return `---\n${fm.join('\n')}\n---\n${String(n.body || '').replace(/^\n+/, '')}${String(n.body || '').endsWith('\n') ? '' : '\n'}`;
@@ -1014,22 +1159,29 @@ const unquote = (v) => {
   return t.replace(/^'(.*)'$/, '$1');
 };
 
-/** The whole brain as an Obsidian vault (zip): folders, frontmatter, wikilinks and the Index note. */
+/**
+ * The whole brain as an Obsidian vault (zip): folders, frontmatter, wikilinks and the Index note.
+ */
 export async function exportZip(projectId, projectName) {
   const idx = await loadIndex(projectId);
   const root = `${safeName(projectName || 'Project')} brain`;
   const files: any = {};
   for (const n of idx.notes) files[`${root}/${n.id}.md`] = strToU8(toMarkdown(n));
   files[`${root}/.obsidian/app.json`] = strToU8(
-    JSON.stringify({ alwaysUpdateLinks: true, newFileFolderPath: 'Notes', newFileLocation: 'folder' }, null, 2),
+    JSON.stringify(
+      { alwaysUpdateLinks: true, newFileFolderPath: 'Notes', newFileLocation: 'folder' },
+      null,
+      2,
+    ),
   );
   return { name: `${root}.zip`, data: Buffer.from(zipSync(files, { level: 6 })) };
 }
 
 /**
- * Imports Markdown notes (from an Obsidian vault zip or .md files) as the team's own notes. Notes TicketForge wrote
- * (origin: ticketforge) are skipped: they come back on the next refresh. A note at a path TicketForge uses is put
- * under Imported/. files: [{ path, data: Buffer | string }]. Returns { added, updated, skipped }.
+ * Imports Markdown notes (from an Obsidian vault zip or .md files) as the team's own notes. Notes
+ * TicketForge wrote (origin: ticketforge) are skipped: they come back on the next refresh. A note
+ * at a path TicketForge uses is put under Imported/. files: [{ path, data: Buffer | string }].
+ * Returns { added, updated, skipped }.
  */
 export async function importNotes(projectId, files, user) {
   let entries: any[] = [];
@@ -1038,25 +1190,41 @@ export async function importNotes(projectId, files, user) {
     if (/\.zip$/i.test(name)) {
       let un;
       try {
-        un = unzipSync(new Uint8Array(f.data), { filter: (x) => /\.md$/i.test(x.name) && x.originalSize < 512 * 1024 });
+        un = unzipSync(new Uint8Array(f.data), {
+          filter: (x) => /\.md$/i.test(x.name) && x.originalSize < 512 * 1024,
+        });
       } catch {
         throw new HttpError(400, `${name} isn’t a zip file that can be read.`);
       }
       const paths = Object.keys(un);
       // A vault zipped as one folder: drop that folder from the paths.
       const top =
-        paths.length && paths.every((x) => x.includes('/') && x.split('/')[0] === paths[0].split('/')[0])
+        paths.length &&
+        paths.every((x) => x.includes('/') && x.split('/')[0] === paths[0].split('/')[0])
           ? `${paths[0].split('/')[0]}/`
           : '';
       for (const x of paths) entries.push({ path: x.slice(top.length), text: strFromU8(un[x]) });
     } else if (/\.(md|markdown)$/i.test(name))
-      entries.push({ path: name.split(/[\\/]/).pop(), text: Buffer.isBuffer(f.data) ? f.data.toString('utf8') : String(f.data) });
+      entries.push({
+        path: name.split(/[\\/]/).pop(),
+        text: Buffer.isBuffer(f.data) ? f.data.toString('utf8') : String(f.data),
+      });
   }
-  entries = entries.filter((e) => !e.path.split('/').some((x) => x.startsWith('.'))).slice(0, MAX_USER_NOTES);
-  if (!entries.length) throw new HttpError(400, 'No Markdown notes found. Choose .md files or a zip of an Obsidian vault.');
+  entries = entries
+    .filter((e) => !e.path.split('/').some((x) => x.startsWith('.')))
+    .slice(0, MAX_USER_NOTES);
+  if (!entries.length)
+    throw new HttpError(
+      400,
+      'No Markdown notes found. Choose .md files or a zip of an Obsidian vault.',
+    );
   const idx = await loadIndex(projectId);
-  const autoIds = new Set(idx.notes.filter((n) => n.kind === 'auto').map((n) => n.id.toLowerCase()));
-  const autoNames = new Set(idx.notes.filter((n) => n.kind === 'auto').map((n) => base(n.id).toLowerCase()));
+  const autoIds = new Set(
+    idx.notes.filter((n) => n.kind === 'auto').map((n) => n.id.toLowerCase()),
+  );
+  const autoNames = new Set(
+    idx.notes.filter((n) => n.kind === 'auto').map((n) => base(n.id).toLowerCase()),
+  );
   const rows: any[] = [];
   let skipped = 0;
   const seen: Set<any> = new Set();
@@ -1072,7 +1240,8 @@ export async function importNotes(projectId, files, user) {
       .map(safeName)
       .filter(Boolean);
     let id = parts.length > 1 ? parts.join('/') : `Notes/${parts[0] || 'Untitled'}`;
-    if (autoIds.has(id.toLowerCase()) || autoNames.has(base(id).toLowerCase())) id = `Imported/${base(id)}`;
+    if (autoIds.has(id.toLowerCase()) || autoNames.has(base(id).toLowerCase()))
+      id = `Imported/${base(id)}`;
     if (seen.has(id.toLowerCase())) {
       skipped++;
       continue;
@@ -1081,7 +1250,10 @@ export async function importNotes(projectId, files, user) {
     const title = String(fm.title || body.match(/^#\s+(.+)$/m)?.[1] || base(id))
       .trim()
       .slice(0, 200);
-    const type = NOTE_TYPES.includes(fm.type) && !['index', 'project', 'context', 'repo'].includes(fm.type) ? fm.type : 'note';
+    const type =
+      NOTE_TYPES.includes(fm.type) && !['index', 'project', 'context', 'repo'].includes(fm.type)
+        ? fm.type
+        : 'note';
     const tags = tagsOf([
       ...(Array.isArray(fm.tags) ? fm.tags : String(fm.tags || '').split(/[,\s]+/)),
       ...[...body.matchAll(/(?:^|\s)#([\p{L}][\p{L}\p{N}_/-]*)/gu)].map((m) => m[1]),
@@ -1090,7 +1262,18 @@ export async function importNotes(projectId, files, user) {
     for (const [k, v] of Object.entries<any>(fm))
       if (!['title', 'type', 'key', 'status', 'tags', 'updated', 'origin'].includes(k)) meta[k] = v;
     const b = clip(body, MAX_BODY);
-    const row = { id, type, key: '', ref: '', title, status: String(fm.status || '').slice(0, 60), tags, links: linksIn(b), meta, body: b };
+    const row = {
+      id,
+      type,
+      key: '',
+      ref: '',
+      title,
+      status: String(fm.status || '').slice(0, 60),
+      tags,
+      links: linksIn(b),
+      meta,
+      body: b,
+    };
     rows.push({ ...row, hash: noteHash(row) });
   }
   const before = new Set(idx.notes.filter((n) => n.kind === 'user').map((n) => n.id));
@@ -1114,7 +1297,8 @@ export async function importNotes(projectId, files, user) {
   return { added, updated: rows.length - added, skipped };
 }
 
-// ---------------------------------------------------------------- folder sync (on this computer only)
+// ---------------------------------------------------------------- folder sync (on this computer
+// only)
 const publicSync = (s) => (s?.dir ? { dir: s.dir, at: s.at || null, last: s.last || null } : null);
 const listMd = (dir) => {
   const out: any[] = [];
@@ -1138,24 +1322,40 @@ const listMd = (dir) => {
   return out;
 };
 /**
- * Two-way sync with a folder on this computer (e.g. inside an Obsidian vault). Generated notes are written to it (and
- * removed when they're gone). The team's own notes go both ways: a note changed on one side since the last sync is
- * copied to the other (when both changed, the newer one wins), a new file becomes a note, and a note or file deleted
- * on one side since the last sync is deleted on the other. Returns what happened.
+ * Two-way sync with a folder on this computer (e.g. inside an Obsidian vault). Generated notes are
+ * written to it (and removed when they're gone). The team's own notes go both ways: a note changed
+ * on one side since the last sync is copied to the other (when both changed, the newer one wins), a
+ * new file becomes a note, and a note or file deleted on one side since the last sync is deleted on
+ * the other. Returns what happened.
  */
 export async function syncFolder(projectId, dirIn, user) {
   const dir = path.resolve(String(dirIn || '').trim());
-  if (!String(dirIn || '').trim() || !path.isAbsolute(String(dirIn).trim())) throw new HttpError(400, 'Choose a folder (its full path).');
-  // Never a system folder, and never straight into a top-level or home folder (it would fill it with note folders).
+  if (!String(dirIn || '').trim() || !path.isAbsolute(String(dirIn).trim()))
+    throw new HttpError(400, 'Choose a folder (its full path).');
+  // Never a system folder, and never straight into a top-level or home folder (it would fill it
+  // with note folders).
   const top = new Set(
-    ['/', '/private', '/var', '/tmp', '/Library', '/Users', '/home', '/Volumes', path.resolve(os.homedir())].map((x) => x.toLowerCase()),
+    [
+      '/',
+      '/private',
+      '/var',
+      '/tmp',
+      '/Library',
+      '/Users',
+      '/home',
+      '/Volumes',
+      path.resolve(os.homedir()),
+    ].map((x) => x.toLowerCase()),
   );
   if (
     top.has(dir.toLowerCase()) ||
     /^\/(bin|sbin|etc|usr|System|dev|proc|boot|private\/etc)(\/|$)/i.test(dir) ||
     /^[A-Z]:\\(Windows|Program Files[^\\]*)?(\\|$)/i.test(dir)
   ) {
-    throw new HttpError(400, 'Choose a folder of your own, such as one inside your Obsidian vault.');
+    throw new HttpError(
+      400,
+      'Choose a folder of your own, such as one inside your Obsidian vault.',
+    );
   }
   fs.mkdirSync(/*turbopackIgnore: true*/ dir, { recursive: true });
   const st = await state(projectId);
@@ -1163,14 +1363,25 @@ export async function syncFolder(projectId, dirIn, user) {
   const idx = await loadIndex(projectId);
   const files = new Set(listMd(dir));
   const now: any = {};
-  const res = { wroteAuto: 0, removedAuto: 0, toFolder: 0, fromFolder: 0, newNotes: 0, deletedNotes: 0, deletedFiles: 0, conflicts: [] };
+  const res = {
+    wroteAuto: 0,
+    removedAuto: 0,
+    toFolder: 0,
+    fromFolder: 0,
+    newNotes: 0,
+    deletedNotes: 0,
+    deletedFiles: 0,
+    conflicts: [],
+  };
   const write = (rel, text) => {
     const p = path.join(/*turbopackIgnore: true*/ dir, ...rel.split('/'));
     fs.mkdirSync(/*turbopackIgnore: true*/ path.dirname(p), { recursive: true });
     fs.writeFileSync(/*turbopackIgnore: true*/ p, text);
   };
-  const read = (rel) => fs.readFileSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/')), 'utf8');
-  const mtime = (rel) => fs.statSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/'))).mtime;
+  const read = (rel) =>
+    fs.readFileSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/')), 'utf8');
+  const mtime = (rel) =>
+    fs.statSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/'))).mtime;
   const remove = (rel) => {
     try {
       fs.unlinkSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/')));
@@ -1244,12 +1455,15 @@ export async function syncFolder(projectId, dirIn, user) {
   }
   if (deletes.length)
     await tx(async (t) => {
-      await t.query("delete from brain_notes where project_id = $1 and kind = 'user' and id = any($2)", [projectId, deletes]);
+      await t.query(
+        "delete from brain_notes where project_id = $1 and kind = 'user' and id = any($2)",
+        [projectId, deletes],
+      );
       await bump(t, projectId);
     });
   if (imports.length) await importRaw(projectId, imports, user);
-  // Imported files are rewritten as the note now reads (its frontmatter, updated time), and every file's hash is kept,
-  // so the next sync knows which side changed.
+  // Imported files are rewritten as the note now reads (its frontmatter, updated time), and every
+  // file's hash is kept, so the next sync knows which side changed.
   const after = await loadIndex(projectId);
   const imported = new Set(imports.map((f) => f.path));
   for (const n of after.notes) {
@@ -1259,11 +1473,20 @@ export async function syncFolder(projectId, dirIn, user) {
       const text = toMarkdown(n);
       write(rel, text);
       now[rel] = sha(text);
-    } else if (!now[rel] && fs.existsSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/')))) now[rel] = sha(read(rel));
+    } else if (
+      !now[rel] &&
+      fs.existsSync(/*turbopackIgnore: true*/ path.join(dir, ...rel.split('/')))
+    )
+      now[rel] = sha(read(rel));
   }
   const data = {
     ...(st?.data || {}),
-    sync: { dir, at: new Date().toISOString(), files: now, last: { ...res, conflicts: res.conflicts.length } },
+    sync: {
+      dir,
+      at: new Date().toISOString(),
+      files: now,
+      last: { ...res, conflicts: res.conflicts.length },
+    },
   };
   await q(
     `insert into brain_state (project_id, version, rev, data) values ($1, 0, 1, $2) on conflict (project_id) do update set data = $2, rev = brain_state.rev + 1`,
@@ -1285,7 +1508,10 @@ async function importRaw(projectId, files, user) {
     const b = clip(body, MAX_BODY);
     const row = {
       id,
-      type: NOTE_TYPES.includes(fm.type) && !['index', 'project', 'context', 'repo'].includes(fm.type) ? fm.type : 'note',
+      type:
+        NOTE_TYPES.includes(fm.type) && !['index', 'project', 'context', 'repo'].includes(fm.type)
+          ? fm.type
+          : 'note',
       key: '',
       ref: '',
       title,

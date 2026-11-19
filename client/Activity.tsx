@@ -1,7 +1,8 @@
 'use client';
-// Activity: the project's timeline of every change, newest first, grouped by day. It joins each issue's own history
-// and comments (created, every field change, links, test results, pull requests…) with the changes the server logs
-// for the rest of the project (sprints, epics, releases, workflow and settings, test management, deleted issues).
+// Activity: the project's timeline of every change, newest first, grouped by day. It joins each
+// issue's own history and comments (created, every field change, links, test results, pull
+// requests…) with the changes the server logs for the rest of the project (sprints, epics,
+// releases, workflow and settings, test management, deleted issues).
 // Filter by type, person, time and text; click an issue to open it.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { P, S, useStore, api, FIELD_LABEL, type Any } from './core';
@@ -10,7 +11,17 @@ import { TF, SF, MenuItem } from './fields';
 import { openDrawer } from './actions';
 import { Header } from './views';
 
-type Ev = { id: string; at: string; author: string; kind: string; issue?: Any; text: ReactNode; plain: string; from?: string; to?: string };
+type Ev = {
+  id: string;
+  at: string;
+  author: string;
+  kind: string;
+  issue?: Any;
+  text: ReactNode;
+  plain: string;
+  from?: string;
+  to?: string;
+};
 const TYPES: [string, string][] = [
   ['', 'All changes'],
   ['issue', 'Issues'],
@@ -43,10 +54,16 @@ const clip = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}…` : s);
 function dayLabel(d: string) {
   const t = new Date();
   const y = new Date(Date.now() - 864e5);
-  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const iso = (x: Date) =>
+    `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
   if (d === iso(t)) return 'Today';
   if (d === iso(y)) return 'Yesterday';
-  return new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 const localDay = (at: string) => {
   const x = new Date(at);
@@ -59,13 +76,19 @@ function kindOf(h: Any) {
   if (h.field === 'epicId') return 'epic';
   if (h.field === 'fixVersions') return 'release';
   const tx = String(h.text || '');
-  if (h.field === 'event' && (/pull request|merge request/i.test(tx) || h.author === 'Development')) return 'pr';
+  if (h.field === 'event' && (/pull request|merge request/i.test(tx) || h.author === 'Development'))
+    return 'pr';
   if (h.field === 'event' && (/test/i.test(tx) || h.author === 'Automation')) return 'test';
   if (h.field === 'testCases') return 'test';
   return 'issue';
 }
 const IssueLink = ({ t }: { t: Any }) => (
-  <button type="button" className="act-issue" onClick={() => openDrawer('issue', t.id)} title={t.title}>
+  <button
+    type="button"
+    className="act-issue"
+    onClick={() => openDrawer('issue', t.id)}
+    title={t.title}
+  >
     <span className="key">{t.key}</span>
     <span className="act-issue-t">{t.title}</span>
   </button>
@@ -211,8 +234,8 @@ export function Activity() {
     <>
       <Header title="Activity" />
       <p className="muted" style={{ marginTop: -6 }}>
-        Every change in this project, newest first: issues and their fields, comments, sprints, epics, releases, tests, pull requests and
-        settings.
+        Every change in this project, newest first: issues and their fields, comments, sprints,
+        epics, releases, tests, pull requests and settings.
       </p>
       <div className="toolbar act-tools">
         <TF
@@ -296,10 +319,23 @@ export function Activity() {
           </span>
         )}
       </div>
-      {err && <p className="warn-text small">Couldn’t load the project-level changes ({err}); issue changes are shown.</p>}
+      {err && (
+        <p className="warn-text small">
+          Couldn’t load the project-level changes ({err}); issue changes are shown.
+        </p>
+      )}
       {!shown.length ? (
-        <EmptyState compact icon={I.history} tone="neutral" title={active ? 'No changes match' : 'No changes yet'}>
-          <p>{active ? 'Try another filter.' : 'Changes to issues, sprints, epics, releases and settings show up here.'}</p>
+        <EmptyState
+          compact
+          icon={I.history}
+          tone="neutral"
+          title={active ? 'No changes match' : 'No changes yet'}
+        >
+          <p>
+            {active
+              ? 'Try another filter.'
+              : 'Changes to issues, sprints, epics, releases and settings show up here.'}
+          </p>
         </EmptyState>
       ) : (
         <div className="act-feed">
@@ -312,7 +348,10 @@ export function Activity() {
               <ol className="act-list">
                 {evs.map((e) => (
                   <li key={e.id} className={`act-item k-${e.kind}`}>
-                    <span className="act-ic" title={TYPES.find(([k]) => k === e.kind)?.[1] || e.kind}>
+                    <span
+                      className="act-ic"
+                      title={TYPES.find(([k]) => k === e.kind)?.[1] || e.kind}
+                    >
                       <Ico svg={KIND_ICON[e.kind] || I.history} />
                     </span>
                     <Avatar name={e.author} size={24} />
@@ -328,8 +367,15 @@ export function Activity() {
                         </div>
                       )}
                     </div>
-                    <time className="act-time muted small" dateTime={e.at} title={new Date(e.at).toLocaleString()}>
-                      {new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    <time
+                      className="act-time muted small"
+                      dateTime={e.at}
+                      title={new Date(e.at).toLocaleString()}
+                    >
+                      {new Date(e.at).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
                     </time>
                   </li>
                 ))}
@@ -338,7 +384,8 @@ export function Activity() {
           ))}
           {shown.length > limit && (
             <button className="show-more" onClick={() => setLimit(limit + 300)}>
-              Show older changes <span className="muted">· {(shown.length - limit).toLocaleString()} more</span>
+              Show older changes{' '}
+              <span className="muted">· {(shown.length - limit).toLocaleString()} more</span>
             </button>
           )}
         </div>

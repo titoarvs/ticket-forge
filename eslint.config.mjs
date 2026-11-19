@@ -1,4 +1,5 @@
-// ESLint (flat config): Next.js core web vitals + TypeScript rules, with formatting left to Prettier (npm run format).
+// ESLint (flat config): Next.js core web vitals + TypeScript rules, with formatting left to
+// Prettier (npm run format).
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
@@ -10,23 +11,38 @@ export default defineConfig([
   prettier,
   {
     rules: {
-      // The app is typed loosely on purpose (JSON project data everywhere, the `Any` alias): `any` is allowed.
+      // The app is typed loosely on purpose (JSON project data everywhere, the `Any` alias): `any`
+      // is allowed.
       '@typescript-eslint/no-explicit-any': 'off',
       // Unused names are warnings; a leading underscore marks one as deliberately unused.
       '@typescript-eslint/no-unused-vars': [
         'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'none',
+          ignoreRestSiblings: true,
+        },
       ],
-      // React Compiler checks: the app doesn't use the React Compiler, and these flag patterns it relies on on purpose
-      // (loading data in effects, the shared S store, Date.now() for "ago"). Turn them on if the compiler is adopted.
+      // React Compiler checks: the app doesn't use the React Compiler, and these flag patterns it
+      // relies on on purpose (loading data in effects, the shared S store, Date.now() for "ago").
+      // Turn them on if the compiler is adopted.
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/purity': 'off',
       'react-hooks/immutability': 'off',
       'react-hooks/globals': 'off',
       'react-hooks/refs': 'off',
       'react-hooks/preserve-manual-memoization': 'off',
-      // Images are avatars, screenshots and uploaded files (data: and API URLs), which next/image can't optimise.
+      // Images are avatars, screenshots and uploaded files (data: and API URLs), which next/image
+      // can't optimise.
       '@next/next/no-img-element': 'off',
+      // Clean code (KISS): small files, short functions, shallow nesting, few parameters. Warnings,
+      // so a change that goes over a limit still builds, and the limit shows where to split next.
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 120, skipBlankLines: true, skipComments: true }],
+      'max-depth': ['warn', 4],
+      'max-params': ['warn', 5],
+      complexity: ['warn', 25],
     },
   },
   // Server code and scripts have no React: names like useOwner() aren't hooks.

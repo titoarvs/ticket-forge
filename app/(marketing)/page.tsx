@@ -28,7 +28,11 @@ const FEATURES: [string, string, string][] = [
     'AI agents that write code',
     'Agents build an issue in its own branch, follow your repository’s patterns, run your checks, then open a pull request for review.',
   ],
-  ['📝', 'Documents on demand', 'Kick Off, Demo, Sign-Off and other epic documents written by agents from your epics and their issues.'],
+  [
+    '📝',
+    'Documents on demand',
+    'Kick Off, Demo, Sign-Off and other epic documents written by agents from your epics and their issues.',
+  ],
   [
     '🔍',
     'Reviews you can trust',
@@ -36,9 +40,18 @@ const FEATURES: [string, string, string][] = [
   ],
 ];
 const STEPS: [string, string][] = [
-  ['Bring your requirements', 'Drop in a document, or start a blank project and write issues with AI.'],
-  ['Shape the backlog', 'Review the epics and issues, answer the AI’s questions, plan sprints and releases.'],
-  ['Build and verify', 'Let agents write the code and tests, review the diff, and ship through your pull requests.'],
+  [
+    'Bring your requirements',
+    'Drop in a document, or start a blank project and write issues with AI.',
+  ],
+  [
+    'Shape the backlog',
+    'Review the epics and issues, answer the AI’s questions, plan sprints and releases.',
+  ],
+  [
+    'Build and verify',
+    'Let agents write the code and tests, review the diff, and ship through your pull requests.',
+  ],
 ];
 
 export default function Landing() {
@@ -48,8 +61,9 @@ export default function Landing() {
         <p className="mk-eyebrow">AI-powered delivery for product teams</p>
         <h1>From requirement documents to a tested backlog, and working code.</h1>
         <p className="mk-lead">
-          TicketForge turns your documents into epics, issues, acceptance criteria and test cases, then puts AI agents to work writing the
-          code, reviewing it and running the tests. You stay in control of every change.
+          TicketForge turns your documents into epics, issues, acceptance criteria and test cases,
+          then puts AI agents to work writing the code, reviewing it and running the tests. You stay
+          in control of every change.
         </p>
         <div className="mk-ctas">
           <Link href="/signup" className="btn primary lg">
@@ -81,7 +95,8 @@ export default function Landing() {
               </div>
             ))}
             <div className="mk-agent">
-              <b>🛠️ Build agent</b> wrote 4 files on <code>tf/pay-12-payslip-pdf</code> · tests pass · ready for review
+              <b>🛠️ Build agent</b> wrote 4 files on <code>tf/pay-12-payslip-pdf</code> · tests pass
+              · ready for review
             </div>
           </div>
         </div>
@@ -121,8 +136,9 @@ export default function Landing() {
         <div>
           <h2>Your workspace, your data</h2>
           <p>
-            Every company gets its own isolated workspace. Keys and tokens are encrypted, AI runs on the providers you choose (or each
-            person’s own Claude subscription), and code changes only reach your repository through pull requests you approve.
+            Every company gets its own isolated workspace. Keys and tokens are encrypted, AI runs on
+            the providers you choose (or each person’s own Claude subscription), and code changes
+            only reach your repository through pull requests you approve.
           </p>
           <p className="small">
             <Link href="/privacy">Privacy Policy</Link> · <Link href="/terms">Terms of Use</Link>

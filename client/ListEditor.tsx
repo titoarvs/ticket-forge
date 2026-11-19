@@ -1,6 +1,7 @@
 'use client';
-// A readable list of assumptions or open questions. Reference codes such as "A-PR-01:" become a tag and short
-// leads such as "Go-live timing:" are bolded. Each item can be edited in place or removed, and new ones added.
+// A readable list of assumptions or open questions. Reference codes such as "A-PR-01:" become a tag
+// and short leads such as "Go-live timing:" are bolded. Each item can be edited in place or
+// removed, and new ones added.
 import { useState } from 'react';
 import { copyText } from './core';
 import { Ico, I } from './ui';
@@ -8,13 +9,18 @@ import { Ico, I } from './ui';
 const LEAD = /^\s*([^:]{2,32}):\s+(?=\S)/;
 const FLAG = /\((?:[^)]*\b(unconfirmed|pending|tbc|tbd|to be confirmed)\b[^)]*)\)/i;
 
-/** Splits "A-PR-01 (from PRD, unconfirmed): text" into its code, lead, text and whether it's unconfirmed. */
+/**
+ * Splits "A-PR-01 (from PRD, unconfirmed): text" into its code, lead, text and whether it's
+ * unconfirmed.
+ */
 function parseItem(s: string) {
   let rest = String(s || '').trim();
   let code = '',
     lead = '';
   const flag = FLAG.test(rest);
-  const c = rest.match(/^\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+[a-z]?)\s*(\([^)]*\))?\s*[:.\-–—]\s*/);
+  const c = rest.match(
+    /^\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+[a-z]?)\s*(\([^)]*\))?\s*[:.\-–—]\s*/,
+  );
   if (c) {
     code = c[1];
     rest = rest.slice(c[0].length);

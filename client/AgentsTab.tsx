@@ -1,8 +1,8 @@
 'use client';
-// Administration → Agents: the TicketForge agents, one per job in the feature lifecycle, as cards. Details shows
-// what an agent does, its inputs, output, tools and the exact prompt it runs with, and lets an administrator turn it
-// off or change its model, effort and extra instructions. Hire picks a project and epic, opens the epic and puts the
-// agent to work there.
+// Administration → Agents: the TicketForge agents, one per job in the feature lifecycle, as cards.
+// Details shows what an agent does, its inputs, output, tools and the exact prompt it runs with,
+// and lets an administrator turn it off or change its model, effort and extra instructions. Hire
+// picks a project and epic, opens the epic and puts the agent to work there.
 import { useEffect, useState } from 'react';
 import { S, toast, openModal, closeModal, ago, aiBody, can, type Any } from './core';
 import { getAgents, saveAgents, agentsAction, deleteAgent } from './api/agents';
@@ -21,7 +21,11 @@ const RUNNER: Record<string, string> = {
 };
 
 const KINDS: [string, string, string][] = [
-  ['review', 'Review (read-only)', 'Reads the code and reports findings: reviews, audits, checks. Never edits.'],
+  [
+    'review',
+    'Review (read-only)',
+    'Reads the code and reports findings: reviews, audits, checks. Never edits.',
+  ],
   ['code', 'Code (edits)', 'Works on an issue in its own git worktree; you review the diff.'],
   ['document', 'Document', 'Writes a Markdown document for an epic.'],
 ];
@@ -79,10 +83,17 @@ same structure, names, libraries, patterns and tests. You never invent a new way
 A short summary: the pattern feature you followed (paths), what changed by file, how each acceptance criterion is met,
 tests added and their result, and anything where you had to depart from the repository's usual way (and why).`;
 const TEMPLATES: { id: string; label: string; md: string }[] = [
-  { id: '__repo', label: '🧬 Repo-native Builder (builds from the repository and project)', md: REPO_BUILDER },
+  {
+    id: '__repo',
+    label: '🧬 Repo-native Builder (builds from the repository and project)',
+    md: REPO_BUILDER,
+  },
 ];
 
-/** Create or edit a custom agent: describe it and the AI writes its rules, or paste / import a .md file. */
+/**
+ * Create or edit a custom agent: describe it and the AI writes its rules, or paste / import a .md
+ * file.
+ */
 function CustomAgentModal({
   a,
   onSaved,
@@ -177,7 +188,11 @@ function CustomAgentModal({
               },
             ]
           : [
-              { label: busy === 'check' ? 'Checking…' : 'Check', disabled: !!busy || !md.trim(), onClick: verify },
+              {
+                label: busy === 'check' ? 'Checking…' : 'Check',
+                disabled: !!busy || !md.trim(),
+                onClick: verify,
+              },
               {
                 label: busy === 'save' ? 'Saving…' : a ? 'Save' : 'Create agent',
                 kind: 'primary' as const,
@@ -188,7 +203,10 @@ function CustomAgentModal({
       ]}
     >
       {!a && (
-        <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        <div
+          className="row"
+          style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}
+        >
           <div className="seg" role="tablist" aria-label="How">
             <button
               role="tab"
@@ -198,7 +216,12 @@ function CustomAgentModal({
             >
               Describe it
             </button>
-            <button role="tab" aria-selected={mode === 'md'} className={mode === 'md' ? 'on' : ''} onClick={() => setMode('md')}>
+            <button
+              role="tab"
+              aria-selected={mode === 'md'}
+              className={mode === 'md' ? 'on' : ''}
+              onClick={() => setMode('md')}
+            >
               Markdown rules
             </button>
           </div>
@@ -225,7 +248,13 @@ function CustomAgentModal({
         <>
           <div className="upd-modes" role="radiogroup" aria-label="Kind">
             {KINDS.map(([k, l, d]) => (
-              <button key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
+              <button
+                key={k}
+                role="radio"
+                aria-checked={kind === k}
+                className={kind === k ? 'on' : ''}
+                onClick={() => setKind(k)}
+              >
                 <b>{l}</b>
                 <span className="muted small">{d}</span>
               </button>
@@ -242,14 +271,16 @@ function CustomAgentModal({
             />
           </label>
           <p className="muted small" style={{ margin: 0 }}>
-            The AI writes the agent’s Markdown rules (name, runner, model, Do / Don’t / Output). You review and edit them before saving.
+            The AI writes the agent’s Markdown rules (name, runner, model, Do / Don’t / Output). You
+            review and edit them before saving.
           </p>
         </>
       ) : (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Same format as Claude Code agent files: a frontmatter block (<code>name</code>, <code>description</code>, <code>runner</code>:
-            code · review · document, optional <code>model</code> and <code>icon</code>), then the instructions.
+            Same format as Claude Code agent files: a frontmatter block (<code>name</code>,{' '}
+            <code>description</code>, <code>runner</code>: code · review · document, optional{' '}
+            <code>model</code> and <code>icon</code>), then the instructions.
             {!md && (
               <>
                 {' '}
@@ -267,7 +298,12 @@ function CustomAgentModal({
             )}{' '}
             <label className="link-btn">
               Import a .md file
-              <input type="file" accept=".md,text/markdown,text/plain" hidden onChange={(e) => file(e.target.files?.[0])} />
+              <input
+                type="file"
+                accept=".md,text/markdown,text/plain"
+                hidden
+                onChange={(e) => file(e.target.files?.[0])}
+              />
             </label>
           </p>
           <TA
@@ -285,7 +321,8 @@ function CustomAgentModal({
             <div className="ok-banner" style={{ marginTop: 8 }}>
               <Ico svg={I.check} />
               <span>
-                <b>{check.name}</b> · {KINDS.find(([k]) => k === check.kind)?.[1]} · {check.model || 'sonnet'} — ready to save.
+                <b>{check.name}</b> · {KINDS.find(([k]) => k === check.kind)?.[1]} ·{' '}
+                {check.model || 'sonnet'} — ready to save.
               </span>
             </div>
           )}
@@ -308,7 +345,12 @@ function AgentDetails({
   onHire: () => void;
   onData: (d: Any) => void;
 }) {
-  const [v, setV] = useState({ enabled: a.enabled, model: a.model || '', effort: a.effort || '', instructions: a.instructions || '' });
+  const [v, setV] = useState({
+    enabled: a.enabled,
+    model: a.model || '',
+    effort: a.effort || '',
+    instructions: a.instructions || '',
+  });
   const code = a.runner === 'code' || a.runner === 'panel';
   const dirty =
     v.enabled !== a.enabled ||
@@ -324,7 +366,11 @@ function AgentDetails({
             {a.runner === 'code' && (
               <button
                 className="btn"
-                onClick={() => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} start={a.id} />)}
+                onClick={() =>
+                  openModal(
+                    <CustomAgentModal onSaved={onData} builtIns={data.builtIns} start={a.id} />,
+                  )
+                }
                 title="A custom agent with this agent’s rules, for you to change"
               >
                 Copy as custom agent
@@ -347,7 +393,10 @@ function AgentDetails({
           </div>
         ) : a.custom ? (
           <div className="row" style={{ gap: 6 }}>
-            <button className="btn" onClick={() => openModal(<CustomAgentModal a={a} onSaved={onData} />)}>
+            <button
+              className="btn"
+              onClick={() => openModal(<CustomAgentModal a={a} onSaved={onData} />)}
+            >
               Edit rules
             </button>
             <button
@@ -429,8 +478,11 @@ function AgentDetails({
             ))}
           </div>
           <p className="muted small">
-            {a.writes ? 'Edits files only in the issue’s worktree.' : 'Read-only: it never edits files.'} Plus the project’s check command,
-            when one is set. It can never commit, push, switch branches or browse the web.
+            {a.writes
+              ? 'Edits files only in the issue’s worktree.'
+              : 'Read-only: it never edits files.'}{' '}
+            Plus the project’s check command, when one is set. It can never commit, push, switch
+            branches or browse the web.
           </p>
           <details className="ad-prompt">
             <summary>Its system prompt</summary>
@@ -453,7 +505,11 @@ function AgentDetails({
         </details>
       )}
       <h4 className="ad-settings">Settings</h4>
-      <CB label="Turned on (people can hire it)" checked={v.enabled} onChange={(e: Any) => setV({ ...v, enabled: e.target.checked })} />
+      <CB
+        label="Turned on (people can hire it)"
+        checked={v.enabled}
+        onChange={(e: Any) => setV({ ...v, enabled: e.target.checked })}
+      />
       {code && (
         <div className="grid2">
           <label className="field">
@@ -466,7 +522,10 @@ function AgentDetails({
                 </MenuItem>
               ))}
             </SF>
-            <small className="muted">A project’s own model (Project settings → Code & GitHub) wins for jobs in that project.</small>
+            <small className="muted">
+              A project’s own model (Project settings → Code & GitHub) wins for jobs in that
+              project.
+            </small>
           </label>
           <label className="field">
             <span>Effort</span>
@@ -498,7 +557,10 @@ function AgentDetails({
   );
 }
 
-/** Hire from Administration: choose the project and epic, then the epic opens with the agent at work. */
+/**
+ * Hire from Administration: choose the project and epic, then the epic opens with the agent at
+ * work.
+ */
 function HireModal({ a }: { a: Any }) {
   const [projects, setProjects] = useState<Any[] | null>(null);
   const [pid, setPid] = useState('');
@@ -530,7 +592,10 @@ function HireModal({ a }: { a: Any }) {
   return (
     <Modal
       title={`Hire ${a.name}`}
-      actions={[{ label: 'Cancel' }, { label: 'Hire', kind: 'primary', disabled: !pid || !eid, onClick: go }]}
+      actions={[
+        { label: 'Cancel' },
+        { label: 'Hire', kind: 'primary', disabled: !pid || !eid, onClick: go },
+      ]}
     >
       <div className="hire-intro">
         <span className="agent-icon" aria-hidden>
@@ -580,7 +645,9 @@ function HireModal({ a }: { a: Any }) {
           </label>
           <p className="muted small" style={{ marginBottom: 0 }}>
             The epic opens with its <b>Agents</b> section, and{' '}
-            {a.runner === 'code' || a.runner === 'panel' ? 'you pick the issue for the agent to work on.' : 'the agent starts there.'}
+            {a.runner === 'code' || a.runner === 'panel'
+              ? 'you pick the issue for the agent to work on.'
+              : 'the agent starts there.'}
           </p>
         </>
       )}
@@ -608,7 +675,8 @@ function Toggle({ a, onChange, busy }: { a: Any; onChange: (on: boolean) => void
     </button>
   );
 }
-const modelOf = (a: Any) => (a.runner === 'code' || a.runner === 'panel' ? a.model || a.defaults?.model || '' : '');
+const modelOf = (a: Any) =>
+  a.runner === 'code' || a.runner === 'panel' ? a.model || a.defaults?.model || '' : '';
 
 /** One agent card: what it does, where it runs, its model, an on/off switch, Details and Hire. */
 function Card({
@@ -668,7 +736,9 @@ function Card({
           {a.workspaceLabel}
         </span>
         {modelOf(a) && <span className="ag-chip mono">{modelOf(a)}</span>}
-        {a.runner === 'code' && <span className="ag-chip">{a.writes ? 'Edits code' : 'Read-only'}</span>}
+        {a.runner === 'code' && (
+          <span className="ag-chip">{a.writes ? 'Edits code' : 'Read-only'}</span>
+        )}
         {a.broken && <span className="ag-chip bad">Rules need fixing</span>}
       </div>
       <footer onClick={(e) => e.stopPropagation()}>
@@ -676,7 +746,9 @@ function Card({
           Details
         </button>
         {a.runner === 'testing' ? (
-          <span className="muted small">{a.enabled ? 'Runs in test runs' : 'Off in test runs'}</span>
+          <span className="muted small">
+            {a.enabled ? 'Runs in test runs' : 'Off in test runs'}
+          </span>
         ) : (
           onHire && (
             <button
@@ -709,7 +781,9 @@ function BuiltInsModal({ data: first, onData }: { data: Any; onData: (d: Any) =>
       onData(d);
       setData(d);
       setSel(new Set());
-      toast(`${ids.length} built-in agent${ids.length === 1 ? '' : 's'} ${action === 'remove' ? 'removed' : 'restored'}`);
+      toast(
+        `${ids.length} built-in agent${ids.length === 1 ? '' : 's'} ${action === 'remove' ? 'removed' : 'restored'}`,
+      );
     } catch (e: Any) {
       toast(e.message, 'err');
     } finally {
@@ -738,9 +812,10 @@ function BuiltInsModal({ data: first, onData }: { data: Any; onData: (d: Any) =>
   return (
     <Modal title="Built-in agents" wide actions={[{ label: 'Close' }]}>
       <p className="muted small" style={{ marginTop: 0 }}>
-        TicketForge comes with these agents. Remove the ones you don’t want; your custom agents take over their jobs (set which under{' '}
-        <b>Default agents</b>). Removed agents can be restored at any time. Document features (test cases, agent documents…) keep working
-        from the epic; they just leave this catalog.
+        TicketForge comes with these agents. Remove the ones you don’t want; your custom agents take
+        over their jobs (set which under <b>Default agents</b>). Removed agents can be restored at
+        any time. Document features (test cases, agent documents…) keep working from the epic; they
+        just leave this catalog.
       </p>
       <div className="bi-bar">
         <button
@@ -810,8 +885,14 @@ function BuiltInsModal({ data: first, onData }: { data: Any; onData: (d: Any) =>
               <b>{b.name}</b>
               <span className="muted small">{kind(b)}</span>
             </label>
-            <span className={`bi-state ${b.removed ? 'off' : 'on'}`}>{b.removed ? 'Removed' : 'In use'}</span>
-            <button className="btn sm subtle" disabled={!!busy} onClick={() => act(b.removed ? 'restore' : 'remove', [b.id])}>
+            <span className={`bi-state ${b.removed ? 'off' : 'on'}`}>
+              {b.removed ? 'Removed' : 'In use'}
+            </span>
+            <button
+              className="btn sm subtle"
+              disabled={!!busy}
+              onClick={() => act(b.removed ? 'restore' : 'remove', [b.id])}
+            >
               {b.removed ? 'Restore' : 'Remove'}
             </button>
           </li>
@@ -826,13 +907,22 @@ function DefaultAgents({ data, onData }: { data: Any; onData: (d: Any) => void }
   const [busy, setBusy] = useState(false);
   const roles = data.roles || {};
   const options = (writes: boolean) =>
-    data.agents.filter((a: Any) => a.runner === 'code' && !a.broken && a.enabled && Boolean(a.writes) === writes);
+    data.agents.filter(
+      (a: Any) => a.runner === 'code' && !a.broken && a.enabled && Boolean(a.writes) === writes,
+    );
   const set = async (key: string, id: string) => {
     setBusy(true);
-    const next: Any = Object.fromEntries(Object.entries(roles).map(([k, r]: Any) => [k, r.chosen || '']));
+    const next: Any = Object.fromEntries(
+      Object.entries(roles).map(([k, r]: Any) => [k, r.chosen || '']),
+    );
     next[key] = id;
     try {
-      onData(await agentsAction({ action: 'roles', roles: Object.fromEntries(Object.entries(next).filter(([, v]) => v)) }));
+      onData(
+        await agentsAction({
+          action: 'roles',
+          roles: Object.fromEntries(Object.entries(next).filter(([, v]) => v)),
+        }),
+      );
       toast('Default agents saved');
     } catch (e: Any) {
       toast(e.message, 'err');
@@ -846,7 +936,8 @@ function DefaultAgents({ data, onData }: { data: Any; onData: (d: Any) => void }
       <div className="ag-roles-h">
         <b>Default agents</b>
         <span className="muted small">
-          Who does each job when nobody picks an agent: Write code with AI, bulk coding, and the reviews of a code job.
+          Who does each job when nobody picks an agent: Write code with AI, bulk coding, and the
+          reviews of a code job.
         </span>
       </div>
       <div className="ag-roles-grid">
@@ -864,7 +955,8 @@ function DefaultAgents({ data, onData }: { data: Any; onData: (d: Any) => void }
             </SF>
             {!r.agent && (
               <small className="bad-text">
-                No {r.writes ? 'code' : 'review'} agent: create one{r.writes ? ' (kind: Code)' : ' (kind: Review)'}.
+                No {r.writes ? 'code' : 'review'} agent: create one
+                {r.writes ? ' (kind: Code)' : ' (kind: Review)'}.
               </small>
             )}
           </label>
@@ -931,7 +1023,13 @@ export function AgentsTab() {
 
   const save = async (id: string, v: Any, quiet = false) => {
     const agents: Any = {};
-    for (const a of data.agents) agents[a.id] = { enabled: a.enabled, model: a.model, effort: a.effort, instructions: a.instructions };
+    for (const a of data.agents)
+      agents[a.id] = {
+        enabled: a.enabled,
+        model: a.model,
+        effort: a.effort,
+        instructions: a.instructions,
+      };
     agents[id] = v;
     try {
       const d = await saveAgents(agents);
@@ -944,7 +1042,11 @@ export function AgentsTab() {
   };
   const toggle = async (a: Any, on: boolean) => {
     setBusy(a.id);
-    await save(a.id, { enabled: on, model: a.model, effort: a.effort, instructions: a.instructions }, true);
+    await save(
+      a.id,
+      { enabled: on, model: a.model, effort: a.effort, instructions: a.instructions },
+      true,
+    );
     setBusy('');
     toast(`${a.name} turned ${on ? 'on' : 'off'}`);
   };
@@ -953,7 +1055,10 @@ export function AgentsTab() {
     setData(d);
     setAgentsCache(d);
   };
-  const details = (a: Any) => openModal(<AgentDetails a={a} data={data} onSave={save} onHire={() => hire(a)} onData={onData} />);
+  const details = (a: Any) =>
+    openModal(
+      <AgentDetails a={a} data={data} onSave={save} onHire={() => hire(a)} onData={onData} />,
+    );
   const create = () => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} />);
   const setV = (v: string) => {
     setView(v);
@@ -969,13 +1074,25 @@ export function AgentsTab() {
     (a: Any) =>
       (phase === 'All' || a.phase === phase) &&
       (!team || a.team === team) &&
-      (!state || (state === 'on' ? a.enabled : state === 'off' ? !a.enabled : state === 'custom' ? a.custom : a.runner === state)) &&
-      (!qq || `${a.name} ${a.summary} ${a.step || ''} ${a.team || ''} ${a.workspaceLabel || ''}`.toLowerCase().includes(qq)),
+      (!state ||
+        (state === 'on'
+          ? a.enabled
+          : state === 'off'
+            ? !a.enabled
+            : state === 'custom'
+              ? a.custom
+              : a.runner === state)) &&
+      (!qq ||
+        `${a.name} ${a.summary} ${a.step || ''} ${a.team || ''} ${a.workspaceLabel || ''}`
+          .toLowerCase()
+          .includes(qq)),
   );
   const teams = (data.teams || []).filter((tm: string) => all.some((a: Any) => a.team === tm));
   const groups: [string, Any[]][] =
     phase === 'All'
-      ? data.phases.map((p: string) => [p, list.filter((a: Any) => a.phase === p)]).filter(([, l]: Any) => l.length)
+      ? data.phases
+          .map((p: string) => [p, list.filter((a: Any) => a.phase === p)])
+          .filter(([, l]: Any) => l.length)
       : [[phase, list]];
   const stats: [string, number, string][] = [
     ['Agents', all.length, ''],
@@ -993,8 +1110,8 @@ export function AgentsTab() {
         <div>
           <h2>Agents</h2>
           <p className="muted small">
-            AI teammates for each step of a feature: plan, build, review, test and release. Turn them on or off, tune their model and
-            instructions, or create your own.
+            AI teammates for each step of a feature: plan, build, review, test and release. Turn
+            them on or off, tune their model and instructions, or create your own.
             {data.updatedAt && (
               <>
                 {' '}
@@ -1004,7 +1121,10 @@ export function AgentsTab() {
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn" onClick={() => openModal(<BuiltInsModal data={data} onData={onData} />)}>
+          <button
+            className="btn"
+            onClick={() => openModal(<BuiltInsModal data={data} onData={onData} />)}
+          >
             Built-in agents{data.removed?.length ? ` (${data.removed.length} removed)` : ''}
           </button>
           {can('ai.use') && (
@@ -1034,7 +1154,11 @@ export function AgentsTab() {
               <>
                 <button
                   className="btn primary"
-                  onClick={() => openModal(<CustomAgentModal onSaved={onData} builtIns={data.builtIns} start="__repo" />)}
+                  onClick={() =>
+                    openModal(
+                      <CustomAgentModal onSaved={onData} builtIns={data.builtIns} start="__repo" />,
+                    )
+                  }
                 >
                   🧬 Start with the Repo-native Builder
                 </button>
@@ -1047,8 +1171,9 @@ export function AgentsTab() {
           }
         >
           <p>
-            All built-in agents are removed. Create your own: describe what it should do and the AI writes its rules, or start from a
-            template. Restore built-in agents any time from <b>Built-in agents</b>.
+            All built-in agents are removed. Create your own: describe what it should do and the AI
+            writes its rules, or start from a template. Restore built-in agents any time from{' '}
+            <b>Built-in agents</b>.
           </p>
         </EmptyState>
       )}
@@ -1173,7 +1298,11 @@ export function AgentsTab() {
             </thead>
             <tbody>
               {list.map((a: Any) => (
-                <tr key={a.id} className={`click ${a.enabled ? '' : 'off'} ${phaseClass(a.phase)}`} onClick={() => details(a)}>
+                <tr
+                  key={a.id}
+                  className={`click ${a.enabled ? '' : 'off'} ${phaseClass(a.phase)}`}
+                  onClick={() => details(a)}
+                >
                   <td data-label="Agent">
                     <div className="ag-row">
                       <span className="agent-icon sm" aria-hidden>
@@ -1195,7 +1324,9 @@ export function AgentsTab() {
                   <td data-label="Runs" className="muted small">
                     {a.workspaceLabel}
                   </td>
-                  <td data-label="Model">{modelOf(a) ? <code>{modelOf(a)}</code> : <span className="muted">—</span>}</td>
+                  <td data-label="Model">
+                    {modelOf(a) ? <code>{modelOf(a)}</code> : <span className="muted">—</span>}
+                  </td>
                   <td data-label="On" onClick={(e) => e.stopPropagation()}>
                     <Toggle a={a} busy={busy === a.id} onChange={(on) => toggle(a, on)} />
                   </td>

@@ -1,11 +1,19 @@
 'use client';
-// Issue row actions, Jira-style. On a backlog row you click the field you want to change (status, assignee, story
-// points, priority) and pick from a small popup; "…" (or a right-click on the row) has the rest: move to the top or
-// bottom of the backlog or to a sprint, assign to me, flag, epic, copy the link, duplicate, delete. When the row is
-// part of a selection, the change applies to every selected issue.
-// One popup for the whole page (S.pop), drawn by <RowPop />: rows stay light (plain buttons, no menus inside them),
-// so a backlog of thousands of issues still scrolls and updates quickly.
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type KeyboardEvent as RKeyboardEvent } from 'react';
+// Issue row actions, Jira-style. On a backlog row you click the field you want to change (status,
+// assignee, story points, priority) and pick from a small popup; "…" (or a right-click on the row)
+// has the rest: move to the top or bottom of the backlog or to a sprint, assign to me, flag, epic,
+// copy the link, duplicate, delete. When the row is part of a selection, the change applies to
+// every selected issue.
+// One popup for the whole page (S.pop), drawn by <RowPop />: rows stay light (plain buttons, no
+// menus inside them), so a backlog of thousands of issues still scrolls and updates quickly.
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent as RMouseEvent,
+  type KeyboardEvent as RKeyboardEvent,
+} from 'react';
 import {
   S,
   emit,
@@ -44,12 +52,19 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const canEdit = () => can('issue.edit');
 const canSprint = () => can('sprint.manage') || can('issue.edit');
 
-/** The issues an action on this row applies to: the whole selection when the row is part of it, else just the row. */
+/**
+ * The issues an action on this row applies to: the whole selection when the row is part of it, else
+ * just the row.
+ */
 const targetIds = (id: string): string[] =>
   S.checked.has(id) && S.checked.size > 1 ? [...S.checked].filter((x: string) => ticket(x)) : [id];
 
 /** Opens the row popup next to a button (or at the mouse, for a right-click). */
-export function openPop(kind: PopKind, ids: string[], from: HTMLElement | { x: number; y: number }) {
+export function openPop(
+  kind: PopKind,
+  ids: string[],
+  from: HTMLElement | { x: number; y: number },
+) {
   let x: number, y: number, bottom: number;
   if (from instanceof HTMLElement) {
     const r = from.getBoundingClientRect();
@@ -95,16 +110,28 @@ const cellProps = (label: string, kind: PopKind, t: Any) => ({
   },
 });
 
-// ---------------------------------------------------------------- actions (every one is undoable with ⌘Z)
+// ---------------------------------------------------------------- actions (every one is undoable
+// with ⌘Z)
 function report(ids: string[], what: string) {
-  if (ids.length > 1) toast(`${plural(ids.length, 'issue')} ${what}`, 'ok', { action: { label: 'Undo', onClick: undo } });
+  if (ids.length > 1)
+    toast(`${plural(ids.length, 'issue')} ${what}`, 'ok', {
+      action: { label: 'Undo', onClick: undo },
+    });
 }
-/** `now`: save at once and put the old value back if the save fails (assignee, story points and priority). */
+/**
+ * `now`: save at once and put the old value back if the save fails (assignee, story points and
+ * priority).
+ */
 function setFieldFor(ids: string[], field: string, value: Any, what: string, now = false) {
-  const list = ids.map(ticket).filter((t: Any) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null));
+  const list = ids
+    .map(ticket)
+    .filter((t: Any) => t && JSON.stringify(t[field] ?? null) !== JSON.stringify(value ?? null));
   if (!list.length) return;
   if (now) editField(list, field, value);
-  else mutate(() => list.forEach((t: Any) => setField(t, field, value)), { tag: ids.length === 1 ? `t.${field}${ids[0]}` : '' });
+  else
+    mutate(() => list.forEach((t: Any) => setField(t, field, value)), {
+      tag: ids.length === 1 ? `t.${field}${ids[0]}` : '',
+    });
   report(
     list.map((t: Any) => t.id),
     what,
@@ -129,9 +156,17 @@ export function setStatusFor(ids: string[], to: string) {
 export const assignTo = (ids: string[], name: string) =>
   setFieldFor(ids, 'assignee', name, name ? `assigned to ${name}` : 'unassigned', true);
 export const setPoints = (ids: string[], v: number | null) =>
-  setFieldFor(ids, 'storyPoints', v, v === null ? 'estimate cleared' : `estimated at ${v} points`, true);
-export const setPriority = (ids: string[], v: string) => setFieldFor(ids, 'priority', v, `set to ${v} priority`, true);
-export const setFlag = (ids: string[], on: boolean) => setFieldFor(ids, 'flagged', on || undefined, on ? 'flagged' : 'unflagged');
+  setFieldFor(
+    ids,
+    'storyPoints',
+    v,
+    v === null ? 'estimate cleared' : `estimated at ${v} points`,
+    true,
+  );
+export const setPriority = (ids: string[], v: string) =>
+  setFieldFor(ids, 'priority', v, `set to ${v} priority`, true);
+export const setFlag = (ids: string[], on: boolean) =>
+  setFieldFor(ids, 'flagged', on || undefined, on ? 'flagged' : 'unflagged');
 export const setEpic = (ids: string[], epicId: string | null) =>
   setFieldFor(
     ids.filter((id) => !isSub(ticket(id))),
@@ -142,16 +177,22 @@ export const setEpic = (ids: string[], epicId: string | null) =>
 
 /** In the backlog (no open sprint, or a closed one), as the Backlog group shows it. */
 const inBacklog = (t: Any, open: Set<string>) => !isSub(t) && !open.has(t.sprintId);
-/** Moves issues to the top or bottom of a sprint or of the backlog (sprintId null), keeping their order. */
+/**
+ * Moves issues to the top or bottom of a sprint or of the backlog (sprintId null), keeping their
+ * order.
+ */
 export function moveTo(ids: string[], sprintId: string | null, where: 'top' | 'bottom') {
   const open = new Set<string>(openSprints().map((s: Any) => s.id));
   const target = sprintId ? P().sprints.find((s: Any) => s.id === sprintId) : null;
   mutate((p) => {
     const set = new Set(ids);
     const moving = p.tickets.filter((t: Any) => set.has(t.id));
-    for (const t of moving) if ((t.sprintId || null) !== sprintId && (sprintId || open.has(t.sprintId))) setField(t, 'sprintId', sprintId);
+    for (const t of moving)
+      if ((t.sprintId || null) !== sprintId && (sprintId || open.has(t.sprintId)))
+        setField(t, 'sprintId', sprintId);
     const rest = p.tickets.filter((t: Any) => !set.has(t.id));
-    const inTarget = (t: Any) => (sprintId ? !isSub(t) && t.sprintId === sprintId : inBacklog(t, open));
+    const inTarget = (t: Any) =>
+      sprintId ? !isSub(t) && t.sprintId === sprintId : inBacklog(t, open);
     let at: number;
     if (where === 'top') {
       at = rest.findIndex(inTarget);
@@ -167,11 +208,16 @@ export function moveTo(ids: string[], sprintId: string | null, where: 'top' | 'b
     p.tickets = rest;
   });
   const where2 = target ? target.name : 'the backlog';
-  toast(`${ids.length === 1 ? ticket(ids[0])?.key : plural(ids.length, 'issue')} moved to the ${where} of ${where2}`, 'ok', {
-    action: { label: 'Undo', onClick: undo },
-  });
+  toast(
+    `${ids.length === 1 ? ticket(ids[0])?.key : plural(ids.length, 'issue')} moved to the ${where} of ${where2}`,
+    'ok',
+    {
+      action: { label: 'Undo', onClick: undo },
+    },
+  );
 }
-const issueLink = (t: Any) => `${location.origin}/p/${P().id}/backlog?issue=${encodeURIComponent(t.id)}`;
+const issueLink = (t: Any) =>
+  `${location.origin}/p/${P().id}/backlog?issue=${encodeURIComponent(t.id)}`;
 function confirmDelete(ids: string[]) {
   const one = ids.length === 1 ? ticket(ids[0]) : null;
   openModal(
@@ -197,7 +243,10 @@ function confirmDelete(ids: string[]) {
 export function StatusCell({ t }: { t: Any }) {
   if (!canEdit()) return <span className={`loz ${sCls(t.status)}`}>{t.status}</span>;
   return (
-    <button className={`loz loz-btn ${sCls(t.status)}`} {...cellProps(`Status of ${t.key}: ${t.status}. Change`, 'status', t)}>
+    <button
+      className={`loz loz-btn ${sCls(t.status)}`}
+      {...cellProps(`Status of ${t.key}: ${t.status}. Change`, 'status', t)}
+    >
       {t.status}
       <Ico svg={I.chevron} />
     </button>
@@ -328,7 +377,9 @@ function StatusList({ ids }: { ids: string[] }) {
         );
       })}
       {one && names.length < statusNames().length && (
-        <p className="pop-note">Only the statuses this issue can move to are shown (Project settings → Workflow).</p>
+        <p className="pop-note">
+          Only the statuses this issue can move to are shown (Project settings → Workflow).
+        </p>
       )}
     </div>
   );
@@ -342,9 +393,17 @@ function AssigneeList({ ids }: { ids: string[] }) {
   const mine = S.user?.name || '';
   const qq = q.trim().toLowerCase();
   const opts: [string, string][] = [];
-  if (mine && cur !== mine && (!qq || 'assign to me'.includes(qq) || mine.toLowerCase().includes(qq))) opts.push([mine, 'Assign to me']);
+  if (
+    mine &&
+    cur !== mine &&
+    (!qq || 'assign to me'.includes(qq) || mine.toLowerCase().includes(qq))
+  )
+    opts.push([mine, 'Assign to me']);
   if (!qq || 'unassigned'.includes(qq)) opts.push(['', 'Unassigned']);
-  for (const n of people.filter((n) => !qq || n.toLowerCase().includes(qq)).sort((a, b) => a.localeCompare(b))) opts.push([n, n]);
+  for (const n of people
+    .filter((n) => !qq || n.toLowerCase().includes(qq))
+    .sort((a, b) => a.localeCompare(b)))
+    opts.push([n, n]);
   const pick = (v: string) => {
     closePop();
     assignTo(ids, v);
@@ -384,7 +443,9 @@ function AssigneeList({ ids }: { ids: string[] }) {
                 <span>{label}</span>
               </>
             )}
-            {one && cur === v && label !== 'Assign to me' && <Ico svg={I.check} className="pop-tick" />}
+            {one && cur === v && label !== 'Assign to me' && (
+              <Ico svg={I.check} className="pop-tick" />
+            )}
           </button>
         ))}
         {!opts.length && <p className="pop-note">No one matches “{q}”.</p>}
@@ -396,7 +457,8 @@ function AssigneeList({ ids }: { ids: string[] }) {
 function PointsEditor({ ids }: { ids: string[] }) {
   const one = ids.length === 1 ? ticket(ids[0]) : null;
   const [v, setV] = useState(one?.storyPoints != null ? String(one.storyPoints) : '');
-  // Any positive number (a free value, not a fixed scale). A text box, so a wrong entry can be shown and explained.
+  // Any positive number (a free value, not a fixed scale). A text box, so a wrong entry can be
+  // shown and explained.
   const t = v.trim();
   const bad = t !== '' && !(/^\d+(\.\d+)?$/.test(t) && Number(t) > 0);
   const n = t === '' || bad ? null : Number(t);
@@ -493,7 +555,9 @@ function EpicList({ ids }: { ids: string[] }) {
   const one = ids.length === 1 ? ticket(ids[0]) : null;
   const [q, setQ] = useState('');
   const qq = q.trim().toLowerCase();
-  const list = P().epics.filter((e: Any) => !qq || `${e.key} ${e.title}`.toLowerCase().includes(qq));
+  const list = P().epics.filter(
+    (e: Any) => !qq || `${e.key} ${e.title}`.toLowerCase().includes(qq),
+  );
   const pick = (id: string | null) => {
     closePop();
     setEpic(ids, id);
@@ -512,13 +576,22 @@ function EpicList({ ids }: { ids: string[] }) {
       )}
       <div className="pop-scroll">
         {list.map((e: Any) => (
-          <button key={e.id} role="option" aria-selected={one?.epicId === e.id} onClick={() => pick(e.id)}>
+          <button
+            key={e.id}
+            role="option"
+            aria-selected={one?.epicId === e.id}
+            onClick={() => pick(e.id)}
+          >
             <Swatch color={e.color} />
             <span>{e.title}</span>
             {one?.epicId === e.id && <Ico svg={I.check} className="pop-tick" />}
           </button>
         ))}
-        <button role="option" aria-selected={one ? !epic(one.epicId) : false} onClick={() => pick(null)}>
+        <button
+          role="option"
+          aria-selected={one ? !epic(one.epicId) : false}
+          onClick={() => pick(null)}
+        >
           <span className="muted">No epic</span>
         </button>
       </div>
@@ -526,11 +599,15 @@ function EpicList({ ids }: { ids: string[] }) {
   );
 }
 
-/** Fix versions: tick to add, untick to remove (for several issues: added to or removed from all of them). */
+/**
+ * Fix versions: tick to add, untick to remove (for several issues: added to or removed from all of
+ * them).
+ */
 function VersionList({ ids }: { ids: string[] }) {
   const list = ids.map(ticket).filter((t: Any) => t && !isSub(t));
   const rel = releases().filter((r: Any) => r.status !== 'archived');
-  const has = (rid: string) => list.length > 0 && list.every((t: Any) => (t.fixVersions || []).includes(rid));
+  const has = (rid: string) =>
+    list.length > 0 && list.every((t: Any) => (t.fixVersions || []).includes(rid));
   const toggle = (rid: string) => {
     const on = !has(rid);
     const name = release(rid)?.name;
@@ -542,9 +619,13 @@ function VersionList({ ids }: { ids: string[] }) {
       }),
     );
     if (list.length > 1)
-      toast(`${plural(list.length, 'issue')} ${on ? `added to ${name}` : `removed from ${name}`}`, 'ok', {
-        action: { label: 'Undo', onClick: undo },
-      });
+      toast(
+        `${plural(list.length, 'issue')} ${on ? `added to ${name}` : `removed from ${name}`}`,
+        'ok',
+        {
+          action: { label: 'Undo', onClick: undo },
+        },
+      );
   };
   return (
     <div className="pop-list" role="listbox" aria-label="Fix versions" aria-multiselectable>
@@ -602,7 +683,12 @@ function MoreMenu({ ids }: { ids: string[] }) {
               </button>
             ))}
           {one && openIds.has(one.sprintId) && (
-            <button role="menuitem" onClick={act(() => moveTo(ids, open.find((s: Any) => s.id === one.sprintId).id, 'top'))}>
+            <button
+              role="menuitem"
+              onClick={act(() =>
+                moveTo(ids, open.find((s: Any) => s.id === one.sprintId).id, 'top'),
+              )}
+            >
               <Ico svg={I.up} />
               Top of {open.find((s: Any) => s.id === one.sprintId).name}
             </button>
@@ -633,7 +719,8 @@ function MoreMenu({ ids }: { ids: string[] }) {
             Change status…
           </button>
           <button role="menuitem" onClick={() => swapPop('points')}>
-            <span className="mi-sp">#</span>Story points…{one?.storyPoints != null && <small>{one.storyPoints}</small>}
+            <span className="mi-sp">#</span>Story points…
+            {one?.storyPoints != null && <small>{one.storyPoints}</small>}
           </button>
           <button role="menuitem" onClick={() => swapPop('priority')}>
             <PriorityIcon p={one?.priority || 'Medium'} />
@@ -645,20 +732,22 @@ function MoreMenu({ ids }: { ids: string[] }) {
               Change epic…{one && epic(one.epicId) && <small>{epic(one.epicId).title}</small>}
             </button>
           )}
-          {!subs && (can('sprint.manage') || edit) && releases().some((r: Any) => r.status !== 'archived') && (
-            <button role="menuitem" onClick={() => swapPop('version')}>
-              <Ico svg={I.calendar} />
-              Fix version…
-              {one && (one.fixVersions || []).length > 0 && (
-                <small>
-                  {(one.fixVersions || [])
-                    .map((v: string) => release(v)?.name)
-                    .filter(Boolean)
-                    .join(', ')}
-                </small>
-              )}
-            </button>
-          )}
+          {!subs &&
+            (can('sprint.manage') || edit) &&
+            releases().some((r: Any) => r.status !== 'archived') && (
+              <button role="menuitem" onClick={() => swapPop('version')}>
+                <Ico svg={I.calendar} />
+                Fix version…
+                {one && (one.fixVersions || []).length > 0 && (
+                  <small>
+                    {(one.fixVersions || [])
+                      .map((v: string) => release(v)?.name)
+                      .filter(Boolean)
+                      .join(', ')}
+                  </small>
+                )}
+              </button>
+            )}
           <button role="menuitem" onClick={act(() => setFlag(ids, !allFlagged))}>
             <Ico svg={I.flag} />
             {allFlagged ? 'Remove flag' : 'Add flag'}
@@ -689,7 +778,10 @@ function MoreMenu({ ids }: { ids: string[] }) {
         </>
       )}
       {!one && (
-        <button role="menuitem" onClick={act(() => copyText(list.map((t: Any) => t.key).join(', ')))}>
+        <button
+          role="menuitem"
+          onClick={act(() => copyText(list.map((t: Any) => t.key).join(', ')))}
+        >
           <Ico svg={I.copy} />
           Copy issue keys
         </button>

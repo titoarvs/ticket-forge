@@ -29,12 +29,18 @@ function groups(p) {
 }
 const sprintOf = (p, t) => (p.sprints || []).find((s) => s.id === t.sprintId)?.name || '';
 const keyOf = (p, id) => p.tickets.find((x) => x.id === id)?.key || '';
-const linksText = (p, t) => (t.links || []).map((l) => `${l.type} ${keyOf(p, l.targetId)}`).join('; ');
+const linksText = (p, t) =>
+  (t.links || []).map((l) => `${l.type} ${keyOf(p, l.targetId)}`).join('; ');
 const prsText = (t) => (t.prs || []).map((r) => `${r.url} (${r.status})`).join('\n');
-const lastRun = (tc) => (tc.lastRun ? `${tc.lastRun.status} ${new Date(tc.lastRun.at).toLocaleString()}` : '');
+const lastRun = (tc) =>
+  tc.lastRun ? `${tc.lastRun.status} ${new Date(tc.lastRun.at).toLocaleString()}` : '';
 const numbered = (list) => list.map((x, i) => `${i + 1}. ${x}`).join('\n');
 const stepsText = (tc) => numbered(tc.steps || []);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const esc = (s) =>
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
 export const slug = (s) =>
   String(s || 'project')
     .replace(/[^a-z0-9]+/gi, '-')
@@ -179,15 +185,33 @@ export function toCsvJira(p) {
     ids.set(t.id, String(n));
   });
   p.epics.forEach((e) =>
-    rows.push([ids.get(e.id), '', 'Epic', e.title, e.description, '', '', '', e.title, '', '', '', e.startDate || '', e.dueDate || '']),
+    rows.push([
+      ids.get(e.id),
+      '',
+      'Epic',
+      e.title,
+      e.description,
+      '',
+      '',
+      '',
+      e.title,
+      '',
+      '',
+      '',
+      e.startDate || '',
+      e.dueDate || '',
+    ]),
   );
   for (const t of p.tickets) {
     const desc = [
       t.userStory && `*User story*\n${t.userStory}`,
       t.description && `*Description*\n${t.description}`,
-      t.acceptanceCriteria.length && `*Acceptance criteria*\n${t.acceptanceCriteria.map((a) => `# ${a}`).join('\n')}`,
-      t.testCases.length && `*Test cases*\n${t.testCases.map((tc) => `* ${tc.key} ${tc.title} — expected: ${tc.expected}`).join('\n')}`,
-      (t.prs || []).length && `*Pull requests*\n${t.prs.map((r) => `* ${r.url} (${r.status})`).join('\n')}`,
+      t.acceptanceCriteria.length &&
+        `*Acceptance criteria*\n${t.acceptanceCriteria.map((a) => `# ${a}`).join('\n')}`,
+      t.testCases.length &&
+        `*Test cases*\n${t.testCases.map((tc) => `* ${tc.key} ${tc.title} — expected: ${tc.expected}`).join('\n')}`,
+      (t.prs || []).length &&
+        `*Pull requests*\n${t.prs.map((r) => `* ${r.url} (${r.status})`).join('\n')}`,
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -364,7 +388,12 @@ export async function toXlsx(p) {
     }
   header(tcs);
   tcs.getColumn('status').eachCell((c, i) => {
-    if (i > 1) c.dataValidation = { type: 'list', allowBlank: true, formulae: ['"Not run,Pass,Fail,Blocked"'] };
+    if (i > 1)
+      c.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"Not run,Pass,Fail,Blocked"'],
+      };
   });
 
   if ((p.sprints || []).length) {
@@ -401,12 +430,20 @@ export async function toXlsx(p) {
 // ---------- Word ----------
 export async function toDocx(p) {
   const kids: any[] = [];
-  const H = (text, heading) => new Paragraph({ text, heading, spacing: { before: 240, after: 120 } });
+  const H = (text, heading) =>
+    new Paragraph({ text, heading, spacing: { before: 240, after: 120 } });
   const P = (text, opts: any = {}) =>
-    new Paragraph({ children: [new TextRun({ text: String(text ?? ''), ...opts })], spacing: { after: 80 } });
+    new Paragraph({
+      children: [new TextRun({ text: String(text ?? ''), ...opts })],
+      spacing: { after: 80 },
+    });
   const label = (l, v) =>
-    new Paragraph({ children: [new TextRun({ text: `${l}: `, bold: true }), new TextRun(String(v ?? ''))], spacing: { after: 60 } });
-  const bullets = (items) => items.map((x) => new Paragraph({ text: x, bullet: { level: 0 }, spacing: { after: 40 } }));
+    new Paragraph({
+      children: [new TextRun({ text: `${l}: `, bold: true }), new TextRun(String(v ?? ''))],
+      spacing: { after: 60 },
+    });
+  const bullets = (items) =>
+    items.map((x) => new Paragraph({ text: x, bullet: { level: 0 }, spacing: { after: 40 } }));
   const multiline = (text) =>
     String(text || '')
       .split('\n')
@@ -415,14 +452,24 @@ export async function toDocx(p) {
     new TableCell({
       children: String(text ?? '')
         .split('\n')
-        .map((l) => new Paragraph({ children: [new TextRun({ text: l, bold: opts.bold, color: opts.color, size: 18 })] })),
+        .map(
+          (l) =>
+            new Paragraph({
+              children: [new TextRun({ text: l, bold: opts.bold, color: opts.color, size: 18 })],
+            }),
+        ),
       shading: opts.fill ? { type: ShadingType.CLEAR, color: 'auto', fill: opts.fill } : undefined,
       width: opts.width ? { size: opts.width, type: WidthType.PERCENTAGE } : undefined,
       margins: { top: 60, bottom: 60, left: 80, right: 80 },
     });
 
   kids.push(new Paragraph({ text: p.name, heading: HeadingLevel.TITLE }));
-  kids.push(P(`Backlog, acceptance criteria and test plan · ${p.key} · ${new Date().toLocaleDateString()}`, { color: '666666' }));
+  kids.push(
+    P(
+      `Backlog, acceptance criteria and test plan · ${p.key} · ${new Date().toLocaleDateString()}`,
+      { color: '666666' },
+    ),
+  );
   if (p.sourceName) kids.push(label('Source document', p.sourceName));
   kids.push(
     label(
@@ -463,7 +510,13 @@ export async function toDocx(p) {
               ),
             }),
             new TableRow({
-              children: [t.type, t.priority, t.storyPoints ?? '—', t.status, t.assignee || 'Unassigned'].map((v) => cell(v, { width: 20 })),
+              children: [
+                t.type,
+                t.priority,
+                t.storyPoints ?? '—',
+                t.status,
+                t.assignee || 'Unassigned',
+              ].map((v) => cell(v, { width: 20 })),
             }),
           ],
         }),
@@ -481,7 +534,10 @@ export async function toDocx(p) {
         kids.push(H('Acceptance criteria', HeadingLevel.HEADING_3));
         t.acceptanceCriteria.forEach((a, i) =>
           kids.push(
-            new Paragraph({ children: [new TextRun({ text: `AC${i + 1}  `, bold: true }), new TextRun(a)], spacing: { after: 60 } }),
+            new Paragraph({
+              children: [new TextRun({ text: `AC${i + 1}  `, bold: true }), new TextRun(a)],
+              spacing: { after: 60 },
+            }),
           ),
         );
       }
@@ -498,7 +554,12 @@ export async function toDocx(p) {
               new TableRow({
                 tableHeader: true,
                 children: ['ID', 'Test', 'Steps', 'Expected'].map((h, i) =>
-                  cell(h, { bold: true, color: 'FFFFFF', fill: '4F46E5', width: [14, 26, 34, 26][i] }),
+                  cell(h, {
+                    bold: true,
+                    color: 'FFFFFF',
+                    fill: '4F46E5',
+                    width: [14, 26, 34, 26][i],
+                  }),
                 ),
               }),
               ...t.testCases.map(
@@ -506,7 +567,9 @@ export async function toDocx(p) {
                   new TableRow({
                     children: [
                       cell(`${tc.key}\n${tc.type} · ${tc.priority}`, { width: 14 }),
-                      cell(`${tc.title}${tc.preconditions ? `\nPre: ${tc.preconditions}` : ''}`, { width: 26 }),
+                      cell(`${tc.title}${tc.preconditions ? `\nPre: ${tc.preconditions}` : ''}`, {
+                        width: 26,
+                      }),
                       cell(stepsText(tc), { width: 34 }),
                       cell(tc.expected, { width: 26 }),
                     ],
@@ -531,7 +594,13 @@ export async function toDocx(p) {
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [new TextRun({ children: [`${p.name} · page `, PageNumber.CURRENT], size: 16, color: '888888' })],
+                children: [
+                  new TextRun({
+                    children: [`${p.name} · page `, PageNumber.CURRENT],
+                    size: 16,
+                    color: '888888',
+                  }),
+                ],
               }),
             ],
           }),
@@ -545,7 +614,12 @@ export async function toDocx(p) {
 // ---------- PDF ----------
 export function toPdf(p) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true, info: { Title: p.name, Creator: 'TicketForge' } });
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 50,
+      bufferPages: true,
+      info: { Title: p.name, Creator: 'TicketForge' },
+    });
     const chunks: any[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -559,7 +633,12 @@ export function toPdf(p) {
     };
     const heading = (text, size, color = ink) => {
       ensure(size * 3);
-      doc.moveDown(0.6).font('Helvetica-Bold').fontSize(size).fillColor(color).text(text, { width: W });
+      doc
+        .moveDown(0.6)
+        .font('Helvetica-Bold')
+        .fontSize(size)
+        .fillColor(color)
+        .text(text, { width: W });
       doc.moveDown(0.25);
     };
     const body = (text, opts: any = {}) => {
@@ -583,7 +662,10 @@ export function toPdf(p) {
     // Cover
     doc.rect(0, 0, doc.page.width, 8).fill(accent);
     doc.moveDown(2).font('Helvetica-Bold').fontSize(24).fillColor(ink).text(p.name, { width: W });
-    body(`Backlog, acceptance criteria and test plan · ${p.key} · ${new Date().toLocaleDateString()}`, { color: muted });
+    body(
+      `Backlog, acceptance criteria and test plan · ${p.key} · ${new Date().toLocaleDateString()}`,
+      { color: muted },
+    );
     doc.moveDown();
     if (p.sourceName) kv('Source document', p.sourceName);
     kv(
@@ -608,7 +690,9 @@ export function toPdf(p) {
     }
     heading('Epics', 14);
     for (const { epic, tickets } of groups(p))
-      body(`${epic.key}  ${epic.title} — ${tickets.length} tickets, ${tickets.reduce((s, t) => s + (t.storyPoints || 0), 0)} SP`);
+      body(
+        `${epic.key}  ${epic.title} — ${tickets.length} tickets, ${tickets.reduce((s, t) => s + (t.storyPoints || 0), 0)} SP`,
+      );
 
     for (const { epic, tickets } of groups(p)) {
       doc.addPage();
@@ -677,12 +761,17 @@ export function toPdf(p) {
               .font('Helvetica')
               .fontSize(8.5)
               .fillColor(muted)
-              .text(`${tc.type} · ${tc.priority}${tc.acRef?.length ? ` · covers ${tc.acRef.map((n) => `AC${n}`).join(', ')}` : ''}`, {
-                width: W - 12,
-              });
+              .text(
+                `${tc.type} · ${tc.priority}${tc.acRef?.length ? ` · covers ${tc.acRef.map((n) => `AC${n}`).join(', ')}` : ''}`,
+                {
+                  width: W - 12,
+                },
+              );
             doc.fillColor(ink).fontSize(9);
             if (tc.preconditions) doc.text(`Preconditions: ${tc.preconditions}`, { width: W - 12 });
-            (tc.steps || []).forEach((s, i) => doc.text(`${i + 1}. ${s}`, { width: W - 24, indent: 8 }));
+            (tc.steps || []).forEach((s, i) =>
+              doc.text(`${i + 1}. ${s}`, { width: W - 24, indent: 8 }),
+            );
             doc
               .font('Helvetica-Bold')
               .text('Expected: ', { continued: true, width: W - 12 })
@@ -703,7 +792,11 @@ export function toPdf(p) {
         .font('Helvetica')
         .fontSize(8)
         .fillColor(muted)
-        .text(`${p.name} · ${i + 1} / ${range.count}`, 50, doc.page.height - 40, { width: W, align: 'center', lineBreak: false });
+        .text(`${p.name} · ${i + 1} / ${range.count}`, 50, doc.page.height - 40, {
+          width: W,
+          align: 'center',
+          lineBreak: false,
+        });
     }
     doc.end();
   });

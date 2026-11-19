@@ -6,8 +6,9 @@ import { followGitHubRuns } from '@/lib/automation';
 import { reportRun } from '@/lib/notify';
 import { githubRunner } from '@/lib/server/gh-runner';
 
-// Test automation → Settings → GitHub Actions: status of the runner in a repository, setting it up (repository
-// secret + a pull request with the workflow), and collecting the results of runs that outlived their request.
+// Test automation → Settings → GitHub Actions: status of the runner in a repository, setting it up
+// (repository secret + a pull request with the workflow), and collecting the results of runs that
+// outlived their request.
 export const maxDuration = 300;
 
 export const GET = api(async (req) => {
@@ -16,7 +17,10 @@ export const GET = api(async (req) => {
   const projectId = String(sp.get('projectId') || '');
   await store.requireProject(user, projectId);
   const repo = String(sp.get('repo') || '').trim();
-  const [token, key] = await Promise.all([getProjectSecret(projectId, 'githubToken'), getProjectSecret(projectId, 'ghRunnerKey')]);
+  const [token, key] = await Promise.all([
+    getProjectSecret(projectId, 'githubToken'),
+    getProjectSecret(projectId, 'ghRunnerKey'),
+  ]);
   try {
     return await runnerStatus({ repo, token: token || '', hasKey: Boolean(key) });
   } catch (e: any) {
@@ -37,7 +41,11 @@ export const POST = api(async (req) => {
       await setProjectSecret(projectId, 'ghRunnerKey', key, user);
     }
     try {
-      return await setupRunner({ repo, token: (await getProjectSecret(projectId, 'githubToken')) || '', key });
+      return await setupRunner({
+        repo,
+        token: (await getProjectSecret(projectId, 'githubToken')) || '',
+        key,
+      });
     } catch (e: any) {
       throw new HttpError(e.status || 400, e.message);
     }
@@ -47,7 +55,8 @@ export const POST = api(async (req) => {
     await store.requireProject(user, projectId);
     const github = await githubRunner(projectId, { deadlineMs: 260_000 });
     const pending = b.pending || {};
-    if (!Array.isArray(pending.runs) || !pending.runs.length) throw new HttpError(400, 'Nothing to collect.');
+    if (!Array.isArray(pending.runs) || !pending.runs.length)
+      throw new HttpError(400, 'Nothing to collect.');
     const origin = appUrl(req);
     return ndjson(req, async (send, signal) => {
       const results = new Map<string, any[]>();
@@ -83,7 +92,11 @@ export const POST = api(async (req) => {
               })),
             });
           } catch (e: any) {
-            send({ type: 'phase', level: 'warn', message: `Could not post test result comments: ${e.message}` });
+            send({
+              type: 'phase',
+              level: 'warn',
+              message: `Could not post test result comments: ${e.message}`,
+            });
           }
         }
       }

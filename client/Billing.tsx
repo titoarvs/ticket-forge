@@ -1,8 +1,9 @@
 'use client';
-// Administration → Billing (hosted service, workspace owner): the plan in force, what the workspace uses against its
-// limits, choosing a plan (a trial needs no card, paying goes through checkout with the gateway of your choice), changing
-// plan and cancelling. Also the "Upgrade" prompt shown anywhere in the app when something would go over the plan (a 402
-// with code 'limit') and the pay prompt shown when a trial ended without a payment (code 'locked').
+// Administration → Billing (hosted service, workspace owner): the plan in force, what the workspace
+// uses against its limits, choosing a plan (a trial needs no card, paying goes through checkout
+// with the gateway of your choice), changing plan and cancelling. Also the "Upgrade" prompt shown
+// anywhere in the app when something would go over the plan (a 402 with code 'limit') and the pay
+// prompt shown when a trial ended without a payment (code 'locked').
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { S, api, toast, openModal, closeModal, emit, type Any } from './core';
@@ -10,7 +11,8 @@ import { Ico, I, Modal, Spinner, ErrorState, Confirm } from './ui';
 import { LimitBar, num } from './Limits';
 import { planPrice } from './Payments';
 
-const date = (d: string | null) => (d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '');
+const date = (d: string | null) =>
+  d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 
 async function go(path: string, body: Any = {}) {
   try {
@@ -37,7 +39,9 @@ export async function refreshLock() {
 async function cancelPlan(name: string, reload: () => void) {
   try {
     const r = await api('/api/billing/cancel', { method: 'POST', body: {} });
-    toast(`Subscription cancelled. ${name} access ends on ${date(r.accessEndsAt) || 'the end of the current period'}.`);
+    toast(
+      `Subscription cancelled. ${name} access ends on ${date(r.accessEndsAt) || 'the end of the current period'}.`,
+    );
   } catch (e: Any) {
     toast(e.message, 'err');
   }
@@ -45,7 +49,10 @@ async function cancelPlan(name: string, reload: () => void) {
   reload();
 }
 
-/** Chooses a plan: a trial starts at once (no card), a change during a trial applies at once, anything else goes to checkout. */
+/**
+ * Chooses a plan: a trial starts at once (no card), a change during a trial applies at once,
+ * anything else goes to checkout.
+ */
 async function choosePlan(pl: Any, reload: () => void) {
   try {
     const r = await api('/api/billing/subscription', { method: 'POST', body: { plan: pl.id } });
@@ -94,7 +101,8 @@ export function BillingTab() {
       <div className="card" style={{ padding: 20 }}>
         <h2 style={{ marginTop: 0 }}>No plans here</h2>
         <p className="muted">
-          This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the hosted service (TICKETFORGE_MODE=saas).
+          This TicketForge is self-hosted, so there are no plans or limits. Plans apply on the
+          hosted service (TICKETFORGE_MODE=saas).
         </p>
       </div>
     );
@@ -201,7 +209,9 @@ export function BillingTab() {
           <div className="bill-plans">
             {d.plans.map((pl: Any) => {
               const current =
-                p.source === 'subscription' || p.source === 'locked' ? pl.id === p.id : pl.id === 'free' && p.source === 'free';
+                p.source === 'subscription' || p.source === 'locked'
+                  ? pl.id === p.id
+                  : pl.id === 'free' && p.source === 'free';
               const canTrial = !pl.isFree && pl.trialDays > 0 && !s.trialEndsAt && !subscribed;
               const label = pl.isFree
                 ? `Switch to ${pl.name}`
@@ -211,14 +221,20 @@ export function BillingTab() {
                     ? `Switch to ${pl.name}`
                     : `Choose ${pl.name}`;
               return (
-                <div key={pl.id} className={`card bill-plan ${current ? 'current' : ''}`} data-testid={`plan-card-${pl.id}`}>
+                <div
+                  key={pl.id}
+                  className={`card bill-plan ${current ? 'current' : ''}`}
+                  data-testid={`plan-card-${pl.id}`}
+                >
                   <h3>{pl.name}</h3>
                   <p className="muted small" style={{ minHeight: 34 }}>
                     {pl.blurb}
                   </p>
                   <div className="bill-price">
                     {planPrice(pl)}
-                    {!pl.isFree && <span className="muted">/{pl.interval === 'year' ? 'year' : 'month'}</span>}
+                    {!pl.isFree && (
+                      <span className="muted">/{pl.interval === 'year' ? 'year' : 'month'}</span>
+                    )}
                   </div>
                   {!pl.isFree && pl.trialDays > 0 && (
                     <p className="muted small" style={{ margin: '0 0 8px' }}>
@@ -240,7 +256,8 @@ export function BillingTab() {
                     {pl.limitList.map((l: Any) => (
                       <li key={l.key}>
                         <Ico svg={I.check} />
-                        {l.name}: {l.value == null || l.value <= 0 ? 'No limit' : num(l.value, l.unit)}
+                        {l.name}:{' '}
+                        {l.value == null || l.value <= 0 ? 'No limit' : num(l.value, l.unit)}
                       </li>
                     ))}
                   </ul>
@@ -255,7 +272,11 @@ export function BillingTab() {
                         (subscribed && !s.cancelAtPeriodEnd && pl.isFree) ||
                         (!pl.isFree && !canTrial && d.gateways.length === 0 && !trialing)
                       }
-                      title={subscribed && pl.isFree ? 'Cancel your subscription to move to the Free plan' : ''}
+                      title={
+                        subscribed && pl.isFree
+                          ? 'Cancel your subscription to move to the Free plan'
+                          : ''
+                      }
                       onClick={() => choosePlan(pl, load)}
                     >
                       {label}
@@ -266,8 +287,9 @@ export function BillingTab() {
             })}
           </div>
           <p className="muted small">
-            Prices exclude taxes where they apply. Payments are handled by the gateway you pick at checkout; TicketForge never sees your
-            card. See the <Link href="/terms">Terms of Use</Link>.
+            Prices exclude taxes where they apply. Payments are handled by the gateway you pick at
+            checkout; TicketForge never sees your card. See the{' '}
+            <Link href="/terms">Terms of Use</Link>.
           </p>
         </>
       )}
@@ -276,7 +298,8 @@ export function BillingTab() {
 }
 
 /**
- * Shown instead of the app when a trial ended without a payment (the server refuses everything else until it is paid).
+ * Shown instead of the app when a trial ended without a payment (the server refuses everything else
+ * until it is paid).
  * The owner pays or cancels; other people are told to ask the owner.
  */
 export function LockedScreen() {
@@ -286,7 +309,12 @@ export function LockedScreen() {
   return (
     <div className="page">
       <div className="page-inner pay">
-        <div className="card pay-card" role="alertdialog" aria-labelledby="locked-h" data-testid="locked-prompt">
+        <div
+          className="card pay-card"
+          role="alertdialog"
+          aria-labelledby="locked-h"
+          data-testid="locked-prompt"
+        >
           <h1 id="locked-h" style={{ marginTop: 0 }}>
             Your {name} trial has ended
           </h1>
@@ -297,7 +325,10 @@ export function LockedScreen() {
           </p>
           {owner && (
             <div className="row" style={{ gap: 8, marginTop: 16 }}>
-              <Link className="btn primary" href={`/checkout?plan=${encodeURIComponent(b.plan?.id || '')}`}>
+              <Link
+                className="btn primary"
+                href={`/checkout?plan=${encodeURIComponent(b.plan?.id || '')}`}
+              >
                 Pay now
               </Link>
               <button
@@ -323,7 +354,10 @@ export function LockedScreen() {
   );
 }
 
-/** Shown when something would go over the plan. Owners go to Billing; others are told to ask the owner. */
+/**
+ * Shown when something would go over the plan. Owners go to Billing; others are told to ask the
+ * owner.
+ */
 export function UpgradeModal({ info }: { info: Any }) {
   const owner = Boolean(S.user?.isOwner);
   return (
@@ -345,10 +379,13 @@ export function UpgradeModal({ info }: { info: Any }) {
           : []),
       ]}
     >
-      <p style={{ marginTop: 0 }}>{info?.error || info?.message || 'This would go over your plan.'}</p>
+      <p style={{ marginTop: 0 }}>
+        {info?.error || info?.message || 'This would go over your plan.'}
+      </p>
       {!owner && <p className="muted">Ask your workspace owner to upgrade the plan.</p>}
     </Modal>
   );
 }
-// Replaces any open dialog: the request that hit the limit usually came from it (e.g. "Create a blank project").
+// Replaces any open dialog: the request that hit the limit usually came from it (e.g. "Create a
+// blank project").
 export const showUpgrade = (info: Any) => openModal(<UpgradeModal info={info} />);

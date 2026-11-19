@@ -1,6 +1,7 @@
 'use client';
-// Project settings → Database: the databases of the app this project builds (Test, Staging, Production). A connection
-// string goes in once and never comes back: the page shows host, port, database, user and the last connection test.
+// Project settings → Database: the databases of the app this project builds (Test, Staging,
+// Production). A connection string goes in once and never comes back: the page shows host, port,
+// database, user and the last connection test.
 import { Fragment, useEffect, useState } from 'react';
 import { P, ago, api, toast, openModal, type Any } from './core';
 import { Ico, I, SetCard, Spinner, ErrorState, EmptyState, Confirm } from './ui';
@@ -17,7 +18,15 @@ type Env = {
   user: string;
   updatedAt: string;
   updatedBy: string | null;
-  lastTest?: { ok: boolean; at: string; by: string | null; version?: string; tables?: number; canWrite?: boolean; error?: string } | null;
+  lastTest?: {
+    ok: boolean;
+    at: string;
+    by: string | null;
+    version?: string;
+    tables?: number;
+    canWrite?: boolean;
+    error?: string;
+  } | null;
 };
 type Setup = { kind: string; value: string; updatedAt?: string; updatedBy?: string | null };
 type Data = {
@@ -37,7 +46,8 @@ const KIND_HELP: Record<string, string> = {
   production: 'The live database. TicketForge reads its structure only, never its rows.',
 };
 const blank = { id: '', name: 'Test', kind: 'test', engine: 'postgres', url: '' };
-// What a connection string looks like for each engine, and where it points (a SQLite connection is a file).
+// What a connection string looks like for each engine, and where it points (a SQLite connection is
+// a file).
 const EXAMPLE: Record<string, string> = {
   postgres: 'postgresql://user:password@host:5432/database',
   supabase: 'postgresql://postgres.<ref>:password@aws-0-<region>.pooler.supabase.com:5432/postgres',
@@ -102,7 +112,11 @@ export function DatabaseSettings() {
   };
   const save = async () => {
     if (!form) return;
-    const r = await act('save', { action: 'save', ...form }, form.id ? 'Connection saved' : 'Connection added');
+    const r = await act(
+      'save',
+      { action: 'save', ...form },
+      form.id ? 'Connection saved' : 'Connection added',
+    );
     if (!r) return;
     setForm(null);
     // A new or changed address is tested at once, so problems show up straight away.
@@ -110,7 +124,11 @@ export function DatabaseSettings() {
   };
   const test = async (id: string) => {
     const r = await act(`test:${id}`, { action: 'test', id });
-    if (r) toast(r.env.lastTest?.ok ? 'Connected' : 'Couldn’t connect', r.env.lastTest?.ok ? 'ok' : 'err');
+    if (r)
+      toast(
+        r.env.lastTest?.ok ? 'Connected' : 'Couldn’t connect',
+        r.env.lastTest?.ok ? 'ok' : 'err',
+      );
   };
   const remove = (e: Env) =>
     openModal(
@@ -123,7 +141,8 @@ export function DatabaseSettings() {
         }}
       />,
     );
-  const edit = (e: Env) => setForm({ id: e.id, name: e.name, kind: e.kind, engine: e.engine, url: '' });
+  const edit = (e: Env) =>
+    setForm({ id: e.id, name: e.name, kind: e.kind, engine: e.engine, url: '' });
 
   return (
     <>
@@ -135,7 +154,9 @@ export function DatabaseSettings() {
             <button
               className="btn primary"
               disabled={!!busy}
-              onClick={() => setForm({ ...blank, name: data.envs.some((e) => e.kind === 'test') ? '' : 'Test' })}
+              onClick={() =>
+                setForm({ ...blank, name: data.envs.some((e) => e.kind === 'test') ? '' : 'Test' })
+              }
             >
               <Ico svg={I.plus} />
               Add connection
@@ -164,7 +185,9 @@ export function DatabaseSettings() {
                   </td>
                   <td>
                     <code>{where(e)}</code>
-                    {e.engine !== 'sqlite' && <div className="muted small">as {e.user || 'default user'}</div>}
+                    {e.engine !== 'sqlite' && (
+                      <div className="muted small">as {e.user || 'default user'}</div>
+                    )}
                   </td>
                   <td>
                     <TestResult env={e} busy={busy === `test:${e.id}`} />
@@ -176,7 +199,12 @@ export function DatabaseSettings() {
                     <button className="btn sm subtle" disabled={!!busy} onClick={() => edit(e)}>
                       Edit
                     </button>{' '}
-                    <button className="btn sm subtle" disabled={!!busy} aria-label={`Remove ${e.name}`} onClick={() => remove(e)}>
+                    <button
+                      className="btn sm subtle"
+                      disabled={!!busy}
+                      aria-label={`Remove ${e.name}`}
+                      onClick={() => remove(e)}
+                    >
                       <Ico svg={I.trash} />
                     </button>
                   </td>
@@ -197,17 +225,29 @@ export function DatabaseSettings() {
 
       {form && (
         <SetCard
-          title={form.id ? `Edit “${data.envs.find((e) => e.id === form.id)?.name || form.name}”` : 'Add a connection'}
+          title={
+            form.id
+              ? `Edit “${data.envs.find((e) => e.id === form.id)?.name || form.name}”`
+              : 'Add a connection'
+          }
           desc="The connection string is encrypted on the server. It’s never shown again, exported or sent to the AI."
         >
           <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
             <label className="field" style={{ flex: 1, minWidth: 180, margin: 0 }}>
               <span>Name</span>
-              <TF value={form.name} maxLength={60} placeholder="Test" onChange={(e: Any) => setForm({ ...form, name: e.target.value })} />
+              <TF
+                value={form.name}
+                maxLength={60}
+                placeholder="Test"
+                onChange={(e: Any) => setForm({ ...form, name: e.target.value })}
+              />
             </label>
             <label className="field" style={{ flex: 1, minWidth: 160, margin: 0 }}>
               <span>Type</span>
-              <SF value={form.kind} onChange={(e: Any) => setForm({ ...form, kind: e.target.value })}>
+              <SF
+                value={form.kind}
+                onChange={(e: Any) => setForm({ ...form, kind: e.target.value })}
+              >
                 {Object.entries(data.kinds).map(([k, l]) => (
                   <MenuItem key={k} value={k}>
                     {l}
@@ -217,7 +257,10 @@ export function DatabaseSettings() {
             </label>
             <label className="field" style={{ flex: 1, minWidth: 160, margin: 0 }}>
               <span>Engine</span>
-              <SF value={form.engine} onChange={(e: Any) => setForm({ ...form, engine: e.target.value })}>
+              <SF
+                value={form.engine}
+                onChange={(e: Any) => setForm({ ...form, engine: e.target.value })}
+              >
                 {Object.entries(data.engines).map(([k, l]) => (
                   <MenuItem key={k} value={k}>
                     {l}
@@ -237,34 +280,43 @@ export function DatabaseSettings() {
               spellCheck={false}
               value={form.url}
               onChange={(e: Any) => setForm({ ...form, url: e.target.value })}
-              placeholder={form.id ? 'Leave empty to keep the saved connection string' : EXAMPLE[form.engine] || EXAMPLE.postgres}
+              placeholder={
+                form.id
+                  ? 'Leave empty to keep the saved connection string'
+                  : EXAMPLE[form.engine] || EXAMPLE.postgres
+              }
             />
           </label>
           {form.engine === 'supabase' && (
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              In Supabase: Project Settings → Database → Connection string → URI. The Session pooler (port 5432) works on networks without
-              IPv6.
+              In Supabase: Project Settings → Database → Connection string → URI. The Session pooler
+              (port 5432) works on networks without IPv6.
             </p>
           )}
           {form.engine === 'mysql' && (
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Works with MySQL 5.7+ and MariaDB 10.2+. Connections that aren’t local use TLS; add <code>?ssl=false</code> for a server
-              without it.
+              Works with MySQL 5.7+ and MariaDB 10.2+. Connections that aren’t local use TLS; add{' '}
+              <code>?ssl=false</code> for a server without it.
             </p>
           )}
           {form.engine === 'sqlite' && (
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              The full path of the database file on the computer TicketForge runs on. Not available on the hosted service.
+              The full path of the database file on the computer TicketForge runs on. Not available
+              on the hosted service.
             </p>
           )}
           {form.engine === 'sqlserver' && (
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Encrypted by default; add <code>?encrypt=false</code> for a server without TLS. SQL Server has no read-only mode, so every
-              read TicketForge does is rolled back.
+              Encrypted by default; add <code>?encrypt=false</code> for a server without TLS. SQL
+              Server has no read-only mode, so every read TicketForge does is rolled back.
             </p>
           )}
           <div className="row" style={{ gap: 8, marginTop: 14 }}>
-            <button className="btn primary" disabled={!!busy || !form.name.trim() || (!form.id && !form.url.trim())} onClick={save}>
+            <button
+              className="btn primary"
+              disabled={!!busy || !form.name.trim() || (!form.id && !form.url.trim())}
+              onClick={save}
+            >
               {busy === 'save' ? (
                 <>
                   <Spinner />
@@ -291,12 +343,22 @@ export function DatabaseSettings() {
 }
 
 /** Which database code jobs and tests use, and what runs before each test run. */
-function UsageCard({ base, data, setData }: { base: string; data: Data; setData: (f: (d: Data | null) => Data | null) => void }) {
+function UsageCard({
+  base,
+  data,
+  setData,
+}: {
+  base: string;
+  data: Data;
+  setData: (f: (d: Data | null) => Data | null) => void;
+}) {
   const test = data.envs.find((e) => e.kind === 'test');
   const [kind, setKind] = useState(data.setup?.kind || 'none');
   const [value, setValue] = useState(data.setup?.value || '');
   const [busy, setBusy] = useState(false);
-  const dirty = kind !== (data.setup?.kind || 'none') || (kind !== 'none' && value.trim() !== (data.setup?.value || ''));
+  const dirty =
+    kind !== (data.setup?.kind || 'none') ||
+    (kind !== 'none' && value.trim() !== (data.setup?.value || ''));
   const save = async () => {
     setBusy(true);
     try {
@@ -313,11 +375,13 @@ function UsageCard({ base, data, setData }: { base: string; data: Data; setData:
   const used =
     data.local && data.mine ? (
       <>
-        your own database (<code>{where(data.mine)}</code>) on this computer, otherwise the project’s <b>{test?.name || 'Test'}</b> database
+        your own database (<code>{where(data.mine)}</code>) on this computer, otherwise the
+        project’s <b>{test?.name || 'Test'}</b> database
       </>
     ) : test ? (
       <>
-        the <b>{test.name}</b> database (<code>{where(test)}</code>, {data.engines[test.engine] || test.engine})
+        the <b>{test.name}</b> database (<code>{where(test)}</code>,{' '}
+        {data.engines[test.engine] || test.engine})
       </>
     ) : null;
   return (
@@ -331,19 +395,20 @@ function UsageCard({ base, data, setData }: { base: string; data: Data; setData:
         <div className="warn-banner">
           <Ico svg={I.warn} />
           <span>
-            No Test database yet: code jobs run without a database, and tests can’t check saved data. Add a connection of type <b>Test</b>{' '}
-            above.
+            No Test database yet: code jobs run without a database, and tests can’t check saved
+            data. Add a connection of type <b>Test</b> above.
           </span>
         </div>
       )}
       <ul className="muted small" style={{ margin: '0 0 12px', paddingLeft: 18 }}>
         <li>
-          <b>Code jobs</b> (on this computer) get it as <code>DATABASE_URL</code> and <code>TEST_DATABASE_URL</code>, so agents can run
-          migrations and tests. TicketForge’s own database and keys are never passed to them.
+          <b>Code jobs</b> (on this computer) get it as <code>DATABASE_URL</code> and{' '}
+          <code>TEST_DATABASE_URL</code>, so agents can run migrations and tests. TicketForge’s own
+          database and keys are never passed to them.
         </li>
         <li>
-          <b>Test runs</b> on this server can check saved data with <code>app.db.query()</code>, read-only. Runs on GitHub Actions don’t get
-          it.
+          <b>Test runs</b> on this server can check saved data with <code>app.db.query()</code>,
+          read-only. Runs on GitHub Actions don’t get it.
         </li>
       </ul>
       <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -368,7 +433,11 @@ function UsageCard({ base, data, setData }: { base: string; data: Data; setData:
             />
           </label>
         )}
-        <button className="btn primary" disabled={busy || !dirty || (kind !== 'none' && !value.trim())} onClick={save}>
+        <button
+          className="btn primary"
+          disabled={busy || !dirty || (kind !== 'none' && !value.trim())}
+          onClick={save}
+        >
           {busy ? (
             <>
               <Spinner />
@@ -390,10 +459,23 @@ function UsageCard({ base, data, setData }: { base: string; data: Data; setData:
   );
 }
 
-/** Your own database for this project: used instead of the project's Test one for your code jobs and test runs. */
-function MineCard({ base, data, setData }: { base: string; data: Data; setData: (f: (d: Data | null) => Data | null) => void }) {
+/**
+ * Your own database for this project: used instead of the project's Test one for your code jobs and
+ * test runs.
+ */
+function MineCard({
+  base,
+  data,
+  setData,
+}: {
+  base: string;
+  data: Data;
+  setData: (f: (d: Data | null) => Data | null) => void;
+}) {
   const [url, setUrl] = useState('');
-  const [engine, setEngine] = useState(data.mine?.engine === 'supabase' ? 'postgres' : data.mine?.engine || 'postgres');
+  const [engine, setEngine] = useState(
+    data.mine?.engine === 'supabase' ? 'postgres' : data.mine?.engine || 'postgres',
+  );
   const [busy, setBusy] = useState('');
   const call = async (key: string, payload: Any, ok?: string) => {
     setBusy(key);
@@ -414,7 +496,11 @@ function MineCard({ base, data, setData }: { base: string; data: Data; setData: 
     if (r) {
       setUrl('');
       const t = await call('test', { action: 'testMine' });
-      if (t) toast(t.mine?.lastTest?.ok ? 'Connected' : 'Couldn’t connect', t.mine?.lastTest?.ok ? 'ok' : 'err');
+      if (t)
+        toast(
+          t.mine?.lastTest?.ok ? 'Connected' : 'Couldn’t connect',
+          t.mine?.lastTest?.ok ? 'ok' : 'err',
+        );
     }
   };
   const m = data.mine;
@@ -425,12 +511,16 @@ function MineCard({ base, data, setData }: { base: string; data: Data; setData: 
     >
       {!data.local ? (
         <p className="muted small" style={{ margin: 0 }}>
-          Your own database can be set up only when TicketForge runs on your computer and is opened at localhost.
+          Your own database can be set up only when TicketForge runs on your computer and is opened
+          at localhost.
         </p>
       ) : (
         <>
           {m && (
-            <div className="row" style={{ gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+            <div
+              className="row"
+              style={{ gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}
+            >
               <span>
                 <code>{where(m)}</code>{' '}
                 <span className="muted small">
@@ -445,7 +535,11 @@ function MineCard({ base, data, setData }: { base: string; data: Data; setData: 
                 disabled={!!busy}
                 onClick={async () => {
                   const t = await call('test', { action: 'testMine' });
-                  if (t) toast(t.mine?.lastTest?.ok ? 'Connected' : 'Couldn’t connect', t.mine?.lastTest?.ok ? 'ok' : 'err');
+                  if (t)
+                    toast(
+                      t.mine?.lastTest?.ok ? 'Connected' : 'Couldn’t connect',
+                      t.mine?.lastTest?.ok ? 'ok' : 'err',
+                    );
                 }}
               >
                 Test
@@ -453,7 +547,9 @@ function MineCard({ base, data, setData }: { base: string; data: Data; setData: 
               <button
                 className="btn sm subtle"
                 disabled={!!busy}
-                onClick={() => call('forget', { action: 'setMine', url: '' }, 'Your own database is forgotten')}
+                onClick={() =>
+                  call('forget', { action: 'setMine', url: '' }, 'Your own database is forgotten')
+                }
               >
                 Forget
               </button>
@@ -532,7 +628,10 @@ type Schema = {
 };
 const tname = (t: Table) => (t.schema && t.schema !== 'public' ? `${t.schema}.${t.name}` : t.name);
 
-/** The app's schema: read it from a connection or the repository, see what changed, and browse the tables. */
+/**
+ * The app's schema: read it from a connection or the repository, see what changed, and browse the
+ * tables.
+ */
 function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
   const [schema, setSchema] = useState<Schema | null>(() => P().dbSchema || null);
   const pickDefault = () =>
@@ -552,7 +651,10 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
     try {
       const r = await api(base, {
         method: 'POST',
-        body: source === 'repo' ? { action: 'readSchema', source: 'repo' } : { action: 'readSchema', id: source },
+        body:
+          source === 'repo'
+            ? { action: 'readSchema', source: 'repo' }
+            : { action: 'readSchema', id: source },
       });
       setSchema(r.schema);
       toast(
@@ -591,7 +693,10 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
     : '';
   const qq = q.trim().toLowerCase();
   const shown = (schema?.tables || []).filter(
-    (t) => !qq || tname(t).toLowerCase().includes(qq) || t.columns.some((c) => c.name.toLowerCase().includes(qq)),
+    (t) =>
+      !qq ||
+      tname(t).toLowerCase().includes(qq) ||
+      t.columns.some((c) => c.name.toLowerCase().includes(qq)),
   );
   return (
     <SetCard
@@ -631,7 +736,10 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
 
       {!schema ? (
         <EmptyState compact icon={I.database} title="No schema yet">
-          <p>Read it from a connection, or from the repository’s schema files when no database is connected.</p>
+          <p>
+            Read it from a connection, or from the repository’s schema files when no database is
+            connected.
+          </p>
         </EmptyState>
       ) : (
         <>
@@ -647,7 +755,10 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
             {schema.truncated && (
               <>
                 {' '}
-                · <span className="t-fail">shortened: very large schemas keep the first 300 tables and 120 columns per table</span>
+                ·{' '}
+                <span className="t-fail">
+                  shortened: very large schemas keep the first 300 tables and 120 columns per table
+                </span>
               </>
             )}
           </p>
@@ -673,12 +784,20 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
                 const isOpen = open === k;
                 return (
                   <Fragment key={k}>
-                    <tr style={{ cursor: 'pointer' }} onClick={() => setOpen(isOpen ? '' : k)} aria-expanded={isOpen}>
+                    <tr
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setOpen(isOpen ? '' : k)}
+                      aria-expanded={isOpen}
+                    >
                       <td>
                         <Ico svg={isOpen ? I.collapse : I.expand} /> <code>{k}</code>
                       </td>
                       <td>{t.columns.length}</td>
-                      <td className="muted small">{t.foreignKeys.length ? t.foreignKeys.map((f) => `→ ${f.refTable}`).join(', ') : '—'}</td>
+                      <td className="muted small">
+                        {t.foreignKeys.length
+                          ? t.foreignKeys.map((f) => `→ ${f.refTable}`).join(', ')
+                          : '—'}
+                      </td>
                     </tr>
                     {isOpen && (
                       <tr>
@@ -697,8 +816,10 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
                                       {[
                                         c.pk && 'primary key',
                                         !c.pk && !c.nullable && 'required',
-                                        t.unique.some((u) => u.length === 1 && u[0] === c.name) && 'unique',
-                                        fk && `→ ${fk.refTable}.${fk.refColumns[fk.columns.indexOf(c.name)] || fk.refColumns[0]}`,
+                                        t.unique.some((u) => u.length === 1 && u[0] === c.name) &&
+                                          'unique',
+                                        fk &&
+                                          `→ ${fk.refTable}.${fk.refColumns[fk.columns.indexOf(c.name)] || fk.refColumns[0]}`,
                                         c.default && `default ${c.default}`,
                                       ]
                                         .filter(Boolean)
@@ -720,7 +841,8 @@ function SchemaCard({ base, envs }: { base: string; envs: Env[] }) {
           {!shown.length && <p className="muted small">No table or column matches “{q}”.</p>}
           {!!schema.enums.length && (
             <p className="muted small" style={{ marginBottom: 0 }}>
-              <b>Enums:</b> {schema.enums.map((e) => `${e.name} (${e.values.join(', ')})`).join(' · ')}
+              <b>Enums:</b>{' '}
+              {schema.enums.map((e) => `${e.name} (${e.values.join(', ')})`).join(' · ')}
             </p>
           )}
         </>
@@ -740,7 +862,8 @@ function ChangesNote({ changes: c }: { changes: Changes }) {
           `${t.table}: ${[
             t.addedColumns.length && `added ${t.addedColumns.join(', ')}`,
             t.removedColumns.length && `removed ${t.removedColumns.join(', ')}`,
-            t.changedColumns.length && `changed ${t.changedColumns.map((x) => `${x.name} (${x.from} → ${x.to})`).join(', ')}`,
+            t.changedColumns.length &&
+              `changed ${t.changedColumns.map((x) => `${x.name} (${x.from} → ${x.to})`).join(', ')}`,
           ]
             .filter(Boolean)
             .join('; ')}`,
@@ -784,8 +907,8 @@ function TestResult({ env, busy }: { env: Env; busy: boolean }) {
     <>
       <span className="loz t-pass">Connected</span>
       <div className="muted small">
-        {/^\d/.test(String(t.version)) ? `PostgreSQL ${t.version}` : t.version} · {t.tables} table{t.tables === 1 ? '' : 's'} ·{' '}
-        {t.canWrite ? 'can write' : 'read-only user'} · {ago(t.at)}
+        {/^\d/.test(String(t.version)) ? `PostgreSQL ${t.version}` : t.version} · {t.tables} table
+        {t.tables === 1 ? '' : 's'} · {t.canWrite ? 'can write' : 'read-only user'} · {ago(t.at)}
       </div>
     </>
   );

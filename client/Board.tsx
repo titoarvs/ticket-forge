@@ -1,9 +1,10 @@
 'use client';
-// Board (Jira-style): one column per workflow status, with sticky column headers, column limits, collapsible
-// columns, swimlanes by epic or assignee, and quick create. Assignee, story points and priority can be changed on the
-// card itself (the same popups as the backlog rows; they save at once and go back if the save fails). On tablets and
-// phones the board shows one column at a time with a tab for each, so nothing scrolls sideways. With custom
-// transitions, columns an issue can't move to are greyed out while dragging.
+// Board (Jira-style): one column per workflow status, with sticky column headers, column limits,
+// collapsible columns, swimlanes by epic or assignee, and quick create. Assignee, story points and
+// priority can be changed on the card itself (the same popups as the backlog rows; they save at
+// once and go back if the save fails). On tablets and phones the board shows one column at a time
+// with a tab for each, so nothing scrolls sideways. With custom transitions, columns an issue can't
+// move to are greyed out while dragging.
 import { memo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -59,9 +60,16 @@ const PRIORITY_TAG: Record<string, [string, string]> = {
   Medium: ['Medium', 'pt-medium'],
   Low: ['Low priority', 'pt-low'],
 };
-const CAT_COLOR: Record<string, string> = { todo: 'var(--text-subtlest)', inprogress: 'var(--brand)', done: '#22c55e' };
+const CAT_COLOR: Record<string, string> = {
+  todo: 'var(--text-subtlest)',
+  inprogress: 'var(--brand)',
+  done: '#22c55e',
+};
 
-/** One issue card. Memoised: only re-renders when the issue (or its selection, sub-tasks or comments) changes. */
+/**
+ * One issue card. Memoised: only re-renders when the issue (or its selection, sub-tasks or
+ * comments) changes.
+ */
 const Card = memo(function Card({
   t,
   showEpic,
@@ -152,13 +160,19 @@ const Card = memo(function Card({
         <span className="right">
           <CodeChip t={t} />
           {t.prs.length > 0 && (
-            <span className="mini" title={`${t.prs.length} pull request${t.prs.length > 1 ? 's' : ''}`}>
+            <span
+              className="mini"
+              title={`${t.prs.length} pull request${t.prs.length > 1 ? 's' : ''}`}
+            >
               <Ico svg={I.pr} />
               {t.prs.length}
             </span>
           )}
           {t.comments?.length > 0 && (
-            <span className="mini" title={`${t.comments.length} comment${t.comments.length > 1 ? 's' : ''}`}>
+            <span
+              className="mini"
+              title={`${t.comments.length} comment${t.comments.length > 1 ? 's' : ''}`}
+            >
               <Ico svg={I.comment} />
               {t.comments.length}
             </span>
@@ -238,7 +252,9 @@ export function Board() {
   const act = activeSprint();
   const useSprint = act && !S.boardAll;
   const wf: Any[] = p.workflow;
-  const list = filtered(useSprint ? p.tickets.filter((t: Any) => t.sprintId === act.id) : p.tickets);
+  const list = filtered(
+    useSprint ? p.tickets.filter((t: Any) => t.sprintId === act.id) : p.tickets,
+  );
   const collapsed: Set<string> = S.boardCollapsed;
   const toggleCol = (id: string) => {
     if (collapsed.has(id)) collapsed.delete(id);
@@ -249,13 +265,18 @@ export function Board() {
   const createOk = can('issue.create');
   const group = S.boardGroup;
 
-  // Tablets and phones: one column at a time, picked with the tabs above the board (collapsing doesn't apply there).
+  // Tablets and phones: one column at a time, picked with the tabs above the board (collapsing
+  // doesn't apply there).
   const narrow = useNarrow();
   const tab: string = wf.some((w) => w.id === S.boardTab) ? S.boardTab : wf[0]?.id;
   const shown = narrow ? wf.filter((w) => w.id === tab) : wf;
   const isCollapsed = (id: string) => !narrow && collapsed.has(id);
   // Column widths: collapsed columns are a narrow strip.
-  const cols = shown.map((w) => (narrow ? 'minmax(0, 1fr)' : isCollapsed(w.id) ? `${COLLAPSED_W}px` : 'minmax(264px, 1fr)')).join(' ');
+  const cols = shown
+    .map((w) =>
+      narrow ? 'minmax(0, 1fr)' : isCollapsed(w.id) ? `${COLLAPSED_W}px` : 'minmax(264px, 1fr)',
+    )
+    .join(' ');
 
   const byStatus = (items: Any[]) => {
     const m = new Map<string, Any[]>(wf.map((w) => [w.name, []]));
@@ -290,7 +311,13 @@ export function Board() {
         zone: { epic: e.id },
         fields: { epicId: e.id },
       })),
-      { id: 'e:none', title: 'Issues without epic', items: list.filter((t: Any) => !epic(t.epicId)), zone: { epic: null }, fields: {} },
+      {
+        id: 'e:none',
+        title: 'Issues without epic',
+        items: list.filter((t: Any) => !epic(t.epicId)),
+        zone: { epic: null },
+        fields: {},
+      },
     ];
   } else if (group === 'assignee') {
     const names = [...new Set(list.map((t: Any) => t.assignee).filter(Boolean))].sort() as string[];
@@ -357,10 +384,17 @@ export function Board() {
               <>
                 <span className="muted small row" style={{ gap: 4 }}>
                   <Ico svg={I.clock} />
-                  {left === null ? 'No end date' : left >= 0 ? `${left} days remaining` : `${-left} days overdue`}
+                  {left === null
+                    ? 'No end date'
+                    : left >= 0
+                      ? `${left} days remaining`
+                      : `${-left} days overdue`}
                 </span>
                 {can('sprint.manage') && (
-                  <button className="btn" onClick={() => openModal(<CompleteSprintModal s={act} />)}>
+                  <button
+                    className="btn"
+                    onClick={() => openModal(<CompleteSprintModal s={act} />)}
+                  >
                     Complete sprint
                   </button>
                 )}
@@ -395,7 +429,10 @@ export function Board() {
             </>
           }
         >
-          <p>Start a sprint from the backlog to track its issues here, or show every issue on the board.</p>
+          <p>
+            Start a sprint from the backlog to track its issues here, or show every issue on the
+            board.
+          </p>
         </EmptyState>
       ) : (
         <>
@@ -419,7 +456,11 @@ export function Board() {
             <button
               className="btn subtle sm board-lanes-toggle"
               onClick={() => {
-                lanes.forEach((l) => (allCollapsed ? S.collapsed.delete(`lane:${l.id}`) : S.collapsed.add(`lane:${l.id}`)));
+                lanes.forEach((l) =>
+                  allCollapsed
+                    ? S.collapsed.delete(`lane:${l.id}`)
+                    : S.collapsed.add(`lane:${l.id}`),
+                );
                 saveUi();
                 emit();
               }}
@@ -449,7 +490,10 @@ export function Board() {
             </div>
           )}
           <div className={`board-wrap ${narrow ? 'narrow' : ''}`} tabIndex={-1}>
-            <div className={`board ${narrow ? 'narrow' : ''}`} style={{ ['--cols' as string]: cols }}>
+            <div
+              className={`board ${narrow ? 'narrow' : ''}`}
+              style={{ ['--cols' as string]: cols }}
+            >
               {/* Column headers (sticky) */}
               {shown.map((w) => {
                 const n = all.get(w.name)!.length;
@@ -574,7 +618,11 @@ export function Board() {
                                 />
                               ))}
                             {!c && createOk && (
-                              <QuickCreate id={`${l.id}|${w.id}`} status={w.name} fields={{ ...sprintFields, ...l.fields }} />
+                              <QuickCreate
+                                id={`${l.id}|${w.id}`}
+                                status={w.name}
+                                fields={{ ...sprintFields, ...l.fields }}
+                              />
                             )}
                           </div>
                         );

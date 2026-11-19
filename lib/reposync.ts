@@ -1,9 +1,11 @@
 // Repository sync for Test automation (local only): reads the project's local repository and
-//  1. finds the app's pages from its routes (lib/routes.ts), with the source files each page is built from;
+//  1. finds the app's pages from its routes (lib/routes.ts), with the source files each page is
+//     built from;
 //  2. works out which pages changed since the last sync (git diff, including uncommitted work);
-//  3. asks the AI which existing test cases those changes affect and rewrites them (two passes: pick, then rewrite);
-//  4. reads the git history and asks the AI which features are already built: existing issues to mark Done, and
-//     delivered work that has no issue yet (added to the backlog as Done).
+//  3. asks the AI which existing test cases those changes affect and rewrites them (two passes:
+//     pick, then rewrite);
+//  4. reads the git history and asks the AI which features are already built: existing issues to
+//     mark Done, and delivered work that has no issue yet (added to the backlog as Done).
 // Nothing is saved here: the app shows the result for review and saves what the person applies.
 import { execFile } from 'node:child_process';
 import path from 'node:path';
@@ -34,10 +36,27 @@ const git: any = (cwd, args, timeout = 60000) =>
   );
 const FIRST_SYNC_COMMITS = 30;
 
-// ---------------------------------------------------------------- pages and what they're built from
-const IMPORT_RE = /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|require\(\s*['"]([^'"]+)['"]\s*\)/g;
-const EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.vue', '.svelte', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
-/** The repo files a page uses: its route files and what they import, two levels deep (relative, ~/ and @/ imports). */
+// ---------------------------------------------------------------- pages and what they're built
+// from
+const IMPORT_RE =
+  /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|require\(\s*['"]([^'"]+)['"]\s*\)/g;
+const EXTS = [
+  '',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.vue',
+  '.svelte',
+  '/index.ts',
+  '/index.tsx',
+  '/index.js',
+  '/index.jsx',
+];
+/**
+ * The repo files a page uses: its route files and what they import, two levels deep (relative, ~/
+ * and @/ imports).
+ */
 async function pageDeps(route, fileSet, read, cache) {
   const seen = new Set(route.files?.length ? route.files : route.file ? [route.file] : []);
   let frontier = [...seen];
@@ -56,7 +75,8 @@ async function pageDeps(route, fileSet, read, cache) {
       for (const m of text.matchAll(IMPORT_RE)) {
         const spec: string = m[1] || m[2] || m[3];
         let base = null;
-        if (spec.startsWith('.')) base = path.posix.normalize(path.posix.join(path.posix.dirname(f as string), spec));
+        if (spec.startsWith('.'))
+          base = path.posix.normalize(path.posix.join(path.posix.dirname(f as string), spec));
         else if (/^[~@]\//.test(spec)) base = `src/${spec.slice(2)}`;
         if (!base) continue;
         const hit = EXTS.map((e) => base + e).find((c) => fileSet.has(c));
@@ -83,11 +103,14 @@ export async function readRepo(dir, lastSha) {
   const fileSet = new Set(files);
   const cache: Map<any, any> = new Map();
   const routes: any[] = [];
-  for (const r of scan.routes) routes.push({ ...r, deps: await pageDeps(r, fileSet, reader.read, cache) });
+  for (const r of scan.routes)
+    routes.push({ ...r, deps: await pageDeps(r, fileSet, reader.read, cache) });
   // Files most pages use (layout, UI kit…) are "shared": a change there isn't pinned on every page.
   const uses: Map<any, any> = new Map();
   for (const r of routes) for (const f of r.deps) uses.set(f, (uses.get(f) || 0) + 1);
-  const shared = new Set([...uses].filter(([, n]) => routes.length >= 4 && n > routes.length / 2).map(([f]) => f));
+  const shared = new Set(
+    [...uses].filter(([, n]) => routes.length >= 4 && n > routes.length / 2).map(([f]) => f),
+  );
 
   const head = (await git(root, ['rev-parse', 'HEAD'])).trim();
   const branch = (await git(root, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
@@ -100,8 +123,14 @@ export async function readRepo(dir, lastSha) {
   let baseNote = base ? `since the last sync (${base.slice(0, 7)})` : '';
   if (!base) {
     base =
-      (await git(root, ['rev-list', '--max-count=1', `--skip=${FIRST_SYNC_COMMITS}`, 'HEAD']).catch(() => '')).trim() ||
-      (await git(root, ['rev-list', '--max-parents=0', 'HEAD'])).trim().split('\n')[0];
+      (
+        await git(root, [
+          'rev-list',
+          '--max-count=1',
+          `--skip=${FIRST_SYNC_COMMITS}`,
+          'HEAD',
+        ]).catch(() => '')
+      ).trim() || (await git(root, ['rev-list', '--max-parents=0', 'HEAD'])).trim().split('\n')[0];
     baseNote = lastSha
       ? `the last synced commit is gone (rebased?), so: the last ${FIRST_SYNC_COMMITS} commits`
       : `first sync: the last ${FIRST_SYNC_COMMITS} commits`;
@@ -115,13 +144,19 @@ export async function readRepo(dir, lastSha) {
       .map((f) => f.trim())
       .filter(Boolean),
   );
-  const uncommitted = (await git(root, ['status', '--porcelain'])).split('\n').filter(Boolean).length;
+  const uncommitted = (await git(root, ['status', '--porcelain']))
+    .split('\n')
+    .filter(Boolean).length;
 
   const pages: any[] = [];
   for (const r of routes) {
     const own = r.deps.filter((f) => changed.has(f) && !shared.has(f));
     let diff = '';
-    if (own.length) diff = clip(await git(root, ['diff', '--unified=2', base, '--', ...own.slice(0, 12)]).catch(() => ''), 5000);
+    if (own.length)
+      diff = clip(
+        await git(root, ['diff', '--unified=2', base, '--', ...own.slice(0, 12)]).catch(() => ''),
+        5000,
+      );
     pages.push({
       path: r.path,
       name: r.name,
@@ -135,7 +170,15 @@ export async function readRepo(dir, lastSha) {
     });
   }
   const sharedChanged = [...changed].filter((f) => shared.has(f));
-  const log = (await git(root, ['log', '-n', '800', '--date=short', '--format=%h%x09%ad%x09%an%x09%s%x09%b%x1e']))
+  const log = (
+    await git(root, [
+      'log',
+      '-n',
+      '800',
+      '--date=short',
+      '--format=%h%x09%ad%x09%an%x09%s%x09%b%x1e',
+    ])
+  )
     .split('\x1e')
     .map((x) => x.trim())
     .filter(Boolean)
@@ -169,7 +212,8 @@ export async function readRepo(dir, lastSha) {
   };
 }
 
-// ---------------------------------------------------------------- AI: test cases the changes affect
+// ---------------------------------------------------------------- AI: test cases the changes
+// affect
 const tcRef = (t, i) => t.testCases[i].key || `${t.key}#${i + 1}`;
 /** @param {{ project: any, repo, ai?: any, emit?: (message: string) => void }} o */
 export async function testCaseUpdates({ project, repo, ai = {}, emit = (_m) => {} }: any) {
@@ -179,12 +223,18 @@ export async function testCaseUpdates({ project, repo, ai = {}, emit = (_m) => {
   const rules = await getRules();
   const system = systemWith(rules, ['tests'], await getGuide());
   const changes = changedPages
-    .map((p) => `### Page "${p.name}" (${p.path})\nChanged files: ${p.changedFiles.join(', ')}\n${p.diff ? `Diff:\n${p.diff}` : ''}`)
+    .map(
+      (p) =>
+        `### Page "${p.name}" (${p.path})\nChanged files: ${p.changedFiles.join(', ')}\n${p.diff ? `Diff:\n${p.diff}` : ''}`,
+    )
     .join('\n\n');
   // Pass 1: which test cases do these changes touch? (titles only, so all 300+ fit)
   emit('AI is checking which test cases the code changes affect…');
   const catalog = tickets
-    .map((t) => `${t.key} ${t.title}\n${t.testCases.map((c, i) => `  [${tcRef(t, i)}] ${clip(c.title, 140)}`).join('\n')}`)
+    .map(
+      (t) =>
+        `${t.key} ${t.title}\n${t.testCases.map((c, i) => `  [${tcRef(t, i)}] ${clip(c.title, 140)}`).join('\n')}`,
+    )
     .join('\n');
   const pick = await askJson({
     ...ai,
@@ -287,9 +337,18 @@ Return JSON: { "updates": [ { "ref": "TC-…", "title": "…", "preconditions": 
 /** @param {{ project: any, repo, ai?: any, emit?: (message: string) => void }} o */
 export async function builtFeatures({ project, repo, ai = {}, emit = (_m) => {} }: any) {
   emit('AI is matching the git history and pages with the backlog…');
-  const doneNames = new Set(project.workflow?.length ? project.workflow.filter((w) => w.category === 'done').map((w) => w.name) : ['Done']); // no saved workflow: the default one
+  const doneNames = new Set(
+    project.workflow?.length
+      ? project.workflow.filter((w) => w.category === 'done').map((w) => w.name)
+      : ['Done'],
+  ); // no saved workflow: the default one
   const rules = await getRules();
-  const history = repo.log.map((c) => `${c.sha} ${c.date} ${c.subject}${c.body && c.body !== c.subject ? ` — ${c.body}` : ''}`).join('\n');
+  const history = repo.log
+    .map(
+      (c) =>
+        `${c.sha} ${c.date} ${c.subject}${c.body && c.body !== c.subject ? ` — ${c.body}` : ''}`,
+    )
+    .join('\n');
   const backlog = project.tickets
     .filter((t) => !t.parentId)
     .map((t) => `${t.key} [${t.status}] ${t.title}`)
@@ -330,7 +389,14 @@ Return JSON: { "done": [ { "key": "PR-…", "evidence": "a1b2c3d PR-31: …" } ]
     .map((d) => {
       const t: any = byKey.get(String(d.key));
       return (
-        t && !doneNames.has(t.status) && { ticketId: t.id, key: t.key, title: t.title, status: t.status, evidence: clip(d.evidence, 400) }
+        t &&
+        !doneNames.has(t.status) && {
+          ticketId: t.id,
+          key: t.key,
+          title: t.title,
+          status: t.status,
+          evidence: clip(d.evidence, 400),
+        }
       );
     })
     .filter(Boolean);
@@ -344,27 +410,48 @@ Return JSON: { "done": [ { "key": "PR-…", "evidence": "a1b2c3d PR-31: …" } ]
       epicKey: epicByKey.has(String(n.epicKey)) ? String(n.epicKey) : null,
       userStory: clip(n.userStory, 600),
       description: clip(n.description, 2000),
-      acceptanceCriteria: (Array.isArray(n.acceptanceCriteria) ? n.acceptanceCriteria : []).map((a) => clip(a, 400)).slice(0, 8),
+      acceptanceCriteria: (Array.isArray(n.acceptanceCriteria) ? n.acceptanceCriteria : [])
+        .map((a) => clip(a, 400))
+        .slice(0, 8),
       pages: (Array.isArray(n.pages) ? n.pages : []).map(String).slice(0, 6),
       evidence: clip(n.evidence, 600),
     }));
   return { done, newIssues };
 }
 
-// ---------------------------------------------------------------- AI: test cases for the pages as built
-const TC_TYPES = ['Functional', 'Negative', 'Edge', 'UI', 'Integration', 'Security', 'Performance', 'Accessibility'];
-/** A page's own code for the prompt: its route file first, then the components it uses (not the shared UI kit). */
+// ---------------------------------------------------------------- AI: test cases for the pages as
+// built
+const TC_TYPES = [
+  'Functional',
+  'Negative',
+  'Edge',
+  'UI',
+  'Integration',
+  'Security',
+  'Performance',
+  'Accessibility',
+];
+/**
+ * A page's own code for the prompt: its route file first, then the components it uses (not the
+ * shared UI kit).
+ */
 async function pageCode(root, page, budget = 48000) {
   const fs = await import('node:fs/promises');
   const files = [page.file, ...page.depFiles.filter((f) => f !== page.file)]
     .filter(Boolean)
-    .filter((f) => !/(^|\/)(components\/ui|ui)\/|\.(css|scss|svg|json|md)$|(^|\/)(utils?|cn)\.[tj]sx?$/.test(f))
+    .filter(
+      (f) =>
+        !/(^|\/)(components\/ui|ui)\/|\.(css|scss|svg|json|md)$|(^|\/)(utils?|cn)\.[tj]sx?$/.test(
+          f,
+        ),
+    )
     .sort((a, b) =>
       a === page.file
         ? -1
         : b === page.file
           ? 1
-          : (/components|features|views|pages|screens/.test(b) ? 1 : 0) - (/components|features|views|pages|screens/.test(a) ? 1 : 0),
+          : (/components|features|views|pages|screens/.test(b) ? 1 : 0) -
+            (/components|features|views|pages|screens/.test(a) ? 1 : 0),
     );
   let out = '';
   const used: any[] = [];
@@ -383,17 +470,27 @@ async function pageCode(root, page, budget = 48000) {
 }
 
 /**
- * Test cases for the app's existing pages, written from their code: for each page, the backlog issue it implements
- * (or a new issue, Done, for delivered work with none) and its test cases. Returns { pages: [...] } for review.
+ * Test cases for the app's existing pages, written from their code: for each page, the backlog
+ * issue it implements (or a new issue, Done, for delivered work with none) and its test cases.
+ * Returns { pages: [...] } for review.
  */
-export async function pageTestCases({ project, dir, only = null, ai = {}, emit = (_m) => {} }: any) {
+export async function pageTestCases({
+  project,
+  dir,
+  only = null,
+  ai = {},
+  emit = (_m) => {},
+}: any) {
   const repo = await readRepo(dir, project.automation?.repoSync?.sha || null);
   const pages = repo.pages.filter((p) => !only?.length || only.includes(p.path));
   const rules = await getRules();
   const system = systemWith(rules, ['tickets', 'tests'], await getGuide());
   const backlog = project.tickets
     .filter((t) => !t.parentId)
-    .map((t) => `${t.key} [${t.status}] ${t.title}${t.epicId ? ` (epic ${project.epics.find((e) => e.id === t.epicId)?.key || ''})` : ''}`)
+    .map(
+      (t) =>
+        `${t.key} [${t.status}] ${t.title}${t.epicId ? ` (epic ${project.epics.find((e) => e.id === t.epicId)?.key || ''})` : ''}`,
+    )
     .join('\n');
   const epics = project.epics.map((e) => `${e.key} ${e.title}`).join('\n');
   const roles = (project.automation?.app?.roles || []).map((r) => r.name).filter(Boolean);
@@ -407,7 +504,9 @@ export async function pageTestCases({ project, dir, only = null, ai = {}, emit =
       if (ai.signal?.aborted) return;
       const pg = queue.shift();
       const { code, files } = await pageCode(repo.root, pg);
-      emit(`Reading ${pg.path} (${files.length} file${files.length === 1 ? '' : 's'}) and writing its test cases… ${done}/${pages.length}`);
+      emit(
+        `Reading ${pg.path} (${files.length} file${files.length === 1 ? '' : 's'}) and writing its test cases… ${done}/${pages.length}`,
+      );
       try {
         const res = await askJson({
           ...ai,
@@ -445,9 +544,14 @@ Return JSON: { "ticketKey": "PR-…" | null, "newIssue": { "title": "…", "epic
             ? {
                 title: clip(res.newIssue.title, 200),
                 epicId: epicByKey.get(String(res.newIssue.epicKey))?.id || null,
-                epicKey: epicByKey.has(String(res.newIssue.epicKey)) ? String(res.newIssue.epicKey) : null,
+                epicKey: epicByKey.has(String(res.newIssue.epicKey))
+                  ? String(res.newIssue.epicKey)
+                  : null,
                 userStory: clip(res.newIssue.userStory, 600),
-                acceptanceCriteria: (Array.isArray(res.newIssue.acceptanceCriteria) ? res.newIssue.acceptanceCriteria : [])
+                acceptanceCriteria: (Array.isArray(res.newIssue.acceptanceCriteria)
+                  ? res.newIssue.acceptanceCriteria
+                  : []
+                )
                   .map((a) => clip(a, 400))
                   .slice(0, 8),
               }
@@ -479,7 +583,13 @@ Return JSON: { "ticketKey": "PR-…" | null, "newIssue": { "title": "…", "epic
         });
       } catch (e) {
         if (ai.signal?.aborted) return;
-        results.push({ path: pg.path, name: pg.name, files, error: clip(e.message, 300), testCases: [] });
+        results.push({
+          path: pg.path,
+          name: pg.name,
+          files,
+          error: clip(e.message, 300),
+          testCases: [],
+        });
       }
       done++;
     }
@@ -489,10 +599,16 @@ Return JSON: { "ticketKey": "PR-…" | null, "newIssue": { "title": "…", "epic
   return { repo: { branch: repo.branch, head: repo.head, root: repo.root }, pages: results };
 }
 
-// ---------------------------------------------------------------- AI: map of what's built, by epic (pages + .md docs + history)
-const MD_SKIP = /(^|\/)(test-results|playwright-report|coverage|node_modules|dist|build|\.[^/]+)\//i;
-const MD_NOT_FEATURES = /(^|\/)(CLAUDE|AGENTS|CONTRIBUTING|CODE_OF_CONDUCT|LICENSE|SECURITY)\.md$|template/i;
-/** The repository's Markdown documents that describe the product (feature notes, change records, release notes, READMEs). */
+// ---------------------------------------------------------------- AI: map of what's built, by epic
+// (pages + .md docs + history)
+const MD_SKIP =
+  /(^|\/)(test-results|playwright-report|coverage|node_modules|dist|build|\.[^/]+)\//i;
+const MD_NOT_FEATURES =
+  /(^|\/)(CLAUDE|AGENTS|CONTRIBUTING|CODE_OF_CONDUCT|LICENSE|SECURITY)\.md$|template/i;
+/**
+ * The repository's Markdown documents that describe the product (feature notes, change records,
+ * release notes, READMEs).
+ */
 export async function featureDocs(root, files, budget = 70000) {
   const fs = await import('node:fs/promises');
   const docs = files
@@ -532,14 +648,23 @@ export async function featureDocs(root, files, budget = 70000) {
 }
 
 /**
- * Everything already built, organized by epic, FROM THE CODE: each page's headings, actions, fields and API calls, the
- * API endpoints and data models (also of the backend repository), then the git history. Markdown documents (release
- * notes, feature notes) only help name and group things: a feature counts only when the code shows it, and every
- * feature must cite code. Features that only documents mention are returned apart ("unverified") and never added.
- * Pass 1 outlines epics and features, pass 2 writes each epic's features as small issues from their pages' code.
- * Existing epics and issues are reused (matched). Returns { epics: [...], unverified: [...] } for review; nothing is saved.
+ * Everything already built, organized by epic, FROM THE CODE: each page's headings, actions, fields
+ * and API calls, the API endpoints and data models (also of the backend repository), then the git
+ * history. Markdown documents (release notes, feature notes) only help name and group things: a
+ * feature counts only when the code shows it, and every feature must cite code. Features that only
+ * documents mention are returned apart ("unverified") and never added.
+ * Pass 1 outlines epics and features, pass 2 writes each epic's features as small issues from their
+ * pages' code.
+ * Existing epics and issues are reused (matched). Returns { epics: [...], unverified: [...] } for
+ * review; nothing is saved.
  */
-export async function builtFeatureMap({ project, dir, backendDir = '', ai = {}, emit = (_m) => {} }: any) {
+export async function builtFeatureMap({
+  project,
+  dir,
+  backendDir = '',
+  ai = {},
+  emit = (_m) => {},
+}: any) {
   const repo = await readRepo(dir, project.automation?.repoSync?.sha || null);
   const reader = localReader(dir);
   const files = await reader.list();
@@ -557,13 +682,21 @@ export async function builtFeatureMap({ project, dir, backendDir = '', ai = {}, 
   const docsText = docs.map((d) => `### ${d.file}\n${clip(d.text, 1500)}`).join('\n\n');
   const history = repo.log
     .filter((c) => !/^merge branch|^wip\b|^chore|bump|^format/i.test(c.subject))
-    .map((c) => `${c.sha} ${c.date} ${c.subject}${c.body && c.body !== c.subject ? ` — ${c.body}` : ''}`)
+    .map(
+      (c) =>
+        `${c.sha} ${c.date} ${c.subject}${c.body && c.body !== c.subject ? ` — ${c.body}` : ''}`,
+    )
     .join('\n');
   const backlog = project.tickets
     .filter((t) => !t.parentId)
-    .map((t) => `${t.key} [${t.status}]${t.epicId ? ` (${project.epics.find((e) => e.id === t.epicId)?.key || ''})` : ''} ${t.title}`)
+    .map(
+      (t) =>
+        `${t.key} [${t.status}]${t.epicId ? ` (${project.epics.find((e) => e.id === t.epicId)?.key || ''})` : ''} ${t.title}`,
+    )
     .join('\n');
-  const epicsText = project.epics.map((e) => `${e.key} ${e.title}${e.description ? ` — ${clip(e.description, 160)}` : ''}`).join('\n');
+  const epicsText = project.epics
+    .map((e) => `${e.key} ${e.title}${e.description ? ` — ${clip(e.description, 160)}` : ''}`)
+    .join('\n');
 
   // Pass 1: the outline.
   emit('AI is grouping what’s built into epics and features…');
@@ -620,9 +753,16 @@ Return JSON: { "epics": [ { "existingKey": "T2-E1" | null, "title": "…", "desc
   });
   const epicByKey = new Map(project.epics.map((e) => [e.key, e]));
   const ticketByKey = new Map(project.tickets.map((t) => [t.key, t]));
-  const doneNames = new Set(project.workflow?.length ? project.workflow.filter((w) => w.category === 'done').map((w) => w.name) : ['Done']); // no saved workflow: the default one
-  let epics = (outline.epics || []).filter((e) => e?.title && Array.isArray(e.features) && e.features.length).slice(0, 25);
-  // Every feature must cite code that exists: features backed only by documents or commits are set apart, not added.
+  const doneNames = new Set(
+    project.workflow?.length
+      ? project.workflow.filter((w) => w.category === 'done').map((w) => w.name)
+      : ['Done'],
+  ); // no saved workflow: the default one
+  let epics = (outline.epics || [])
+    .filter((e) => e?.title && Array.isArray(e.features) && e.features.length)
+    .slice(0, 25);
+  // Every feature must cite code that exists: features backed only by documents or commits are set
+  // apart, not added.
   const unverified = (outline.notInCode || [])
     .filter((x) => x?.title)
     .map((x) => ({
@@ -639,15 +779,20 @@ Return JSON: { "epics": [ { "existingKey": "T2-E1" | null, "title": "…", "desc
       unverified.push({
         title: clip(f.title, 200),
         source: (f.hints || f.sources || []).join(', ').slice(0, 200),
-        why: code.length ? `Its code references weren’t found in the repository (${clip(code.join(', '), 120)})` : 'No code cited',
+        why: code.length
+          ? `Its code references weren’t found in the repository (${clip(code.join(', '), 120)})`
+          : 'No code cited',
       });
       return false;
     });
   }
   epics = epics.filter((e) => e.features.length);
   if (unverified.length)
-    emit(`${unverified.length} item${unverified.length > 1 ? 's' : ''} only the documents mention: set aside, not added.`);
-  // Small epics (one or two features) fold into the closest broad area, so the backlog isn't a long list of tiny epics.
+    emit(
+      `${unverified.length} item${unverified.length > 1 ? 's' : ''} only the documents mention: set aside, not added.`,
+    );
+  // Small epics (one or two features) fold into the closest broad area, so the backlog isn't a long
+  // list of tiny epics.
   const tiny = epics.filter((e) => e.features.length < 2);
   if (tiny.length && epics.length > 3) {
     emit(`Folding ${tiny.length} small epic${tiny.length > 1 ? 's' : ''} into broader ones…`);
@@ -685,11 +830,14 @@ Return JSON: { "moves": [ { "from": "small epic title", "to": "broader epic titl
     }
   }
 
-  // Pass 2: small tickets, per epic (in parallel), from the documents and pages behind each feature.
+  // Pass 2: small tickets, per epic (in parallel), from the documents and pages behind each
+  // feature.
   const scale = rules.tickets?.pointScale?.length ? rules.tickets.pointScale : [1, 2, 3, 5, 8, 13];
   const maxPts = Math.min(5, rules.tickets?.maxPoints || 5);
   const small = scale.filter((x) => x <= Math.min(3, maxPts));
-  const acRange = rules.tickets?.acMin ? `${rules.tickets.acMin}–${rules.tickets.acMax || rules.tickets.acMin}` : '2–4';
+  const acRange = rules.tickets?.acMin
+    ? `${rules.tickets.acMin}–${rules.tickets.acMax || rules.tickets.acMin}`
+    : '2–4';
   const acMax = rules.tickets?.acMax || 5;
   let done = 0;
   const detailed = new Array(epics.length);
@@ -701,8 +849,11 @@ Return JSON: { "moves": [ { "from": "small epic title", "to": "broader epic titl
       const { e, i } = queue.shift();
       emit(`Writing the features of “${e.title}”… ${done}/${epics.length}`);
       const feats = e.features.slice(0, 30);
-      // Evidence: the code of the features' pages first (their real labels, fields, rules), then their endpoints; documents last, as hints.
-      const pagesOf = [...new Set(feats.flatMap((f) => [...(f.pages || []), ...(f.code || [])]).map(String))];
+      // Evidence: the code of the features' pages first (their real labels, fields, rules), then
+      // their endpoints; documents last, as hints.
+      const pagesOf = [
+        ...new Set(feats.flatMap((f) => [...(f.pages || []), ...(f.code || [])]).map(String)),
+      ];
       let codeText = '';
       for (const pg of repo.pages.filter((x) => pagesOf.includes(x.path)).slice(0, 6)) {
         if (codeText.length > 36000) break;
@@ -714,7 +865,11 @@ Return JSON: { "moves": [ { "from": "small epic title", "to": "broader epic titl
         .filter(
           (l) =>
             pagesOf.some((x: any) => (x.includes(' ') ? l.includes(x.split(' ')[1]) : false)) ||
-            feats.some((f) => (f.code || []).some((c) => l.includes(String(c).replace(/^(GET|POST|PUT|PATCH|DELETE|ANY)\s+/i, '')))),
+            feats.some((f) =>
+              (f.code || []).some((c) =>
+                l.includes(String(c).replace(/^(GET|POST|PUT|PATCH|DELETE|ANY)\s+/i, '')),
+              ),
+            ),
         );
       const evidence = [...new Set(feats.flatMap((f) => f.hints || []))]
         .filter((s) => docByFile.has(s))
@@ -760,7 +915,8 @@ Return JSON: { "tickets": [ { "feature": 1, "title": "…", "type": "Story|Task|
         description: clip(e.description || '', 400),
         isNew: !ex,
         error: res.error || null,
-        // One entry per small ticket; `group` is the feature it came from. Existing issues stay one ticket each.
+        // One entry per small ticket; `group` is the feature it came from. Existing issues stay one
+        // ticket each.
         features: feats.flatMap((f, n) => {
           const t: any = f.existingKey ? ticketByKey.get(String(f.existingKey)) : null;
           const base = {
@@ -771,7 +927,9 @@ Return JSON: { "tickets": [ { "feature": 1, "title": "…", "type": "Story|Task|
           const mine = (res.tickets || []).filter((x) => Number(x.feature) === n + 1 && x?.title);
           const pts = (v) => {
             const x = Number(v);
-            return Number.isFinite(x) && x > 0 ? scale.reduce((b, c) => (Math.abs(c - x) < Math.abs(b - x) ? c : b), scale[0]) : null;
+            return Number.isFinite(x) && x > 0
+              ? scale.reduce((b, c) => (Math.abs(c - x) < Math.abs(b - x) ? c : b), scale[0])
+              : null;
           };
           const one = (d, title) => ({
             ...base,
@@ -780,7 +938,9 @@ Return JSON: { "tickets": [ { "feature": 1, "title": "…", "type": "Story|Task|
             storyPoints: pts(d.storyPoints),
             userStory: clip(d.userStory || '', 600),
             description: clip(d.description || '', 1500),
-            acceptanceCriteria: (Array.isArray(d.acceptanceCriteria) ? d.acceptanceCriteria : []).map((a) => clip(a, 400)).slice(0, acMax),
+            acceptanceCriteria: (Array.isArray(d.acceptanceCriteria) ? d.acceptanceCriteria : [])
+              .map((a) => clip(a, 400))
+              .slice(0, acMax),
           });
           if (t)
             return [
@@ -796,7 +956,14 @@ Return JSON: { "tickets": [ { "feature": 1, "title": "…", "type": "Story|Task|
             ];
           if (!mine.length)
             return [
-              { ...one({}, f.title), existingId: null, existingKey: null, existingStatus: null, alreadyDone: false, existingEpicId: null },
+              {
+                ...one({}, f.title),
+                existingId: null,
+                existingKey: null,
+                existingStatus: null,
+                alreadyDone: false,
+                existingEpicId: null,
+              },
             ];
           return mine.slice(0, 8).map((d) => ({
             ...one(d, d.title),

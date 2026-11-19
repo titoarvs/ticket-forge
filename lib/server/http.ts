@@ -11,7 +11,10 @@ import { startWorker as startDriveWorker } from '@/lib/gdrive';
 
 const G = globalThis as any;
 
-/** Creates tables, seeds roles and imports legacy JSON projects — once per server process, and again when the schema changes. */
+/**
+ * Creates tables, seeds roles and imports legacy JSON projects — once per server process, and again
+ * when the schema changes.
+ */
 export function ready(): Promise<void> {
   if (G.__tfReadyFor !== SCHEMA_VERSION) {
     G.__tfReady = null;
@@ -51,13 +54,26 @@ export async function ownerOnly() {
   if (!u.is_owner) throw new HttpError(403, 'Only the owner can manage users and invites.');
   return u;
 }
-/** Whether this user may set up payment gateways and plans: the owner of the default workspace, or a platform admin (PLATFORM_ADMIN_EMAILS). */
+/**
+ * Whether this user may set up payment gateways and plans: the owner of the default workspace, or a
+ * platform admin (PLATFORM_ADMIN_EMAILS).
+ */
 export const runsThePlatform = (u: any) =>
-  Boolean(u?.is_owner && (u.workspace_id === DEFAULT_WS || platformAdminEmails().includes(String(u.email).toLowerCase())));
-/** Only the owner who runs this TicketForge: payment gateways and plans (Administration → Billing). */
+  Boolean(
+    u?.is_owner &&
+    (u.workspace_id === DEFAULT_WS ||
+      platformAdminEmails().includes(String(u.email).toLowerCase())),
+  );
+/**
+ * Only the owner who runs this TicketForge: payment gateways and plans (Administration → Billing).
+ */
 export async function platformOwner() {
   const u: any = await authed();
-  if (!runsThePlatform(u)) throw new HttpError(403, 'Only the owner who runs this TicketForge can set up payment gateways and plans.');
+  if (!runsThePlatform(u))
+    throw new HttpError(
+      403,
+      'Only the owner who runs this TicketForge can set up payment gateways and plans.',
+    );
   return u;
 }
 export async function perm(...perms: string[]) {
@@ -88,7 +104,8 @@ export async function clientIp() {
   const h = await headers();
   return h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip') || 'local';
 }
-export const appUrl = (req: Request) => (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '');
+export const appUrl = (req: Request) =>
+  (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '');
 export const aiOpts = (b: any) => {
   const c: any = currentContext();
   const pid = b?.projectId || b?.project?.id;
@@ -98,28 +115,39 @@ export const aiOpts = (b: any) => {
 const aiOptsOf = (b: any) => ({
   provider: b?.provider || undefined,
   model: b?.model || undefined,
-  run: typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run) ? b.run : undefined,
+  run:
+    typeof b?.run === 'string' && /^(auto|high|standard|light|cfg:[\w-]{1,40})$/.test(b.run)
+      ? b.run
+      : undefined,
   fresh: b?.fresh === true || b?.regenerate === true || undefined,
 });
 
-/** API routes that still work while the workspace is locked, so the owner can sign in, see the plans and pay. */
+/**
+ * API routes that still work while the workspace is locked, so the owner can sign in, see the plans
+ * and pay.
+ */
 const LOCK_EXEMPT = /^\/api\/(auth|billing|plans|features|status)(\/|$)/;
 
 type Ctx = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, params: Record<string, string>) => Promise<any>;
-const resolve = async (fn: Handler, req: Request, p: Promise<Record<string, string>>) => fn(req, (await p) || {});
+const resolve = async (fn: Handler, req: Request, p: Promise<Record<string, string>>) =>
+  fn(req, (await p) || {});
 
-/** The person an API token (Authorization: Bearer tfk_…) acts as, or null when it is missing, unknown, revoked or expired. */
+/**
+ * The person an API token (Authorization: Bearer tfk_…) acts as, or null when it is missing,
+ * unknown, revoked or expired.
+ */
 async function bearerUser(req: Request) {
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.get('authorization') || '');
   return m ? auth.apiTokenUser(m[1]) : null;
 }
 
 /**
- * Wraps a handler: setup, cross-site check, JSON responses and error mapping.
- * { bearer: true } is for routes called by other programs (MCP): the caller is the person of the API token in the
- * Authorization header, never the browser's session cookie (so there is nothing for a cross-site page to ride on, and no
- * origin check). Without a valid token the handler sees no user (`authed()` refuses).
+ * Wraps a handler: setup, cross-site check, JSON responses and error mapping. { bearer: true } is
+ * for routes called by other programs (MCP): the caller is the person of the API token in the
+ * Authorization header, never the browser's session cookie (so there is nothing for a cross-site
+ * page to ride on, and no origin check). Without a valid token the handler sees no user (`authed()`
+ * refuses).
  */
 export function api(fn: Handler, opts: { bearer?: boolean } = {}) {
   return async (req: Request, ctx: Ctx) => {
@@ -127,16 +155,25 @@ export function api(fn: Handler, opts: { bearer?: boolean } = {}) {
       await ready();
       if (!opts.bearer && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         const origin = req.headers.get('origin');
-        if (origin && new URL(origin).host !== req.headers.get('host')) throw new HttpError(403, 'Cross-site request blocked');
+        if (origin && new URL(origin).host !== req.headers.get('host'))
+          throw new HttpError(403, 'Cross-site request blocked');
       }
-      // Every query in this request runs as the signed-in user, so database row-level security applies.
+      // Every query in this request runs as the signed-in user, so database row-level security
+      // applies.
       const user = opts.bearer ? await bearerUser(req) : await currentUser();
-      // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the configured AI API.
-      // On the hosted service (SaaS) never: the server's own Claude sign-in must not answer for other companies.
+      // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the
+      // configured AI API.
+      // On the hosted service (SaaS) never: the server's own Claude sign-in must not answer for
+      // other companies.
       const local = requestIsLocal(isLocalHost, req.headers);
-      // The project this request is about (for AI usage per project): from the address, or set by aiOpts from the body.
-      const projectId = decodeURIComponent(new URL(req.url).pathname.match(/^\/api\/projects\/([^/]+)/)?.[1] || '') || null;
-      // Workspaces: a project of another workspace doesn't exist as far as this request is concerned.
+      // The project this request is about (for AI usage per project): from the address, or set by
+      // aiOpts from the body.
+      const projectId =
+        decodeURIComponent(
+          new URL(req.url).pathname.match(/^\/api\/projects\/([^/]+)/)?.[1] || '',
+        ) || null;
+      // Workspaces: a project of another workspace doesn't exist as far as this request is
+      // concerned.
       if (projectId && user) {
         const w = await store.projectWorkspace(projectId);
         if (w && w !== user.workspace_id) throw new HttpError(404, 'Project not found');
@@ -144,35 +181,57 @@ export function api(fn: Handler, opts: { bearer?: boolean } = {}) {
       const out = await asUser(
         user?.id,
         async () => {
-          // A trial that ended without a payment locks the workspace: everything but sign-in and billing refuses until it is paid.
+          // A trial that ended without a payment locks the workspace: everything but sign-in and
+          // billing refuses until it is paid.
           if (user && !LOCK_EXEMPT.test(new URL(req.url).pathname)) {
             const lock = await lockStatus(user.workspace_id);
             if (lock.locked)
-              throw Object.assign(new HttpError(402, `Your ${lock.plan.name} trial has ended. Pay to keep using this workspace.`), {
-                extra: { code: 'locked', plan: lock.plan.id },
-              });
+              throw Object.assign(
+                new HttpError(
+                  402,
+                  `Your ${lock.plan.name} trial has ended. Pay to keep using this workspace.`,
+                ),
+                {
+                  extra: { code: 'locked', plan: lock.plan.id },
+                },
+              );
           }
-          // Feature flags: a feature the workspace owner locked refuses its API routes for everyone in that workspace.
+          // Feature flags: a feature the workspace owner locked refuses its API routes for everyone
+          // in that workspace.
           const locked = await lockedFeatureFor(new URL(req.url).pathname);
           if (locked) throw new HttpError(423, lockedMessage(locked));
           return resolve(fn, req, ctx?.params ? ctx.params : Promise.resolve({}));
         },
         user,
-        { local, projectId, runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local' },
+        {
+          local,
+          projectId,
+          runOn: req.headers.get('x-tf-run-on') === 'github' ? 'github' : 'local',
+        },
       );
       return out instanceof Response ? out : Response.json(out ?? { ok: true });
     } catch (err) {
-      // Drizzle wraps database errors as "Failed query: <sql> params: …", which hides what PostgreSQL said
-      // (and puts the query's parameters in the message). Report the database's own error instead.
-      const e = err?.cause && /^Failed query:/.test(String(err?.message)) ? Object.assign(err.cause, { query: err.query }) : err;
+      // Drizzle wraps database errors as "Failed query: <sql> params: …", which hides what
+      // PostgreSQL said (and puts the query's parameters in the message). Report the database's own
+      // error instead.
+      const e =
+        err?.cause && /^Failed query:/.test(String(err?.message))
+          ? Object.assign(err.cause, { query: err.query })
+          : err;
       if (!e.status || e.status >= 500) console.error(e);
-      return Response.json({ error: e.message || String(e), ...(e.extra || {}) }, { status: e.status || 500 });
+      return Response.json(
+        { error: e.message || String(e), ...(e.extra || {}) },
+        { status: e.status || 500 },
+      );
     }
   };
 }
 
 /** Streams newline-delimited JSON events. The run is aborted if the client disconnects. */
-export function ndjson(req: Request, run: (send: (o: any) => void, signal: AbortSignal) => Promise<void>) {
+export function ndjson(
+  req: Request,
+  run: (send: (o: any) => void, signal: AbortSignal) => Promise<void>,
+) {
   const enc = new TextEncoder();
   const ctrl = new AbortController();
   req.signal.addEventListener('abort', () => ctrl.abort());
@@ -192,7 +251,8 @@ export function ndjson(req: Request, run: (send: (o: any) => void, signal: Abort
       try {
         await run(send, ctrl.signal);
       } catch (e) {
-        if (!ctrl.signal.aborted) send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) });
+        if (!ctrl.signal.aborted)
+          send({ type: 'error', error: e.message, message: e.message, ...(e.extra || {}) });
       } finally {
         clearInterval(ping);
         open = false;
@@ -208,7 +268,11 @@ export function ndjson(req: Request, run: (send: (o: any) => void, signal: Abort
     },
   });
   return new Response(stream, {
-    headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' },
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
   });
 }
 

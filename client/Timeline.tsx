@@ -1,6 +1,7 @@
 'use client';
-// Timeline: every epic (feature) on a calendar. Drag a bar to move it, drag its ends to change the start or due
-// date, or click an empty row to schedule an epic. Expand an epic to see its issues, placed by their sprints.
+// Timeline: every epic (feature) on a calendar. Drag a bar to move it, drag its ends to change the
+// start or due date, or click an empty row to schedule an epic. Expand an epic to see its issues,
+// placed by their sprints.
 import {
   useEffect,
   useLayoutEffect,
@@ -10,7 +11,20 @@ import {
   type PointerEvent as RPointerEvent,
   type KeyboardEvent as RKeyboardEvent,
 } from 'react';
-import { S, emit, P, fmtDate, sprint, epicTickets, catOf, can, mutate, saveUi, openModal, type Any } from './core';
+import {
+  S,
+  emit,
+  P,
+  fmtDate,
+  sprint,
+  epicTickets,
+  catOf,
+  can,
+  mutate,
+  saveUi,
+  openModal,
+  type Any,
+} from './core';
 import { Ico, I, TypeIcon, EmptyState, StatusLoz } from './ui';
 import { openDrawer, addEpic } from './actions';
 import { Header, epicProgress } from './views';
@@ -49,7 +63,12 @@ const todayStr = () => {
 };
 const span = (a: string, b: string) => Math.round((toMs(b) - toMs(a)) / DAY);
 const fmt = (d: string) => fmtDate(`${d}T00:00:00`);
-const fmtY = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtY = (d: string) =>
+  new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
 /** An epic's dates: its own start/due dates, or an estimate from the sprints its issues are in. */
 export function epicRange(e: Any): { start: string; end: string; derived: boolean } | null {
@@ -138,7 +157,8 @@ export function Timeline() {
   const scroller = useRef<HTMLDivElement>(null);
   const open: Set<string> = S.tlOpen;
 
-  // The visible range: whole quarters around every date in the project, today, and some room to plan ahead.
+  // The visible range: whole quarters around every date in the project, today, and some room to
+  // plan ahead.
   const { from, to } = useMemo(() => {
     const ds = [today];
     for (const e of p.epics) {
@@ -161,12 +181,20 @@ export function Timeline() {
   const width = days * ppd;
   const x = (d: string) => span(from, d) * ppd;
   const top = scale(from, to, zoom[0] === 'weeks' ? 'month' : 'year');
-  const bottom = scale(from, to, zoom[0] === 'weeks' ? 'week' : zoom[0] === 'months' ? 'month' : 'quarter');
+  const bottom = scale(
+    from,
+    to,
+    zoom[0] === 'weeks' ? 'week' : zoom[0] === 'months' ? 'month' : 'quarter',
+  );
 
   // Open on today.
   const scrollToToday = (smooth = false) => {
     const el = scroller.current;
-    if (el) el.scrollTo({ left: Math.max(0, x(today) - (el.clientWidth - LEFT) / 3), behavior: smooth ? 'smooth' : 'auto' });
+    if (el)
+      el.scrollTo({
+        left: Math.max(0, x(today) - (el.clientWidth - LEFT) / 3),
+        behavior: smooth ? 'smooth' : 'auto',
+      });
   };
   useLayoutEffect(() => {
     scrollToToday();
@@ -203,12 +231,27 @@ export function Timeline() {
     const left = el.getBoundingClientRect().left + LEFT - el.scrollLeft;
     return addDays(from, Math.floor((clientX - left) / ppd));
   };
-  const begin = (ev: RPointerEvent<HTMLElement>, e: Any, mode: Drag['mode'], s0: string, e0: string) => {
+  const begin = (
+    ev: RPointerEvent<HTMLElement>,
+    e: Any,
+    mode: Drag['mode'],
+    s0: string,
+    e0: string,
+  ) => {
     if (!ed || ev.button !== 0) return;
     ev.preventDefault();
     ev.stopPropagation();
     (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
-    drag.current = { id: e.id, mode, x: ev.clientX, s0, e0, moved: mode === 'create', start: s0, end: e0 };
+    drag.current = {
+      id: e.id,
+      mode,
+      x: ev.clientX,
+      s0,
+      e0,
+      moved: mode === 'create',
+      start: s0,
+      end: e0,
+    };
     if (mode === 'create') setPreview({ id: e.id, start: s0, end: e0 });
     document.body.classList.add('resizing-x');
   };
@@ -272,7 +315,8 @@ export function Timeline() {
     if (!ed || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
     ev.preventDefault();
     const n = (ev.key === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 7 : 1);
-    if (ev.altKey) setEpicDates(e, r.start, addDays(r.end, n) < r.start ? r.start : addDays(r.end, n));
+    if (ev.altKey)
+      setEpicDates(e, r.start, addDays(r.end, n) < r.start ? r.start : addDays(r.end, n));
     else setEpicDates(e, addDays(r.start, n), addDays(r.end, n));
   };
 
@@ -307,7 +351,10 @@ export function Timeline() {
             </>
           }
         >
-          <p>Each epic gets a bar from its start to its due date, so you can see what’s planned when and what’s running late.</p>
+          <p>
+            Each epic gets a bar from its start to its due date, so you can see what’s planned when
+            and what’s running late.
+          </p>
         </EmptyState>
       </>
     );
@@ -321,7 +368,9 @@ export function Timeline() {
         sub={
           <span className="muted small">
             {scheduled} of {p.epics.length} epic{p.epics.length === 1 ? '' : 's'} scheduled
-            {ed ? ' · drag a bar to move it, drag its ends to change dates, or click an empty row to schedule' : ''}
+            {ed
+              ? ' · drag a bar to move it, drag its ends to change dates, or click an empty row to schedule'
+              : ''}
           </span>
         }
         right={
@@ -344,7 +393,13 @@ export function Timeline() {
       <div className="row tl-bar">
         <div className="seg" role="radiogroup" aria-label="Zoom">
           {ZOOMS.map(([k, l]) => (
-            <button key={k} role="radio" aria-checked={zoom[0] === k} className={zoom[0] === k ? 'on' : ''} onClick={() => setZoom(k)}>
+            <button
+              key={k}
+              role="radio"
+              aria-checked={zoom[0] === k}
+              className={zoom[0] === k ? 'on' : ''}
+              onClick={() => setZoom(k)}
+            >
               {l}
             </button>
           ))}
@@ -368,7 +423,11 @@ export function Timeline() {
         </span>
       </div>
 
-      <div className={`tl ${narrow ? 'narrow' : ''}`} ref={scroller} style={{ ['--tl-left' as string]: `${LEFT}px` }}>
+      <div
+        className={`tl ${narrow ? 'narrow' : ''}`}
+        ref={scroller}
+        style={{ ['--tl-left' as string]: `${LEFT}px` }}
+      >
         <div className="tl-inner" style={{ width: LEFT + width }}>
           {/* time scale */}
           <div className="tl-head">
@@ -412,7 +471,10 @@ export function Timeline() {
                   <span
                     key={s.id}
                     className={`tl-sprint ${s.state}`}
-                    style={{ left: x(s.startDate), width: Math.max(ppd, (span(s.startDate, s.endDate) + 1) * ppd) }}
+                    style={{
+                      left: x(s.startDate),
+                      width: Math.max(ppd, (span(s.startDate, s.endDate) + 1) * ppd),
+                    }}
                     title={`${s.name}: ${fmtY(s.startDate)} – ${fmtY(s.endDate)}${s.state === 'active' ? ' (active)' : s.state === 'closed' ? ' (closed)' : ''}`}
                   >
                     {s.name}
@@ -434,7 +496,10 @@ export function Timeline() {
             {p.epics.map((e: Any) => {
               const pr = epicProgress(e);
               const base = epicRange(e);
-              const r = preview?.id === e.id ? { start: preview.start, end: preview.end, derived: false } : base;
+              const r =
+                preview?.id === e.id
+                  ? { start: preview.start, end: preview.end, derived: false }
+                  : base;
               const pct = pr.total ? Math.round((pr.done / pr.total) * 100) : 0;
               const late = !!r && !r.derived && r.end < today && pr.done < Math.max(1, pr.total);
               const isOpen = open.has(e.id);
@@ -465,8 +530,13 @@ export function Timeline() {
                       >
                         <span className="key">{e.key}</span> {e.title}
                       </a>
-                      {late && <span className="tl-late-dot" title="Past its due date and not done" />}
-                      <span className="muted small tl-pct" title={`${pr.done} of ${pr.total} issues done`}>
+                      {late && (
+                        <span className="tl-late-dot" title="Past its due date and not done" />
+                      )}
+                      <span
+                        className="muted small tl-pct"
+                        title={`${pr.done} of ${pr.total} issues done`}
+                      >
                         {pct}%
                       </span>
                     </div>
@@ -489,7 +559,11 @@ export function Timeline() {
                           className={`tl-epic ${r.derived ? 'derived' : ''} ${late ? 'late' : ''} ${preview?.id === e.id ? 'dragging' : ''}`}
                           role="button"
                           tabIndex={0}
-                          style={{ left: x(r.start), width: Math.max(ppd, (span(r.start, r.end) + 1) * ppd), ['--c' as string]: e.color }}
+                          style={{
+                            left: x(r.start),
+                            width: Math.max(ppd, (span(r.start, r.end) + 1) * ppd),
+                            ['--c' as string]: e.color,
+                          }}
                           aria-label={`${e.key} ${e.title}: ${fmtY(r.start)} to ${fmtY(r.end)}${r.derived ? ', estimated from sprints' : ''}, ${pct}% done${late ? ', overdue' : ''}`}
                           title={`${e.title}\n${fmtY(r.start)} – ${fmtY(r.end)} (${span(r.start, r.end) + 1} days)${r.derived ? '\nEstimated from its issues’ sprints. Drag to set dates.' : ''}\n${pr.done} of ${pr.total} issues done${late ? '\nOverdue' : ''}`}
                           onPointerDown={(ev) => begin(ev, e, 'move', r.start, r.end)}
@@ -518,7 +592,9 @@ export function Timeline() {
                           )}
                         </div>
                       ) : (
-                        <span className="tl-empty muted small">{ed ? 'Click or drag to schedule' : 'No dates'}</span>
+                        <span className="tl-empty muted small">
+                          {ed ? 'Click or drag to schedule' : 'No dates'}
+                        </span>
                       )}
                       {preview?.id === e.id && (
                         <span className="tl-dates" style={{ left: x(preview.end) + ppd + 8 }}>
@@ -552,14 +628,19 @@ export function Timeline() {
                           {has ? (
                             <button
                               className={`tl-issue c-${cat}`}
-                              style={{ left: x(s.startDate), width: Math.max(ppd, (span(s.startDate, s.endDate) + 1) * ppd) }}
+                              style={{
+                                left: x(s.startDate),
+                                width: Math.max(ppd, (span(s.startDate, s.endDate) + 1) * ppd),
+                              }}
                               title={`${t.key} ${t.title}\n${s.name}: ${fmtY(s.startDate)} – ${fmtY(s.endDate)}\n${t.status}`}
                               onClick={() => openDrawer('issue', t.id)}
                             >
                               <span>{t.key}</span>
                             </button>
                           ) : (
-                            <span className="tl-empty muted small">{s ? `${s.name} has no dates yet` : 'Not in a sprint'}</span>
+                            <span className="tl-empty muted small">
+                              {s ? `${s.name} has no dates yet` : 'Not in a sprint'}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -572,8 +653,8 @@ export function Timeline() {
         </div>
       </div>
       <p className="muted small" style={{ marginTop: 10 }}>
-        Issues show the dates of the sprint they’re in. Keyboard: focus a bar, ←/→ moves it a day (Shift: a week), Alt+←/→ changes its due
-        date, Enter opens it.
+        Issues show the dates of the sprint they’re in. Keyboard: focus a bar, ←/→ moves it a day
+        (Shift: a week), Alt+←/→ changes its due date, Enter opens it.
       </p>
     </>
   );

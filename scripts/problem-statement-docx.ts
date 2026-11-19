@@ -1,5 +1,6 @@
 // Builds the Ticket Forge problem statement Word document from its Markdown source.
-// Usage: `npm run docs:problem-statement`. Reads docs/ticket-forge-problem-statement.md, writes docs/ticket-forge-problem-statement.docx.
+// Usage: `npm run docs:problem-statement`. Reads docs/ticket-forge-problem-statement.md, writes
+// docs/ticket-forge-problem-statement.docx.
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdownToDocx } from '../lib/md-docx';

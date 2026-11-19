@@ -1,9 +1,11 @@
 'use client';
-// Brain: the project's knowledge vault (lib/brain.ts). Linked Markdown notes about everything TicketForge knows (the
-// project, epics, issues, decisions, open questions, releases, documents, the app context and the repository profile),
-// kept up to date from the project, plus the team's own notes. AI actions and code agents read the notes linked to
-// their task first. Opens in Obsidian (download the vault), imports Obsidian notes, and on this computer syncs with a
-// folder. A list with search and filters, the note (Markdown with [[wikilinks]], backlinks), and a graph of the links.
+// Brain: the project's knowledge vault (lib/brain.ts). Linked Markdown notes about everything
+// TicketForge knows (the project, epics, issues, decisions, open questions, releases, documents,
+// the app context and the repository profile), kept up to date from the project, plus the team's
+// own notes. AI actions and code agents read the notes linked to their task first. Opens in
+// Obsidian (download the vault), imports Obsidian notes, and on this computer syncs with a folder.
+// A list with search and filters, the note (Markdown with [[wikilinks]], backlinks), and a graph of
+// the links.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   P,
@@ -40,7 +42,20 @@ const TYPE_LABEL: Record<string, string> = {
   question: 'Question',
   note: 'Note',
 };
-const TYPE_ORDER = ['note', 'epic', 'issue', 'decision', 'question', 'doc', 'release', 'source', 'project', 'context', 'repo', 'index'];
+const TYPE_ORDER = [
+  'note',
+  'epic',
+  'issue',
+  'decision',
+  'question',
+  'doc',
+  'release',
+  'source',
+  'project',
+  'context',
+  'repo',
+  'index',
+];
 const USER_TYPES = ['note', 'decision', 'question', 'doc'];
 const base = (id: string) => String(id).split('/').pop() || id;
 const lc = (s: string) =>
@@ -85,7 +100,8 @@ function makeResolver(notes: Note[]) {
     put(n.title, n.id);
     put(n.key, n.id);
   }
-  return (t: string) => by.get(lc(t).replace(/\.md$/, '')) || by.get(lc(t).split('/').pop() || '') || null;
+  return (t: string) =>
+    by.get(lc(t).replace(/\.md$/, '')) || by.get(lc(t).split('/').pop() || '') || null;
 }
 const readUrlNote = () => {
   try {
@@ -138,7 +154,8 @@ export function Brain() {
       return null;
     }
   };
-  // The brain follows the project: reload (the server refreshes the generated notes) when the project changes.
+  // The brain follows the project: reload (the server refreshes the generated notes) when the
+  // project changes.
   useEffect(() => {
     const t = setTimeout(load, list ? 800 : 0);
     return () => clearTimeout(t);
@@ -169,7 +186,8 @@ export function Brain() {
       live = false;
     };
   }, [sel, list?.rev, p.id]);
-  // Full-text search on the server (bodies aren't in the list); titles, keys and tags match at once here.
+  // Full-text search on the server (bodies aren't in the list); titles, keys and tags match at once
+  // here.
   useEffect(() => {
     if (q.trim().length < 3) {
       setFound(null);
@@ -191,7 +209,10 @@ export function Brain() {
     for (const n of notes) for (const id of n.out) m.set(id, [...(m.get(id) || []), n.id]);
     return m;
   }, [notes]);
-  const tags = useMemo(() => [...new Set(notes.flatMap((n) => n.tags))].filter((t) => !TYPE_LABEL[t]).sort(), [notes]);
+  const tags = useMemo(
+    () => [...new Set(notes.flatMap((n) => n.tags))].filter((t) => !TYPE_LABEL[t]).sort(),
+    [notes],
+  );
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const n of notes) c[n.type] = (c[n.type] || 0) + 1;
@@ -205,7 +226,11 @@ export function Brain() {
       (n) =>
         (!type || n.type === type) &&
         (!tag || n.tags.includes(tag)) &&
-        (!words.length || hit.has(n.id) || words.every((w) => lc(`${n.key} ${n.title} ${n.tags.join(' ')} ${n.excerpt}`).includes(w))),
+        (!words.length ||
+          hit.has(n.id) ||
+          words.every((w) =>
+            lc(`${n.key} ${n.title} ${n.tags.join(' ')} ${n.excerpt}`).includes(w),
+          )),
     );
     return out.sort(
       (a, b) =>
@@ -219,7 +244,10 @@ export function Brain() {
   const refresh = async () => {
     setBusy('refresh');
     try {
-      const r = await api(`/api/projects/${p.id}/brain`, { method: 'POST', body: { action: 'refresh' } });
+      const r = await api(`/api/projects/${p.id}/brain`, {
+        method: 'POST',
+        body: { action: 'refresh' },
+      });
       setList((l) => ({ ...(l as List), ...r }));
       toast(
         r.written || r.removed
@@ -236,8 +264,13 @@ export function Brain() {
   };
   const download = async () => {
     try {
-      await downloadFrom(`/api/projects/${p.id}/brain?export=zip`, { method: 'GET', fallbackName: `${p.name} brain.zip` });
-      toast('Unzip it, then in Obsidian choose Open folder as vault.', 'ok', { title: 'Vault downloaded' });
+      await downloadFrom(`/api/projects/${p.id}/brain?export=zip`, {
+        method: 'GET',
+        fallbackName: `${p.name} brain.zip`,
+      });
+      toast('Unzip it, then in Obsidian choose Open folder as vault.', 'ok', {
+        title: 'Vault downloaded',
+      });
     } catch (e: Any) {
       toast(e.message, 'err');
     }
@@ -280,7 +313,10 @@ export function Brain() {
         text="It’s removed from the brain for everyone. Links to it stay as plain text."
         onYes={async () => {
           try {
-            await api(`/api/projects/${p.id}/brain`, { method: 'POST', body: { action: 'delete', id: n.id } });
+            await api(`/api/projects/${p.id}/brain`, {
+              method: 'POST',
+              body: { action: 'delete', id: n.id },
+            });
             setSel('');
             await load();
             toast('Note deleted');
@@ -301,10 +337,20 @@ export function Brain() {
   const right = (
     <>
       <div className="seg brain-seg" role="tablist" aria-label="View">
-        <button role="tab" aria-selected={mode === 'notes'} className={mode === 'notes' ? 'on' : ''} onClick={() => setMode('notes')}>
+        <button
+          role="tab"
+          aria-selected={mode === 'notes'}
+          className={mode === 'notes' ? 'on' : ''}
+          onClick={() => setMode('notes')}
+        >
           Notes
         </button>
-        <button role="tab" aria-selected={mode === 'graph'} className={mode === 'graph' ? 'on' : ''} onClick={() => setMode('graph')}>
+        <button
+          role="tab"
+          aria-selected={mode === 'graph'}
+          className={mode === 'graph' ? 'on' : ''}
+          onClick={() => setMode('graph')}
+        >
           Graph
         </button>
       </div>
@@ -325,7 +371,12 @@ export function Brain() {
       <Menu
         id="brain-more"
         button={
-          <button className="icon-btn" aria-label="More brain actions" title="More" onClick={() => setMenu('brain-more')}>
+          <button
+            className="icon-btn"
+            aria-label="More brain actions"
+            title="More"
+            onClick={() => setMenu('brain-more')}
+          >
             <Ico svg={I.more} />
           </button>
         }
@@ -393,7 +444,9 @@ export function Brain() {
           <aside className="brain-list" aria-label="Notes">
             <Filters {...{ q, setQ, type, setType, tag, setTag, tags, counts }} />
             <div className="brain-count muted small">
-              {shown.length === notes.length ? `${notes.length} notes` : `${shown.length} of ${notes.length} notes`}
+              {shown.length === notes.length
+                ? `${notes.length} notes`
+                : `${shown.length} of ${notes.length} notes`}
             </div>
             <div className="brain-items" role="list">
               {shown.slice(0, 600).map((n) => (
@@ -435,7 +488,12 @@ export function Brain() {
           </aside>
           <section className="brain-main" aria-label="Note">
             {edit ? (
-              <NoteEditor draft={edit} notes={notes} onCancel={() => setEdit(null)} onSaved={saved} />
+              <NoteEditor
+                draft={edit}
+                notes={notes}
+                onCancel={() => setEdit(null)}
+                onSaved={saved}
+              />
             ) : sel && note ? (
               <NoteView
                 note={note}
@@ -484,9 +542,22 @@ export function Brain() {
 function Filters({ q, setQ, type, setType, tag, setTag, tags, counts }: Any) {
   return (
     <div className="brain-filters">
-      <TF search size="small" placeholder="Search notes" value={q} onChange={(e: Any) => setQ(e.target.value)} aria-label="Search notes" />
+      <TF
+        search
+        size="small"
+        placeholder="Search notes"
+        value={q}
+        onChange={(e: Any) => setQ(e.target.value)}
+        aria-label="Search notes"
+      />
       <div className="brain-filter-row">
-        <SF filter size="small" value={type} onChange={(e: Any) => setType(e.target.value)} aria-label="Type">
+        <SF
+          filter
+          size="small"
+          value={type}
+          onChange={(e: Any) => setType(e.target.value)}
+          aria-label="Type"
+        >
           <MenuItem value="">All types</MenuItem>
           {TYPE_ORDER.filter((t) => counts[t]).map((t) => (
             <MenuItem key={t} value={t}>
@@ -496,7 +567,13 @@ function Filters({ q, setQ, type, setType, tag, setTag, tags, counts }: Any) {
           ))}
         </SF>
         {tags.length > 0 && (
-          <SF filter size="small" value={tag} onChange={(e: Any) => setTag(e.target.value)} aria-label="Tag">
+          <SF
+            filter
+            size="small"
+            value={tag}
+            onChange={(e: Any) => setTag(e.target.value)}
+            aria-label="Tag"
+          >
             <MenuItem value="">All tags</MenuItem>
             {tags.map((t: string) => (
               <MenuItem key={t} value={t}>
@@ -522,7 +599,15 @@ function Filters({ q, setQ, type, setType, tag, setTag, tags, counts }: Any) {
   );
 }
 
-function BrainHome({ list, onOpen, onNew }: { list: List; onOpen: (id: string) => void; onNew: (() => void) | null }) {
+function BrainHome({
+  list,
+  onOpen,
+  onNew,
+}: {
+  list: List;
+  onOpen: (id: string) => void;
+  onNew: (() => void) | null;
+}) {
   const idx = list.notes.find((n) => n.type === 'index');
   const recent = list.notes
     .filter((n) => n.kind === 'user')
@@ -552,13 +637,15 @@ function BrainHome({ list, onOpen, onNew }: { list: List; onOpen: (id: string) =
         }
       >
         <p>
-          Linked notes about everything in this project: epics, issues with their acceptance criteria and status, decisions, open questions,
-          releases, documents, the app context and the repository profile. TicketForge keeps them up to date as the project changes.
+          Linked notes about everything in this project: epics, issues with their acceptance
+          criteria and status, decisions, open questions, releases, documents, the app context and
+          the repository profile. TicketForge keeps them up to date as the project changes.
         </p>
         <p>
           AI actions and code agents read the notes linked to their task before they start
-          {list.useInAi ? '' : ' (switched off for this project in Brain settings)'}. Add your own notes for what isn’t written anywhere
-          else, link them with <code>[[PRJ-12]]</code>, and TicketForge never overwrites them.
+          {list.useInAi ? '' : ' (switched off for this project in Brain settings)'}. Add your own
+          notes for what isn’t written anywhere else, link them with <code>[[PRJ-12]]</code>, and
+          TicketForge never overwrites them.
         </p>
       </EmptyState>
       {recent.length > 0 && (
@@ -583,7 +670,17 @@ function BrainHome({ list, onOpen, onNew }: { list: List; onOpen: (id: string) =
   );
 }
 
-function LinkList({ title, items, onOpen, empty }: { title: string; items: Any[]; onOpen: (id: string) => void; empty: string }) {
+function LinkList({
+  title,
+  items,
+  onOpen,
+  empty,
+}: {
+  title: string;
+  items: Any[];
+  onOpen: (id: string) => void;
+  empty: string;
+}) {
   return (
     <div className="brain-links">
       <h3 className="brain-h">
@@ -592,7 +689,12 @@ function LinkList({ title, items, onOpen, empty }: { title: string; items: Any[]
       {items.length ? (
         <div className="brain-links-list">
           {items.map((x) => (
-            <button key={x.id} className="brain-link-item" onClick={() => onOpen(x.id)} title={x.id}>
+            <button
+              key={x.id}
+              className="brain-link-item"
+              onClick={() => onOpen(x.id)}
+              title={x.id}
+            >
               <span className={`bn-dot t-${x.type}`} aria-hidden="true" />
               <span className="brain-link-text">
                 {x.key && (x.type === 'issue' || x.type === 'epic') ? <b>{x.key} </b> : null}
@@ -611,7 +713,18 @@ function LinkList({ title, items, onOpen, empty }: { title: string; items: Any[]
   );
 }
 
-function NoteView({ note, list, resolve, byId, back: _back, onOpen, onBack, onEdit, onDelete, onCreate }: Any) {
+function NoteView({
+  note,
+  list,
+  resolve,
+  byId,
+  back: _back,
+  onOpen,
+  onBack,
+  onEdit,
+  onDelete,
+  onCreate,
+}: Any) {
   const mine = note.kind === 'user';
   const issue = note.kind === 'auto' && note.type === 'issue' ? ticketOf(note.ref) : null;
   const ep = note.kind === 'auto' && note.type === 'epic' ? epicOf(note.ref) : null;
@@ -637,7 +750,11 @@ function NoteView({ note, list, resolve, byId, back: _back, onOpen, onBack, onEd
         className="wikilink missing"
         disabled={!list.can.write}
         onClick={() => onCreate(target, `# ${target}\n\n`)}
-        title={list.can.write ? `No note called “${target}” yet. Click to create it.` : `No note called “${target}” yet`}
+        title={
+          list.can.write
+            ? `No note called “${target}” yet. Click to create it.`
+            : `No note called “${target}” yet`
+        }
       >
         {label}
       </button>
@@ -681,7 +798,16 @@ function NoteView({ note, list, resolve, byId, back: _back, onOpen, onBack, onEd
           {(issue || ep) && (
             <button
               className="btn sm ai"
-              onClick={() => openModal(<AiPreview issueId={issue?.id} epicId={ep?.id} title={note.title} onOpen={onOpen} />)}
+              onClick={() =>
+                openModal(
+                  <AiPreview
+                    issueId={issue?.id}
+                    epicId={ep?.id}
+                    title={note.title}
+                    onOpen={onOpen}
+                  />,
+                )
+              }
               title="The notes AI actions and code agents get for this"
             >
               <Ico svg={I.sparkle} />
@@ -694,7 +820,12 @@ function NoteView({ note, list, resolve, byId, back: _back, onOpen, onBack, onEd
                 <Ico svg={I.pencil} />
                 Edit
               </button>
-              <button className="icon-btn" onClick={onDelete} aria-label="Delete note" title="Delete">
+              <button
+                className="icon-btn"
+                onClick={onDelete}
+                aria-label="Delete note"
+                title="Delete"
+              >
                 <Ico svg={I.trash} />
               </button>
             </>
@@ -714,7 +845,10 @@ function NoteView({ note, list, resolve, byId, back: _back, onOpen, onBack, onEd
       {!mine && list.can.write && (
         <p className="muted small" style={{ marginTop: 16 }}>
           Something to add?{' '}
-          <button className="link-btn" onClick={() => onCreate(`About ${base(note.id)}`, `Notes on [[${base(note.id)}]]\n\n`)}>
+          <button
+            className="link-btn"
+            onClick={() => onCreate(`About ${base(note.id)}`, `Notes on [[${base(note.id)}]]\n\n`)}
+          >
             Write a note that links here
           </button>
           .
@@ -731,15 +865,35 @@ function NoteView({ note, list, resolve, byId, back: _back, onOpen, onBack, onEd
         </p>
       )}
       <div className="brain-link-cols">
-        <LinkList title="Links to" items={note.out} onOpen={onOpen} empty="This note doesn’t link to other notes." />
-        <LinkList title="Linked from" items={note.back} onOpen={onOpen} empty="No other note links here yet." />
+        <LinkList
+          title="Links to"
+          items={note.out}
+          onOpen={onOpen}
+          empty="This note doesn’t link to other notes."
+        />
+        <LinkList
+          title="Linked from"
+          items={note.back}
+          onOpen={onOpen}
+          empty="No other note links here yet."
+        />
       </div>
     </article>
   );
 }
 
 /** Create or edit one of the team's own notes. Typing [[ suggests notes to link. */
-function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: Note[]; onCancel: () => void; onSaved: (n: Any) => void }) {
+function NoteEditor({
+  draft,
+  notes,
+  onCancel,
+  onSaved,
+}: {
+  draft: Any;
+  notes: Note[];
+  onCancel: () => void;
+  onSaved: (n: Any) => void;
+}) {
   const [d, setD] = useState<Any>(draft);
   const [busy, setBusy] = useState(false);
   const [sug, setSug] = useState<{ q: string; at: number } | null>(null);
@@ -752,7 +906,8 @@ function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: No
     const m = before.match(/\[\[([^\]\n|]{0,60})$/);
     setSug(m ? { q: m[1], at: pos - m[1].length } : null);
   };
-  // Best first: key or file name starting with what's typed, then title, then anywhere; issues and epics before the rest.
+  // Best first: key or file name starting with what's typed, then title, then anywhere; issues and
+  // epics before the rest.
   const matches = !sug
     ? []
     : notes
@@ -772,7 +927,15 @@ function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: No
                   : `${key} ${title} ${name}`.includes(x)
                     ? 3
                     : 9;
-          return { n, r: r * 20 + Math.max(0, ['issue', 'epic', 'note', 'decision', 'question'].indexOf(n.type) + 1 || 10) };
+          return {
+            n,
+            r:
+              r * 20 +
+              Math.max(
+                0,
+                ['issue', 'epic', 'note', 'decision', 'question'].indexOf(n.type) + 1 || 10,
+              ),
+          };
         })
         .filter((x) => x.r < 180)
         .sort((a, b) => a.r - b.r || a.n.id.localeCompare(b.n.id, undefined, { numeric: true }))
@@ -836,7 +999,11 @@ function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: No
         </label>
         <label className="brain-field">
           <span className="small muted">Type</span>
-          <SF size="small" value={USER_TYPES.includes(d.type) ? d.type : 'note'} onChange={(e: Any) => set('type', e.target.value)}>
+          <SF
+            size="small"
+            value={USER_TYPES.includes(d.type) ? d.type : 'note'}
+            onChange={(e: Any) => set('type', e.target.value)}
+          >
             {USER_TYPES.map((t) => (
               <MenuItem key={t} value={t}>
                 {TYPE_LABEL[t]}
@@ -846,11 +1013,21 @@ function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: No
         </label>
         <label className="brain-field">
           <span className="small muted">Tags</span>
-          <TF size="small" value={d.tags} onChange={(e: Any) => set('tags', e.target.value)} placeholder="payments, risk" />
+          <TF
+            size="small"
+            value={d.tags}
+            onChange={(e: Any) => set('tags', e.target.value)}
+            placeholder="payments, risk"
+          />
         </label>
         <label className="brain-field">
           <span className="small muted">Status</span>
-          <TF size="small" value={d.status} onChange={(e: Any) => set('status', e.target.value)} placeholder="Optional, e.g. Accepted" />
+          <TF
+            size="small"
+            value={d.status}
+            onChange={(e: Any) => set('status', e.target.value)}
+            placeholder="Optional, e.g. Accepted"
+          />
         </label>
       </div>
       <div className="brain-body-wrap">
@@ -896,7 +1073,11 @@ function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: No
         Type <code>[[</code> to link a note. AI actions about the notes you link read this note too.
       </p>
       <div className="row" style={{ gap: 8 }}>
-        <button className="btn primary" disabled={busy || !String(d.title || '').trim()} onClick={save}>
+        <button
+          className="btn primary"
+          disabled={busy || !String(d.title || '').trim()}
+          onClick={save}
+        >
           {busy ? <Spinner /> : null}
           {d.id ? 'Save' : 'Add note'}
         </button>
@@ -909,7 +1090,17 @@ function NoteEditor({ draft, notes, onCancel, onSaved }: { draft: Any; notes: No
 }
 
 /** The PROJECT BRAIN block AI actions and code agents get for an issue or epic. */
-function AiPreview({ issueId, epicId, title, onOpen }: { issueId?: string; epicId?: string; title: string; onOpen: (id: string) => void }) {
+function AiPreview({
+  issueId,
+  epicId,
+  title,
+  onOpen,
+}: {
+  issueId?: string;
+  epicId?: string;
+  title: string;
+  onOpen: (id: string) => void;
+}) {
   const [r, setR] = useState<Any>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
@@ -920,7 +1111,11 @@ function AiPreview({ issueId, epicId, title, onOpen }: { issueId?: string; epicI
       .catch((e) => setErr(e.message));
   }, [issueId, epicId]);
   return (
-    <Modal title={`What the AI reads for ${title}`} wide actions={[{ label: 'Close', kind: 'primary' }]}>
+    <Modal
+      title={`What the AI reads for ${title}`}
+      wide
+      actions={[{ label: 'Close', kind: 'primary' }]}
+    >
       {err ? (
         <p className="danger-text">{err}</p>
       ) : !r ? (
@@ -932,9 +1127,10 @@ function AiPreview({ issueId, epicId, title, onOpen }: { issueId?: string; epicI
       ) : (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Added to the prompt of AI actions and code agents about this {issueId ? 'issue' : 'epic'}: the note itself, notes it links to
-            and that link to it (one and two links away), and the notes whose words match best. {r.block.length.toLocaleString()}{' '}
-            characters.
+            Added to the prompt of AI actions and code agents about this{' '}
+            {issueId ? 'issue' : 'epic'}: the note itself, notes it links to and that link to it
+            (one and two links away), and the notes whose words match best.{' '}
+            {r.block.length.toLocaleString()} characters.
           </p>
           <div className="brain-links-list" style={{ marginBottom: 12 }}>
             {r.notes.map((n: Any) => (
@@ -970,9 +1166,16 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
   const saveAi = async (v: boolean) => {
     setUseInAi(v);
     try {
-      await api(`/api/projects/${pid}/brain`, { method: 'POST', body: { action: 'settings', useInAi: v } });
+      await api(`/api/projects/${pid}/brain`, {
+        method: 'POST',
+        body: { action: 'settings', useInAi: v },
+      });
       await reload();
-      toast(v ? 'AI actions read the brain again.' : 'AI actions no longer read the brain for this project.');
+      toast(
+        v
+          ? 'AI actions read the brain again.'
+          : 'AI actions no longer read the brain for this project.',
+      );
     } catch (e: Any) {
       setUseInAi(!v);
       toast(e.message, 'err');
@@ -981,7 +1184,10 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
   const sync = async () => {
     setBusy('sync');
     try {
-      const r = await api(`/api/projects/${pid}/brain`, { method: 'POST', body: { action: 'sync', dir } });
+      const r = await api(`/api/projects/${pid}/brain`, {
+        method: 'POST',
+        body: { action: 'sync', dir },
+      });
       setLast(r);
       await reload();
       toast(
@@ -997,7 +1203,10 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
   };
   const stop = async () => {
     try {
-      await api(`/api/projects/${pid}/brain`, { method: 'POST', body: { action: 'syncFolder', dir: '' } });
+      await api(`/api/projects/${pid}/brain`, {
+        method: 'POST',
+        body: { action: 'syncFolder', dir: '' },
+      });
       setDir('');
       setLast(null);
       await reload();
@@ -1020,8 +1229,9 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
           <b>AI reads the brain</b>
           <br />
           <span className="muted small">
-            Writing tickets and test cases, documents, splits, plans and code jobs start from the notes linked to their issue or epic (up to
-            about 9,000 characters).{!can?.settings ? ' Changing this needs the Project settings permission.' : ''}
+            Writing tickets and test cases, documents, splits, plans and code jobs start from the
+            notes linked to their issue or epic (up to about 9,000 characters).
+            {!can?.settings ? ' Changing this needs the Project settings permission.' : ''}
           </span>
         </span>
       </label>
@@ -1031,14 +1241,16 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
       </h3>
       {!list?.local ? (
         <p className="muted small">
-          When TicketForge runs on your computer (opened at localhost), it can keep a folder, such as one inside your Obsidian vault, in
-          step with the brain. Here, use Download for Obsidian and Import instead.
+          When TicketForge runs on your computer (opened at localhost), it can keep a folder, such
+          as one inside your Obsidian vault, in step with the brain. Here, use Download for Obsidian
+          and Import instead.
         </p>
       ) : (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Writes every note to the folder. Your own notes go both ways: edit them in Obsidian or here, and each sync copies the newer
-            version across. New files in the folder become notes. Notes TicketForge writes are refreshed in the folder each time.
+            Writes every note to the folder. Your own notes go both ways: edit them in Obsidian or
+            here, and each sync copies the newer version across. New files in the folder become
+            notes. Notes TicketForge writes are refreshed in the folder each time.
           </p>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <TF
@@ -1061,7 +1273,12 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
                     hint="Open the folder for this project’s notes (it can be inside your Obsidian vault), then choose it."
                     onPick={(x) => {
                       setDir(x);
-                      openModal(<BrainSettings list={{ ...(list as List), sync: { ...(list?.sync || {}), dir: x } }} reload={reload} />);
+                      openModal(
+                        <BrainSettings
+                          list={{ ...(list as List), sync: { ...(list?.sync || {}), dir: x } }}
+                          reload={reload}
+                        />,
+                      );
                     }}
                   />,
                 )
@@ -1072,7 +1289,11 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
             </button>
           </div>
           <div className="row" style={{ gap: 8, marginTop: 10 }}>
-            <button className="btn primary" disabled={!can?.settings || !dir.trim() || busy === 'sync'} onClick={sync}>
+            <button
+              className="btn primary"
+              disabled={!can?.settings || !dir.trim() || busy === 'sync'}
+              onClick={sync}
+            >
               {busy === 'sync' ? <Spinner /> : <Ico svg={I.refresh} />}Sync now
             </button>
             {list?.sync?.dir && (
@@ -1083,8 +1304,9 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
           </div>
           {last && (
             <p className="muted small">
-              Last sync{list?.sync?.at ? ` ${ago(list.sync.at)}` : ''}: {last.wroteAuto} generated notes written, {last.toFolder} of yours
-              to the folder, {(last.fromFolder || 0) + (last.newNotes || 0)} from it
+              Last sync{list?.sync?.at ? ` ${ago(list.sync.at)}` : ''}: {last.wroteAuto} generated
+              notes written, {last.toFolder} of yours to the folder,{' '}
+              {(last.fromFolder || 0) + (last.newNotes || 0)} from it
               {last.deletedNotes ? `, ${last.deletedNotes} deleted here` : ''}
               {last.deletedFiles ? `, ${last.deletedFiles} files deleted` : ''}.
             </p>
@@ -1096,7 +1318,9 @@ function BrainSettings({ list, reload }: { list: List | null; reload: () => Prom
 }
 
 // ---------------------------------------------------------------- graph
-/** Colours per note type, read from the page's CSS variables (so they follow light and dark mode). */
+/**
+ * Colours per note type, read from the page's CSS variables (so they follow light and dark mode).
+ */
 function palette() {
   const cs = getComputedStyle(document.documentElement);
   const v = (n: string, d: string) => cs.getPropertyValue(n).trim() || d;
@@ -1144,8 +1368,11 @@ function BrainGraph({
   const sim = useRef<Any>(null);
   // The nodes shown: the filtered notes, or (around a note) it and the notes up to two links away.
   const graph = useMemo(() => {
-    // The Index links to everything, so it's left out (it would pull every note into one knot) unless it's open.
-    let ids = new Set(notes.filter((n) => n.type !== 'index' || n.id === selected).map((n) => n.id));
+    // The Index links to everything, so it's left out (it would pull every note into one knot)
+    // unless it's open.
+    let ids = new Set(
+      notes.filter((n) => n.type !== 'index' || n.id === selected).map((n) => n.id),
+    );
     const allById = new Map(all.map((n) => [n.id, n]));
     if (local && selected && allById.has(selected)) {
       const near = new Map<string, Set<string>>();
@@ -1209,12 +1436,15 @@ function BrainGraph({
       };
     });
     const byId = new Map(nodes.map((n) => [n.id, n]));
-    const edges = graph.edges.map(([a, b]) => [byId.get(a)!, byId.get(b)!]).filter(([a, b]) => a && b) as [GNode, GNode][];
+    const edges = graph.edges
+      .map(([a, b]) => [byId.get(a)!, byId.get(b)!])
+      .filter(([a, b]) => a && b) as [GNode, GNode][];
     for (const [a, b] of edges) {
       a.deg++;
       b.deg++;
     }
-    // Only the selection changed (same notes): keep the layout and view; new notes: lay out again and fit.
+    // Only the selection changed (same notes): keep the layout and view; new notes: lay out again
+    // and fit.
     const settled = prev.size > 0 && nodes.every((n) => prev.has(n.id));
     const s: Any = (sim.current = {
       nodes,
@@ -1227,7 +1457,10 @@ function BrainGraph({
       drag: null,
       fitted: settled,
     });
-    const radius = (n: GNode) => 3.5 + Math.min(9, Math.sqrt(n.deg) * 1.6) + (n.type === 'index' || n.type === 'project' ? 3 : 0);
+    const radius = (n: GNode) =>
+      3.5 +
+      Math.min(9, Math.sqrt(n.deg) * 1.6) +
+      (n.type === 'index' || n.type === 'project' ? 3 : 0);
     const size = () => {
       const w = box.clientWidth,
         h = box.clientHeight,
@@ -1253,7 +1486,10 @@ function BrainGraph({
         x1 = Math.max(x1, n.x);
         y1 = Math.max(y1, n.y);
       }
-      const k = Math.min(2.2, Math.max(0.15, Math.min(s.w / (x1 - x0 + 120), s.h / (y1 - y0 + 120))));
+      const k = Math.min(
+        2.2,
+        Math.max(0.15, Math.min(s.w / (x1 - x0 + 120), s.h / (y1 - y0 + 120))),
+      );
       s.view = { k, x: s.w / 2 - ((x0 + x1) / 2) * k, y: s.h / 2 - ((y0 + y1) / 2) * k };
     };
     s.fit = () => {
@@ -1262,7 +1498,8 @@ function BrainGraph({
     };
     if (!settled) s.view = { x: s.w / 2, y: s.h / 2, k: nodes.length > 200 ? 0.5 : 1 };
     const step = () => {
-      // Repulsion between nearby nodes (grid buckets: fast for hundreds of notes), springs along links, a pull to the middle.
+      // Repulsion between nearby nodes (grid buckets: fast for hundreds of notes), springs along
+      // links, a pull to the middle.
       const CELL = 150,
         grid = new Map<string, GNode[]>();
       for (const n of nodes) {
@@ -1374,10 +1611,19 @@ function BrainGraph({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       for (const n of nodes) {
-        const show = near.has(n) || v.k > 1.3 || (v.k > 0.7 && n.deg > 6) || n.type === 'index' || n.type === 'project';
+        const show =
+          near.has(n) ||
+          v.k > 1.3 ||
+          (v.k > 0.7 && n.deg > 6) ||
+          n.type === 'index' ||
+          n.type === 'project';
         if (!show) continue;
         const label =
-          n.key && (n.type === 'issue' || n.type === 'epic') ? (near.has(n) || v.k > 1.8 ? `${n.key} ${n.title}` : n.key) : n.title;
+          n.key && (n.type === 'issue' || n.type === 'epic')
+            ? near.has(n) || v.k > 1.8
+              ? `${n.key} ${n.title}`
+              : n.key
+            : n.title;
         const t = label.length > 42 ? `${label.slice(0, 40)}…` : label;
         const y = n.y + radius(n) + 3 / v.k;
         ctx.lineWidth = 3 / v.k;
@@ -1409,7 +1655,8 @@ function BrainGraph({
     };
     s.draw = draw;
     s.raf = requestAnimationFrame(loop);
-    // Pointer: drag a note, drag the background to pan, wheel or the buttons to zoom; click opens a note.
+    // Pointer: drag a note, drag the background to pan, wheel or the buttons to zoom; click opens a
+    // note.
     const toWorld = (e: PointerEvent | WheelEvent) => {
       const r = cv.getBoundingClientRect();
       return {
@@ -1503,7 +1750,10 @@ function BrainGraph({
       s.colors = palette();
       draw();
     });
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'class'],
+    });
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
     const onScheme = () => {
       s.colors = palette();
@@ -1532,7 +1782,11 @@ function BrainGraph({
     const k = Math.min(4, Math.max(0.08, s.view.k * f));
     const cx = s.w / 2,
       cy = s.h / 2;
-    s.view = { k, x: cx - ((cx - s.view.x) / s.view.k) * k, y: cy - ((cy - s.view.y) / s.view.k) * k };
+    s.view = {
+      k,
+      x: cx - ((cx - s.view.x) / s.view.k) * k,
+      y: cy - ((cy - s.view.y) / s.view.k) * k,
+    };
     s.draw();
   };
   const types = TYPE_ORDER.filter((t) => graph.nodes.some((n) => n.type === t));
@@ -1542,7 +1796,12 @@ function BrainGraph({
         {filters}
         <div className="brain-graph-tools">
           <label className="row small" style={{ gap: 6 }}>
-            <input type="checkbox" checked={local} disabled={!selected} onChange={(e) => setLocal(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={local}
+              disabled={!selected}
+              onChange={(e) => setLocal(e.target.checked)}
+            />
             Around the open note
           </label>
           <span className="muted small">
@@ -1559,7 +1818,9 @@ function BrainGraph({
         {hover && (
           <div className="brain-graph-tip">
             <b>
-              {hover.key && (hover.type === 'issue' || hover.type === 'epic') ? `${hover.key} ` : ''}
+              {hover.key && (hover.type === 'issue' || hover.type === 'epic')
+                ? `${hover.key} `
+                : ''}
               {hover.title}
             </b>
             <span className="muted small">
@@ -1568,19 +1829,36 @@ function BrainGraph({
           </div>
         )}
         <div className="brain-zoom">
-          <button className="icon-btn" aria-label="Zoom in" title="Zoom in" onClick={() => zoom(1.3)}>
+          <button
+            className="icon-btn"
+            aria-label="Zoom in"
+            title="Zoom in"
+            onClick={() => zoom(1.3)}
+          >
             <Ico svg={I.plus} />
           </button>
-          <button className="icon-btn" aria-label="Zoom out" title="Zoom out" onClick={() => zoom(1 / 1.3)}>
+          <button
+            className="icon-btn"
+            aria-label="Zoom out"
+            title="Zoom out"
+            onClick={() => zoom(1 / 1.3)}
+          >
             <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>
               −
             </span>
           </button>
-          <button className="icon-btn" aria-label="Fit to screen" title="Fit" onClick={() => sim.current?.fit()}>
+          <button
+            className="icon-btn"
+            aria-label="Fit to screen"
+            title="Fit"
+            onClick={() => sim.current?.fit()}
+          >
             <Ico svg={I.expand} />
           </button>
         </div>
-        {!graph.nodes.length && <div className="brain-graph-empty muted">No notes match the filters.</div>}
+        {!graph.nodes.length && (
+          <div className="brain-graph-empty muted">No notes match the filters.</div>
+        )}
       </div>
       <div className="brain-legend" aria-label="Colours">
         {types.map((t) => (

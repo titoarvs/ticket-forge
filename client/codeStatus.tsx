@@ -1,10 +1,25 @@
 'use client';
-// Coding indicators: which issues have AI-written code, and in what state (writing now, ready for review, pull
-// request open, merged, committed, failed). Shown on backlog rows, board cards and the issue panel. The state comes
-// from the project's code jobs (this computer and the AI API) and from the issue's linked pull requests, and is
-// refreshed every few seconds while a job is running. When a job finishes and the issue has code, the issue moves to
-// Done by itself (no approval step): see completeOnCode.
-import { S, emit, api, P, isDone, can, feat, ticket, mutate, setField, saveNow, toast, type Any } from './core';
+// Coding indicators: which issues have AI-written code, and in what state (writing now, ready for
+// review, pull request open, merged, committed, failed). Shown on backlog rows, board cards and the
+// issue panel. The state comes from the project's code jobs (this computer and the AI API) and from
+// the issue's linked pull requests, and is refreshed every few seconds while a job is running. When
+// a job finishes and the issue has code, the issue moves to Done by itself (no approval step): see
+// completeOnCode.
+import {
+  S,
+  emit,
+  api,
+  P,
+  isDone,
+  can,
+  feat,
+  ticket,
+  mutate,
+  setField,
+  saveNow,
+  toast,
+  type Any,
+} from './core';
 import { Ico, I, Spinner } from './ui';
 
 type Job = {
@@ -40,7 +55,9 @@ export function codeInfo(t: Any): CodeInfo {
   const live = jobs.filter((j) => LIVE.includes(j.status));
   const prs: Any[] = t.prs || [];
   const merged = prs.some((r) => r.status === 'Merged') || jobs.some((j) => j.status === 'merged'); // a job merged from TicketForge (TF-123)
-  const open = prs.some((r) => ['Open', 'Draft'].includes(r.status)) || jobs.some((j) => j.status === 'pr' && !merged);
+  const open =
+    prs.some((r) => ['Open', 'Draft'].includes(r.status)) ||
+    jobs.some((j) => j.status === 'pr' && !merged);
   if (live.length) {
     const j = live[0];
     return {
@@ -91,11 +108,14 @@ export function codeInfo(t: Any): CodeInfo {
 }
 const FINISHED = ['review', 'pr', 'merged', 'committed'];
 /**
- * The issue already has finished AI code (TF-123): "Write code" is disabled and the existing code is shown instead.
+ * The issue already has finished AI code (TF-123): "Write code" is disabled and the existing code
+ * is shown instead.
  * An issue built in both repositories is finished when each side has its code.
  */
 export function finishedCode(t: Any): boolean {
-  const done = ((G.pid === P()?.id ? G.byTicket[t.id] : null) || []).filter((j) => FINISHED.includes(j.status));
+  const done = ((G.pid === P()?.id ? G.byTicket[t.id] : null) || []).filter((j) =>
+    FINISHED.includes(j.status),
+  );
   if (!done.length) return false;
   if (!(P()?.devBackend?.enabled && t.layer === 'both')) return true;
   return ['frontend', 'backend'].every((s) => done.some((j) => (j.side || 'frontend') === s));
@@ -115,12 +135,21 @@ export function CodeChip({ t, compact = false }: { t: Any; compact?: boolean }) 
     ) : (
       <Ico
         svg={
-          c.state === 'failed' ? I.warn : c.state === 'merged' || (c.coded && isDone(t)) ? I.check : c.state === 'review' ? I.sparkle : I.pr
+          c.state === 'failed'
+            ? I.warn
+            : c.state === 'merged' || (c.coded && isDone(t))
+              ? I.check
+              : c.state === 'review'
+                ? I.sparkle
+                : I.pr
         }
       />
     );
   return (
-    <span className={`code-ind c-${c.state} ${c.coded && isDone(t) ? 'is-done' : ''}`} title={c.title}>
+    <span
+      className={`code-ind c-${c.state} ${c.coded && isDone(t) ? 'is-done' : ''}`}
+      title={c.title}
+    >
       {icon}
       {!compact && c.label}
     </span>
@@ -128,16 +157,20 @@ export function CodeChip({ t, compact = false }: { t: Any; compact?: boolean }) 
 }
 
 const MOVING = new Set<string>();
-/** The status code completion moves an issue to: the workflow's "Done", or else its first status in the done category. */
+/**
+ * The status code completion moves an issue to: the workflow's "Done", or else its first status in
+ * the done category.
+ */
 const doneStatus = (): string => {
   const w: Any[] = (P()?.workflow || []).filter((x: Any) => x.category === 'done');
   return (w.find((x) => /^done$/i.test(x.name)) || w[0])?.name || '';
 };
 
 /**
- * Moves an issue to Done once its code is complete, with no approval step, from any status (custom ones too).
- * An issue that is already done is left alone. When the change can't be saved (the server is unreachable) the old
- * status is put back and an error is shown.
+ * Moves an issue to Done once its code is complete, with no approval step, from any status (custom
+ * ones too).
+ * An issue that is already done is left alone. When the change can't be saved (the server is
+ * unreachable) the old status is put back and an error is shown.
  */
 export async function completeOnCode(t: Any) {
   const to = doneStatus();
@@ -179,10 +212,16 @@ async function load(pid: string) {
     G.byTicket = by;
     G.at = Date.now();
     if (JSON.stringify(by) !== before) emit();
-    // Code completed: an issue whose job was running at the last refresh and now has code moves to Done.
+    // Code completed: an issue whose job was running at the last refresh and now has code moves to
+    // Done.
     for (const id of Object.keys(prev)) {
       const t = ticket(id);
-      if (t && prev[id].some((j) => LIVE.includes(j.status)) && !(by[id] || []).some((j) => LIVE.includes(j.status)) && codeInfo(t).coded)
+      if (
+        t &&
+        prev[id].some((j) => LIVE.includes(j.status)) &&
+        !(by[id] || []).some((j) => LIVE.includes(j.status)) &&
+        codeInfo(t).coded
+      )
         completeOnCode(t).catch(() => {});
     }
     return (r.jobs || []).some((j: Job) => LIVE.includes(j.status));
@@ -199,10 +238,14 @@ export function refreshCodeStatus() {
   if (pid && G.pid === pid) load(pid).catch(() => {});
 }
 
-/** Starts keeping the open project's coding state fresh: every 4 s while something is running, else every 30 s. */
+/**
+ * Starts keeping the open project's coding state fresh: every 4 s while something is running, else
+ * every 30 s.
+ */
 export function watchCodeStatus(pid: string) {
   stopWatching();
-  // Every member sees the coding state, not only those who can use AI: they review and approve the code (TF-123).
+  // Every member sees the coding state, not only those who can use AI: they review and approve the
+  // code (TF-123).
   if (!pid || !feat('code')) {
     G.pid = pid;
     G.byTicket = {};

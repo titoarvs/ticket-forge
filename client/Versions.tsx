@@ -1,17 +1,42 @@
 'use client';
-// Issue versions: the whole issue is saved as a version on every status change (and every restore). Everyone with
-// access sees the list, can view a version and compare two of them; admins and managers (issue.restore) can restore.
+// Issue versions: the whole issue is saved as a version on every status change (and every restore).
+// Everyone with access sees the list, can view a version and compare two of them; admins and
+// managers (issue.restore) can restore.
 import { useCallback, useEffect, useState } from 'react';
 import { S, P, ago, toast, openModal, closeModal, pullRemote, type Any } from './core';
 import { listVersions, restoreVersion } from './api/versions';
-import { type Version, labelOf, same, fullTime, fieldKeys, show, matchesIssue } from './logic/versions';
-import { Ico, I, Avatar, StatusLoz, Modal, Confirm, EmptyState, ErrorState, Loading, Sk } from './ui';
+import {
+  type Version,
+  labelOf,
+  same,
+  fullTime,
+  fieldKeys,
+  show,
+  matchesIssue,
+} from './logic/versions';
+import {
+  Ico,
+  I,
+  Avatar,
+  StatusLoz,
+  Modal,
+  Confirm,
+  EmptyState,
+  ErrorState,
+  Loading,
+  Sk,
+} from './ui';
 import { CB } from './fields';
 
 /** The Versions tab of an issue's Activity section. */
 export function VersionHistory({ t }: { t: Any }) {
   const pid = P()?.id;
-  const [state, setState] = useState<{ loading: boolean; error: Any; versions: Version[]; canRestore: boolean }>({
+  const [state, setState] = useState<{
+    loading: boolean;
+    error: Any;
+    versions: Version[];
+    canRestore: boolean;
+  }>({
     loading: true,
     error: null,
     versions: [],
@@ -24,7 +49,12 @@ export function VersionHistory({ t }: { t: Any }) {
   const load = useCallback(async () => {
     try {
       const d = await listVersions(pid, t.id);
-      setState({ loading: false, error: null, versions: d.versions || [], canRestore: Boolean(d.canRestore) });
+      setState({
+        loading: false,
+        error: null,
+        versions: d.versions || [],
+        canRestore: Boolean(d.canRestore),
+      });
       setPicked((p) => p.filter((n) => (d.versions || []).some((v: Version) => v.number === n)));
     } catch (e: Any) {
       setState((s) => ({ ...s, loading: false, error: e }));
@@ -41,8 +71,9 @@ export function VersionHistory({ t }: { t: Any }) {
         label="Restore"
         text={
           <>
-            The fields of {t.key} are set back to version {v.number} (status <b>{v.status || 'None'}</b>). Comments and history are kept,
-            and the restore is saved as a new version.
+            The fields of {t.key} are set back to version {v.number} (status{' '}
+            <b>{v.status || 'None'}</b>). Comments and history are kept, and the restore is saved as
+            a new version.
           </>
         }
         onYes={async () => {
@@ -66,9 +97,12 @@ export function VersionHistory({ t }: { t: Any }) {
         onRestore={state.canRestore && !matchesIssue(t, v) ? () => restore(v) : undefined}
       />,
     );
-  const toggle = (n: number, on: boolean) => setPicked((p) => (on ? [...p.filter((x) => x !== n), n].slice(-2) : p.filter((x) => x !== n)));
+  const toggle = (n: number, on: boolean) =>
+    setPicked((p) => (on ? [...p.filter((x) => x !== n), n].slice(-2) : p.filter((x) => x !== n)));
   const compare = () => {
-    const [a, b] = [...picked].sort((x, y) => x - y).map((n) => state.versions.find((v) => v.number === n)!);
+    const [a, b] = [...picked]
+      .sort((x, y) => x - y)
+      .map((n) => state.versions.find((v) => v.number === n)!);
     if (a && b) openModal(<DiffModal t={t} a={a} b={b} />);
   };
 
@@ -90,7 +124,10 @@ export function VersionHistory({ t }: { t: Any }) {
         </div>
       </Loading>
     );
-  if (state.error) return <ErrorState compact title="Couldn’t load the versions" error={state.error} onRetry={load} />;
+  if (state.error)
+    return (
+      <ErrorState compact title="Couldn’t load the versions" error={state.error} onRetry={load} />
+    );
   if (!state.versions.length)
     return (
       <EmptyState compact icon={I.history} tone="neutral" title="No versions yet">
@@ -133,7 +170,9 @@ export function VersionHistory({ t }: { t: Any }) {
                 <div className="ver-title">
                   <b>Version {v.number}</b>
                   {i === 0 && <span className="label-chip">Latest</span>}
-                  {v.restoredFrom ? <span className="label-chip">Restored from version {v.restoredFrom}</span> : null}
+                  {v.restoredFrom ? (
+                    <span className="label-chip">Restored from version {v.restoredFrom}</span>
+                  ) : null}
                 </div>
                 <div className="muted small">
                   {v.author || 'Unknown'} ·{' '}
@@ -147,11 +186,19 @@ export function VersionHistory({ t }: { t: Any }) {
                 <StatusLoz s={v.status || 'None'} />
               </span>
               <span className="ver-ops">
-                <button className="btn sm subtle" onClick={() => view(v)} aria-label={`View version ${v.number}`}>
+                <button
+                  className="btn sm subtle"
+                  onClick={() => view(v)}
+                  aria-label={`View version ${v.number}`}
+                >
                   View
                 </button>
                 {canRestore && (
-                  <button className="btn sm" onClick={() => restore(v)} aria-label={`Restore version ${v.number}`}>
+                  <button
+                    className="btn sm"
+                    onClick={() => restore(v)}
+                    aria-label={`Restore version ${v.number}`}
+                  >
                     <Ico svg={I.refresh} />
                     Restore
                   </button>
@@ -166,7 +213,17 @@ export function VersionHistory({ t }: { t: Any }) {
 }
 
 /** Every field of one version. */
-function VersionModal({ t, v, latest, onRestore }: { t: Any; v: Version; latest: boolean; onRestore?: () => void }) {
+function VersionModal({
+  t,
+  v,
+  latest,
+  onRestore,
+}: {
+  t: Any;
+  v: Version;
+  latest: boolean;
+  onRestore?: () => void;
+}) {
   const keys = fieldKeys(v.data);
   return (
     <Modal
@@ -195,7 +252,9 @@ function VersionModal({ t, v, latest, onRestore }: { t: Any; v: Version; latest:
         {keys.map((k) => (
           <div key={k}>
             <dt>{labelOf(k)}</dt>
-            <dd>{k === 'status' ? <StatusLoz s={v.data.status || 'None'} /> : show(k, v.data[k])}</dd>
+            <dd>
+              {k === 'status' ? <StatusLoz s={v.data.status || 'None'} /> : show(k, v.data[k])}
+            </dd>
           </div>
         ))}
       </dl>
@@ -207,7 +266,11 @@ function VersionModal({ t, v, latest, onRestore }: { t: Any; v: Version; latest:
 function DiffModal({ t, a, b }: { t: Any; a: Version; b: Version }) {
   const changed = fieldKeys(a.data, b.data).filter((k) => !same(a.data[k], b.data[k]));
   return (
-    <Modal wide title={`${t.key} · version ${a.number} → version ${b.number}`} actions={[{ label: 'Close' }]}>
+    <Modal
+      wide
+      title={`${t.key} · version ${a.number} → version ${b.number}`}
+      actions={[{ label: 'Close' }]}
+    >
       {!changed.length ? (
         <EmptyState compact icon={I.check} tone="neutral" title="No differences">
           <p>
@@ -243,11 +306,19 @@ function DiffModal({ t, a, b }: { t: Any; a: Version; b: Version }) {
                     <th scope="row">{labelOf(k)}</th>
                     <td className="ver-old">
                       <span className="sr-only">Old value: </span>
-                      {k === 'status' ? <StatusLoz s={a.data.status || 'None'} /> : show(k, a.data[k])}
+                      {k === 'status' ? (
+                        <StatusLoz s={a.data.status || 'None'} />
+                      ) : (
+                        show(k, a.data[k])
+                      )}
                     </td>
                     <td className="ver-new">
                       <span className="sr-only">New value: </span>
-                      {k === 'status' ? <StatusLoz s={b.data.status || 'None'} /> : show(k, b.data[k])}
+                      {k === 'status' ? (
+                        <StatusLoz s={b.data.status || 'None'} />
+                      ) : (
+                        show(k, b.data[k])
+                      )}
                     </td>
                   </tr>
                 ))}

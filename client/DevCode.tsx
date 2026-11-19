@@ -1,6 +1,8 @@
 'use client';
-// Code & GitHub: a project's local repository and GitHub settings, and the "Write code with AI" job for an issue:
-// Claude Code implements it in its own git worktree, you review the diff, TicketForge opens the pull request.
+// Code & GitHub: a project's local repository and GitHub settings, and the "Write code with AI" job
+// for an issue:
+// Claude Code implements it in its own git worktree, you review the diff, TicketForge opens the
+// pull request.
 import { useEffect, useRef, useState } from 'react';
 import { refreshCodeStatus } from './codeStatus';
 import {
@@ -45,9 +47,14 @@ const setBe = (k: string, v: Any) =>
     { tag: `devBackend.${k}` },
   );
 /** The project has a separate backend repository set up. */
-/** This person's own folder for a repository (set up on their computer), else the project's shared one. */
+/**
+ * This person's own folder for a repository (set up on their computer), else the project's shared
+ * one.
+ */
 const myPath = (side: 'frontend' | 'backend'): string =>
-  S.auth?.prefs?.local?.[P().id]?.[side]?.path || (side === 'backend' ? be().localPath : dev().localPath) || '';
+  S.auth?.prefs?.local?.[P().id]?.[side]?.path ||
+  (side === 'backend' ? be().localPath : dev().localPath) ||
+  '';
 const hasBackend = () => Boolean(be().enabled && myPath('backend'));
 const setDev = (k: string, v: Any) =>
   mutate(
@@ -57,7 +64,10 @@ const setDev = (k: string, v: Any) =>
     { tag: `dev.${k}` },
   );
 
-/** Pick a folder on this computer: click through folders (git repositories are marked), then choose one. */
+/**
+ * Pick a folder on this computer: click through folders (git repositories are marked), then choose
+ * one.
+ */
 export function FolderPicker({
   start,
   onPick,
@@ -76,10 +86,21 @@ export function FolderPicker({
     setBusy(true);
     setErr('');
     try {
-      setAt(await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: { action: 'browse', path } }));
+      setAt(
+        await api(`/api/projects/${P().id}/dev`, {
+          method: 'POST',
+          body: { action: 'browse', path },
+        }),
+      );
     } catch (e: Any) {
       setErr(e.message);
-      if (!at) setAt(await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: { action: 'browse', path: '' } }).catch(() => null));
+      if (!at)
+        setAt(
+          await api(`/api/projects/${P().id}/dev`, {
+            method: 'POST',
+            body: { action: 'browse', path: '' },
+          }).catch(() => null),
+        );
     } finally {
       setBusy(false);
     }
@@ -91,7 +112,10 @@ export function FolderPicker({
     ? at.path
         .split('/')
         .filter(Boolean)
-        .map((part: string, i: number, all: string[]) => ({ name: part, path: `/${all.slice(0, i + 1).join('/')}` }))
+        .map((part: string, i: number, all: string[]) => ({
+          name: part,
+          path: `/${all.slice(0, i + 1).join('/')}`,
+        }))
     : [];
   return (
     <Modal
@@ -114,7 +138,11 @@ export function FolderPicker({
         <>
           <div className="fp-places">
             {at.places.map((p: Any) => (
-              <button key={p.path} className={`btn sm ${at.path === p.path ? 'primary' : 'subtle'}`} onClick={() => go(p.path)}>
+              <button
+                key={p.path}
+                className={`btn sm ${at.path === p.path ? 'primary' : 'subtle'}`}
+                onClick={() => go(p.path)}
+              >
                 {p.name}
               </button>
             ))}
@@ -176,7 +204,10 @@ export function FolderPicker({
   );
 }
 
-/** Connect GitHub: device sign-in (a code you approve on github.com). Admins can set the OAuth App client ID here. */
+/**
+ * Connect GitHub: device sign-in (a code you approve on github.com). Admins can set the OAuth App
+ * client ID here.
+ */
 function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account: Any) => void }) {
   const [configured, setConfigured] = useState(Boolean(env?.githubConnect?.configured));
   const [clientId, setClientId] = useState('');
@@ -216,7 +247,11 @@ function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account: Any) 
         }
         setState('');
         setFlow(null);
-        setErr(r.state === 'denied' ? 'The sign-in was cancelled on GitHub.' : 'The code expired. Start again.');
+        setErr(
+          r.state === 'denied'
+            ? 'The sign-in was cancelled on GitHub.'
+            : 'The code expired. Start again.',
+        );
         return;
       }
     } catch (e: Any) {
@@ -247,13 +282,17 @@ function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account: Any) 
       {!configured ? (
         <>
           <p className="small" style={{ marginTop: 0 }}>
-            Connecting a GitHub account uses a <b>GitHub OAuth App</b> that belongs to your organisation (one per TicketForge, made once by
-            an administrator):
+            Connecting a GitHub account uses a <b>GitHub OAuth App</b> that belongs to your
+            organisation (one per TicketForge, made once by an administrator):
           </p>
           <ol className="small gc-steps">
             <li>
               On GitHub:{' '}
-              <a href="https://github.com/settings/applications/new" target="_blank" rel="noopener noreferrer">
+              <a
+                href="https://github.com/settings/applications/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Settings → Developer settings → OAuth Apps → New OAuth App
               </a>
               . Any name; homepage and callback URL can be this TicketForge’s address.
@@ -267,27 +306,34 @@ function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account: Any) 
           </ol>
           {can('users.manage') ? (
             <div className="dev-path">
-              <TF value={clientId} spellCheck={false} placeholder="Ov23li… or Iv1.…" onChange={(e) => setClientId(e.target.value)} />
+              <TF
+                value={clientId}
+                spellCheck={false}
+                placeholder="Ov23li… or Iv1.…"
+                onChange={(e) => setClientId(e.target.value)}
+              />
               <button className="btn primary" disabled={!clientId.trim()} onClick={saveId}>
                 Save and connect
               </button>
             </div>
           ) : (
             <p className="muted small">
-              Ask an administrator to do this (or set <code>TICKETFORGE_GITHUB_CLIENT_ID</code> on the server).
+              Ask an administrator to do this (or set <code>TICKETFORGE_GITHUB_CLIENT_ID</code> on
+              the server).
             </p>
           )}
           <p className="muted small">
-            Other ways that work now: sign in with <code>gh auth login</code> on this computer, or save a personal access token under GitHub
-            access.
+            Other ways that work now: sign in with <code>gh auth login</code> on this computer, or
+            save a personal access token under GitHub access.
           </p>
         </>
       ) : !flow ? (
         <>
           <p className="small" style={{ marginTop: 0 }}>
-            Sign in with your GitHub account to pick any of your repositories (personal and organisations), clone them, and open pull
-            requests. TicketForge asks for <code>repo</code>, <code>read:org</code> and <code>workflow</code> access; the token is stored
-            encrypted for this project and you can disconnect at any time.
+            Sign in with your GitHub account to pick any of your repositories (personal and
+            organisations), clone them, and open pull requests. TicketForge asks for{' '}
+            <code>repo</code>, <code>read:org</code> and <code>workflow</code> access; the token is
+            stored encrypted for this project and you can disconnect at any time.
           </p>
           <button className="btn primary" disabled={state === 'starting'} onClick={start}>
             {state === 'starting' ? (
@@ -314,7 +360,13 @@ function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account: Any) 
           <p className="small" style={{ margin: 0 }}>
             2. Open GitHub, paste it and approve TicketForge
           </p>
-          <a className="btn primary" href={flow.verificationUri} target="_blank" rel="noopener noreferrer" onClick={copy}>
+          <a
+            className="btn primary"
+            href={flow.verificationUri}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={copy}
+          >
             <Ico svg={I.external} />
             Open {flow.verificationUri.replace(/^https?:\/\//, '')}
           </a>
@@ -347,10 +399,18 @@ function RepoPickerModal({ onPick }: { onPick: (r: Any) => void }) {
       });
   }, []);
   const needle = q.trim().toLowerCase();
-  const shown = (list || []).filter((r) => !needle || `${r.fullName} ${r.description}`.toLowerCase().includes(needle));
+  const shown = (list || []).filter(
+    (r) => !needle || `${r.fullName} ${r.description}`.toLowerCase().includes(needle),
+  );
   return (
     <Modal title="Choose a repository" wide actions={[{ label: 'Cancel' }]}>
-      <TF search autoFocus value={q} placeholder="Search your repositories" onChange={(e) => setQ(e.target.value)} />
+      <TF
+        search
+        autoFocus
+        value={q}
+        placeholder="Search your repositories"
+        onChange={(e) => setQ(e.target.value)}
+      />
       {err && (
         <div className="warn-banner danger" style={{ marginTop: 8 }}>
           <Ico svg={I.warn} />
@@ -397,8 +457,19 @@ function RepoPickerModal({ onPick }: { onPick: (r: Any) => void }) {
   );
 }
 
-/** Project settings → Code & GitHub → GitHub account: who TicketForge acts as on GitHub (clone, push, pull requests). */
-function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv: (e: Any) => void }) {
+/**
+ * Project settings → Code & GitHub → GitHub account: who TicketForge acts as on GitHub (clone,
+ * push, pull requests).
+ */
+function GitHubAccountCard({
+  ed,
+  env,
+  setEnv,
+}: {
+  ed: boolean;
+  env: Any;
+  setEnv: (e: Any) => void;
+}) {
   const acct = dev().githubAccount;
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
@@ -430,7 +501,10 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
         label={connected ? 'Disconnect' : 'Remove'}
         text="TicketForge forgets this project’s GitHub token. Repositories already set up stay; cloning private repositories, pushing and pull requests need a token or your gh sign-in again."
         onYes={async () => {
-          await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: { action: 'clearToken' } });
+          await api(`/api/projects/${P().id}/dev`, {
+            method: 'POST',
+            body: { action: 'clearToken' },
+          });
           setDev('githubAccount', null);
           setEnv({ ...env, hasToken: false });
           toast(connected ? 'GitHub disconnected' : 'Token removed');
@@ -440,7 +514,10 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
   const saveToken = async () => {
     setBusy(true);
     try {
-      const r = await api(`/api/projects/${P().id}/dev`, { method: 'POST', body: { action: 'saveToken', token } });
+      const r = await api(`/api/projects/${P().id}/dev`, {
+        method: 'POST',
+        body: { action: 'saveToken', token },
+      });
       setDev('githubAccount', null);
       setEnv({ ...env, hasToken: r.hasToken });
       setToken('');
@@ -474,7 +551,8 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
             <>
               <b>Connected as @{acct.login}</b>
               <span className="muted small">
-                {acct.name ? `${acct.name} · ` : ''}connected {ago(acct.connectedAt)} · repo, read:org and workflow access
+                {acct.name ? `${acct.name} · ` : ''}connected {ago(acct.connectedAt)} · repo,
+                read:org and workflow access
               </span>
             </>
           ) : how ? (
@@ -486,13 +564,17 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
             <>
               <b>Not needed on this computer</b>
               <span className="muted small">
-                Git uses your own sign-in. Connect only to choose from your GitHub repositories in a list.
+                Git uses your own sign-in. Connect only to choose from your GitHub repositories in a
+                list.
               </span>
             </>
           ) : (
             <>
               <b>Not connected</b>
-              <span className="muted small">Connect your GitHub account to choose from all your repositories and open pull requests.</span>
+              <span className="muted small">
+                Connect your GitHub account to choose from all your repositories and open pull
+                requests.
+              </span>
             </>
           )}
         </div>
@@ -506,7 +588,11 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
             <>
               <button className={local ? 'btn' : 'btn primary'} onClick={connect}>
                 <Ico svg={I.pr} />
-                {how ? 'Connect your account' : local ? 'Connect GitHub (optional)' : 'Connect GitHub'}
+                {how
+                  ? 'Connect your account'
+                  : local
+                    ? 'Connect GitHub (optional)'
+                    : 'Connect GitHub'}
               </button>
               {env?.hasToken && (
                 <button className="btn subtle" onClick={forget}>
@@ -520,8 +606,8 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
         <details className="gha-pat">
           <summary className="small">Use a personal access token instead</summary>
           <p className="muted small" style={{ margin: '6px 0' }}>
-            A fine-grained token with Contents and Pull requests (read and write) on the repositories, plus Workflows for GitHub Actions.
-            Stored encrypted.
+            A fine-grained token with Contents and Pull requests (read and write) on the
+            repositories, plus Workflows for GitHub Actions. Stored encrypted.
           </p>
           <div className="dev-path">
             <TF
@@ -541,41 +627,72 @@ function GitHubAccountCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv:
   );
 }
 
-/** On the deployed app nothing is cloned: GitHub repositories are used through GitHub (Actions and the API). */
+/**
+ * On the deployed app nothing is cloned: GitHub repositories are used through GitHub (Actions and
+ * the API).
+ */
 const DEPLOYED_HINT: Record<string, string> = {
   github: 'Pick one from your account; used through GitHub, nothing to clone.',
   url: 'A GitHub URL or owner/name; used through GitHub.',
   folder: 'Only when TicketForge runs on that computer.',
 };
 const SOURCES: [string, string, string][] = [
-  ['github', 'Your GitHub repositories', 'Pick one from your account; TicketForge clones it for you.'],
-  ['url', 'Git URL', 'Any https or SSH URL (GitHub, GitLab, others); cloned with your own git sign-in, no token needed.'],
+  [
+    'github',
+    'Your GitHub repositories',
+    'Pick one from your account; TicketForge clones it for you.',
+  ],
+  [
+    'url',
+    'Git URL',
+    'Any https or SSH URL (GitHub, GitLab, others); cloned with your own git sign-in, no token needed.',
+  ],
   ['folder', 'Folder on this computer', 'A clone you already have.'],
 ];
 /**
- * The repository of one side (frontend = the project's main repository, or backend): a summary of the one in use
- * (where it is, its branch, its state) and a chooser for a new one from GitHub, a Git URL or a local folder.
+ * The repository of one side (frontend = the project's main repository, or backend): a summary of
+ * the one in use (where it is, its branch, its state) and a chooser for a new one from GitHub, a
+ * Git URL or a local folder.
  */
-function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; ed: boolean; env: Any; setEnv: (e: Any) => void }) {
+function RepoChooser({
+  side,
+  ed,
+  env,
+  setEnv,
+}: {
+  side: 'frontend' | 'backend';
+  ed: boolean;
+  env: Any;
+  setEnv: (e: Any) => void;
+}) {
   const d = side === 'backend' ? be() : dev();
   const key = side === 'backend' ? 'devBackend' : 'dev';
   const local = env?.local !== false;
-  // The folder on disk is each person's own (Project settings are shared, the copy on your computer is yours).
+  // The folder on disk is each person's own (Project settings are shared, the copy on your computer
+  // is yours).
   const mineE = S.auth?.prefs?.local?.[P().id]?.[side];
   const sharedOk = env ? Boolean(env.sharedUsable?.[side]) : true;
   const lpath: string = mineE?.path || (sharedOk ? d.localPath : '') || '';
   const src = mineE?.source || (sharedOk ? d.source : null);
   const isClone = src?.type === 'clone';
   const mineOk = local; // on this computer everyone sets up their own copy; the project's shared choices need the settings permission
-  // On the deployed app a GitHub repository is used through GitHub, even when it was cloned on someone's computer.
-  const isGh = d.source?.type === 'github' || (!local && Boolean(d.repo) && (d.provider || 'GitHub') === 'GitHub');
+  // On the deployed app a GitHub repository is used through GitHub, even when it was cloned on
+  // someone's computer.
+  const isGh =
+    d.source?.type === 'github' ||
+    (!local && Boolean(d.repo) && (d.provider || 'GitHub') === 'GitHub');
   const has = Boolean(lpath || (isGh && d.repo));
-  const [mode, setMode] = useState<string>(lpath || (d.source?.type === 'github' && d.repo) ? '' : side === 'backend' ? 'url' : 'github');
-  // Once the environment is known: on this computer start with a Git URL (it needs no GitHub sign-in) unless GitHub is already usable.
+  const [mode, setMode] = useState<string>(
+    lpath || (d.source?.type === 'github' && d.repo) ? '' : side === 'backend' ? 'url' : 'github',
+  );
+  // Once the environment is known: on this computer start with a Git URL (it needs no GitHub
+  // sign-in) unless GitHub is already usable.
   const picked = useRef(false);
   useEffect(() => {
     if (!env || has || picked.current || side === 'backend') return;
-    setMode(env.local !== false && !(env.hasToken || env.ghSignedIn || env.envToken) ? 'url' : 'github');
+    setMode(
+      env.local !== false && !(env.hasToken || env.ghSignedIn || env.envToken) ? 'url' : 'github',
+    );
   }, [env]); // eslint-disable-line react-hooks/exhaustive-deps
   const [status, setStatus] = useState<Any>(null);
   const [busy, setBusy] = useState('');
@@ -586,12 +703,19 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
   const [folder, setFolder] = useState(lpath && !isClone ? lpath : '');
   const base = `/api/projects/${P().id}/dev`;
   const canList = Boolean(env?.hasToken || env?.ghSignedIn || env?.envToken);
-  // A new repository: the folder is saved as this person's own, and (with the settings permission) the repository's name,
-  // provider and base branch become the project's, unless it's the same repository.
+  // A new repository: the folder is saved as this person's own, and (with the settings permission)
+  // the repository's name, provider and base branch become the project's, unless it's the same
+  // repository.
   const apply = async (rr: Any, source: Any) => {
     if (rr.path && source?.type !== 'github') {
-      const out = await api(base, { method: 'POST', body: { action: 'setMyLocal', side, path: rr.path, source } });
-      S.auth.prefs = { ...(S.auth.prefs || {}), local: { ...(S.auth.prefs?.local || {}), [P().id]: out.local } };
+      const out = await api(base, {
+        method: 'POST',
+        body: { action: 'setMyLocal', side, path: rr.path, source },
+      });
+      S.auth.prefs = {
+        ...(S.auth.prefs || {}),
+        local: { ...(S.auth.prefs?.local || {}), [P().id]: out.local },
+      };
       emit();
     }
     if (ed)
@@ -640,7 +764,11 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
     setErr('');
     setStep('Starting…');
     try {
-      const res = await api(base, { method: 'POST', raw: true, body: { action: 'clone', side, source, branch: br } });
+      const res = await api(base, {
+        method: 'POST',
+        raw: true,
+        body: { action: 'clone', side, source, branch: br },
+      });
       let got: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'step') setStep(ev.text);
@@ -648,11 +776,18 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
         else if (ev.type === 'error') throw new Error(ev.message);
       });
       if (got) {
-        await apply(got, { type: 'clone', url: source, branch: br, clonedAt: new Date().toISOString() });
+        await apply(got, {
+          type: 'clone',
+          url: source,
+          branch: br,
+          clonedAt: new Date().toISOString(),
+        });
         setStatus({ ok: true, ...got });
         setMode('');
         setUrl('');
-        toast(`${isClone && src?.url === source ? 'Updated' : 'Cloned'} ${got.repo || 'the repository'}`);
+        toast(
+          `${isClone && src?.url === source ? 'Updated' : 'Cloned'} ${got.repo || 'the repository'}`,
+        );
       }
     } catch (e: Any) {
       setErr(e.message);
@@ -661,16 +796,23 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
       setStep('');
     }
   };
-  // Deployed: a GitHub repository is used through GitHub (Actions and the API), with no copy on this server.
+  // Deployed: a GitHub repository is used through GitHub (Actions and the API), with no copy on
+  // this server.
   const pickRemote = (fullName: string, defaultBranch = '') => {
-    apply({ path: '', repo: fullName, provider: 'GitHub', defaultBranch: defaultBranch || 'main' }, { type: 'github' });
+    apply(
+      { path: '', repo: fullName, provider: 'GitHub', defaultBranch: defaultBranch || 'main' },
+      { type: 'github' },
+    );
     setStatus(null);
     setMode('');
     setUrl('');
     toast(`Using ${fullName} on GitHub`);
   };
   const ghName = (u: string) =>
-    (u.trim().match(/^(?:https?:\/\/github\.com\/|git@github\.com:)?([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i) || [])[1] || '';
+    (u
+      .trim()
+      .match(/^(?:https?:\/\/github\.com\/|git@github\.com:)?([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i) ||
+      [])[1] || '';
   const working = busy === 'clone';
   const name =
     d.repo ||
@@ -689,7 +831,9 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
             <div className="rc-name">
               <b>{name}</b>
               <span className="rc-badges">
-                <span className="ag-chip tiny">{isGh ? 'On GitHub' : isClone ? 'Cloned by TicketForge' : 'Local folder'}</span>
+                <span className="ag-chip tiny">
+                  {isGh ? 'On GitHub' : isClone ? 'Cloned by TicketForge' : 'Local folder'}
+                </span>
                 {d.provider && <span className="ag-chip tiny">{d.provider}</span>}
               </span>
             </div>
@@ -697,11 +841,19 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
             {(ed || mineOk) && (
               <>
                 {isGh ? null : isClone ? (
-                  <button className="btn sm" disabled={!local || !!busy} onClick={() => clone(src.url, src.branch || '')}>
+                  <button
+                    className="btn sm"
+                    disabled={!local || !!busy}
+                    onClick={() => clone(src.url, src.branch || '')}
+                  >
                     {working ? <Spinner /> : <Ico svg={I.refresh} />}Update
                   </button>
                 ) : (
-                  <button className="btn sm" disabled={!local || !!busy} onClick={() => inspect(lpath)}>
+                  <button
+                    className="btn sm"
+                    disabled={!local || !!busy}
+                    onClick={() => inspect(lpath)}
+                  >
                     {busy === 'check' ? <Spinner /> : null}Check
                   </button>
                 )}
@@ -710,7 +862,15 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
                   disabled={!!busy}
                   onClick={() => {
                     setErr('');
-                    setMode(isGh ? 'github' : isClone ? (src?.url && /github/i.test(src.url) ? 'github' : 'url') : 'folder');
+                    setMode(
+                      isGh
+                        ? 'github'
+                        : isClone
+                          ? src?.url && /github/i.test(src.url)
+                            ? 'github'
+                            : 'url'
+                          : 'folder',
+                    );
                   }}
                 >
                   Change
@@ -734,7 +894,8 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
             )}
             {status?.ok && (
               <span>
-                default branch <code>{status.defaultBranch}</code> · on <code>{status.currentBranch}</code>
+                default branch <code>{status.defaultBranch}</code> · on{' '}
+                <code>{status.currentBranch}</code>
                 {status.uncommitted
                   ? ` · ${status.uncommitted} uncommitted change${status.uncommitted === 1 ? '' : 's'} (never touched)`
                   : ''}
@@ -752,7 +913,11 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
       )}
       {(mode || !has) && (
         <div className="rc-pick">
-          <div className="rc-sources" role="radiogroup" aria-label="Where the repository comes from">
+          <div
+            className="rc-sources"
+            role="radiogroup"
+            aria-label="Where the repository comes from"
+          >
             {SOURCES.map(([k, l, h]) => (
               <button
                 key={k}
@@ -786,7 +951,9 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
                       openModal(
                         <RepoPickerModal
                           onPick={(r) =>
-                            local && runPlace() !== 'github' ? clone(r.cloneUrl, '') : pickRemote(r.fullName, r.defaultBranch)
+                            local && runPlace() !== 'github'
+                              ? clone(r.cloneUrl, '')
+                              : pickRemote(r.fullName, r.defaultBranch)
                           }
                         />,
                       )
@@ -811,7 +978,10 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
                         <GitHubConnectModal
                           env={env}
                           onDone={(a) => {
-                            setDev('githubAccount', { ...a, connectedAt: new Date().toISOString() });
+                            setDev('githubAccount', {
+                              ...a,
+                              connectedAt: new Date().toISOString(),
+                            });
                             setEnv({ ...env, hasToken: true });
                           }}
                         />,
@@ -853,7 +1023,10 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
                 onClick={() => {
                   if (local) clone(url.trim(), branch.trim());
                   else if (ghName(url)) pickRemote(ghName(url), branch.trim());
-                  else setErr('From the deployed TicketForge, use a GitHub repository (owner/name or its GitHub URL).');
+                  else
+                    setErr(
+                      'From the deployed TicketForge, use a GitHub repository (owner/name or its GitHub URL).',
+                    );
                 }}
               >
                 {local ? 'Clone' : 'Use'}
@@ -910,17 +1083,18 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
             <div className="warn-banner" style={{ marginTop: 8 }}>
               <Ico svg={I.warn} />
               <span>
-                You opened TicketForge on this computer, but it is running in hosted mode (<code>TICKETFORGE_MODE=saas</code> in{' '}
-                <code>.env</code>), which keeps this computer’s folders off. To use a folder here, add{' '}
-                <code>TICKETFORGE_ALLOW_LOCAL=1</code> to <code>.env</code> (or remove <code>TICKETFORGE_MODE=saas</code>) and restart
-                TicketForge.
+                You opened TicketForge on this computer, but it is running in hosted mode (
+                <code>TICKETFORGE_MODE=saas</code> in <code>.env</code>), which keeps this
+                computer’s folders off. To use a folder here, add{' '}
+                <code>TICKETFORGE_ALLOW_LOCAL=1</code> to <code>.env</code> (or remove{' '}
+                <code>TICKETFORGE_MODE=saas</code>) and restart TicketForge.
               </span>
             </div>
           )}
           {!local && (
             <p className="small muted" style={{ margin: '8px 0 0' }}>
-              Deployed: your GitHub repositories and GitHub URLs are used through GitHub (no copy here); folders on a computer work when
-              TicketForge runs on that computer.
+              Deployed: your GitHub repositories and GitHub URLs are used through GitHub (no copy
+              here); folders on a computer work when TicketForge runs on that computer.
             </p>
           )}
           {has && mode && (
@@ -954,8 +1128,9 @@ function RepoChooser({ side, ed, env, setEnv }: { side: 'frontend' | 'backend'; 
 }
 
 /**
- * Project settings → Code & GitHub → Where code jobs run: on this computer (Claude Code next to the checkout) or through
- * your AI provider and the GitHub API (works from the deployed TicketForge; nothing to set up beyond GitHub access).
+ * Project settings → Code & GitHub → Where code jobs run: on this computer (Claude Code next to the
+ * checkout) or through your AI provider and the GitHub API (works from the deployed TicketForge;
+ * nothing to set up beyond GitHub access).
  */
 function CodeRunnerCard({ ed: _ed, env }: { ed: boolean; env: Any }) {
   const d = dev();
@@ -970,8 +1145,9 @@ function CodeRunnerCard({ ed: _ed, env }: { ed: boolean; env: Any }) {
       <p className="muted small" style={{ margin: '0 0 8px' }}>
         {local ? (
           <>
-            Your choice on this computer, for code jobs <b>and</b> test runs (it’s remembered in this browser, not saved in the project).
-            The deployed TicketForge always uses the AI API and GitHub.
+            Your choice on this computer, for code jobs <b>and</b> test runs (it’s remembered in
+            this browser, not saved in the project). The deployed TicketForge always uses the AI API
+            and GitHub.
           </>
         ) : (
           <>This TicketForge is deployed, so code jobs use your AI provider and GitHub.</>
@@ -1025,15 +1201,18 @@ function CodeRunnerCard({ ed: _ed, env }: { ed: boolean; env: Any }) {
             <div className="ok-banner">
               <Ico svg={I.check} />
               <span>
-                Write code with AI works on <b>{d.repo}</b>. It needs an AI provider (Administration → AI) and a GitHub connection with
-                write access to the repository; there is nothing to install or set up there.
+                Write code with AI works on <b>{d.repo}</b>. It needs an AI provider (Administration
+                → AI) and a GitHub connection with write access to the repository; there is nothing
+                to install or set up there.
               </span>
             </div>
           )}
           <p className="muted small" style={{ margin: '8px 0 0' }}>
-            The AI reads the files that matter for the issue and returns exact edits; TicketForge checks each one against the file, then
-            commits to the issue’s branch. It can’t run your tests or build, so review the diff before opening the pull request (use the
-            checks on the pull request for the rest). It never changes workflow files, <code>.env</code> files or lock files.
+            The AI reads the files that matter for the issue and returns exact edits; TicketForge
+            checks each one against the file, then commits to the issue’s branch. It can’t run your
+            tests or build, so review the diff before opening the pull request (use the checks on
+            the pull request for the rest). It never changes workflow files, <code>.env</code> files
+            or lock files.
           </p>
         </div>
       )}
@@ -1056,8 +1235,9 @@ export function DevSettings({ ed }: { ed: boolean }) {
         <div className="warn-banner">
           <Ico svg={I.warn} />
           <span>
-            This TicketForge runs in hosted mode (<code>TICKETFORGE_MODE=saas</code>), so it treats you as deployed even at localhost. Add{' '}
-            <code>TICKETFORGE_ALLOW_LOCAL=1</code> to <code>.env</code> and restart to use folders, git and Claude Code on this computer.
+            This TicketForge runs in hosted mode (<code>TICKETFORGE_MODE=saas</code>), so it treats
+            you as deployed even at localhost. Add <code>TICKETFORGE_ALLOW_LOCAL=1</code> to{' '}
+            <code>.env</code> and restart to use folders, git and Claude Code on this computer.
           </span>
         </div>
       )}
@@ -1065,8 +1245,9 @@ export function DevSettings({ ed }: { ed: boolean }) {
         <div className="ok-banner">
           <Ico svg={I.check} />
           <span>
-            This TicketForge is deployed: choose a GitHub repository and code jobs use your AI provider and GitHub (see{' '}
-            <b>Where code jobs run</b>). Folders on a computer and cloning work when TicketForge runs on your computer.
+            This TicketForge is deployed: choose a GitHub repository and code jobs use your AI
+            provider and GitHub (see <b>Where code jobs run</b>). Folders on a computer and cloning
+            work when TicketForge runs on your computer.
           </span>
         </div>
       )}
@@ -1103,7 +1284,11 @@ export function DevSettings({ ed }: { ed: boolean }) {
           </label>
           <label className="field">
             <span>Claude model</span>
-            <SF disabled={!ed} value={d.model || ''} onChange={(e) => setDev('model', e.target.value)}>
+            <SF
+              disabled={!ed}
+              value={d.model || ''}
+              onChange={(e) => setDev('model', e.target.value)}
+            >
               <MenuItem value="">Each agent’s own (Administration → Agents)</MenuItem>
               {['opus', 'sonnet', 'haiku'].map((m) => (
                 <MenuItem key={m} value={m}>
@@ -1120,10 +1305,16 @@ export function DevSettings({ ed }: { ed: boolean }) {
               min={1}
               max={10}
               value={String(d.requiredApprovals ?? 1)}
-              onChange={(e) => setDev('requiredApprovals', Math.min(10, Math.max(1, Math.floor(Number(e.target.value)) || 1)))}
+              onChange={(e) =>
+                setDev(
+                  'requiredApprovals',
+                  Math.min(10, Math.max(1, Math.floor(Number(e.target.value)) || 1)),
+                )
+              }
             />
             <small className="muted">
-              How many members must approve AI-written code before “Approve and merge” merges its pull request (1 to 10).
+              How many members must approve AI-written code before “Approve and merge” merges its
+              pull request (1 to 10).
             </small>
           </label>
         </div>
@@ -1145,7 +1336,10 @@ export function DevSettings({ ed }: { ed: boolean }) {
                 spellCheck={false}
                 onChange={(e) => setDev('repo', e.target.value.trim())}
               />
-              <small className="muted">Found automatically from the repository; change it only if pull requests should go elsewhere.</small>
+              <small className="muted">
+                Found automatically from the repository; change it only if pull requests should go
+                elsewhere.
+              </small>
             </label>
           </div>
         </details>
@@ -1165,7 +1359,10 @@ export function DevSettings({ ed }: { ed: boolean }) {
             spellCheck={false}
             onChange={(e) => setDev('checkCommand', e.target.value)}
           />
-          <small className="muted">The only command it may run, to check its work. Leave empty and it only reads and edits code.</small>
+          <small className="muted">
+            The only command it may run, to check its work. Leave empty and it only reads and edits
+            code.
+          </small>
         </label>
         <label className="field">
           <span>Team conventions</span>
@@ -1186,9 +1383,10 @@ export function DevSettings({ ed }: { ed: boolean }) {
 }
 
 /**
- * Project settings → Code & GitHub → Repository profile: "Learn from repository" runs a read-only agent that writes
- * how this codebase is built (stack, structure, how features are built, conventions, tests, commands). Every code
- * job gets it, so new code follows the repo. It can be edited by hand and learned again after big changes.
+ * Project settings → Code & GitHub → Repository profile: "Learn from repository" runs a read-only
+ * agent that writes how this codebase is built (stack, structure, how features are built,
+ * conventions, tests, commands). Every code job gets it, so new code follows the repo. It can be
+ * edited by hand and learned again after big changes.
  */
 function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }) {
   const d = side === 'backend' ? be() : dev();
@@ -1204,7 +1402,11 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
     setStep('Starting Claude Code…');
     setSteps(0);
     try {
-      const res = await api(`/api/projects/${P().id}/dev`, { method: 'POST', raw: true, body: { action: 'learn', side } });
+      const res = await api(`/api/projects/${P().id}/dev`, {
+        method: 'POST',
+        raw: true,
+        body: { action: 'learn', side },
+      });
       let got: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'step') {
@@ -1214,7 +1416,11 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
         else if (ev.type === 'error') throw new Error(ev.message);
       });
       if (got) {
-        set('repoProfile', { markdown: got.markdown, commit: got.commit, learnedAt: got.learnedAt });
+        set('repoProfile', {
+          markdown: got.markdown,
+          commit: got.commit,
+          learnedAt: got.learnedAt,
+        });
         toast(
           `Learned ${side === 'backend' ? 'the backend repository' : 'the repository'}${got.costUsd ? ` ($${got.costUsd.toFixed(2)})` : ''}. Code jobs follow it now.`,
         );
@@ -1240,7 +1446,8 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
                   at <code>{prof.commit}</code>
                 </>
               ) : null}
-              {prof.editedAt ? ' · edited' : ''} · {Math.round(prof.markdown.length / 100) / 10}k characters
+              {prof.editedAt ? ' · edited' : ''} · {Math.round(prof.markdown.length / 100) / 10}k
+              characters
             </>
           ) : (
             'Not learned yet: agents only see the conventions above.'
@@ -1276,9 +1483,9 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
       )}
       {!busy && (
         <p className="muted small" style={{ margin: '4px 0 0' }}>
-          A read-only agent reads the code (never changes it) and writes its stack, structure, how a feature is built end to end,
-          conventions, tests and commands. Every code job gets it, so new code is built the way this repository already works. Learn again
-          after big changes.
+          A read-only agent reads the code (never changes it) and writes its stack, structure, how a
+          feature is built end to end, conventions, tests and commands. Every code job gets it, so
+          new code is built the way this repository already works. Learn again after big changes.
         </p>
       )}
       {prof && !busy && (
@@ -1286,12 +1493,22 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
           <summary className="small">View{ed ? ' or edit' : ''} the profile</summary>
           {edit ? (
             <>
-              <TA mono rows={18} value={text} spellCheck={false} onChange={(e) => setText(e.target.value)} />
+              <TA
+                mono
+                rows={18}
+                value={text}
+                spellCheck={false}
+                onChange={(e) => setText(e.target.value)}
+              />
               <div className="row" style={{ gap: 8, marginTop: 8 }}>
                 <button
                   className="btn sm primary"
                   onClick={() => {
-                    set('repoProfile', { ...prof, markdown: text.slice(0, 14000), editedAt: new Date().toISOString() });
+                    set('repoProfile', {
+                      ...prof,
+                      markdown: text.slice(0, 14000),
+                      editedAt: new Date().toISOString(),
+                    });
                     setEdit(false);
                     toast('Profile saved');
                   }}
@@ -1321,7 +1538,12 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
                   </button>
                   <button
                     className="btn sm subtle"
-                    onClick={() => saveBlob(new Blob([prof.markdown], { type: 'text/markdown' }), `repository-profile-${side}.md`)}
+                    onClick={() =>
+                      saveBlob(
+                        new Blob([prof.markdown], { type: 'text/markdown' }),
+                        `repository-profile-${side}.md`,
+                      )
+                    }
                   >
                     Download .md
                   </button>
@@ -1338,7 +1560,9 @@ function RepoProfile({ side, ed }: { side: 'frontend' | 'backend'; ed: boolean }
   );
 }
 
-/** Project settings → Code & GitHub → CodeRabbit: the CLI's status and an optional Agentic API key. */
+/**
+ * Project settings → Code & GitHub → CodeRabbit: the CLI's status and an optional Agentic API key.
+ */
 function CodeRabbitCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv: (e: Any) => void }) {
   const cr = env?.coderabbit;
   const [key, setKey] = useState('');
@@ -1378,10 +1602,21 @@ function CodeRabbitCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv: (e
       {!env ? (
         <p className="muted small">Checking…</p>
       ) : cr === null ? (
-        <p className="muted small">Works when TicketForge runs on your computer (opened at localhost).</p>
+        <p className="muted small">
+          Works when TicketForge runs on your computer (opened at localhost).
+        </p>
       ) : (
         <>
-          <p className="small" style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <p
+            className="small"
+            style={{
+              margin: '0 0 8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
             <span className={`dot ${cr?.installed && (cr.signedIn || cr.hasKey) ? 'ok' : 'bad'}`} />
             {!cr?.installed
               ? 'The CodeRabbit CLI isn’t installed on this computer.'
@@ -1401,7 +1636,8 @@ function CodeRabbitCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv: (e
           )}
           {cr?.installed && !cr.signedIn && !cr.hasKey && (
             <p className="small muted" style={{ margin: '0 0 8px' }}>
-              Run <code>coderabbit auth login</code> in a terminal, or save an Agentic API key below.
+              Run <code>coderabbit auth login</code> in a terminal, or save an Agentic API key
+              below.
             </p>
           )}
           {ed && (
@@ -1410,7 +1646,11 @@ function CodeRabbitCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv: (e
                 type="password"
                 autoComplete="off"
                 value={key}
-                placeholder={cr?.hasKey ? 'Replace the saved Agentic API key' : 'Agentic API key (optional), cr-…'}
+                placeholder={
+                  cr?.hasKey
+                    ? 'Replace the saved Agentic API key'
+                    : 'Agentic API key (optional), cr-…'
+                }
                 onChange={(e) => setKey(e.target.value)}
               />
               <button className="btn" disabled={!key.trim() || !!busy} onClick={() => save()}>
@@ -1429,8 +1669,21 @@ function CodeRabbitCard({ ed, env, setEnv }: { ed: boolean; env: Any; setEnv: (e
   );
 }
 
-/** Project settings → Code & GitHub: a separate backend repository (pull requests on GitHub, merge requests on GitLab) and the frontend/backend split of issues. */
-function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; local: boolean; env: Any; setEnv: (e: Any) => void }) {
+/**
+ * Project settings → Code & GitHub: a separate backend repository (pull requests on GitHub, merge
+ * requests on GitLab) and the frontend/backend split of issues.
+ */
+function BackendRepoCard({
+  ed,
+  local: _local,
+  env,
+  setEnv,
+}: {
+  ed: boolean;
+  local: boolean;
+  env: Any;
+  setEnv: (e: Any) => void;
+}) {
   const d = be();
   const [check] = useState<Any>(null);
   const [glToken, setGlToken] = useState('');
@@ -1440,7 +1693,9 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
     try {
       const r = await api(`/api/projects/${P().id}/dev`, {
         method: 'POST',
-        body: clear ? { action: 'clearGitlabToken' } : { action: 'saveGitlabToken', token: glToken },
+        body: clear
+          ? { action: 'clearGitlabToken' }
+          : { action: 'saveGitlabToken', token: glToken },
       });
       setEnv({ ...env, hasGitlabToken: r.hasGitlabToken });
       setGlToken('');
@@ -1461,7 +1716,10 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
       kind: 'ai',
     });
     try {
-      const r = await api(`/api/projects/${P().id}/layers`, { method: 'POST', body: aiBody({ all }) });
+      const r = await api(`/api/projects/${P().id}/layers`, {
+        method: 'POST',
+        body: aiBody({ all }),
+      });
       const ids = Object.keys(r.layers);
       mutate((pp) => {
         for (const t of pp.tickets)
@@ -1500,7 +1758,9 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
           <h4 className="rc-sub">Branches and pull requests</h4>
           <div className="grid2">
             <label className="field">
-              <span>{gitlab ? 'GitLab project (group/name)' : 'GitHub repository (owner/name)'}</span>
+              <span>
+                {gitlab ? 'GitLab project (group/name)' : 'GitHub repository (owner/name)'}
+              </span>
               <TF
                 disabled={!ed}
                 value={d.repo || ''}
@@ -1509,7 +1769,8 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
                 onChange={(e) => setBe('repo', e.target.value.trim())}
               />
               <small className="muted">
-                Found automatically from the repository. Pull requests open {gitlab ? 'as GitLab merge requests' : 'on GitHub'}.
+                Found automatically from the repository. Pull requests open{' '}
+                {gitlab ? 'as GitLab merge requests' : 'on GitHub'}.
               </small>
             </label>
             <label className="field">
@@ -1557,7 +1818,10 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
             <div className="field" style={{ marginTop: 4 }}>
               <span>GitLab access token</span>
               <p className="small" style={{ margin: '0 0 6px' }}>
-                <span className={`dot ${env?.hasGitlabToken || env?.envGitlabToken ? 'ok' : 'bad'}`} style={{ marginRight: 6 }} />
+                <span
+                  className={`dot ${env?.hasGitlabToken || env?.envGitlabToken ? 'ok' : 'bad'}`}
+                  style={{ marginRight: 6 }}
+                />
                 {env?.hasGitlabToken
                   ? 'A token is saved for this project (encrypted).'
                   : env?.envGitlabToken
@@ -1570,10 +1834,18 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
                     type="password"
                     autoComplete="off"
                     value={glToken}
-                    placeholder={env?.hasGitlabToken ? 'Replace the saved token' : 'glpat-… (scopes: api, write_repository)'}
+                    placeholder={
+                      env?.hasGitlabToken
+                        ? 'Replace the saved token'
+                        : 'glpat-… (scopes: api, write_repository)'
+                    }
                     onChange={(e) => setGlToken(e.target.value)}
                   />
-                  <button className="btn" disabled={!glToken.trim() || !!busy} onClick={() => saveGl()}>
+                  <button
+                    className="btn"
+                    disabled={!glToken.trim() || !!busy}
+                    onClick={() => saveGl()}
+                  >
                     Save token
                   </button>
                   {env?.hasGitlabToken && (
@@ -1595,7 +1867,11 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
             </span>
             {can('ai.use') && can('issue.edit') && (
               <>
-                <button className="btn sm ai" disabled={!!busy || marked === issues.length} onClick={() => classify(false)}>
+                <button
+                  className="btn sm ai"
+                  disabled={!!busy || marked === issues.length}
+                  onClick={() => classify(false)}
+                >
                   {busy === 'classify' ? (
                     <>
                       <Spinner />
@@ -1609,7 +1885,11 @@ function BackendRepoCard({ ed, local: _local, env, setEnv }: { ed: boolean; loca
                   )}
                 </button>
                 {marked > 0 && (
-                  <button className="btn sm subtle" disabled={!!busy} onClick={() => classify(true)}>
+                  <button
+                    className="btn sm subtle"
+                    disabled={!!busy}
+                    onClick={() => classify(true)}
+                  >
                     Re-check all
                   </button>
                 )}
@@ -1641,11 +1921,22 @@ const STATUS: Record<string, string> = {
 };
 
 /**
- * Approvals on a code job (TF-123): who approved, the count against what the project asks for, and Approve / Approve and
- * merge. Any member who can open the project can approve; merging needs the pull request to be open. Not enough
- * approvals blocks the merge with how many are still needed (the server's message).
+ * Approvals on a code job (TF-123): who approved, the count against what the project asks for, and
+ * Approve / Approve and merge. Any member who can open the project can approve; merging needs the
+ * pull request to be open. Not enough approvals blocks the merge with how many are still needed
+ * (the server's message).
  */
-function ApprovalBox({ job, busy, onApprove, onMerge }: { job: Any; busy: string; onApprove: () => void; onMerge: () => void }) {
+function ApprovalBox({
+  job,
+  busy,
+  onApprove,
+  onMerge,
+}: {
+  job: Any;
+  busy: string;
+  onApprove: () => void;
+  onMerge: () => void;
+}) {
   const approvals: Any[] = job.approvals || [];
   const need = job.required || 1;
   const mine = approvals.some((a) => a.userId === S.user?.id);
@@ -1761,7 +2052,10 @@ function ApprovalBox({ job, busy, onApprove, onMerge }: { job: Any; busy: string
   );
 }
 
-/** Where the job is: set up → agent working → your review → shipped (or the report, for read-only agents). */
+/**
+ * Where the job is: set up → agent working → your review → shipped (or the report, for read-only
+ * agents).
+ */
 function JobSteps({ job }: { job: Any }) {
   const report = job.status === 'report' || job.kind === 'pr-review';
   const steps = report
@@ -1782,15 +2076,26 @@ function JobSteps({ job }: { job: Any }) {
   };
   const cur = at[job.status] ?? 1;
   const bad = ['failed', 'cancelled'].includes(job.status);
-  const finished = report ? job.status === 'report' : ['committed', 'pr', 'merged'].includes(job.status);
+  const finished = report
+    ? job.status === 'report'
+    : ['committed', 'pr', 'merged'].includes(job.status);
   return (
     <ol className="cj-steps">
       {steps.map((label, i) => {
-        const state = i < cur || (finished && i === cur) ? 'done' : i === cur ? (bad ? 'bad' : 'on') : '';
+        const state =
+          i < cur || (finished && i === cur) ? 'done' : i === cur ? (bad ? 'bad' : 'on') : '';
         return (
           <li key={label} className={state}>
-            <span className="dot">{state === 'done' ? <Ico svg={I.check} /> : state === 'bad' ? '!' : i + 1}</span>
-            <span>{job.status === 'committed' && i === 3 ? 'Committed' : job.status === 'merged' && i === 3 ? 'Merged' : label}</span>
+            <span className="dot">
+              {state === 'done' ? <Ico svg={I.check} /> : state === 'bad' ? '!' : i + 1}
+            </span>
+            <span>
+              {job.status === 'committed' && i === 3
+                ? 'Committed'
+                : job.status === 'merged' && i === 3
+                  ? 'Merged'
+                  : label}
+            </span>
           </li>
         );
       })}
@@ -1798,7 +2103,8 @@ function JobSteps({ job }: { job: Any }) {
   );
 }
 
-const VERB_RE = /^(\s*↳\s*)?(Reading|Editing|Writing|Finding files|Searching|Listing|Running|Planning:|Delegating to)\s*([\s\S]*)$/;
+const VERB_RE =
+  /^(\s*↳\s*)?(Reading|Editing|Writing|Finding files|Searching|Listing|Running|Planning:|Delegating to)\s*([\s\S]*)$/;
 const VERB_ICON: Record<string, string> = {
   Reading: I.doc,
   Editing: I.pencil,
@@ -1810,10 +2116,21 @@ const VERB_ICON: Record<string, string> = {
   'Planning:': I.check,
   'Delegating to': I.bot,
 };
-const KIND_ICON: Record<string, string> = { info: I.clock, text: I.comment, done: I.check, error: I.warn, warn: I.warn, you: I.user };
+const KIND_ICON: Record<string, string> = {
+  info: I.clock,
+  text: I.comment,
+  done: I.check,
+  error: I.warn,
+  warn: I.warn,
+  you: I.user,
+};
 const hhmm = (at: string) => {
   try {
-    return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(at).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   } catch {
     return '';
   }
@@ -1858,16 +2175,29 @@ function Activity({ log, running }: { log: Any[]; running: boolean }) {
     </ol>
   );
 }
-/** Issue panel → Write code with AI: start, watch, review, ask for changes, open the pull request. */
-export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: { t: Any; agentId?: string; initialSide?: string }) {
-  // Projects with a separate backend: one job per repository (Frontend / Backend). "Both" issues start with the backend.
+/**
+ * Issue panel → Write code with AI: start, watch, review, ask for changes, open the pull request.
+ */
+export function CodeModal({
+  t,
+  agentId: initialAgent = 'build',
+  initialSide,
+}: {
+  t: Any;
+  agentId?: string;
+  initialSide?: string;
+}) {
+  // Projects with a separate backend: one job per repository (Frontend / Backend). "Both" issues
+  // start with the backend.
   const [jobs, setJobs] = useState<Record<string, Any>>({});
   const [backend, setBackend] = useState(hasBackend());
   const [side, setSide] = useState<string>(
-    initialSide || (hasBackend() && (t.layer === 'backend' || t.layer === 'both') ? 'backend' : 'frontend'),
+    initialSide ||
+      (hasBackend() && (t.layer === 'backend' || t.layer === 'both') ? 'backend' : 'frontend'),
   );
   const job = jobs[side] || null;
-  const setJob = (v: Any) => setJobs((js) => ({ ...js, [side]: typeof v === 'function' ? v(js[side]) : v }));
+  const setJob = (v: Any) =>
+    setJobs((js) => ({ ...js, [side]: typeof v === 'function' ? v(js[side]) : v }));
   const [agents, setAgents] = useState<Any[]>([]);
   const [agentId, setAgentId] = useState(initialAgent);
   const [reviewTab, setReviewTab] = useState(0);
@@ -1904,15 +2234,20 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
       .catch((e) => toast(e.message, 'err'))
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // With two repositories, default to the agent made for that side (unless an agent was chosen for you).
-  // With two repositories, default to that repository's agent (Administration → Agents → Default agents).
+  // With two repositories, default to the agent made for that side (unless an agent was chosen for
+  // you).
+  // With two repositories, default to that repository's agent (Administration → Agents → Default
+  // agents).
   useEffect(() => {
     if (backend && initialAgent === 'build' && roles[side]) setAgentId(roles[side]);
   }, [side, backend, roles]); // eslint-disable-line react-hooks/exhaustive-deps
   // Follow every running job (both repositories when they run at once).
   useEffect(() => {
     const live = Object.entries(jobs).filter(
-      ([, j]) => j && (['starting', 'queued', 'running'].includes(j.status) || j.coderabbit?.status === 'running'),
+      ([, j]) =>
+        j &&
+        (['starting', 'queued', 'running'].includes(j.status) ||
+          j.coderabbit?.status === 'running'),
     );
     if (!live.length) return;
     const h = setTimeout(
@@ -1947,7 +2282,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   useEffect(() => {
     setTab('');
   }, [job?.id]);
-  // A finished CodeRabbit review is saved on the issue (findings, then their status: bug, sent to agent, dismissed).
+  // A finished CodeRabbit review is saved on the issue (findings, then their status: bug, sent to
+  // agent, dismissed).
   useEffect(() => {
     if (job?.coderabbit?.status === 'done') saveReview(t, job);
   }, [job?.coderabbit?.status, job?.coderabbit?.round]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1956,7 +2292,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     try {
       const r = await api(base, { method: 'POST', body: { ...body, jobId: job?.id } });
       refreshCodeStatus();
-      if (r?.id) setJob((j: Any) => ({ ...r, log: kind === 'start' ? r.log : [...(j?.log || []), ...r.log.slice(j?.logSize ?? 0)] }));
+      if (r?.id)
+        setJob((j: Any) => ({
+          ...r,
+          log: kind === 'start' ? r.log : [...(j?.log || []), ...r.log.slice(j?.logSize ?? 0)],
+        }));
       return r;
     } catch (e: Any) {
       toast(e.message, 'err');
@@ -1969,7 +2309,10 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   const startBoth = async () => {
     setBusy('both');
     try {
-      const r = await api(base, { method: 'POST', body: { action: 'start-both', ticketId: t.id, instructions: text } });
+      const r = await api(base, {
+        method: 'POST',
+        body: { action: 'start-both', ticketId: t.id, instructions: text },
+      });
       refreshCodeStatus();
       setJobs((js) => ({ ...js, ...r.jobs }));
       setContract(r.contract || '');
@@ -2000,7 +2343,10 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
   const draftPr = async () => {
     setBusy('draft');
     try {
-      const r = await api(base, { method: 'POST', body: aiBody({ action: 'prDraft', jobId: job?.id }) });
+      const r = await api(base, {
+        method: 'POST',
+        body: aiBody({ action: 'prDraft', jobId: job?.id }),
+      });
       setTitle(r.title);
       setPrBody(r.body);
     } catch (e: Any) {
@@ -2023,7 +2369,10 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     toast(
       `Pushed ${r.commit} to ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number}: the ${job.target.provider === 'GitLab' ? 'merge request' : 'pull request'} is updated.`,
       'ok',
-      { title: 'Changes pushed', action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') } },
+      {
+        title: 'Changes pushed',
+        action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') },
+      },
     );
   };
   const openPr = async () => {
@@ -2032,24 +2381,39 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     setJob(r.job);
     const noun = job.provider === 'GitLab' ? 'merge request' : 'pull request';
     if (r.pr.compare) {
-      // Pushed with your git setup; the request opens on GitHub/GitLab (no token to open it from here).
+      // Pushed with your git setup; the request opens on GitHub/GitLab (no token to open it from
+      // here).
       mutate(() => {
         logEvent(t, `pushed ${r.pr.branch} with code written by AI`, 'Development');
       });
-      toast(`Pushed ${r.pr.branch}. Open the ${noun} on ${job.provider || 'GitHub'} to finish.`, 'ok', {
-        title: 'Branch pushed',
-        action: { label: `Open ${noun}`, onClick: () => window.open(r.pr.url, '_blank', 'noopener') },
-      });
+      toast(
+        `Pushed ${r.pr.branch}. Open the ${noun} on ${job.provider || 'GitHub'} to finish.`,
+        'ok',
+        {
+          title: 'Branch pushed',
+          action: {
+            label: `Open ${noun}`,
+            onClick: () => window.open(r.pr.url, '_blank', 'noopener'),
+          },
+        },
+      );
       window.open(r.pr.url, '_blank', 'noopener');
       return;
     }
     mutate(() => {
       t.prs.push({ id: uid(), ...r.pr, checkedAt: nowIso() });
-      logEvent(t, `opened ${noun} ${r.pr.repo} #${r.pr.number} with code written by AI`, 'Development');
+      logEvent(
+        t,
+        `opened ${noun} ${r.pr.repo} #${r.pr.number} with code written by AI`,
+        'Development',
+      );
     });
     toast(`Opened ${r.pr.repo} #${r.pr.number}`);
   };
-  /** Approve the code (TF-123). Approve and merge also records the approval; when it is blocked the approval stays, so the job is read again for the new count. */
+  /**
+   * Approve the code (TF-123). Approve and merge also records the approval; when it is blocked the
+   * approval stays, so the job is read again for the new count.
+   */
   const reloadJob = async () => {
     try {
       const r = await api(`${base}?jobId=${job.id}&since=${job.logSize || 0}`);
@@ -2070,25 +2434,42 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
       return;
     }
     mutate(() => {
-      const pr = t.prs.find((x: Any) => (x.url && x.url === r.pr?.url) || (x.number && x.number === r.pr?.number && x.repo === r.repo));
+      const pr = t.prs.find(
+        (x: Any) =>
+          (x.url && x.url === r.pr?.url) ||
+          (x.number && x.number === r.pr?.number && x.repo === r.repo),
+      );
       if (pr) {
         pr.status = 'Merged';
         pr.mergedAt = r.merged?.at || nowIso();
       }
-      logEvent(t, `merged pull request #${r.pr?.number} after ${r.approvals?.length || 0} of ${r.required} approvals`, 'Development');
+      logEvent(
+        t,
+        `merged pull request #${r.pr?.number} after ${r.approvals?.length || 0} of ${r.required} approvals`,
+        'Development',
+      );
     });
     toast(`${r.repo} #${r.pr?.number} is merged.`, 'ok', {
       title: 'Code merged',
-      action: r.pr?.url ? { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') } : undefined,
+      action: r.pr?.url
+        ? { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') }
+        : undefined,
     });
   };
   const running = job && ['starting', 'queued', 'running'].includes(job.status);
   const d = dev();
-  // An AI review of an open pull request: remember the verdict on the linked request (Pull requests page).
+  // An AI review of an open pull request: remember the verdict on the linked request (Pull requests
+  // page).
   const isPrReview = job?.kind === 'pr-review';
   const reviewedPr = isPrReview ? t.prs.find((r: Any) => r.url === job.target?.url) : null;
   useEffect(() => {
-    if (!isPrReview || job.status !== 'report' || !reviewedPr || reviewedPr.aiReview?.jobId === job.id) return;
+    if (
+      !isPrReview ||
+      job.status !== 'report' ||
+      !reviewedPr ||
+      reviewedPr.aiReview?.jobId === job.id
+    )
+      return;
     const verdict = /request(ed)? changes/i.test(job.summary || '')
       ? 'Changes requested'
       : /approve with comments/i.test(job.summary || '')
@@ -2097,7 +2478,13 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           ? 'Approve'
           : 'Reviewed';
     mutate(() => {
-      reviewedPr.aiReview = { jobId: job.id, at: job.finishedAt || nowIso(), agent: job.agentName, verdict, posted: null };
+      reviewedPr.aiReview = {
+        jobId: job.id,
+        at: job.finishedAt || nowIso(),
+        agent: job.agentName,
+        verdict,
+        posted: null,
+      };
       logEvent(
         t,
         `${job.agentName} agent reviewed ${reviewedPr.provider === 'GitLab' ? '!' : '#'}${reviewedPr.number}: ${verdict}`,
@@ -2112,10 +2499,14 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
       mutate(() => {
         reviewedPr.aiReview = { ...(reviewedPr.aiReview || {}), posted: r.posted };
       });
-    toast(`The review is a comment on ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number} now.`, 'ok', {
-      title: 'Review posted',
-      action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') },
-    });
+    toast(
+      `The review is a comment on ${job.target.provider === 'GitLab' ? '!' : '#'}${job.target.number} now.`,
+      'ok',
+      {
+        title: 'Review posted',
+        action: { label: 'Open', onClick: () => window.open(job.target.url, '_blank', 'noopener') },
+      },
+    );
   };
   return (
     <Modal
@@ -2130,9 +2521,19 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             const jj = jobs[k];
             const busyK = jj && ['starting', 'queued', 'running'].includes(jj.status);
             return (
-              <button key={k} role="tab" aria-selected={side === k} className={side === k ? 'on' : ''} onClick={() => setSide(k)}>
-                <span className={`layer-chip l-${k}`}>{k === 'backend' ? 'Backend' : 'Frontend'}</span>
-                <span className="muted small">{k === 'backend' ? be().repo || myPath('backend') : d.repo || myPath('frontend')}</span>
+              <button
+                key={k}
+                role="tab"
+                aria-selected={side === k}
+                className={side === k ? 'on' : ''}
+                onClick={() => setSide(k)}
+              >
+                <span className={`layer-chip l-${k}`}>
+                  {k === 'backend' ? 'Backend' : 'Frontend'}
+                </span>
+                <span className="muted small">
+                  {k === 'backend' ? be().repo || myPath('backend') : d.repo || myPath('frontend')}
+                </span>
                 <span className="side-state small">
                   {busyK ? (
                     <>
@@ -2151,7 +2552,9 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             {t.layer ? (
               <>
                 This issue is marked <b>{LAYER_LABEL[t.layer]}</b>.
-                {t.layer === 'both' ? ' Build both at once, or the backend first so the frontend gets its API summary.' : ''}
+                {t.layer === 'both'
+                  ? ' Build both at once, or the backend first so the frontend gets its API summary.'
+                  : ''}
               </>
             ) : (
               'Mark the issue frontend, backend or both in its details.'
@@ -2162,7 +2565,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
       {contract && (
         <details className="contract-box">
           <summary className="small">
-            <b>API contract</b> <span className="muted">shared by the backend and frontend jobs</span>
+            <b>API contract</b>{' '}
+            <span className="muted">shared by the backend and frontend jobs</span>
           </summary>
           <pre>{contract}</pre>
         </details>
@@ -2180,7 +2584,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                 <div className="warn-banner" style={{ marginBottom: 8 }}>
                   <Ico svg={I.warn} />
                   <span>
-                    No agent can write code yet. Create one in Administration → Agents (kind: <b>Code</b>).
+                    No agent can write code yet. Create one in Administration → Agents (kind:{' '}
+                    <b>Code</b>).
                   </span>
                 </div>
               )}
@@ -2227,14 +2632,16 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             </>
           )}
           <p className="muted small" style={{ marginTop: 0 }}>
-            It runs as a Claude Code agent on <b>{t.title}</b> from its story, {t.acceptanceCriteria?.length || 0} acceptance criteria and{' '}
-            {t.testCases?.length || 0} test cases, in a new branch{' '}
+            It runs as a Claude Code agent on <b>{t.title}</b> from its story,{' '}
+            {t.acceptanceCriteria?.length || 0} acceptance criteria and {t.testCases?.length || 0}{' '}
+            test cases, in a new branch{' '}
             <code>
               {d.branchPrefix ?? 'tf/'}
               {String(t.key).toLowerCase()}-…
             </code>{' '}
-            from <code>{d.baseBranch || 'the default branch'}</code> of <b>{d.repo || d.localPath}</b>, in its own worktree. Nothing is
-            pushed until you review the changes and open the pull request.
+            from <code>{d.baseBranch || 'the default branch'}</code> of{' '}
+            <b>{d.repo || d.localPath}</b>, in its own worktree. Nothing is pushed until you review
+            the changes and open the pull request.
           </p>
           <label className="field">
             <span>Extra instructions (optional)</span>
@@ -2250,8 +2657,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
               <div>
                 <b>Build both at once</b>
                 <span className="muted small">
-                  Agrees the API in a few seconds, then the backend and frontend agents work in parallel, each in its own repository. About
-                  twice as fast as one after the other.
+                  Agrees the API in a few seconds, then the backend and frontend agents work in
+                  parallel, each in its own repository. About twice as fast as one after the other.
                 </span>
               </div>
               <button className="btn ai" disabled={!!busy} onClick={startBoth}>
@@ -2276,8 +2683,15 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             !['committed', 'review', 'starting', 'running'].includes(jobs.backend?.status) && (
               <div className="warn-banner" style={{ marginBottom: 8 }}>
                 <Ico svg={I.warn} />
-                <span>The backend part isn’t done yet. You can start the frontend now, but it won’t know the final API.</span>
-                <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('backend')}>
+                <span>
+                  The backend part isn’t done yet. You can start the frontend now, but it won’t know
+                  the final API.
+                </span>
+                <button
+                  className="btn sm"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => setSide('backend')}
+                >
                   Go to Backend
                 </button>
               </div>
@@ -2288,7 +2702,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
               {be().repo ? (
                 <>
                   {' '}
-                  · {be().provider === 'GitLab' ? 'merge request on GitLab' : 'pull request on GitHub'} <code>{be().repo}</code>
+                  ·{' '}
+                  {be().provider === 'GitLab'
+                    ? 'merge request on GitLab'
+                    : 'pull request on GitHub'}{' '}
+                  <code>{be().repo}</code>
                 </>
               ) : (
                 ''
@@ -2299,7 +2717,9 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           <button
             className="btn ai"
             disabled={!!busy}
-            onClick={() => act('start', { action: 'start', ticketId: t.id, instructions: text, agentId, side })}
+            onClick={() =>
+              act('start', { action: 'start', ticketId: t.id, instructions: text, agentId, side })
+            }
           >
             {busy ? (
               <>
@@ -2410,19 +2830,32 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
           )}
           {(() => {
             const tabs = [
-              job.summary && !running && { id: 'summary', label: job.status === 'report' ? 'Report' : 'Summary' },
+              job.summary &&
+                !running && {
+                  id: 'summary',
+                  label: job.status === 'report' ? 'Report' : 'Summary',
+                },
               job.files?.length > 0 && { id: 'changes', label: 'Changes', n: job.files.length },
               job.reviews?.length > 0 && { id: 'reviews', label: 'Reviews', n: job.reviews.length },
               job.coderabbit && {
                 id: 'coderabbit',
                 label: 'CodeRabbit',
-                n: job.coderabbit.status === 'running' ? undefined : (job.coderabbit.findings || []).length,
+                n:
+                  job.coderabbit.status === 'running'
+                    ? undefined
+                    : (job.coderabbit.findings || []).length,
               },
-              { id: 'activity', label: running ? 'Live activity' : 'Activity', n: job.log.filter((l: Any) => l.kind === 'tool').length },
+              {
+                id: 'activity',
+                label: running ? 'Live activity' : 'Activity',
+                n: job.log.filter((l: Any) => l.kind === 'tool').length,
+              },
             ].filter(Boolean) as { id: string; label: string; n?: number }[];
             const cur =
-              tabs.find((x) => x.id === tab)?.id || (running ? 'activity' : tabs.find((x) => x.id === 'changes')?.id || tabs[0].id); // finished code opens on its diff (TF-123)
-            const rawVerdict = (job.summary || '').match(/^\s*\*\*Verdict:\s*([^*]+?)\.?\*\*/i)?.[1] || '';
+              tabs.find((x) => x.id === tab)?.id ||
+              (running ? 'activity' : tabs.find((x) => x.id === 'changes')?.id || tabs[0].id); // finished code opens on its diff (TF-123)
+            const rawVerdict =
+              (job.summary || '').match(/^\s*\*\*Verdict:\s*([^*]+?)\.?\*\*/i)?.[1] || '';
             const vClass = /request|block|reject/i.test(rawVerdict)
               ? 'bad'
               : /comment/i.test(rawVerdict)
@@ -2447,10 +2880,14 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                     </button>
                   ))}
                 </div>
-                <div className={`cj-panel ${cur === 'changes' ? 'cj-panel-diff' : ''}`} ref={cur === 'activity' ? logRef : undefined}>
+                <div
+                  className={`cj-panel ${cur === 'changes' ? 'cj-panel-diff' : ''}`}
+                  ref={cur === 'activity' ? logRef : undefined}
+                >
                   {cur === 'summary' && (
                     <>
-                      {(rawVerdict || (job.status === 'report' && (isPrReview || can('export')))) && (
+                      {(rawVerdict ||
+                        (job.status === 'report' && (isPrReview || can('export')))) && (
                         <div className="cj-toolbar">
                           {rawVerdict && (
                             <span className={`cj-verdict v-${vClass}`}>
@@ -2463,11 +2900,16 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                             <>
                               {job.posted ? (
                                 <span className="muted small">
-                                  <Ico svg={I.check} /> Posted on {job.target.provider === 'GitLab' ? '!' : '#'}
+                                  <Ico svg={I.check} /> Posted on{' '}
+                                  {job.target.provider === 'GitLab' ? '!' : '#'}
                                   {job.target.number} {ago(job.posted)}
                                 </span>
                               ) : (
-                                <button className="btn sm primary" disabled={!!busy} onClick={postReview}>
+                                <button
+                                  className="btn sm primary"
+                                  disabled={!!busy}
+                                  onClick={postReview}
+                                >
                                   {busy === 'postReview' ? (
                                     <>
                                       <Spinner />
@@ -2482,7 +2924,12 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                                   )}
                                 </button>
                               )}
-                              <a className="btn sm subtle" href={job.target.url} target="_blank" rel="noopener noreferrer">
+                              <a
+                                className="btn sm subtle"
+                                href={job.target.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 <Ico svg={I.external} />
                                 Open
                               </a>
@@ -2508,7 +2955,10 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                               <button
                                 className="btn sm subtle"
                                 onClick={() =>
-                                  saveBlob(new Blob([job.summary], { type: 'text/markdown' }), `${job.agentName} - ${job.ticketKey}.md`)
+                                  saveBlob(
+                                    new Blob([job.summary], { type: 'text/markdown' }),
+                                    `${job.agentName} - ${job.ticketKey}.md`,
+                                  )
                                 }
                               >
                                 <Ico svg={I.download} />
@@ -2519,7 +2969,13 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                         </div>
                       )}
                       <div className="cj-doc code-md">
-                        <Markdown text={rawVerdict ? job.summary.replace(/^\s*\*\*Verdict:[^*]*\*\*\s*/i, '') : job.summary} />
+                        <Markdown
+                          text={
+                            rawVerdict
+                              ? job.summary.replace(/^\s*\*\*Verdict:[^*]*\*\*\s*/i, '')
+                              : job.summary
+                          }
+                        />
                       </div>
                     </>
                   )}
@@ -2532,7 +2988,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                         <>
                           <div className="cj-toolbar">
                             <b className="small">
-                              {rv.panel ? 'Review Panel' : rv.agent || 'Review agent'} · round {rv.round}
+                              {rv.panel ? 'Review Panel' : rv.agent || 'Review agent'} · round{' '}
+                              {rv.round}
                             </b>
                             <span className="spacer" />
                             {job.status === 'review' && (
@@ -2591,14 +3048,19 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                           <div className="small">
                             <b>Plan</b>{' '}
                             <span className="muted">
-                              {job.todos.filter((x: Any) => x.status === 'completed').length} of {job.todos.length} done
+                              {job.todos.filter((x: Any) => x.status === 'completed').length} of{' '}
+                              {job.todos.length} done
                             </span>
                           </div>
                           <ul>
                             {job.todos.map((x: Any, i: number) => (
                               <li key={i} className={x.status}>
                                 <span className="tick">
-                                  {x.status === 'completed' ? <Ico svg={I.check} /> : x.status === 'in_progress' ? <Spinner /> : null}
+                                  {x.status === 'completed' ? (
+                                    <Ico svg={I.check} />
+                                  ) : x.status === 'in_progress' ? (
+                                    <Spinner />
+                                  ) : null}
                                 </span>
                                 {x.content}
                               </li>
@@ -2693,7 +3155,10 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                 }}
                 title="An independent review by the CodeRabbit CLI: findings by severity, with fix instructions"
               >
-                🐇 {job.coderabbit?.status === 'running' ? 'CodeRabbit is reviewing…' : 'CodeRabbit review'}
+                🐇{' '}
+                {job.coderabbit?.status === 'running'
+                  ? 'CodeRabbit is reviewing…'
+                  : 'CodeRabbit review'}
               </button>
               <span className="muted small">Read-only reviewers. They never edit files.</span>
             </div>
@@ -2702,11 +3167,18 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
             <div className="ok-banner">
               <Ico svg={I.check} />
               <span>
-                Committed on the local branch <code>{job.branch}</code> in <code>{job.repoPath}</code>. Nothing was pushed.
-                {side === 'backend' && t.layer === 'both' ? ' Next: the Frontend tab, which builds on this API.' : ''}
+                Committed on the local branch <code>{job.branch}</code> in{' '}
+                <code>{job.repoPath}</code>. Nothing was pushed.
+                {side === 'backend' && t.layer === 'both'
+                  ? ' Next: the Frontend tab, which builds on this API.'
+                  : ''}
               </span>
               {side === 'backend' && t.layer === 'both' && (
-                <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSide('frontend')}>
+                <button
+                  className="btn sm"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => setSide('frontend')}
+                >
                   Go to Frontend
                 </button>
               )}
@@ -2717,9 +3189,17 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
               <div className="pr-compose-h">
                 <Ico svg={I.pr} />
                 <b>
-                  Update {job.target.provider === 'GitLab' ? `merge request !${job.target.number}` : `pull request #${job.target.number}`}
+                  Update{' '}
+                  {job.target.provider === 'GitLab'
+                    ? `merge request !${job.target.number}`
+                    : `pull request #${job.target.number}`}
                 </b>
-                <a className="muted small" href={job.target.url} target="_blank" rel="noopener noreferrer">
+                <a
+                  className="muted small"
+                  href={job.target.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {job.target.title}
                 </a>
               </div>
@@ -2728,7 +3208,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                 <TF value={title} onChange={(e) => setTitle(e.target.value)} />
               </label>
               <div className="row" style={{ gap: 8 }}>
-                <button className="btn primary" disabled={!!busy || !title.trim()} onClick={pushUpdate}>
+                <button
+                  className="btn primary"
+                  disabled={!!busy || !title.trim()}
+                  onClick={pushUpdate}
+                >
                   {busy === 'push' ? (
                     <>
                       <Spinner />
@@ -2743,7 +3227,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                   )}
                 </button>
                 <span className="muted small">
-                  Pushes to <code>{job.branch}</code>; the {job.target.provider === 'GitLab' ? 'merge request' : 'pull request'} updates
+                  Pushes to <code>{job.branch}</code>; the{' '}
+                  {job.target.provider === 'GitLab' ? 'merge request' : 'pull request'} updates
                   itself, and a comment says what changed.
                 </span>
               </div>
@@ -2758,7 +3243,12 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                   <code>{job.branch}</code> → <code>{job.base}</code>
                 </span>
                 {can('ai.use') && (
-                  <button className="btn sm ai" style={{ marginLeft: 'auto' }} disabled={!!busy} onClick={draftPr}>
+                  <button
+                    className="btn sm ai"
+                    style={{ marginLeft: 'auto' }}
+                    disabled={!!busy}
+                    onClick={draftPr}
+                  >
                     {busy === 'draft' ? (
                       <>
                         <Spinner />
@@ -2787,7 +3277,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                 />
               </label>
               <div className="row" style={{ gap: 8 }}>
-                <CB label="Draft" checked={draft} onChange={(e: Any) => setDraft(e.target.checked)} />
+                <CB
+                  label="Draft"
+                  checked={draft}
+                  onChange={(e: Any) => setDraft(e.target.checked)}
+                />
                 <span className="spacer" />
                 {!job.remote && (
                   <button
@@ -2808,7 +3302,11 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                   ) : (
                     <>
                       <Ico svg={I.pr} />
-                      {job.remote ? 'Open pull request' : <>Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>}
+                      {job.remote ? (
+                        'Open pull request'
+                      ) : (
+                        <>Commit, push and open {job.provider === 'GitLab' ? 'MR' : 'PR'}</>
+                      )}
                     </>
                   )}
                 </button>
@@ -2818,8 +3316,9 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                   'Opens the pull request for the branch the job pushed to GitHub.'
                 ) : (
                   <>
-                    Commits with your git name and email, pushes <code>{job.branch}</code> to the repository’s <code>origin</code> with your
-                    own git setup (SSH key or credential helper; the project’s token only if that’s refused), then opens the{' '}
+                    Commits with your git name and email, pushes <code>{job.branch}</code> to the
+                    repository’s <code>origin</code> with your own git setup (SSH key or credential
+                    helper; the project’s token only if that’s refused), then opens the{' '}
                     {job.provider === 'GitLab' ? 'merge request' : 'pull request'}.
                   </>
                 )}
@@ -2832,7 +3331,8 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
               <span>
                 Committed and pushed <code>{job.branch}</code> with your git setup.{' '}
                 <a href={job.pr.url} target="_blank" rel="noopener noreferrer">
-                  Open the {job.provider === 'GitLab' ? 'merge request' : 'pull request'} on {job.provider || 'GitHub'}
+                  Open the {job.provider === 'GitLab' ? 'merge request' : 'pull request'} on{' '}
+                  {job.provider || 'GitHub'}
                 </a>{' '}
                 to finish; link it to this issue in Development once it’s open.
               </span>
@@ -2847,7 +3347,9 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
                   {job.provider === 'GitLab' ? '!' : '#'}
                   {job.pr.number} {job.pr.title}
                 </a>{' '}
-                {job.target ? 'is updated with these changes.' : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}
+                {job.target
+                  ? 'is updated with these changes.'
+                  : `is open${job.pr.draft ? ' as a draft' : ''} and linked to this issue.`}
               </span>
             </div>
           )}
@@ -2856,18 +3358,35 @@ export function CodeModal({ t, agentId: initialAgent = 'build', initialSide }: {
     </Modal>
   );
 }
-export const openCode = (t: Any, side?: string) => openModal(<CodeModal t={t} initialSide={side} />);
-/** "Write code" on an issue or an epic's issue (TF-124): Code Jobs in a new tab with the issue; this tab stays as it is. The page loads the prompt and the linked repository or spec itself. */
+export const openCode = (t: Any, side?: string) =>
+  openModal(<CodeModal t={t} initialSide={side} />);
+/**
+ * "Write code" on an issue or an epic's issue (TF-124): Code Jobs in a new tab with the issue; this
+ * tab stays as it is. The page loads the prompt and the linked repository or spec itself.
+ */
 export const openWriteCode = (t: Any) => {
-  window.open(`/code-jobs?project=${encodeURIComponent(P().id)}&ticket=${encodeURIComponent(t.id)}`, '_blank', 'noopener');
+  window.open(
+    `/code-jobs?project=${encodeURIComponent(P().id)}&ticket=${encodeURIComponent(t.id)}`,
+    '_blank',
+    'noopener',
+  );
 };
 
-// ---------------------------------------------------------------- update an open pull / merge request with AI
+// ---------------------------------------------------------------- update an open pull / merge
+// request with AI
 const UPDATE_MODES: [string, string, string][] = [
   ['prompt', 'Apply changes', 'Tell the agent what to change; it works on the request’s branch.'],
-  ['enhance', 'Enhance', 'Better tests, edge cases and error handling, without changing what it does.'],
+  [
+    'enhance',
+    'Enhance',
+    'Better tests, edge cases and error handling, without changing what it does.',
+  ],
   ['review', 'Address review comments', 'Reads the open review comments and fixes what they ask.'],
-  ['describe', 'Improve description', 'Rewrites the title and description from the real diff. No code changes.'],
+  [
+    'describe',
+    'Improve description',
+    'Rewrites the title and description from the real diff. No code changes.',
+  ],
 ];
 function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
   const [mode, setMode] = useState('prompt');
@@ -2880,7 +3399,14 @@ function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
   const loadComments = async () => {
     setComments(null);
     try {
-      setComments((await api(base, { method: 'POST', body: { action: 'comments', ticketId: t.id, prId: pr.id } })).comments);
+      setComments(
+        (
+          await api(base, {
+            method: 'POST',
+            body: { action: 'comments', ticketId: t.id, prId: pr.id },
+          })
+        ).comments,
+      );
     } catch (e: Any) {
       setComments([]);
       toast(e.message, 'err');
@@ -2894,7 +3420,10 @@ function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
     setBusy(true);
     try {
       if (mode === 'describe') {
-        const r = await api(base, { method: 'POST', body: aiBody({ action: 'describe', ticketId: t.id, prId: pr.id }) });
+        const r = await api(base, {
+          method: 'POST',
+          body: aiBody({ action: 'describe', ticketId: t.id, prId: pr.id }),
+        });
         mutate(() => {
           pr.title = r.title;
           logEvent(t, `rewrote the description of ${noun} ${ref} with AI`, 'Development');
@@ -2906,7 +3435,10 @@ function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
         });
         return;
       }
-      const job = await api(base, { method: 'POST', body: aiBody({ action: 'update', ticketId: t.id, prId: pr.id, mode, prompt: text }) });
+      const job = await api(base, {
+        method: 'POST',
+        body: aiBody({ action: 'update', ticketId: t.id, prId: pr.id, mode, prompt: text }),
+      });
       closeModal();
       openCode(t, job.side);
     } catch (e: Any) {
@@ -2915,7 +3447,8 @@ function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
       setBusy(false);
     }
   };
-  const ready = mode === 'prompt' ? Boolean(text.trim()) : mode === 'review' ? Boolean(comments?.length) : true;
+  const ready =
+    mode === 'prompt' ? Boolean(text.trim()) : mode === 'review' ? Boolean(comments?.length) : true;
   return (
     <Modal
       title={`Update ${ref} with AI`}
@@ -2931,12 +3464,18 @@ function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        <b>{pr.title}</b> · {pr.repo} · <code>{pr.branch}</code> → <code>{pr.base}</code>. Code changes run on the {noun}’s own branch; you
-        review the diff, then push to the same {noun}.
+        <b>{pr.title}</b> · {pr.repo} · <code>{pr.branch}</code> → <code>{pr.base}</code>. Code
+        changes run on the {noun}’s own branch; you review the diff, then push to the same {noun}.
       </p>
       <div className="upd-modes" role="radiogroup" aria-label="What to do">
         {UPDATE_MODES.map(([k, l, d]) => (
-          <button key={k} role="radio" aria-checked={mode === k} className={mode === k ? 'on' : ''} onClick={() => pick(k)}>
+          <button
+            key={k}
+            role="radio"
+            aria-checked={mode === k}
+            className={mode === k ? 'on' : ''}
+            onClick={() => pick(k)}
+          >
             <b>{l}</b>
             <span className="muted small">{d}</span>
           </button>
@@ -2991,10 +3530,14 @@ function UpdatePrModal({ t, pr }: { t: Any; pr: Any }) {
   );
 }
 export const openUpdatePr = (t: Any, pr: Any) => openModal(<UpdatePrModal t={t} pr={pr} />);
-// CodeRabbit findings on a pull request → an agent round on that request's branch (same as Update → What to change).
+// CodeRabbit findings on a pull request → an agent round on that request's branch (same as Update →
+// What to change).
 setPrFixer(async (t, pr, text) => {
   if (!codeReady()) {
-    toast('Writing code needs TicketForge on your computer with the local repository set (Project settings → Code & GitHub).', 'err');
+    toast(
+      'Writing code needs TicketForge on your computer with the local repository set (Project settings → Code & GitHub).',
+      'err',
+    );
     return;
   }
   try {
@@ -3014,9 +3557,19 @@ void emit;
 
 // ---------------------------------------------------------------- many issues at once
 const LIVE = ['starting', 'queued', 'running'];
-const sideOf = (t: Any) => (hasBackend() ? (t.layer === 'both' ? 'both' : t.layer === 'backend' ? 'backend' : 'frontend') : 'frontend');
+const sideOf = (t: Any) =>
+  hasBackend()
+    ? t.layer === 'both'
+      ? 'both'
+      : t.layer === 'backend'
+        ? 'backend'
+        : 'frontend'
+    : 'frontend';
 
-/** Backlog → select issues → Write code with AI: one job per issue (both repositories for Frontend + Backend issues). */
+/**
+ * Backlog → select issues → Write code with AI: one job per issue (both repositories for Frontend +
+ * Backend issues).
+ */
 export function BulkCodeModal({ ids }: { ids: string[] }) {
   const tickets = P().tickets.filter((x: Any) => ids.includes(x.id));
   const [agents, setAgents] = useState<Any[]>([]);
@@ -3035,12 +3588,19 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
     setBusy(true);
     try {
       const ticketIds = only || tickets.map((x: Any) => x.id);
-      const r = await api(base, { method: 'POST', body: aiBody({ action: 'start-many', ticketIds, instructions: text, agentId }) });
-      setResult({ ...r, held: tickets.filter((x: Any) => !ticketIds.includes(x.id)).map((x: Any) => x.key) });
+      const r = await api(base, {
+        method: 'POST',
+        body: aiBody({ action: 'start-many', ticketIds, instructions: text, agentId }),
+      });
+      setResult({
+        ...r,
+        held: tickets.filter((x: Any) => !ticketIds.includes(x.id)).map((x: Any) => x.key),
+      });
       refreshCodeStatus();
       mutate(() => {
         for (const x of tickets)
-          if (r.started.some((j: Any) => j.ticketId === x.id)) logEvent(x, 'started writing code with AI (batch)', 'Development');
+          if (r.started.some((j: Any) => j.ticketId === x.id))
+            logEvent(x, 'started writing code with AI (batch)', 'Development');
       });
       S.checked.clear();
       emit();
@@ -3053,12 +3613,17 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
   if (result)
     return (
       <Modal title="Code jobs" wide actions={[{ label: 'Close (jobs keep running)' }]}>
-        <div className={`warn-banner ${result.skipped.length ? '' : 'ok-banner'}`} style={{ marginBottom: 12 }}>
+        <div
+          className={`warn-banner ${result.skipped.length ? '' : 'ok-banner'}`}
+          style={{ marginBottom: 12 }}
+        >
           <Ico svg={result.skipped.length ? I.warn : I.check} />
           <span>
             Started {result.started.length} job{result.started.length === 1 ? '' : 's'}
-            {result.skipped.length ? `; skipped ${result.skipped.map((x: Any) => `${x.key} (${x.reason})`).join(', ')}` : ''}. Up to{' '}
-            {result.queue.max} run at once; the rest wait in line.
+            {result.skipped.length
+              ? `; skipped ${result.skipped.map((x: Any) => `${x.key} (${x.reason})`).join(', ')}`
+              : ''}
+            . Up to {result.queue.max} run at once; the rest wait in line.
             {result.held?.length
               ? ` Held back to avoid conflicts: ${result.held.join(', ')}. Start them once the first round is merged.`
               : ''}
@@ -3068,10 +3633,15 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
       </Modal>
     );
   return (
-    <Modal title={`Write code for ${tickets.length} issue${tickets.length === 1 ? '' : 's'}`} wide actions={[{ label: 'Cancel' }]}>
+    <Modal
+      title={`Write code for ${tickets.length} issue${tickets.length === 1 ? '' : 's'}`}
+      wide
+      actions={[{ label: 'Cancel' }]}
+    >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Each issue gets its own branch, worktree and Claude Code agent. Frontend + Backend issues get an API contract and a job in each
-        repository. Jobs run a few at a time; the rest wait in line, and you review each one as it finishes.
+        Each issue gets its own branch, worktree and Claude Code agent. Frontend + Backend issues
+        get an API contract and a job in each repository. Jobs run a few at a time; the rest wait in
+        line, and you review each one as it finishes.
       </p>
       <ul className="bulk-code-list">
         {tickets.map((x: Any) => (
@@ -3080,7 +3650,11 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
             <span className="bcl-title">{x.title}</span>
             {hasBackend() ? (
               <span className={`layer-chip l-${sideOf(x)}`}>
-                {{ frontend: 'Frontend', backend: 'Backend', both: 'FE + BE' }[sideOf(x) as 'frontend']}
+                {
+                  { frontend: 'Frontend', backend: 'Backend', both: 'FE + BE' }[
+                    sideOf(x) as 'frontend'
+                  ]
+                }
               </span>
             ) : null}
             <span className="muted small">{x.acceptanceCriteria?.length || 0} AC</span>
@@ -3091,7 +3665,11 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
         <label className="field" style={{ minWidth: 240 }}>
           <span>Agent</span>
           <SF value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            <MenuItem value="">{hasBackend() ? 'Automatic: Frontend / Backend Developer per repository' : 'Build a Ticket'}</MenuItem>
+            <MenuItem value="">
+              {hasBackend()
+                ? 'Automatic: Frontend / Backend Developer per repository'
+                : 'Build a Ticket'}
+            </MenuItem>
             {agents.map((a: Any) => (
               <MenuItem key={a.id} value={a.id}>
                 {a.icon} {a.name} · {a.model}
@@ -3109,7 +3687,11 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
           onChange={(e) => setText(e.target.value)}
         />
       </label>
-      <ParallelCheck ids={tickets.map((x: Any) => x.id)} busy={busy} onStart={(ids) => start(ids)} />
+      <ParallelCheck
+        ids={tickets.map((x: Any) => x.id)}
+        busy={busy}
+        onStart={(ids) => start(ids)}
+      />
       <button className="btn ai" disabled={busy || !tickets.length} onClick={() => start()}>
         {busy ? (
           <>
@@ -3129,7 +3711,9 @@ export function BulkCodeModal({ ids }: { ids: string[] }) {
   );
 }
 
-/** Every code job in the project, live: status, progress, changes and cost; click one to open it. */
+/**
+ * Every code job in the project, live: status, progress, changes and cost; click one to open it.
+ */
 export function CodeJobs() {
   const [data, setData] = useState<Any>(null);
   const base = `/api/projects/${P().id}/code`;
@@ -3155,7 +3739,8 @@ export function CodeJobs() {
   if (!jobs.length)
     return (
       <p className="muted">
-        No code jobs yet. Select issues in the backlog and choose <b>Write code with AI</b>, or open an issue’s Development section.
+        No code jobs yet. Select issues in the backlog and choose <b>Write code with AI</b>, or open
+        an issue’s Development section.
       </p>
     );
   const n = (s: string[]) => jobs.filter((j: Any) => s.includes(j.status)).length;
@@ -3220,8 +3805,17 @@ export function CodeJobs() {
               }}
             >
               <span className={`cj-badge s-${j.status}`}>
-                {LIVE.includes(j.status) ? <Spinner /> : <Ico svg={['failed', 'cancelled'].includes(j.status) ? I.warn : I.check} />}
-                {({ queued: 'Waiting', running: 'Working', starting: 'Starting' } as Record<string, string>)[j.status] ||
+                {LIVE.includes(j.status) ? (
+                  <Spinner />
+                ) : (
+                  <Ico svg={['failed', 'cancelled'].includes(j.status) ? I.warn : I.check} />
+                )}
+                {(
+                  { queued: 'Waiting', running: 'Working', starting: 'Starting' } as Record<
+                    string,
+                    string
+                  >
+                )[j.status] ||
                   STATUS[j.status] ||
                   j.status}
               </span>
@@ -3229,7 +3823,11 @@ export function CodeJobs() {
                 <div className="job-l1">
                   <code>{j.ticketKey}</code>
                   <span className="job-title">{t?.title || ''}</span>
-                  {hasBackend() && <span className={`layer-chip l-${j.side}`}>{j.side === 'backend' ? 'Backend' : 'Frontend'}</span>}
+                  {hasBackend() && (
+                    <span className={`layer-chip l-${j.side}`}>
+                      {j.side === 'backend' ? 'Backend' : 'Frontend'}
+                    </span>
+                  )}
                 </div>
                 <div className="job-l2 muted small">
                   <span>{j.agentName}</span>
@@ -3245,8 +3843,8 @@ export function CodeJobs() {
                   ) : null}
                   {j.files?.length > 0 && (
                     <span>
-                      {j.files.length} file{j.files.length === 1 ? '' : 's'} <span className="da">+{add}</span>{' '}
-                      <span className="dr">−{del}</span>
+                      {j.files.length} file{j.files.length === 1 ? '' : 's'}{' '}
+                      <span className="da">+{add}</span> <span className="dr">−{del}</span>
                     </span>
                   )}
                   {j.costUsd > 0 && <span>${j.costUsd.toFixed(2)}</span>}

@@ -1,8 +1,9 @@
 import { api, authed, body, HttpError } from '@/lib/server/http';
 import { publicFlags, setFlags } from '@/lib/features';
 
-// Feature flags (Administration → Features). Everyone signed in can read which features are locked (the app hides
-// them); only the owner can lock or unlock: PUT { changes: { [featureId]: { locked: boolean, note?: string } } }.
+// Feature flags (Administration → Features). Everyone signed in can read which features are locked
+// (the app hides them); only the owner can lock or unlock: PUT { changes: { [featureId]: { locked:
+// boolean, note?: string } } }.
 export const GET = api(async () => {
   await authed();
   return publicFlags();

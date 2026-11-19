@@ -2,8 +2,10 @@ import { api, authed } from '@/lib/server/http';
 import * as store from '@/lib/store';
 import * as auth from '@/lib/auth';
 
-// A project link from another of your workspaces: which one it's in, so the app can offer to switch there.
-// Answers only for workspaces you belong to; otherwise { workspace: null }, the same as for a project that doesn't exist.
+// A project link from another of your workspaces: which one it's in, so the app can offer to switch
+// there.
+// Answers only for workspaces you belong to; otherwise { workspace: null }, the same as for a
+// project that doesn't exist.
 export const GET = api(async (req) => {
   const u: any = await authed();
   const id = String(new URL(req.url).searchParams.get('project') || '');

@@ -2,8 +2,32 @@
 // Administration: users, invites, roles & permissions, email. Also the "Your account" dialog.
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { S, emit, useStore, feat, toast, openModal, closeModal, copyText, ago, closeProject, type Any } from './core';
-import { Modal, Confirm, Ico, I, Avatar, Spinner, EmptyState, ErrorState, SectionNav, useSection, PlanLimits } from './ui';
+import {
+  S,
+  emit,
+  useStore,
+  feat,
+  toast,
+  openModal,
+  closeModal,
+  copyText,
+  ago,
+  closeProject,
+  type Any,
+} from './core';
+import {
+  Modal,
+  Confirm,
+  Ico,
+  I,
+  Avatar,
+  Spinner,
+  EmptyState,
+  ErrorState,
+  SectionNav,
+  useSection,
+  PlanLimits,
+} from './ui';
 import {
   loadAdminData,
   updateUser,
@@ -53,15 +77,30 @@ const TABS: [string, string, string][] = [
 ];
 /** Tabs only the owner sees: people (users and invites) and feature flags. */
 const OWNER_TABS = ['users', 'invites', 'features', 'gdrive', 'billing', 'payments'];
-/** Features the owner locked. A feature that starts locked (Google Drive storage) isn't counted: nobody locked it. */
+/**
+ * Features the owner locked. A feature that starts locked (Google Drive storage) isn't counted:
+ * nobody locked it.
+ */
 const lockedCount = () => (S.flags?.features || []).filter((f: Any) => f.locked && !f.off).length;
-const A: Any = { users: [], roles: [], invites: [], projects: [], email: null, ai: null, loaded: false, error: null };
+const A: Any = {
+  users: [],
+  roles: [],
+  invites: [],
+  projects: [],
+  email: null,
+  ai: null,
+  loaded: false,
+  error: null,
+};
 
-const accessText = (a: Any) => (a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`);
+const accessText = (a: Any) =>
+  a === 'all' ? 'All projects' : `${(a || []).length} project${(a || []).length === 1 ? '' : 's'}`;
 const accessTitle = (a: Any) =>
   a === 'all'
     ? 'Every current and future project'
-    : (a || []).map((id: string) => A.projects.find((p: Any) => p.id === id)?.name || id).join(', ') || 'No projects';
+    : (a || [])
+        .map((id: string) => A.projects.find((p: Any) => p.id === id)?.name || id)
+        .join(', ') || 'No projects';
 function inviteState(i: Any): [string, string] {
   if (i.accepted_at) return ['Accepted', 's-done'];
   if (i.revoked_at) return ['Revoked', 's-todo'];
@@ -70,7 +109,9 @@ function inviteState(i: Any): [string, string] {
 }
 async function load() {
   // Users and invites are the owner's alone (the server refuses them to other administrators).
-  const { users, roles, invites, projects, email, ai } = await loadAdminData(Boolean(S.user?.isOwner));
+  const { users, roles, invites, projects, email, ai } = await loadAdminData(
+    Boolean(S.user?.isOwner),
+  );
   Object.assign(A, { users, roles, invites, projects, email, loaded: true, error: null });
   if (ai) applyAi(ai);
   else emit();
@@ -112,7 +153,8 @@ export default function AdminPage({ tab }: { tab: string }) {
       (k !== 'billing' || S.auth?.saas) &&
       (k !== 'payments' || (S.auth?.saas && S.auth?.canManageBilling)),
   );
-  // A non-owner who opens Billing stays on it and is told it's for the owner (BillingTab), not sent to another tab.
+  // A non-owner who opens Billing stays on it and is told it's for the owner (BillingTab), not sent
+  // to another tab.
   const t = tabs.some(([k]) => k === tt) || (tt === 'billing' && S.auth?.saas) ? tt : tabs[0][0];
   if (!A.loaded) {
     if (!A.error) return <AdminSkeleton />;
@@ -164,7 +206,9 @@ export default function AdminPage({ tab }: { tab: string }) {
               <Ico svg={ic} />
               {l}
               {k === 'invites' && <span className="count">{pending}</span>}
-              {k === 'features' && lockedCount() > 0 && <span className="count bad">{lockedCount()}</span>}
+              {k === 'features' && lockedCount() > 0 && (
+                <span className="count bad">{lockedCount()}</span>
+              )}
               {k === 'users' && <span className="count">{A.users.length}</span>}
             </Link>
           ))}
@@ -189,11 +233,19 @@ export default function AdminPage({ tab }: { tab: string }) {
 // ---------------------------------------------------------------- users
 function UsersTab({ q, setQ }: { q: string; setQ: (v: string) => void }) {
   const qq = q.toLowerCase();
-  const list = A.users.filter((u: Any) => !qq || `${u.name} ${u.email} ${u.roleName}`.toLowerCase().includes(qq));
+  const list = A.users.filter(
+    (u: Any) => !qq || `${u.name} ${u.email} ${u.roleName}`.toLowerCase().includes(qq),
+  );
   return (
     <>
       <div className="toolbar">
-        <TF search sx={{ width: 220 }} placeholder="Search users" value={q} onChange={(e) => setQ(e.target.value)} />
+        <TF
+          search
+          sx={{ width: 220 }}
+          placeholder="Search users"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <div className="spacer" />
         <span className="muted small">
           {A.users.filter((u: Any) => u.status === 'active').length} active · {A.users.length} total
@@ -230,7 +282,10 @@ function UsersTab({ q, setQ }: { q: string; setQ: (v: string) => void }) {
                 </div>
               </td>
               <td>
-                <span title={u.isOwner ? 'The owner is always an Administrator' : undefined} style={{ display: 'inline-block' }}>
+                <span
+                  title={u.isOwner ? 'The owner is always an Administrator' : undefined}
+                  style={{ display: 'inline-block' }}
+                >
                   <SF
                     filter
                     value={u.roleId}
@@ -285,7 +340,10 @@ function UsersTab({ q, setQ }: { q: string; setQ: (v: string) => void }) {
                       className="btn sm subtle"
                       onClick={() =>
                         act(
-                          () => updateUser(u.id, { status: u.status === 'active' ? 'disabled' : 'active' }),
+                          () =>
+                            updateUser(u.id, {
+                              status: u.status === 'active' ? 'disabled' : 'active',
+                            }),
                           `${u.name} ${u.status === 'active' ? 'disabled — signed out everywhere' : 'enabled'}`,
                         )
                       }
@@ -340,7 +398,11 @@ function AccessPicker({ value, onChange }: { value: Any; onChange: (v: Any) => v
   return (
     <div className="field">
       <span>Project access</span>
-      <RB checked={all} onChange={() => onChange('all')} label="All projects, including future ones" />
+      <RB
+        checked={all}
+        onChange={() => onChange('all')}
+        label="All projects, including future ones"
+      />
       <RB checked={!all} onChange={() => onChange([])} label="Only selected projects" />
       {!all && (
         <div className="proj-pick">
@@ -379,13 +441,17 @@ function AccessModal({ u }: { u: Any }) {
           kind: 'primary',
           onClick: async () => {
             closeModal();
-            await act(() => updateUser(u.id, { projectAccess: access }), `Updated access for ${u.name}`);
+            await act(
+              () => updateUser(u.id, { projectAccess: access }),
+              `Updated access for ${u.name}`,
+            );
           },
         },
       ]}
     >
       <p className="muted" style={{ marginTop: 0 }}>
-        {u.email} · {u.roleName}. Their role decides what they can do; this decides which projects they can see.
+        {u.email} · {u.roleName}. Their role decides what they can do; this decides which projects
+        they can see.
       </p>
       <AccessPicker value={access} onChange={setAccess} />
     </Modal>
@@ -437,8 +503,8 @@ function InvitesTab() {
         <div className="warn-banner">
           <Ico svg={I.warn} />
           <span>
-            Email isn’t configured, so invites give you a link to share yourself. See the <Link href="/admin/email">Email</Link> tab to send
-            them automatically.
+            Email isn’t configured, so invites give you a link to share yourself. See the{' '}
+            <Link href="/admin/email">Email</Link> tab to send them automatically.
           </span>
         </div>
       )}
@@ -470,7 +536,11 @@ function InvitesTab() {
                     <span className={`loz ${cls}`}>{st}</span>
                     {st === 'Pending' && (
                       <div className="muted small">
-                        expires {new Date(i.expires_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                        expires{' '}
+                        {new Date(i.expires_at).toLocaleDateString(undefined, {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
                       </div>
                     )}
                   </td>
@@ -486,7 +556,10 @@ function InvitesTab() {
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {st !== 'Accepted' && <ResendButton id={i.id} />}
                     {st === 'Pending' && (
-                      <button className="btn sm danger-subtle" onClick={() => act(() => revokeInvite(i.id), 'Invite revoked')}>
+                      <button
+                        className="btn sm danger-subtle"
+                        onClick={() => act(() => revokeInvite(i.id), 'Invite revoked')}
+                      >
                         Revoke
                       </button>
                     )}
@@ -513,7 +586,10 @@ function InvitesTab() {
     </>
   );
 }
-/** Resend (or new link) for one invite: disabled with a spinner while it sends; the server enforces the cooldown and maximum. */
+/**
+ * Resend (or new link) for one invite: disabled with a spinner while it sends; the server enforces
+ * the cooldown and maximum.
+ */
 function ResendButton({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
@@ -521,7 +597,10 @@ function ResendButton({ id }: { id: string }) {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
-    const r = await act(() => resendInvite(id), A.email?.configured ? 'Invite resent' : 'New invite link created');
+    const r = await act(
+      () => resendInvite(id),
+      A.email?.configured ? 'Invite resent' : 'New invite link created',
+    );
     inFlight.current = false;
     setBusy(false);
     if (r) openModal(<LinkModal title={`New invite link for ${r.email}`} res={r} />);
@@ -543,7 +622,12 @@ function InviteModal() {
     inFlight.current = true;
     setSending(true);
     try {
-      const res = await createInvites({ emails: f.emails, roleId: f.roleId, projectAccess: f.access, message: f.message });
+      const res = await createInvites({
+        emails: f.emails,
+        roleId: f.roleId,
+        projectAccess: f.access,
+        message: f.message,
+      });
       const sent = res.results.filter((r: Any) => !r.error).length;
       if (sent) toast(`${sent === 1 ? 'Invite' : `${sent} invites`} sent`);
       for (const r of res.results) if (r.error) toast(`${r.email}: ${r.error}`, 'err');
@@ -563,7 +647,13 @@ function InviteModal() {
       persistent={sending}
       actions={[
         { label: 'Cancel', disabled: sending },
-        { label: sending ? 'Sending…' : 'Send invites', kind: 'primary', disabled: !f.emails.trim(), busy: sending, onClick: send },
+        {
+          label: sending ? 'Sending…' : 'Send invites',
+          kind: 'primary',
+          disabled: !f.emails.trim(),
+          busy: sending,
+          onClick: send,
+        },
       ]}
     >
       <label className="field">
@@ -643,7 +733,8 @@ function InviteResults({ results }: { results: Any[] }) {
         </div>
       ))}
       <p className="muted small" style={{ marginBottom: 0 }}>
-        Each link works once and expires in 7 days. Anyone with the link can create the account, so share it only with that person.
+        Each link works once and expires in 7 days. Anyone with the link can create the account, so
+        share it only with that person.
       </p>
     </Modal>
   );
@@ -654,7 +745,9 @@ function RolesTab() {
   const perms = S.auth.permissions;
   const groups = [...new Set(perms.map((p: Any) => p.group))] as string[];
   const toggle = async (r: Any, key: string, on: boolean) => {
-    const permissions = on ? [...new Set([...r.permissions, key])] : r.permissions.filter((k: string) => k !== key);
+    const permissions = on
+      ? [...new Set([...r.permissions, key])]
+      : r.permissions.filter((k: string) => k !== key);
     r.permissions = permissions;
     emit();
     await act(
@@ -665,8 +758,8 @@ function RolesTab() {
   return (
     <>
       <p className="muted" style={{ marginTop: -4 }}>
-        Tick what each role can do. Changes apply immediately to everyone with that role. The Administrator role always has every
-        permission.
+        Tick what each role can do. Changes apply immediately to everyone with that role. The
+        Administrator role always has every permission.
       </p>
       <div className="toolbar">
         <button className="btn" onClick={() => openModal(<RoleModal />)}>
@@ -690,10 +783,18 @@ function RolesTab() {
                       <span className="muted small">Locked</span>
                     ) : (
                       <span>
-                        <button className="icon-btn" title="Rename" onClick={() => openModal(<RoleModal role={r} />)}>
+                        <button
+                          className="icon-btn"
+                          title="Rename"
+                          onClick={() => openModal(<RoleModal role={r} />)}
+                        >
                           <Ico svg={I.pencil} />
                         </button>
-                        <button className="icon-btn" title="Delete role" onClick={() => openModal(<DeleteRoleModal role={r} />)}>
+                        <button
+                          className="icon-btn"
+                          title="Delete role"
+                          onClick={() => openModal(<DeleteRoleModal role={r} />)}
+                        >
                           <Ico svg={I.trash} />
                         </button>
                       </span>
@@ -736,7 +837,11 @@ function RolesTab() {
   );
 }
 function RoleModal({ role }: { role?: Any }) {
-  const [f, setF] = useState({ name: role?.name || '', description: role?.description || '', copy: '' });
+  const [f, setF] = useState({
+    name: role?.name || '',
+    description: role?.description || '',
+    copy: '',
+  });
   return (
     <Modal
       title={role ? `Edit ${role.name}` : 'Create role'}
@@ -751,7 +856,11 @@ function RoleModal({ role }: { role?: Any }) {
             await act(
               () =>
                 role
-                  ? updateRole(role.id, { name: f.name.trim(), description: f.description.trim(), permissions: role.permissions })
+                  ? updateRole(role.id, {
+                      name: f.name.trim(),
+                      description: f.description.trim(),
+                      permissions: role.permissions,
+                    })
                   : createRole({
                       name: f.name.trim(),
                       description: f.description.trim(),
@@ -767,11 +876,20 @@ function RoleModal({ role }: { role?: Any }) {
         <span>
           Name <span className="req">*</span>
         </span>
-        <TF autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Business analyst" />
+        <TF
+          autoFocus
+          value={f.name}
+          onChange={(e) => setF({ ...f, name: e.target.value })}
+          placeholder="e.g. Business analyst"
+        />
       </label>
       <label className="field">
         <span>Description</span>
-        <TF value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="What this role is for" />
+        <TF
+          value={f.description}
+          onChange={(e) => setF({ ...f, description: e.target.value })}
+          placeholder="What this role is for"
+        />
       </label>
       {!role && (
         <label className="field">
@@ -802,7 +920,10 @@ function DeleteRoleModal({ role }: { role: Any }) {
           kind: 'danger',
           onClick: async () => {
             closeModal();
-            await act(() => deleteRole(role.id, role.users ? to : undefined), `Deleted ${role.name}`);
+            await act(
+              () => deleteRole(role.id, role.users ? to : undefined),
+              `Deleted ${role.name}`,
+            );
           },
         },
       ]}
@@ -835,23 +956,41 @@ function applyAi(st: Any) {
   S.status = {
     ...(S.status || {}),
     ...st,
-    account: acct && { cli: acct.cli, signedIn: acct.signedIn, loggedIn: acct.loggedIn, subscriptionType: acct.subscriptionType },
+    account: acct && {
+      cli: acct.cli,
+      signedIn: acct.signedIn,
+      loggedIn: acct.loggedIn,
+      subscriptionType: acct.subscriptionType,
+    },
   };
   emit();
 }
-const PLAN: Record<string, string> = { pro: 'Pro', max: 'Max', team: 'Team', enterprise: 'Enterprise', free: 'Free' };
+const PLAN: Record<string, string> = {
+  pro: 'Pro',
+  max: 'Max',
+  team: 'Team',
+  enterprise: 'Enterprise',
+  free: 'Free',
+};
 
 function envExample(c: Any, id: string) {
   const p = c.providers.find((x: Any) => x.id === id) || {};
   const lines = [`AI_PROVIDER=${id}`];
   if (id === 'ollama') lines.push(`AI_BASE_URL=${p.base}`);
-  else if (id === 'custom') lines.push('AI_BASE_URL=https://your-endpoint.example.com/v1', 'AI_API_KEY=your-key');
+  else if (id === 'custom')
+    lines.push('AI_BASE_URL=https://your-endpoint.example.com/v1', 'AI_API_KEY=your-key');
   else lines.push(`AI_API_KEY=your-key        # or ${p.keys?.[0]}`);
   lines.push(p.model ? `AI_MODEL=${p.model}` : 'AI_MODEL=a-model-your-key-can-use');
   return lines.join('\n');
 }
-const MISSING: Record<string, string> = { provider: 'a provider', key: 'the API key', model: 'the model', baseUrl: 'the endpoint URL' };
-const join = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
+const MISSING: Record<string, string> = {
+  provider: 'a provider',
+  key: 'the API key',
+  model: 'the model',
+  baseUrl: 'the endpoint URL',
+};
+const join = (xs: string[]) =>
+  xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '';
 
 function TestResult({ t, onPick }: { t: Any; onPick?: (m: string) => void }) {
   if (t.ok)
@@ -890,7 +1029,12 @@ function ModelList({ models, onPick }: { models: string[]; onPick?: (m: string) 
       </p>
       <div className="model-list">
         {models.map((m) => (
-          <button key={m} type="button" className="label-chip" onClick={() => (onPick ? onPick(m) : copyText(m))}>
+          <button
+            key={m}
+            type="button"
+            className="label-chip"
+            onClick={() => (onPick ? onPick(m) : copyText(m))}
+          >
             {m}
           </button>
         ))}
@@ -901,7 +1045,9 @@ function ModelList({ models, onPick }: { models: string[]; onPick?: (m: string) 
 
 /** Add or edit one AI provider. The key is saved encrypted and never shown again. */
 function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
-  const saved = entry ? (c.settings?.providers || []).find((x: Any) => x.id === entry.entryId) : null;
+  const saved = entry
+    ? (c.settings?.providers || []).find((x: Any) => x.id === entry.entryId)
+    : null;
   const [f, setF] = useState(() => ({
     provider: saved?.provider || 'claude-sub',
     model: saved?.model || '',
@@ -921,9 +1067,12 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
     setModels([]);
     setResult(null);
   };
-  // The saved key is reused only for the same provider and endpoint, so it's never sent to a different service.
+  // The saved key is reused only for the same provider and endpoint, so it's never sent to a
+  // different service.
   const keepsKey = Boolean(
-    saved?.hasKey && saved.provider === f.provider && (saved.baseUrl || '') === f.baseUrl.trim().replace(/\/+$/, ''),
+    saved?.hasKey &&
+    saved.provider === f.provider &&
+    (saved.baseUrl || '') === f.baseUrl.trim().replace(/\/+$/, ''),
   );
   const keyOptional = f.provider === 'ollama' || f.provider === 'custom';
   const needsUrl = f.provider === 'custom';
@@ -931,9 +1080,18 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
   const [advanced, setAdvanced] = useState(Boolean(saved?.baseUrl) && !needsUrl);
   const showUrl = !sub && (needsUrl || f.provider === 'ollama' || advanced);
   const canSave = Boolean(
-    f.provider && (f.model.trim() || p.model) && (!needsUrl || f.baseUrl.trim()) && (keyOptional || keepsKey || f.apiKey.trim()),
+    f.provider &&
+    (f.model.trim() || p.model) &&
+    (!needsUrl || f.baseUrl.trim()) &&
+    (keyOptional || keepsKey || f.apiKey.trim()),
   );
-  const draft = { id: saved?.id, provider: f.provider, model: f.model.trim(), baseUrl: f.baseUrl.trim(), apiKey: f.apiKey.trim() };
+  const draft = {
+    id: saved?.id,
+    provider: f.provider,
+    model: f.model.trim(),
+    baseUrl: f.baseUrl.trim(),
+    apiKey: f.apiKey.trim(),
+  };
   const run = async (what: string, fn: () => Promise<void>) => {
     setBusy(what);
     try {
@@ -948,7 +1106,11 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
     run('models', async () => {
       const r = await aiAction({ action: 'models', draft });
       setModels(r.models || []);
-      if (!r.models?.length) setResult({ ok: false, error: 'The provider didn’t list any models. Type the model name instead.' });
+      if (!r.models?.length)
+        setResult({
+          ok: false,
+          error: 'The provider didn’t list any models. Type the model name instead.',
+        });
     });
   const test = () => run('test', async () => setResult(await aiAction({ action: 'test', draft })));
   const save = () =>
@@ -1019,22 +1181,26 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
       {sub && (
         <div className="sub-note small">
           <p style={{ margin: '0 0 6px' }}>
-            <b>Shared:</b> everyone’s AI requests use this plan. To use your subscription only for yourself, set it up in <b>My AI</b> (your
-            avatar menu) instead; each person can add their own there. TicketForge runs Claude Code on this server, signed in with the token
+            <b>Shared:</b> everyone’s AI requests use this plan. To use your subscription only for
+            yourself, set it up in <b>My AI</b> (your avatar menu) instead; each person can add
+            their own there. TicketForge runs Claude Code on this server, signed in with the token
             (no API billing).
           </p>
           <ol style={{ margin: '0 0 6px', paddingLeft: 18 }}>
             <li>
-              In a terminal on your computer run <code>claude setup-token</code> and sign in with your Claude account.
+              In a terminal on your computer run <code>claude setup-token</code> and sign in with
+              your Claude account.
             </li>
             <li>
-              Paste the <code>sk-ant-oat01-…</code> token it prints here (shown once; valid for a year).
+              Paste the <code>sk-ant-oat01-…</code> token it prints here (shown once; valid for a
+              year).
             </li>
           </ol>
           <p className="muted" style={{ margin: 0 }}>
             Needs Claude Code installed where TicketForge runs (your computer or a VPS:{' '}
-            <code>npm install -g @anthropic-ai/claude-code</code>); serverless hosting such as Vercel can’t run it. It counts toward your
-            plan’s limits, and your plan is meant for your own use: for a whole team, use a team plan or an API.
+            <code>npm install -g @anthropic-ai/claude-code</code>); serverless hosting such as
+            Vercel can’t run it. It counts toward your plan’s limits, and your plan is meant for
+            your own use: for a whole team, use a team plan or an API.
           </p>
         </div>
       )}
@@ -1079,7 +1245,11 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
           <button
             type="button"
             className="btn"
-            disabled={!!busy || (!keyOptional && !keepsKey && !f.apiKey.trim()) || (needsUrl && !f.baseUrl.trim())}
+            disabled={
+              !!busy ||
+              (!keyOptional && !keepsKey && !f.apiKey.trim()) ||
+              (needsUrl && !f.baseUrl.trim())
+            }
             onClick={loadModels}
           >
             {busy === 'models' ? (
@@ -1093,7 +1263,9 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
           </button>
         </div>
       </div>
-      {models.length > 0 && !result && <ModelList models={models} onPick={(m) => set('model', m)} />}
+      {models.length > 0 && !result && (
+        <ModelList models={models} onPick={(m) => set('model', m)} />
+      )}
       {result && (
         <div style={{ marginTop: 12 }}>
           <TestResult t={result} onPick={(m) => set('model', m)} />
@@ -1103,7 +1275,10 @@ function ProviderModal({ c, entry }: { c: Any; entry?: Any }) {
   );
 }
 
-/** The AI APIs in priority order, with their health and the controls to reorder, switch and test them. */
+/**
+ * The AI APIs in priority order, with their health and the controls to reorder, switch and test
+ * them.
+ */
 function ProvidersCard({ c }: { c: Any }) {
   const [busy, setBusy] = useState('');
   const [tests, setTests] = useState<Record<string, Any>>({});
@@ -1132,7 +1307,8 @@ function ProvidersCard({ c }: { c: Any }) {
       setTests((t) => ({ ...t, [x.entryId]: r }));
       applyAi(await getAiSettings());
     });
-  const reset = (id?: string) => run(`reset:${id || 'all'}`, async () => applyAi(await aiAction({ action: 'reset', id })));
+  const reset = (id?: string) =>
+    run(`reset:${id || 'all'}`, async () => applyAi(await aiAction({ action: 'reset', id })));
   const remove = (x: Any) =>
     openModal(
       <Confirm
@@ -1164,8 +1340,16 @@ function ProvidersCard({ c }: { c: Any }) {
     if (x.cooldown)
       return (
         <span className="loz t-blocked" title={x.cooldown.message}>
-          {x.cooldown.kind === 'credits' ? 'Out of credits' : x.cooldown.kind === 'auth' ? 'Key rejected' : 'Limited'} · retry{' '}
-          {new Date(x.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          {x.cooldown.kind === 'credits'
+            ? 'Out of credits'
+            : x.cooldown.kind === 'auth'
+              ? 'Key rejected'
+              : 'Limited'}{' '}
+          · retry{' '}
+          {new Date(x.cooldown.until).toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
         </span>
       );
     if (x.active) return <span className="loz t-pass">In use</span>;
@@ -1178,8 +1362,9 @@ function ProvidersCard({ c }: { c: Any }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3>AI providers</h3>
           <p className="sub" style={{ marginBottom: 12 }}>
-            TicketForge uses the first provider that’s available. When one hits a rate limit, runs out of credits or fails, it switches to
-            the next one automatically and tries the first again later. Keys are stored encrypted and never shown again.
+            TicketForge uses the first provider that’s available. When one hits a rate limit, runs
+            out of credits or fails, it switches to the next one automatically and tries the first
+            again later. Keys are stored encrypted and never shown again.
           </p>
         </div>
         <button className="btn primary" onClick={() => openModal(<ProviderModal c={c} />)}>
@@ -1195,7 +1380,10 @@ function ProvidersCard({ c }: { c: Any }) {
             const pi = panel.findIndex((y) => y.entryId === x.entryId);
             const t = tests[x.entryId];
             return (
-              <div key={x.entryId} className={`prov ${x.active ? 'active' : ''} ${x.enabled ? '' : 'off'}`}>
+              <div
+                key={x.entryId}
+                className={`prov ${x.active ? 'active' : ''} ${x.enabled ? '' : 'off'}`}
+              >
                 <div className="prov-main">
                   <span className="prov-n" title="Priority">
                     {i + 1}
@@ -1215,7 +1403,9 @@ function ProvidersCard({ c }: { c: Any }) {
                           : x.keySet
                             ? ''
                             : ' · no key')}
-                      {!x.configured && x.missing?.length ? ` · missing ${join(x.missing.map((m: string) => MISSING[m]))}` : ''}
+                      {!x.configured && x.missing?.length
+                        ? ` · missing ${join(x.missing.map((m: string) => MISSING[m]))}`
+                        : ''}
                       {x.cooldown && <> · {x.cooldown.reason}</>}
                     </div>
                   </div>
@@ -1230,7 +1420,11 @@ function ProvidersCard({ c }: { c: Any }) {
                         Retry now
                       </button>
                     )}
-                    <button className="btn sm subtle" disabled={!!busy || !x.configured} onClick={() => test(x)}>
+                    <button
+                      className="btn sm subtle"
+                      disabled={!!busy || !x.configured}
+                      onClick={() => test(x)}
+                    >
                       {busy === `test:${x.entryId}` ? (
                         <>
                           <Spinner />
@@ -1274,11 +1468,19 @@ function ProvidersCard({ c }: { c: Any }) {
                           <CB
                             checked={x.enabled}
                             disabled={!!busy}
-                            onChange={(e: Any) => run(`toggle:${x.entryId}`, () => patch({ id: x.entryId, enabled: e.target.checked }))}
+                            onChange={(e: Any) =>
+                              run(`toggle:${x.entryId}`, () =>
+                                patch({ id: x.entryId, enabled: e.target.checked }),
+                              )
+                            }
                           />
                           On
                         </label>
-                        <button className="btn sm subtle" disabled={!!busy} onClick={() => openModal(<ProviderModal c={c} entry={x} />)}>
+                        <button
+                          className="btn sm subtle"
+                          disabled={!!busy}
+                          onClick={() => openModal(<ProviderModal c={c} entry={x} />)}
+                        >
                           Edit
                         </button>
                         <button
@@ -1315,7 +1517,10 @@ function ProvidersCard({ c }: { c: Any }) {
             </button>
           }
         >
-          <p>Add one or more AI APIs. With two or more, TicketForge switches automatically when one is limited.</p>
+          <p>
+            Add one or more AI APIs. With two or more, TicketForge switches automatically when one
+            is limited.
+          </p>
         </EmptyState>
       )}
 
@@ -1324,10 +1529,12 @@ function ProvidersCard({ c }: { c: Any }) {
           <CB
             checked={c.accountFallback !== false}
             disabled={!!busy}
-            onChange={(e: Any) => run('fallback', () => patch({ accountFallback: e.target.checked }))}
+            onChange={(e: Any) =>
+              run('fallback', () => patch({ accountFallback: e.target.checked }))
+            }
           />
-          On your own computer, use these providers when the local AI can’t: not installed, not signed in, sign-in expired, or usage limit
-          reached
+          On your own computer, use these providers when the local AI can’t: not installed, not
+          signed in, sign-in expired, or usage limit reached
         </label>
         {anyCooling && (
           <button className="btn sm subtle" disabled={!!busy} onClick={() => reset()}>
@@ -1339,7 +1546,10 @@ function ProvidersCard({ c }: { c: Any }) {
   );
 }
 
-/** Which AI runs on this computer (localhost): Claude Code or the GitHub Copilot CLI, and Copilot as Claude's backup. */
+/**
+ * Which AI runs on this computer (localhost): Claude Code or the GitHub Copilot CLI, and Copilot as
+ * Claude's backup.
+ */
 function LocalAiCard({ c }: { c: Any }) {
   const [busy, setBusy] = useState('');
   const run = async (key: string, fn: () => Promise<void>) => {
@@ -1357,12 +1567,15 @@ function LocalAiCard({ c }: { c: Any }) {
     <div className="card wide">
       <h3>Local AI</h3>
       <p className="sub">
-        Used when TicketForge is opened on this computer (localhost), with your own subscription. Model routing picks the model per task.
+        Used when TicketForge is opened on this computer (localhost), with your own subscription.
+        Model routing picks the model per task.
       </p>
       <div className="local-ai" style={{ marginTop: 0 }}>
         <div className="local-ai-h">
           <b>Local AI on this computer</b>
-          <span className="muted small">Used when TicketForge is opened at localhost. Runs with your own subscription.</span>
+          <span className="muted small">
+            Used when TicketForge is opened at localhost. Runs with your own subscription.
+          </span>
         </div>
         <div className="local-ai-opts" role="radiogroup" aria-label="Local AI">
           {(
@@ -1385,7 +1598,9 @@ function LocalAiCard({ c }: { c: Any }) {
           ))}
         </div>
         <div className="local-ai-cp small">
-          <span className={`dot ${!c.copilot.available ? 'bad' : c.copilot.cooldown ? 'warn' : 'ok'}`} />
+          <span
+            className={`dot ${!c.copilot.available ? 'bad' : c.copilot.cooldown ? 'warn' : 'ok'}`}
+          />
           {c.copilot.available ? (
             <>
               GitHub Copilot CLI {c.copilot.version}
@@ -1393,7 +1608,10 @@ function LocalAiCard({ c }: { c: Any }) {
                 <>
                   {' '}
                   · {c.copilot.cooldown.reason} · back{' '}
-                  {new Date(c.copilot.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  {new Date(c.copilot.cooldown.until).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
                 </>
               ) : (
                 ' · ready'
@@ -1401,8 +1619,8 @@ function LocalAiCard({ c }: { c: Any }) {
             </>
           ) : (
             <>
-              GitHub Copilot CLI isn’t installed. Run <code>npm install -g @github/copilot</code>, then <code>copilot</code> and{' '}
-              <code>/login</code>.
+              GitHub Copilot CLI isn’t installed. Run <code>npm install -g @github/copilot</code>,
+              then <code>copilot</code> and <code>/login</code>.
             </>
           )}
           {c.copilot.available && (
@@ -1427,9 +1645,12 @@ function LocalAiCard({ c }: { c: Any }) {
             <CB
               checked={Boolean(c.copilotBackup)}
               disabled={!!busy}
-              onChange={(e: Any) => run('cpbackup', () => patch({ copilotBackup: e.target.checked }))}
+              onChange={(e: Any) =>
+                run('cpbackup', () => patch({ copilotBackup: e.target.checked }))
+              }
             />
-            When your Claude account is limited or signed out, use GitHub Copilot before the providers below
+            When your Claude account is limited or signed out, use GitHub Copilot before the
+            providers below
           </label>
         )}
       </div>
@@ -1445,7 +1666,17 @@ function AiTab() {
   const [envProv, setEnvProv] = useState('openai');
   const [sec, setSec] = useSection(
     'tf.adminAiSec',
-    ['flow', 'connection', 'routing', 'models', 'usage', 'savings', 'configs', 'providers', 'local'],
+    [
+      'flow',
+      'connection',
+      'routing',
+      'models',
+      'usage',
+      'savings',
+      'configs',
+      'providers',
+      'local',
+    ],
     'flow',
   );
   const refresh = async () => {
@@ -1462,7 +1693,11 @@ function AiTab() {
   if (!c) {
     return (
       <div className="card">
-        <ErrorState compact title="Couldn’t check the AI connection" onRetry={async () => applyAi(await getAiSettings(true))}>
+        <ErrorState
+          compact
+          title="Couldn’t check the AI connection"
+          onRetry={async () => applyAi(await getAiSettings(true))}
+        >
           <p>The server didn’t report how TicketForge connects to AI.</p>
         </ErrorState>
       </div>
@@ -1507,8 +1742,18 @@ function AiTab() {
       icon: I.chart,
       badge: c.routingOn ? null : <span className="loz">Off</span>,
     },
-    { key: 'models', label: 'Models per tier', hint: 'High, Standard and Light on each AI', icon: I.bot },
-    { key: 'usage', label: 'Usage & suggestions', hint: 'Calls, tokens, cost and how to use less', icon: I.history },
+    {
+      key: 'models',
+      label: 'Models per tier',
+      hint: 'High, Standard and Light on each AI',
+      icon: I.bot,
+    },
+    {
+      key: 'usage',
+      label: 'Usage & suggestions',
+      hint: 'Calls, tokens, cost and how to use less',
+      icon: I.history,
+    },
     {
       key: 'savings',
       label: 'Savings & limits',
@@ -1525,17 +1770,28 @@ function AiTab() {
       label: 'Configurations',
       hint: 'Named AI setups for AI buttons',
       icon: I.settings,
-      badge: (c.settings?.configs || []).length ? <span className="count">{c.settings.configs.length}</span> : null,
+      badge: (c.settings?.configs || []).length ? (
+        <span className="count">{c.settings.configs.length}</span>
+      ) : null,
     },
     {
       key: 'providers',
       label: 'Providers',
       hint: 'AI APIs, in priority order',
       icon: I.grid,
-      badge: (c.apis || []).some((x: Any) => x.cooldown) ? <span className="loz t-blocked">Limited</span> : null,
+      badge: (c.apis || []).some((x: Any) => x.cooldown) ? (
+        <span className="loz t-blocked">Limited</span>
+      ) : null,
     },
-    { key: 'decisions', label: 'Decisions', hint: 'Fast choices with Jev (optional)', icon: I.flag },
-    ...(c.copilot ? [{ key: 'local', label: 'Local AI', hint: 'Claude Code or GitHub Copilot', icon: I.user }] : []),
+    {
+      key: 'decisions',
+      label: 'Decisions',
+      hint: 'Fast choices with Jev (optional)',
+      icon: I.flag,
+    },
+    ...(c.copilot
+      ? [{ key: 'local', label: 'Local AI', hint: 'Claude Code or GitHub Copilot', icon: I.user }]
+      : []),
   ];
   return (
     <div className="sec-layout">
@@ -1593,19 +1849,27 @@ function AiTab() {
                   {c.account?.subscriptionType
                     ? `${String(c.account.subscriptionType).replace(/^./, (x: string) => x.toUpperCase())} `
                     : ''}
-                  plan’s usage, read from Anthropic with your Claude Code sign-in on this computer (the same numbers as Claude’s own usage
-                  page). The AI pill warns at 80%.
-                  {c.localEngine !== 'copilot' && c.copilot.available ? ' Near the weekly limit? Switch to Copilot with ⌥⇧A.' : ''}
+                  plan’s usage, read from Anthropic with your Claude Code sign-in on this computer
+                  (the same numbers as Claude’s own usage page). The AI pill warns at 80%.
+                  {c.localEngine !== 'copilot' && c.copilot.available
+                    ? ' Near the weekly limit? Switch to Copilot with ⌥⇧A.'
+                    : ''}
                 </p>
                 {c.planUsage ? (
                   <PlanLimits u={c.planUsage} />
                 ) : (
-                  <p className="muted small">Not available: sign in to Claude Code with a Pro or Max plan to see these.</p>
+                  <p className="muted small">
+                    Not available: sign in to Claude Code with a Pro or Max plan to see these.
+                  </p>
                 )}
                 {c.planUsage?.checkedAt && (
                   <p className="muted small" style={{ marginBottom: 0 }}>
-                    Checked {new Date(c.planUsage.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · updates every
-                    minute.
+                    Checked{' '}
+                    {new Date(c.planUsage.checkedAt).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}{' '}
+                    · updates every minute.
                   </p>
                 )}
               </div>
@@ -1631,8 +1895,9 @@ function AiTab() {
                 {showEnv && (
                   <>
                     {' '}
-                    A provider set with environment variables (on Vercel: <b>Settings → Environment Variables</b>, then redeploy) is used
-                    after the ones above.
+                    A provider set with environment variables (on Vercel:{' '}
+                    <b>Settings → Environment Variables</b>, then redeploy) is used after the ones
+                    above.
                   </>
                 )}
               </p>
@@ -1659,15 +1924,18 @@ function AiTab() {
             <div className="card wide">
               <h3>AI connection</h3>
               <p className="sub">
-                TicketForge uses AI to write and improve tickets and test scripts. On your own computer it uses your Claude account;
-                anywhere else, the providers below.
+                TicketForge uses AI to write and improve tickets and test scripts. On your own
+                computer it uses your Claude account; anywhere else, the providers below.
               </p>
               <table className="tbl">
                 <tbody>
                   {row(
                     'This address uses',
                     <>
-                      <span className={`loz ${c.ready ? 't-pass' : 't-fail'}`}>{c.ready ? 'Ready' : 'Not set up'}</span> <b>{now}</b>
+                      <span className={`loz ${c.ready ? 't-pass' : 't-fail'}`}>
+                        {c.ready ? 'Ready' : 'Not set up'}
+                      </span>{' '}
+                      <b>{now}</b>
                       {c.switched && (
                         <span className="loz t-blocked" style={{ marginLeft: 6 }}>
                           Switched
@@ -1684,8 +1952,9 @@ function AiTab() {
                         {c.mode === 'account' && c.switched && (
                           <>
                             {' '}
-                            Your Claude account {acct?.cooldown ? 'hit its usage limit' : 'isn’t available'}, so the providers below stand
-                            in.
+                            Your Claude account{' '}
+                            {acct?.cooldown ? 'hit its usage limit' : 'isn’t available'}, so the
+                            providers below stand in.
                           </>
                         )}
                       </div>
@@ -1726,8 +1995,13 @@ function AiTab() {
                               {acct.cooldown && (
                                 <div className="small" style={{ color: 'var(--warning)' }}>
                                   Usage limit reached · resets{' '}
-                                  {new Date(acct.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                                  {c.accountFallback ? '. Using the providers below until then.' : '.'}
+                                  {new Date(acct.cooldown.until).toLocaleTimeString([], {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                  })}
+                                  {c.accountFallback
+                                    ? '. Using the providers below until then.'
+                                    : '.'}
                                 </div>
                               )}
                             </>
@@ -1754,13 +2028,15 @@ function AiTab() {
                   <p style={{ marginBottom: 0 }}>
                     {acct?.cli?.available ? (
                       <>
-                        Open Terminal on this computer, run <code>claude</code> and sign in with your Claude account. Then click{' '}
-                        <b>Check again</b>.
+                        Open Terminal on this computer, run <code>claude</code> and sign in with
+                        your Claude account. Then click <b>Check again</b>.
                       </>
                     ) : (
                       <>
-                        Install Claude Code on this computer with <code>npm install -g @anthropic-ai/claude-code</code>, run{' '}
-                        <code>claude</code> and sign in with your Claude account. Then click <b>Check again</b>.
+                        Install Claude Code on this computer with{' '}
+                        <code>npm install -g @anthropic-ai/claude-code</code>, run{' '}
+                        <code>claude</code> and sign in with your Claude account. Then click{' '}
+                        <b>Check again</b>.
                       </>
                     )}
                   </p>
@@ -1842,7 +2118,9 @@ function AiTab() {
                         }}
                       >
                         {c.localEngine === 'copilot' ? 'GitHub Copilot' : 'Claude Code'}
-                        {c.localEngine !== 'copilot' && c.copilotBackup ? ', Copilot as backup' : ''}
+                        {c.localEngine !== 'copilot' && c.copilotBackup
+                          ? ', Copilot as backup'
+                          : ''}
                       </a>,
                     )}
                 </tbody>
@@ -1888,7 +2166,12 @@ function EmailTab() {
               'Links point to',
               <>
                 {e.appUrl}
-                {!e.appUrlSet && <span className="muted small"> (detected — set APP_URL for a public address)</span>}
+                {!e.appUrlSet && (
+                  <span className="muted small">
+                    {' '}
+                    (detected — set APP_URL for a public address)
+                  </span>
+                )}
               </>,
             )}
           </tbody>
@@ -1936,8 +2219,8 @@ function EmailTab() {
             'Data is stored in your Postgres database.'
           ) : (
             <>
-              Using the built-in local database. Set DATABASE_URL to your Supabase connection string and run <code>npm run db:push</code> to
-              move your data there.
+              Using the built-in local database. Set DATABASE_URL to your Supabase connection string
+              and run <code>npm run db:push</code> to move your data there.
             </>
           )}
         </p>
@@ -1945,7 +2228,8 @@ function EmailTab() {
       <div className="card wide">
         <h3>Configuration</h3>
         <p className="sub">
-          Add these to the <code>.env</code> file in the project folder, then restart TicketForge. Passwords are never shown here.
+          Add these to the <code>.env</code> file in the project folder, then restart TicketForge.
+          Passwords are never shown here.
         </p>
         <pre className="code">{`DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
 APP_URL=https://tickets.yourcompany.com
@@ -2001,11 +2285,21 @@ export function AccountModal() {
       <h4 style={{ margin: '0 0 8px' }}>Change password</h4>
       <label className="field">
         <span>Current password</span>
-        <TF type="password" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} />
+        <TF
+          type="password"
+          autoComplete="current-password"
+          value={cur}
+          onChange={(e) => setCur(e.target.value)}
+        />
       </label>
       <label className="field">
         <span>New password (at least 8 characters)</span>
-        <TF type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+        <TF
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+        />
       </label>
     </Modal>
   );

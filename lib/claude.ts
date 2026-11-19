@@ -1,11 +1,13 @@
 // AI for TicketForge. Two modes, picked per request:
-//  - "account": on your own computer (opened at localhost), the Claude Code CLI (`claude -p`) with the
-//    personal Claude account you're signed into there. No API key needed.
-//  - "api": anywhere else (Vercel, a server, a domain), an AI API you configure with environment variables:
-//    Anthropic, or any OpenAI-compatible API (OpenAI, Google Gemini, OpenRouter, Groq, DeepSeek, Mistral,
-//    xAI, Together, Ollama, or your own endpoint). Set up by an administrator in Administration → AI, or with
-//    environment variables (see .env.example). Several APIs can be set up in priority order: when one is rate
-//    limited, out of credits or failing, TicketForge switches to the next and retries the first one later.
+//  - "account": on your own computer (opened at localhost), the Claude Code CLI (`claude -p`) with
+//    the personal Claude account you're signed into there. No API key needed.
+//  - "api": anywhere else (Vercel, a server, a domain), an AI API you configure with environment
+//    variables:
+//    Anthropic, or any OpenAI-compatible API (OpenAI, Google Gemini, OpenRouter, Groq, DeepSeek,
+//    Mistral, xAI, Together, Ollama, or your own endpoint). Set up by an administrator in
+//    Administration → AI, or with environment variables (see .env.example). Several APIs can be set
+//    up in priority order: when one is rate limited, out of credits or failing, TicketForge
+//    switches to the next and retries the first one later.
 //    Locally, when your Claude account hits its usage limit, it can switch to those APIs too.
 // AI_MODE=account|api overrides the automatic choice.
 import { spawn, execFile } from 'node:child_process';
@@ -44,7 +46,10 @@ fs.mkdirSync(WORKDIR, { recursive: true });
 
 export const DEFAULT_API_MODEL = 'claude-opus-5-5';
 export const DEFAULT_CLI_MODEL = 'opus';
-/** Reasoning level (Administration → Generation) → provider effort. Fast is the default: direct and consistent. */
+/**
+ * Reasoning level (Administration → Generation) → provider effort. Fast is the default: direct and
+ * consistent.
+ */
 const EFFORT = { fast: 'low', balanced: 'medium', thorough: 'high' };
 const effortOf = (reasoning) => EFFORT[reasoning] || EFFORT.fast;
 
@@ -67,10 +72,17 @@ function candidateBins() {
     }
   };
   out.push(...globDir(path.join(home, '.local', 'share', 'claude', 'versions')));
-  for (const d of globDir(path.join(home, 'Library', 'Application Support', 'Claude', 'claude-code'), ['*'])) {
+  for (const d of globDir(
+    path.join(home, 'Library', 'Application Support', 'Claude', 'claude-code'),
+    ['*'],
+  )) {
     out.push(path.join(d, 'claude.app', 'Contents', 'MacOS', 'claude'));
   }
-  out.push(path.join(home, '.claude', 'local', 'claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude');
+  out.push(
+    path.join(home, '.claude', 'local', 'claude'),
+    '/opt/homebrew/bin/claude',
+    '/usr/local/bin/claude',
+  );
   return [...new Set(out)];
 }
 const versionOf = (bin) =>
@@ -100,7 +112,10 @@ export function cliInfo() {
 
 // ---------------------------------------------------------------- which mode
 const LOCAL_HOST = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]|::1|[a-z0-9-]+\.localhost)$/i;
-/** True when the app was opened on this computer (localhost). Behind a proxy, X-Forwarded-Host counts. */
+/**
+ * True when the app was opened on this computer (localhost). Behind a proxy, X-Forwarded-Host
+ * counts.
+ */
 export function isLocalHost(hostHeader) {
   const h = String(hostHeader || '')
     .split(',')[0]
@@ -116,7 +131,8 @@ function isLocalRequest() {
 }
 /** "account" (your Claude account through Claude Code) or "api" (the configured AI API). */
 export function aiMode() {
-  // The hosted service (SaaS) never answers with the server's own Claude sign-in: each workspace uses its own AI.
+  // The hosted service (SaaS) never answers with the server's own Claude sign-in: each workspace
+  // uses its own AI.
   if (isSaas()) return 'api';
   const forced = String(process.env.AI_MODE || '').toLowerCase();
   if (forced === 'account' || forced === 'api') return forced;
@@ -126,7 +142,8 @@ export function aiMode() {
 // ---------------------------------------------------------------- AI API providers
 // Everything except Anthropic speaks the OpenAI chat-completions format.
 export const PROVIDERS = {
-  // Your Claude Pro/Max plan: runs the real Claude Code here, signed in with a token from `claude setup-token`.
+  // Your Claude Pro/Max plan: runs the real Claude Code here, signed in with a token from `claude
+  // setup-token`.
   'claude-sub': {
     label: 'Claude subscription, shared with everyone (Claude Code)',
     kind: 'claude-code',
@@ -142,24 +159,68 @@ export const PROVIDERS = {
     model: 'claude-opus-5-5',
     site: 'console.anthropic.com',
   },
-  openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', keys: ['OPENAI_API_KEY'], site: 'platform.openai.com' },
+  openai: {
+    label: 'OpenAI',
+    base: 'https://api.openai.com/v1',
+    keys: ['OPENAI_API_KEY'],
+    site: 'platform.openai.com',
+  },
   gemini: {
     label: 'Google Gemini',
     base: 'https://generativelanguage.googleapis.com/v1beta/openai',
     keys: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
     site: 'aistudio.google.com',
   },
-  openrouter: { label: 'OpenRouter', base: 'https://openrouter.ai/api/v1', keys: ['OPENROUTER_API_KEY'], site: 'openrouter.ai' },
-  groq: { label: 'Groq', base: 'https://api.groq.com/openai/v1', keys: ['GROQ_API_KEY'], site: 'console.groq.com' },
-  deepseek: { label: 'DeepSeek', base: 'https://api.deepseek.com/v1', keys: ['DEEPSEEK_API_KEY'], site: 'platform.deepseek.com' },
-  mistral: { label: 'Mistral', base: 'https://api.mistral.ai/v1', keys: ['MISTRAL_API_KEY'], site: 'console.mistral.ai' },
-  xai: { label: 'xAI (Grok)', base: 'https://api.x.ai/v1', keys: ['XAI_API_KEY'], site: 'console.x.ai' },
-  together: { label: 'Together AI', base: 'https://api.together.xyz/v1', keys: ['TOGETHER_API_KEY'], site: 'api.together.ai' },
-  ollama: { label: 'Ollama', base: 'http://localhost:11434/v1', keys: [], keyOptional: true, site: 'ollama.com' },
+  openrouter: {
+    label: 'OpenRouter',
+    base: 'https://openrouter.ai/api/v1',
+    keys: ['OPENROUTER_API_KEY'],
+    site: 'openrouter.ai',
+  },
+  groq: {
+    label: 'Groq',
+    base: 'https://api.groq.com/openai/v1',
+    keys: ['GROQ_API_KEY'],
+    site: 'console.groq.com',
+  },
+  deepseek: {
+    label: 'DeepSeek',
+    base: 'https://api.deepseek.com/v1',
+    keys: ['DEEPSEEK_API_KEY'],
+    site: 'platform.deepseek.com',
+  },
+  mistral: {
+    label: 'Mistral',
+    base: 'https://api.mistral.ai/v1',
+    keys: ['MISTRAL_API_KEY'],
+    site: 'console.mistral.ai',
+  },
+  xai: {
+    label: 'xAI (Grok)',
+    base: 'https://api.x.ai/v1',
+    keys: ['XAI_API_KEY'],
+    site: 'console.x.ai',
+  },
+  together: {
+    label: 'Together AI',
+    base: 'https://api.together.xyz/v1',
+    keys: ['TOGETHER_API_KEY'],
+    site: 'api.together.ai',
+  },
+  ollama: {
+    label: 'Ollama',
+    base: 'http://localhost:11434/v1',
+    keys: [],
+    keyOptional: true,
+    site: 'ollama.com',
+  },
   custom: { label: 'OpenAI-compatible API', base: '', keys: [], keyOptional: true },
 };
 
-/** A Claude subscription token (from `claude setup-token`) only works inside Claude Code, never as an API key. */
+/**
+ * A Claude subscription token (from `claude setup-token`) only works inside Claude Code, never as
+ * an API key.
+ */
 export const SUBSCRIPTION_TOKEN_NOTE =
   'This is a Claude subscription token (sk-ant-oat…, from claude setup-token), not an API key. Add it as the “Claude subscription (Claude Code)” provider instead: that runs Claude Code with your plan.';
 export const isSubscriptionToken = (k) => /^sk-ant-oat/i.test(String(k || '').trim());
@@ -167,7 +228,8 @@ function buildConfig({ id, key = '', model = '', baseUrl = '', source, keyError 
   const p = PROVIDERS[id];
   if (p?.kind === 'anthropic' && isSubscriptionToken(key)) keyError = SUBSCRIPTION_TOKEN_NOTE;
   if (p?.kind === 'claude-code' && key && !isSubscriptionToken(key))
-    keyError = 'That isn’t a Claude subscription token: run claude setup-token and paste the sk-ant-oat01-… token it prints.';
+    keyError =
+      'That isn’t a Claude subscription token: run claude setup-token and paste the sk-ant-oat01-… token it prints.';
   if (!p)
     return {
       id: id || null,
@@ -175,12 +237,18 @@ function buildConfig({ id, key = '', model = '', baseUrl = '', source, keyError 
       source,
       configured: false,
       missing: id ? [] : ['provider'],
-      error: id ? `Unknown AI provider "${id}". Use one of: ${Object.keys(PROVIDERS).join(', ')}.` : null,
+      error: id
+        ? `Unknown AI provider "${id}". Use one of: ${Object.keys(PROVIDERS).join(', ')}.`
+        : null,
     };
   const base = String(baseUrl || p.base || '').replace(/\/+$/, '');
   const m = String(model || p.model || '').trim();
   const kind = p.kind || 'openai';
-  const missing = [!key && !p.keyOptional && 'key', kind === 'openai' && !base && 'baseUrl', !m && 'model'].filter(Boolean);
+  const missing = [
+    !key && !p.keyOptional && 'key',
+    kind === 'openai' && !base && 'baseUrl',
+    !m && 'model',
+  ].filter(Boolean);
   return {
     id,
     label: p.label,
@@ -197,19 +265,42 @@ function buildConfig({ id, key = '', model = '', baseUrl = '', source, keyError 
     error: keyError,
   };
 }
-/** From AI_PROVIDER / AI_API_KEY / AI_MODEL / AI_BASE_URL, or a provider's own key variable (e.g. OPENAI_API_KEY). */
+/**
+ * From AI_PROVIDER / AI_API_KEY / AI_MODEL / AI_BASE_URL, or a provider's own key variable (e.g.
+ * OPENAI_API_KEY).
+ */
 function envConfig() {
   let id = String(process.env.AI_PROVIDER || '')
     .toLowerCase()
     .trim();
   if (!id)
-    id = Object.keys(PROVIDERS).find((k) => PROVIDERS[k].keys.some((e) => process.env[e])) || (process.env.AI_BASE_URL ? 'custom' : '');
-  if (!id) return { id: null, label: null, source: 'env', configured: false, missing: ['provider'], error: null };
+    id =
+      Object.keys(PROVIDERS).find((k) => PROVIDERS[k].keys.some((e) => process.env[e])) ||
+      (process.env.AI_BASE_URL ? 'custom' : '');
+  if (!id)
+    return {
+      id: null,
+      label: null,
+      source: 'env',
+      configured: false,
+      missing: ['provider'],
+      error: null,
+    };
   const p: any = PROVIDERS[id];
-  const key = process.env.AI_API_KEY || (p ? p.keys.map((e) => process.env[e]).find(Boolean) : '') || '';
-  return buildConfig({ id, key, model: process.env.AI_MODEL, baseUrl: process.env.AI_BASE_URL, source: 'env' });
+  const key =
+    process.env.AI_API_KEY || (p ? p.keys.map((e) => process.env[e]).find(Boolean) : '') || '';
+  return buildConfig({
+    id,
+    key,
+    model: process.env.AI_MODEL,
+    baseUrl: process.env.AI_BASE_URL,
+    source: 'env',
+  });
 }
-/** Every AI API in priority order: the providers saved in Administration → AI, then the environment's. */
+/**
+ * Every AI API in priority order: the providers saved in Administration → AI, then the
+ * environment's.
+ */
 export async function apiChain({ all = false }: any = {}) {
   let saved: any[] = [];
   try {
@@ -220,12 +311,22 @@ export async function apiChain({ all = false }: any = {}) {
   const chain = saved
     .filter((e) => all || e.enabled !== false)
     .map((e) => ({
-      ...buildConfig({ id: e.provider, key: e.key, model: e.model, baseUrl: e.baseUrl, source: 'panel', keyError: e.keyError }),
+      ...buildConfig({
+        id: e.provider,
+        key: e.key,
+        model: e.model,
+        baseUrl: e.baseUrl,
+        source: 'panel',
+        keyError: e.keyError,
+      }),
       entryId: e.id,
       enabled: e.enabled !== false,
     }));
   const env = envConfig();
-  if (env.id && !chain.some((c) => c.id === env.id && c.key === env.key && c.baseUrl === env.baseUrl))
+  if (
+    env.id &&
+    !chain.some((c) => c.id === env.id && c.key === env.key && c.baseUrl === env.baseUrl)
+  )
     chain.push({ ...env, entryId: 'env', enabled: true });
   return chain;
 }
@@ -235,7 +336,10 @@ export async function apiConfig() {
   const ready = all.filter((c) => c.configured);
   return ready.find((c) => !cooling(c.entryId)) || ready[0] || all[0] || envConfig();
 }
-/** Settings typed in the panel but not saved yet. A blank key reuses entry `id`'s saved key only for the same provider and endpoint. */
+/**
+ * Settings typed in the panel but not saved yet. A blank key reuses entry `id`'s saved key only for
+ * the same provider and endpoint.
+ */
 async function draftConfig(d) {
   const id = String(d?.provider || '');
   const key = String(d?.apiKey || '').trim() || (await savedKeyFor(d?.id, id, d?.baseUrl));
@@ -246,14 +350,18 @@ async function targetConfig(t) {
   if (t?.draft) return draftConfig(t.draft);
   if (t?.id) {
     const c = (await apiChain({ all: true })).find((x) => x.entryId === t.id);
-    if (!c) throw Object.assign(new Error('That provider was removed. Reload the page.'), { status: 404 });
+    if (!c)
+      throw Object.assign(new Error('That provider was removed. Reload the page.'), {
+        status: 404,
+      });
     return c;
   }
   return apiConfig();
 }
 
-// ---------------------------------------------------------------- switching when a provider is limited
-// In-memory per server instance: which providers are cooling down after a limit or failure, and which was used last.
+// ---------------------------------------------------------------- switching when a provider is
+// limited In-memory per server instance: which providers are cooling down after a limit or failure,
+// and which was used last.
 G0.__tfAiHealth ??= { cool: new Map(), last: null };
 const H = G0.__tfAiHealth;
 function cooling(key) {
@@ -280,7 +388,13 @@ export function clearCooldown(key) {
 const health = (key) => {
   const c = cooling(key);
   return (
-    c && { kind: c.kind, reason: c.reason, message: c.message, at: new Date(c.at).toISOString(), until: new Date(c.until).toISOString() }
+    c && {
+      kind: c.kind,
+      reason: c.reason,
+      message: c.message,
+      at: new Date(c.at).toISOString(),
+      until: new Date(c.until).toISOString(),
+    }
   );
 };
 
@@ -313,7 +427,9 @@ function retryAfterMs(headers) {
   return 0;
 }
 const capWait = (ms, dflt) => Math.min(Math.max(ms || dflt, 5000), 6 * 36e5);
-/** Why a provider failed and how long to leave it alone. null: not the provider's fault (cancelled). */
+/**
+ * Why a provider failed and how long to leave it alone. null: not the provider's fault (cancelled).
+ */
 function classify(e) {
   if (e?.name === 'AbortError' || e?.message === 'Cancelled') return null;
   const status = e?.httpStatus;
@@ -324,10 +440,15 @@ function classify(e) {
       msg,
     )
   ) {
-    return { kind: 'credits', reason: 'is out of credits or over its quota', waitMs: capWait(e.retryAfterMs, 36e5) };
+    return {
+      kind: 'credits',
+      reason: 'is out of credits or over its quota',
+      waitMs: capWait(e.retryAfterMs, 36e5),
+    };
   }
-  // Claude subscription limits ("You've hit your weekly limit · resets Nov 13 at 4am", "5-hour limit", "session limit"):
-  // the account rests for hours, so move work to the AI APIs and don't retry it every minute.
+  // Claude subscription limits ("You've hit your weekly limit · resets Nov 13 at 4am", "5-hour
+  // limit", "session limit"): the account rests for hours, so move work to the AI APIs and don't
+  // retry it every minute.
   if (
     /hit your (weekly|daily|monthly|session|\d+-hour|usage)? ?limit|(weekly|daily|monthly|session|\d+-hour) limit|limit\s*·\s*resets/i.test(
       msg,
@@ -340,14 +461,28 @@ function classify(e) {
       waitMs: kind === 'weekly' ? 6 * 36e5 : kind === 'daily' ? 2 * 36e5 : 30 * 6e4,
     };
   }
-  if (status === 429 || /rate.?limit|too many requests|resource.?exhausted|usage limit|limit reached|tokens per min/i.test(msg)) {
+  if (
+    status === 429 ||
+    /rate.?limit|too many requests|resource.?exhausted|usage limit|limit reached|tokens per min/i.test(
+      msg,
+    )
+  ) {
     return { kind: 'rate', reason: 'hit its rate limit', waitMs: capWait(e.retryAfterMs, 6e4) };
   }
-  if (status === 529 || status === 503 || /overloaded|temporarily unavailable|over capacity/i.test(msg)) {
+  if (
+    status === 529 ||
+    status === 503 ||
+    /overloaded|temporarily unavailable|over capacity/i.test(msg)
+  ) {
     return { kind: 'busy', reason: 'is overloaded', waitMs: capWait(e.retryAfterMs, 3e4) };
   }
-  if (status === 401 || status === 403) return { kind: 'auth', reason: 'rejected its API key', waitMs: 6e5 };
-  if (/output limit|context length|context window|maximum context|too many tokens|prompt is too long/i.test(msg))
+  if (status === 401 || status === 403)
+    return { kind: 'auth', reason: 'rejected its API key', waitMs: 6e5 };
+  if (
+    /output limit|context length|context window|maximum context|too many tokens|prompt is too long/i.test(
+      msg,
+    )
+  )
     return { kind: 'size', reason: 'can’t handle a request this large', waitMs: 0 };
   return { kind: 'error', reason: 'failed', waitMs: 12e4 };
 }
@@ -355,12 +490,14 @@ const nameOf = (c) => `${c.label}${c.model ? ` (${c.model})` : ''}`;
 const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 /**
- * Tries each provider in order until one answers. Providers that are cooling down go last. `from` describes why we
- * got here (the Claude account's limit) so the first switch can be reported.
+ * Tries each provider in order until one answers. Providers that are cooling down go last. `from`
+ * describes why we got here (the Claude account's limit) so the first switch can be reported.
  */
 async function runChain(chain, opts, from?) {
   const fresh = chain.filter((c) => !cooling(c.entryId));
-  const resting = chain.filter((c) => cooling(c.entryId)).sort((a, b) => cooling(a.entryId).until - cooling(b.entryId).until);
+  const resting = chain
+    .filter((c) => cooling(c.entryId))
+    .sort((a, b) => cooling(a.entryId).until - cooling(b.entryId).until);
   const order = [...fresh, ...resting];
   const problems: any[] = [];
   let prev = from;
@@ -374,7 +511,8 @@ async function runChain(chain, opts, from?) {
       opts.onSwitch?.(
         `${prev.name} ${prev.reason}, so TicketForge switched to ${nameOf(cfg)}${c ? ` (it ${c.reason} earlier; trying it again)` : ''}.`,
       );
-    // The service's own AI (keys from the environment) counts toward the workspace's plan; its own keys don't.
+    // The service's own AI (keys from the environment) counts toward the workspace's plan; its own
+    // keys don't.
     const giveBack = cfg.source === 'env' ? await consume('aiCalls') : null;
     try {
       const out = await callApi(cfg, opts);
@@ -387,7 +525,9 @@ async function runChain(chain, opts, from?) {
       const f = classify(e);
       if (!f) throw e;
       markFailed(cfg.entryId, nameOf(cfg), f, e.message);
-      problems.push(`${nameOf(cfg)} ${f.reason}${f.waitMs ? ` (retrying after ${clock(Date.now() + f.waitMs)})` : ''}: ${e.message}`);
+      problems.push(
+        `${nameOf(cfg)} ${f.reason}${f.waitMs ? ` (retrying after ${clock(Date.now() + f.waitMs)})` : ''}: ${e.message}`,
+      );
       if (order.length === 1 && !from) throw e; // only one provider: its own error says it best
       prev = { name: nameOf(cfg), reason: f.reason };
     }
@@ -423,11 +563,23 @@ const publicApi = (c) => ({
   error: c.error,
 });
 
-const ENV_NAMES = { provider: 'AI_PROVIDER', key: 'AI_API_KEY', model: 'AI_MODEL', baseUrl: 'AI_BASE_URL' };
-const UI_NAMES = { provider: 'a provider', key: 'the API key', model: 'the model', baseUrl: 'the endpoint URL' };
-const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0]);
+const ENV_NAMES = {
+  provider: 'AI_PROVIDER',
+  key: 'AI_API_KEY',
+  model: 'AI_MODEL',
+  baseUrl: 'AI_BASE_URL',
+};
+const UI_NAMES = {
+  provider: 'a provider',
+  key: 'the API key',
+  model: 'the model',
+  baseUrl: 'the endpoint URL',
+};
+const list = (xs) =>
+  xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0];
 function apiSetupMessage(c) {
-  if (!c) return 'No AI API is set up for this address. An administrator can add one in Administration → AI.';
+  if (!c)
+    return 'No AI API is set up for this address. An administrator can add one in Administration → AI.';
   if (c.error) return c.error;
   if (!c.id)
     return 'No AI API is set up for this address. An administrator can add one in Administration → AI, or open TicketForge on your own computer to use your Claude account.';
@@ -436,7 +588,10 @@ function apiSetupMessage(c) {
   return `${c.label} isn’t fully set up: add ${list(c.missing.map((m) => UI_NAMES[m]))} in Administration → AI.`;
 }
 
-/** Which AI this request uses, every API in priority order with its health, and whether it's ready. `details` adds account email and organization (admins). */
+/**
+ * Which AI this request uses, every API in priority order with its health, and whether it's ready.
+ * `details` adds account email and organization (admins).
+ */
 export async function providerStatus({ details = false, planFresh = false }: any = {}) {
   const mode = aiMode();
   const chainAll = await apiChain({ all: true });
@@ -451,14 +606,26 @@ export async function providerStatus({ details = false, planFresh = false }: any
       cli,
       signedIn: Boolean(cli.available && acct?.loggedIn !== false),
       cooldown: health('account'),
-      ...(acct ? (details ? acct : { loggedIn: acct.loggedIn, subscriptionType: acct.subscriptionType || null }) : {}),
+      ...(acct
+        ? details
+          ? acct
+          : { loggedIn: acct.loggedIn, subscriptionType: acct.subscriptionType || null }
+        : {}),
     };
   }
   const aiSet = await getAiSettings().catch(() => ({}));
   const fallback = await accountFallbackOn();
-  // Locally: the providers stand in while your Claude account is limited, signed out or not installed.
-  const accountLimited = mode === 'account' && (Boolean(account?.cooldown) || !account?.signedIn) && fallback && usable.length > 0;
-  const ready = mode === 'account' ? Boolean(account?.signedIn) || (fallback && usable.length > 0) : usable.length > 0;
+  // Locally: the providers stand in while your Claude account is limited, signed out or not
+  // installed.
+  const accountLimited =
+    mode === 'account' &&
+    (Boolean(account?.cooldown) || !account?.signedIn) &&
+    fallback &&
+    usable.length > 0;
+  const ready =
+    mode === 'account'
+      ? Boolean(account?.signedIn) || (fallback && usable.length > 0)
+      : usable.length > 0;
   return {
     mode,
     ready,
@@ -472,36 +639,57 @@ export async function providerStatus({ details = false, planFresh = false }: any
       return b.limit ? { ...b, action: r.budget.action } : null;
     })(),
     ...(await (async () => {
-      // Which AI answers next on this computer: Copilot (chosen, or standing in for a limited Claude account), Claude, or an API.
+      // Which AI answers next on this computer: Copilot (chosen, or standing in for a limited
+      // Claude account), Claude, or an API.
       const cp = mode === 'account' ? await copilotInfo() : { available: false };
       const cpOk = cp.available && !cooling('copilot');
       if (mode === 'account' && aiSet.localEngine === 'copilot' && cpOk)
         return { label: 'GitHub Copilot', model: aiSet.copilotModel || 'default', switched: false };
       if (mode === 'account' && aiSet.localEngine === 'copilot' && !cpOk)
         return {
-          label: !accountLimited && account?.signedIn ? 'Claude account' : active ? active.label : 'AI not set up',
+          label:
+            !accountLimited && account?.signedIn
+              ? 'Claude account'
+              : active
+                ? active.label
+                : 'AI not set up',
           model: !accountLimited && account?.signedIn ? DEFAULT_CLI_MODEL : active?.model || null,
           switched: true,
         };
       if (mode === 'account' && accountLimited && aiSet.copilotBackup && cpOk)
         return { label: 'GitHub Copilot', model: aiSet.copilotModel || 'default', switched: true };
       return {
-        label: mode === 'account' && !accountLimited ? 'Claude account' : active ? active.label : 'AI not set up',
+        label:
+          mode === 'account' && !accountLimited
+            ? 'Claude account'
+            : active
+              ? active.label
+              : 'AI not set up',
         model: normalizeRouting(aiSet.routing).enabled
           ? 'per task'
           : mode === 'account' && !accountLimited
             ? DEFAULT_CLI_MODEL
             : active?.model || null,
-        switched: mode === 'account' ? accountLimited : Boolean(active && usable[0] && active !== usable[0]),
+        switched:
+          mode === 'account'
+            ? accountLimited
+            : Boolean(active && usable[0] && active !== usable[0]),
       };
     })()),
     backups: Math.max(0, usable.length - 1),
     account,
     accountFallback: fallback,
     // GitHub Copilot as the local AI or Claude's backup (this computer only).
-    copilot: mode === 'account' ? { ...(await copilotInfo()), cooldown: health('copilot'), models: COPILOT_MODELS } : null,
-    // Your Claude plan's 5-hour and weekly limits (this computer only, when signed in to Claude Code with a plan).
-    planUsage: mode === 'account' && account?.signedIn ? await planUsage({ fresh: planFresh }).catch(() => null) : null,
+    copilot:
+      mode === 'account'
+        ? { ...(await copilotInfo()), cooldown: health('copilot'), models: COPILOT_MODELS }
+        : null,
+    // Your Claude plan's 5-hour and weekly limits (this computer only, when signed in to Claude
+    // Code with a plan).
+    planUsage:
+      mode === 'account' && account?.signedIn
+        ? await planUsage({ fresh: planFresh }).catch(() => null)
+        : null,
     localEngine: aiSet.localEngine === 'copilot' ? 'copilot' : 'claude',
     copilotModel: aiSet.copilotModel || '',
     copilotBackup: Boolean(aiSet.copilotBackup),
@@ -509,7 +697,13 @@ export async function providerStatus({ details = false, planFresh = false }: any
     // Admins get the full list; everyone else only names, models and health.
     apis: chainAll.map((c) =>
       details
-        ? { ...publicApi(c), entryId: c.entryId, enabled: c.enabled, cooldown: health(c.entryId), active: c === active }
+        ? {
+            ...publicApi(c),
+            entryId: c.entryId,
+            enabled: c.enabled,
+            cooldown: health(c.entryId),
+            active: c === active,
+          }
         : {
             label: c.label,
             model: c.model || null,
@@ -532,7 +726,8 @@ export async function providerStatus({ details = false, planFresh = false }: any
         }
       : {}),
     routingOn: normalizeRouting(aiSet.routing).enabled,
-    // For the model picker on AI buttons (everyone): what each tier runs on here, and the custom configurations.
+    // For the model picker on AI buttons (everyone): what each tier runs on here, and the custom
+    // configurations.
     aiChoices: (() => {
       const r: any = normalizeRouting(aiSet.routing);
       const api = active || usable[0] || null;
@@ -548,7 +743,13 @@ export async function providerStatus({ details = false, planFresh = false }: any
         tiers: Object.fromEntries(TIERS.map((t) => [t, tierModel(t)])),
         configs: normalizeConfigs(aiSet.configs)
           .filter((c) => c.enabled)
-          .map((c) => ({ id: c.id, name: c.name, engine: c.engine, model: c.model, reasoning: c.reasoning })),
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            engine: c.engine,
+            model: c.model,
+            reasoning: c.reasoning,
+          })),
       };
     })(),
     providers: Object.entries<any>(PROVIDERS).map(([id, p]: any) => ({
@@ -564,7 +765,8 @@ export async function providerStatus({ details = false, planFresh = false }: any
   };
 }
 
-// ---------------------------------------------------------------- Claude Code (local, personal account)
+// ---------------------------------------------------------------- Claude Code (local, personal
+// account)
 const G = globalThis;
 G.__tfClaude ??= { status: null, statusAt: 0, pending: null };
 const C = G.__tfClaude;
@@ -583,35 +785,68 @@ function runCli(args, { timeout = 20000 }: any = {}) {
       /*turbopackIgnore: true*/ CLI_BIN,
       args,
       { cwd: WORKDIR, env: cliEnv(), timeout, maxBuffer: 1 << 20 },
-      (err, stdout, stderr) => resolve({ code: err ? (err.code ?? 1) : 0, stdout: String(stdout), stderr: String(stderr) }),
+      (err, stdout, stderr) =>
+        resolve({
+          code: err ? (err.code ?? 1) : 0,
+          stdout: String(stdout),
+          stderr: String(stderr),
+        }),
     );
     child.stdin.end();
   });
 }
 /**
- * GitHub Copilot's limits as TicketForge can see them on this computer (the Copilot CLI doesn't report your plan's
- * premium-request quota): { connected, reason?, rows: [{ key, name, value, reached }] }. "Connected" = TicketForge runs
- * on this computer, the CLI is installed and it isn't signed out. Not connected → no rows.
+ * GitHub Copilot's limits as TicketForge can see them on this computer (the Copilot CLI doesn't
+ * report your plan's premium-request quota): { connected, reason?, rows: [{ key, name, value,
+ * reached }] }. "Connected" = TicketForge runs on this computer, the CLI is installed and it isn't
+ * signed out. Not connected → no rows.
  */
 export async function copilotLimits() {
   if (aiMode() !== 'account')
-    return { connected: false, rows: [], reason: 'GitHub Copilot only runs when TicketForge is opened on your own computer.' };
+    return {
+      connected: false,
+      rows: [],
+      reason: 'GitHub Copilot only runs when TicketForge is opened on your own computer.',
+    };
   const info = await copilotInfo();
-  if (!info.available) return { connected: false, rows: [], reason: 'The GitHub Copilot CLI isn’t installed on this computer.' };
+  if (!info.available)
+    return {
+      connected: false,
+      rows: [],
+      reason: 'The GitHub Copilot CLI isn’t installed on this computer.',
+    };
   const cool = health('copilot');
-  if (cool?.kind === 'auth') return { connected: false, rows: [], reason: 'GitHub Copilot isn’t signed in on this computer.' };
+  if (cool?.kind === 'auth')
+    return {
+      connected: false,
+      rows: [],
+      reason: 'GitHub Copilot isn’t signed in on this computer.',
+    };
   const s = await getAiSettings().catch(() => ({}));
   const hit = Boolean(cool && ['rate', 'credits'].includes(cool.kind));
-  const back = new Date(cool?.until || 0).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const back = new Date(cool?.until || 0).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
   return {
     connected: true,
     rows: [
-      { key: 'usage', name: 'Usage limit', value: hit ? `Reached, back at ${back}` : 'Not reached', reached: hit },
+      {
+        key: 'usage',
+        name: 'Usage limit',
+        value: hit ? `Reached, back at ${back}` : 'Not reached',
+        reached: hit,
+      },
       { key: 'model', name: 'Model', value: s.copilotModel || 'Copilot’s default', reached: false },
       {
         key: 'role',
         name: 'Used as',
-        value: s.localEngine === 'copilot' ? 'Main local AI' : s.copilotBackup ? 'Backup for your Claude account' : 'Not used',
+        value:
+          s.localEngine === 'copilot'
+            ? 'Main local AI'
+            : s.copilotBackup
+              ? 'Backup for your Claude account'
+              : 'Not used',
         reached: false,
       },
       { key: 'cli', name: 'Copilot CLI', value: `Version ${info.version}`, reached: false },
@@ -619,8 +854,9 @@ export async function copilotLimits() {
   };
 }
 /**
- * Whether Claude Code on this computer is signed in. Fresh for a minute; after that the last answer is returned
- * at once and checked again in the background, so the status bar never waits on (or flickers with) the CLI.
+ * Whether Claude Code on this computer is signed in. Fresh for a minute; after that the last answer
+ * is returned at once and checked again in the background, so the status bar never waits on (or
+ * flickers with) the CLI.
  */
 export async function accountStatus({ fresh = false }: any = {}) {
   const age = Date.now() - C.statusAt;
@@ -643,8 +879,8 @@ async function readAccount() {
       subscriptionType: j.subscriptionType || null,
     };
   } catch {
-    // No JSON: an older Claude Code without `claude auth` (unknown, so don't block it), or a failed or
-    // timed-out check (null: keep what we knew).
+    // No JSON: an older Claude Code without `claude auth` (unknown, so don't block it), or a failed
+    // or timed-out check (null: keep what we knew).
     return r.code === 0 ? { loggedIn: null } : null;
   }
 }
@@ -654,7 +890,8 @@ function checkAccount() {
     try {
       await cliInfo();
       let st = await readAccount();
-      // Signed in a moment ago and now not? Ask once more before showing it (token refreshes can blip).
+      // Signed in a moment ago and now not? Ask once more before showing it (token refreshes can
+      // blip).
       if (st?.loggedIn === false && C.status?.loggedIn === true) {
         await new Promise((r) => setTimeout(r, 1500));
         st = await readAccount();
@@ -671,8 +908,9 @@ function checkAccount() {
 }
 
 /**
- * Ask the AI once and return the full text reply. Uses your Claude account locally, the AI API elsewhere.
- * opts: { system, prompt, model, onText(chunkLength, totalLength), signal }. `model` only applies to the Claude account.
+ * Ask the AI once and return the full text reply. Uses your Claude account locally, the AI API
+ * elsewhere. opts: { system, prompt, model, onText(chunkLength, totalLength), signal }. `model`
+ * only applies to the Claude account.
  */
 /** AI isn't set up: a 503 the app shows as a message, not a crash. */
 const notReady = (msg) => Object.assign(new Error(msg), { status: 503 });
@@ -683,7 +921,10 @@ async function askAccount(opts, { useCopilot, viaCopilotFirst }: any) {
   const resting = cooling('account');
   let from = null;
   if (resting && fallback) {
-    from = { name: 'Your Claude account', reason: `${resting.reason} (resets ${clock(resting.until)})` };
+    from = {
+      name: 'Your Claude account',
+      reason: `${resting.reason} (resets ${clock(resting.until)})`,
+    };
   } else {
     const cli = await cliInfo();
     const unusable = !cli.available
@@ -704,23 +945,33 @@ async function askAccount(opts, { useCopilot, viaCopilotFirst }: any) {
     }
   }
   if (!from && viaCopilotFirst)
-    opts.onSwitch?.(`${viaCopilotFirst.name} ${viaCopilotFirst.reason}, so TicketForge switched to your Claude account.`);
+    opts.onSwitch?.(
+      `${viaCopilotFirst.name} ${viaCopilotFirst.reason}, so TicketForge switched to your Claude account.`,
+    );
   if (!from) {
     try {
       const model = opts.model || DEFAULT_CLI_MODEL;
       const out = await askViaCli({ ...opts, model });
-      H.last = { key: 'account', label: `Your Claude account (${model})`, at: new Date().toISOString() };
+      H.last = {
+        key: 'account',
+        label: `Your Claude account (${model})`,
+        at: new Date().toISOString(),
+      };
       opts.used = { label: 'Claude account', model };
       if (resting) clearCooldown('account');
       return out;
     } catch (e) {
       let f = classify(e);
-      // A sign-in that expired or was never finished, or Claude Code that won't start, also moves work to the
-      // connected AI APIs (and rests the account for 10 minutes); other errors are shown as they are.
+      // A sign-in that expired or was never finished, or Claude Code that won't start, also moves
+      // work to the connected AI APIs (and rests the account for 10 minutes); other errors are
+      // shown as they are.
       if (f && (CLI_SIGNIN_RE.test(e.message) || e.code === 'ENOENT')) {
         f = {
           kind: 'auth',
-          reason: e.code === 'ENOENT' ? 'isn’t available (Claude Code didn’t start)' : 'isn’t signed in, or its sign-in expired',
+          reason:
+            e.code === 'ENOENT'
+              ? 'isn’t available (Claude Code didn’t start)'
+              : 'isn’t signed in, or its sign-in expired',
           waitMs: 6e5,
         };
         C.status = { loggedIn: false };
@@ -730,10 +981,14 @@ async function askAccount(opts, { useCopilot, viaCopilotFirst }: any) {
       if (f.kind === 'rate' && !/limit$/.test(f.reason)) f.reason = 'hit its usage limit';
       markFailed('account', 'Your Claude account', f, e.message);
       if (!fallback) throw e;
-      from = { name: 'Your Claude account', reason: `${f.reason} (resets ${clock(Date.now() + f.waitMs)})` };
+      from = {
+        name: 'Your Claude account',
+        reason: `${f.reason} (resets ${clock(Date.now() + f.waitMs)})`,
+      };
     }
   }
-  // GitHub Copilot as the backup for the Claude account (Administration → AI → Local AI), before the AI APIs.
+  // GitHub Copilot as the backup for the Claude account (Administration → AI → Local AI), before
+  // the AI APIs.
   if (useCopilot) {
     const r = await tryCopilot(opts, from);
     if (r.ok) return r.text;
@@ -751,7 +1006,10 @@ async function askAccount(opts, { useCopilot, viaCopilotFirst }: any) {
   return runChain(chain, opts, from);
 }
 
-/** One try with GitHub Copilot. Returns { ok, text } or { ok: false, from, error } for the next AI to take over. */
+/**
+ * One try with GitHub Copilot. Returns { ok, text } or { ok: false, from, error } for the next AI
+ * to take over.
+ */
 async function tryCopilot(opts, from) {
   const c = cooling('copilot');
   if (c)
@@ -761,18 +1019,29 @@ async function tryCopilot(opts, from) {
       error: new Error(`GitHub Copilot ${c.reason}.`),
     };
   const s = await getAiSettings().catch(() => ({}));
-  if (from) opts.onSwitch?.(`${from.name} ${from.reason}, so TicketForge switched to GitHub Copilot.`);
+  if (from)
+    opts.onSwitch?.(`${from.name} ${from.reason}, so TicketForge switched to GitHub Copilot.`);
   try {
-    const model = opts.copilotModel || (opts.tier && opts.routing?.copilot?.[opts.tier]) || s.copilotModel || '';
+    const model =
+      opts.copilotModel ||
+      (opts.tier && opts.routing?.copilot?.[opts.tier]) ||
+      s.copilotModel ||
+      '';
     const text = await askViaCopilot({ ...opts, model });
-    H.last = { key: 'copilot', label: `GitHub Copilot${model ? ` (${model})` : ''}`, at: new Date().toISOString() };
+    H.last = {
+      key: 'copilot',
+      label: `GitHub Copilot${model ? ` (${model})` : ''}`,
+      at: new Date().toISOString(),
+    };
     opts.used = { label: 'GitHub Copilot', model: model || 'default' };
     return { ok: true, text };
   } catch (e) {
     if (opts.signal?.aborted || e.message === 'Cancelled') throw e;
     let f = classify(e) || { kind: 'error', reason: 'failed', waitMs: 12e4 };
-    if (e.code === 'ENOENT') f = { kind: 'auth', reason: 'isn’t installed on this computer', waitMs: 6e5 };
-    else if (e.httpStatus === 401) f = { kind: 'auth', reason: 'isn’t signed in on this computer', waitMs: 6e5 };
+    if (e.code === 'ENOENT')
+      f = { kind: 'auth', reason: 'isn’t installed on this computer', waitMs: 6e5 };
+    else if (e.httpStatus === 401)
+      f = { kind: 'auth', reason: 'isn’t signed in on this computer', waitMs: 6e5 };
     else if (f.kind === 'rate') f.reason = 'hit its usage limit';
     markFailed('copilot', 'GitHub Copilot', f, e.message);
     return { ok: false, from: { name: 'GitHub Copilot', reason: f.reason }, error: e };
@@ -780,24 +1049,32 @@ async function tryCopilot(opts, from) {
 }
 
 /**
- * Ask the AI. opts.task names the kind of work (lib/aitasks.ts): with model routing on, it picks the model tier
- * for that work on every AI (Claude account, Copilot, each API), and light work skips extended thinking.
+ * Ask the AI. opts.task names the kind of work (lib/aitasks.ts): with model routing on, it picks
+ * the model tier for that work on every AI (Claude account, Copilot, each API), and light work
+ * skips extended thinking.
  */
 export async function askAI(opts) {
-  // Project brain (lib/brain.ts): the notes linked to this task go at the start of the prompt. The system prompt (with
-  // the app context) stays the same text from call to call, so it keeps being cached by the provider.
+  // Project brain (lib/brain.ts): the notes linked to this task go at the start of the prompt. The
+  // system prompt (with the app context) stays the same text from call to call, so it keeps being
+  // cached by the provider.
   if (opts.brain) {
     const { brainBlock } = await import('./brain');
     const block = await brainBlock(opts.brain);
-    opts = { ...opts, brain: undefined, prompt: block ? `${block}\n\n${opts.prompt || ''}` : opts.prompt };
+    opts = {
+      ...opts,
+      brain: undefined,
+      prompt: block ? `${block}\n\n${opts.prompt || ''}` : opts.prompt,
+    };
   }
   const s0 = await getAiSettings().catch(() => ({}));
   const routing = normalizeRouting(s0.routing);
   const configs = normalizeConfigs(s0.configs).filter((c) => c.enabled);
-  // What runs: the person's pick on the AI button (opts.run: a tier or 'cfg:<id>'), else model routing for the task.
+  // What runs: the person's pick on the AI button (opts.run: a tier or 'cfg:<id>'), else model
+  // routing for the task.
   const run = String(opts.run || '');
   let pick = TIERS.includes(run) || /^cfg:/.test(run) ? run : pickFor(routing, opts.task);
-  // Monthly budget (API spend): at the limit, High work runs on Standard, or AI pauses, as the owner chose.
+  // Monthly budget (API spend): at the limit, High work runs on Standard, or AI pauses, as the
+  // owner chose.
   const budget = await budgetState(routing);
   if (budget.over && !currentContext().user?.is_owner) {
     if (routing.budget.action === 'pause')
@@ -807,11 +1084,16 @@ export async function askAI(opts) {
         ),
         { status: 402 },
       );
-    if (routing.budget.action === 'downgrade' && (pick === 'high' || (!pick && tierFor(routing, opts.task) === 'high'))) pick = 'standard';
+    if (
+      routing.budget.action === 'downgrade' &&
+      (pick === 'high' || (!pick && tierFor(routing, opts.task) === 'high'))
+    )
+      pick = 'standard';
   }
   const config = /^cfg:/.test(pick) ? configs.find((c) => `cfg:${c.id}` === pick) || null : null;
   const tier = TIERS.includes(pick) ? pick : config ? '' : tierFor(routing, opts.task);
-  // meter: filled by the call with the real token counts (API), read when the call is recorded (ai_usage).
+  // meter: filled by the call with the real token counts (API), read when the call is recorded
+  // (ai_usage).
   const o = { ...opts, routing, tier, config, meter: {} };
   if (tier) {
     o.model = routing.claude[tier] || CLAUDE_TIER_DEFAULTS[tier];
@@ -819,12 +1101,22 @@ export async function askAI(opts) {
   }
   if (config) {
     if (config.reasoning) o.reasoning = config.reasoning;
-    if (config.instructions) o.system = `${o.system || ''}\n\nAlways follow these instructions (${config.name}):\n${config.instructions}`;
+    if (config.instructions)
+      o.system = `${o.system || ''}\n\nAlways follow these instructions (${config.name}):\n${config.instructions}`;
     if (config.engine === 'claude' && config.model) o.model = config.model;
   }
-  // Save usage: an identical request for a cacheable task reuses the stored answer (fresh: true skips it).
+  // Save usage: an identical request for a cacheable task reuses the stored answer (fresh: true
+  // skips it).
   const cacheable = routing.cache && !opts.fresh && routing.cacheTasks.includes(opts.task);
-  const key = cacheable ? cacheKey([opts.task, pick || o.model || '', o.reasoning || '', o.system || '', o.prompt || '']) : null;
+  const key = cacheable
+    ? cacheKey([
+        opts.task,
+        pick || o.model || '',
+        o.reasoning || '',
+        o.system || '',
+        o.prompt || '',
+      ])
+    : null;
   if (key) {
     const hit = await cacheGet(key, routing.cacheDays);
     if (hit != null) {
@@ -839,7 +1131,8 @@ export async function askAI(opts) {
   }
   const started = Date.now();
   let text;
-  // My AI: the person's own Claude subscription first (only theirs: it's read with their own access).
+  // My AI: the person's own Claude subscription first (only theirs: it's read with their own
+  // access).
   const mine = await myActiveToken().catch(() => null);
   if (mine) {
     const model = o.model && /^(opus|sonnet|haiku)$/.test(o.model) ? o.model : mine.model;
@@ -852,13 +1145,20 @@ export async function askAI(opts) {
       return text;
     } catch (e) {
       if (opts.signal?.aborted || !mine.teamFallback) {
-        recordUsage({ ...o, used: { label: 'Your Claude subscription', model } }, { ms: Date.now() - started, ok: false });
+        recordUsage(
+          { ...o, used: { label: 'Your Claude subscription', model } },
+          { ms: Date.now() - started, ok: false },
+        );
         throw Object.assign(
-          new Error(`Your Claude subscription: ${e.message}${mine.teamFallback ? '' : ' (My AI is set to use only your subscription.)'}`),
+          new Error(
+            `Your Claude subscription: ${e.message}${mine.teamFallback ? '' : ' (My AI is set to use only your subscription.)'}`,
+          ),
           { status: e.httpStatus === 429 ? 429 : 503 },
         );
       }
-      opts.onSwitch?.(`Your Claude subscription isn’t available (${String(e.message).split('\n')[0].slice(0, 140)}); using the team’s AI.`);
+      opts.onSwitch?.(
+        `Your Claude subscription isn’t available (${String(e.message).split('\n')[0].slice(0, 140)}); using the team’s AI.`,
+      );
     }
   }
   try {
@@ -874,9 +1174,10 @@ export async function askAI(opts) {
   return text;
 }
 /**
- * One row per AI call in ai_usage (who, which project, task, engine, model, tokens, time, cost). API calls report
- * their real tokens; the Claude account and Copilot don't, so their tokens are estimated (characters ÷ 4) and the
- * cost of an account run is what the same tokens would cost on the API. Best effort: never fails the AI call.
+ * One row per AI call in ai_usage (who, which project, task, engine, model, tokens, time, cost).
+ * API calls report their real tokens; the Claude account and Copilot don't, so their tokens are
+ * estimated (characters ÷ 4) and the cost of an account run is what the same tokens would cost on
+ * the API. Best effort: never fails the AI call.
  */
 function recordUsage(o, { text = '', ms = 0, cached = false, ok = true }: any) {
   const ctx = currentContext();
@@ -892,7 +1193,12 @@ function recordUsage(o, { text = '', ms = 0, cached = false, ok = true }: any) {
           : '';
   const real = o.meter?.tokens;
   const sent = String(o.system || '').length + String(o.prompt || '').length;
-  const tok = real || { input: Math.round(sent / 4), output: Math.round(String(text || '').length / 4), cacheRead: 0, cacheWrite: 0 };
+  const tok = real || {
+    input: Math.round(sent / 4),
+    output: Math.round(String(text || '').length / 4),
+    cacheRead: 0,
+    cacheWrite: 0,
+  };
   const model = cached ? '' : String(used.model || o.model || '');
   const cost = cached || !ok ? 0 : costOf(model, tok, o.routing?.prices);
   const user = ctx.user || null;
@@ -964,7 +1270,8 @@ function noteUsage(o, text, ms) {
   const k = o.task && AI_TASKS.some((t) => t.id === o.task) ? o.task : 'other';
   const u = (U.tasks[k] ??= { calls: 0, chars: 0, ms: 0, models: {} });
   u.calls += 1;
-  u.chars += String(o.system || '').length + String(o.prompt || '').length + String(text || '').length;
+  u.chars +=
+    String(o.system || '').length + String(o.prompt || '').length + String(text || '').length;
   u.ms += ms;
   const m = o.used ? `${o.used.label}${o.used.model ? ` · ${o.used.model}` : ''}` : 'unknown';
   u.models[m] = (u.models[m] || 0) + 1;
@@ -980,15 +1287,21 @@ function noteTokens(u) {
   t.cacheWrite += u.cache_creation_input_tokens || 0;
 }
 /**
- * The Claude model for a Claude Code agent run: a model set on the agent in Administration → Agents wins; otherwise
- * model routing's tier for the agent's task; otherwise the agent's own default.
+ * The Claude model for a Claude Code agent run: a model set on the agent in Administration → Agents
+ * wins; otherwise model routing's tier for the agent's task; otherwise the agent's own default.
  */
 export async function agentModel(agentId, agent) {
   if (agent?.modelSet) return { model: agent.model, task: AGENT_TASK[agentId] || 'code' };
   const routing = normalizeRouting((await getAiSettings().catch(() => ({}))).routing);
   const task = AGENT_TASK[agentId] || 'code';
   const tier = tierFor(routing, task);
-  return { model: (tier && (routing.claude[tier] || CLAUDE_TIER_DEFAULTS[tier])) || agent?.model || DEFAULT_CLI_MODEL, task };
+  return {
+    model:
+      (tier && (routing.claude[tier] || CLAUDE_TIER_DEFAULTS[tier])) ||
+      agent?.model ||
+      DEFAULT_CLI_MODEL,
+    task,
+  };
 }
 /** Usage of one Claude Code agent run (it reports its own cost). */
 export function noteAgentUsage({ task, model, ms, costUsd }: any) {
@@ -1022,13 +1335,20 @@ export function clearAiUsage() {
 }
 
 async function askRouted(opts) {
-  // A custom configuration names its engine: that engine goes first; the usual chain stands in if it's unavailable.
+  // A custom configuration names its engine: that engine goes first; the usual chain stands in if
+  // it's unavailable.
   const f = opts.config;
   if (f?.engine === 'api') {
     const chain = (await apiChain()).filter((c) => c.configured);
     const first = chain.find((c) => c.entryId === f.providerId) || null;
-    if (first) return runChain([{ ...first, model: f.model || first.model }, ...chain.filter((c) => c !== first)], opts);
-    opts.onSwitch?.(`The “${f.name}” configuration’s AI API isn’t set up, so TicketForge used the usual AI.`);
+    if (first)
+      return runChain(
+        [{ ...first, model: f.model || first.model }, ...chain.filter((c) => c !== first)],
+        opts,
+      );
+    opts.onSwitch?.(
+      `The “${f.name}” configuration’s AI API isn’t set up, so TicketForge used the usual AI.`,
+    );
   } else if (f?.engine === 'copilot' && aiMode() === 'account') {
     opts.copilotModel = f.model; // set on opts itself: the call records which AI answered on this object
     const r = await tryCopilot(opts, null);
@@ -1042,14 +1362,18 @@ async function askRouted(opts) {
   if (aiMode() === 'account') {
     const s = await getAiSettings().catch(() => ({}));
     const copilotOn = (await copilotInfo()).available;
-    // GitHub Copilot as the local AI: it goes first; your Claude account and then the AI APIs stand in for it.
+    // GitHub Copilot as the local AI: it goes first; your Claude account and then the AI APIs stand
+    // in for it.
     if (s.localEngine === 'copilot') {
       const r = await tryCopilot(opts, null);
       if (r.ok) return r.text;
       if (!(await accountFallbackOn())) throw r.error;
       return askAccount(opts, { useCopilot: false, viaCopilotFirst: r.from });
     }
-    return askAccount(opts, { useCopilot: Boolean(s.copilotBackup) && copilotOn, viaCopilotFirst: null });
+    return askAccount(opts, {
+      useCopilot: Boolean(s.copilotBackup) && copilotOn,
+      viaCopilotFirst: null,
+    });
   }
   const all = await apiChain();
   const chain = all.filter((c) => c.configured);
@@ -1057,14 +1381,19 @@ async function askRouted(opts) {
   return runChain(chain, opts);
 }
 const callApi = (cfg, opts) =>
-  (cfg.kind === 'claude-code' ? askViaSubscription : cfg.kind === 'anthropic' ? askViaAnthropic : askViaOpenAICompatible)({
+  (cfg.kind === 'claude-code'
+    ? askViaSubscription
+    : cfg.kind === 'anthropic'
+      ? askViaAnthropic
+      : askViaOpenAICompatible)({
     ...opts,
     model: cfg.model,
     cfg,
   });
 /**
- * The Claude subscription provider: Claude Code on this server, signed in with the saved subscription token (never an
- * API key, never this computer's own Claude login). Needs Claude Code installed where TicketForge runs.
+ * The Claude subscription provider: Claude Code on this server, signed in with the saved
+ * subscription token (never an API key, never this computer's own Claude login). Needs Claude Code
+ * installed where TicketForge runs.
  */
 export async function askViaSubscription(opts) {
   const cli = await cliInfo();
@@ -1084,7 +1413,8 @@ export async function askViaSubscription(opts) {
   try {
     return await cliOnce({ ...opts, env }, true);
   } catch (e) {
-    if (/unknown option.*--effort|--effort/i.test(e.message) && !e.httpStatus) return cliOnce({ ...opts, env }, false);
+    if (/unknown option.*--effort|--effort/i.test(e.message) && !e.httpStatus)
+      return cliOnce({ ...opts, env }, false);
     if (CLI_SIGNIN_RE.test(e.message) && !e.httpStatus) e.httpStatus = 401;
     throw e;
   }
@@ -1100,11 +1430,15 @@ async function askViaCli(opts) {
   try {
     return await cliOnce(opts, true);
   } catch (e) {
-    if (/unknown option.*--effort|--effort/i.test(e.message) && !e.httpStatus) return cliOnce(opts, false);
+    if (/unknown option.*--effort|--effort/i.test(e.message) && !e.httpStatus)
+      return cliOnce(opts, false);
     throw e;
   }
 }
-function cliOnce({ system, prompt, model, onText, signal, reasoning, env: envIn }: any, withEffort) {
+function cliOnce(
+  { system, prompt, model, onText, signal, reasoning, env: envIn }: any,
+  withEffort,
+) {
   return new Promise((resolve, reject) => {
     const args = [
       '-p',
@@ -1123,7 +1457,11 @@ function cliOnce({ system, prompt, model, onText, signal, reasoning, env: envIn 
     ];
     // Keeps the CLI on the signed-in Claude account unless TICKETFORGE_CLI_USE_API_KEY is set.
     const env = envIn || cliEnv();
-    const child = spawn(/*turbopackIgnore: true*/ CLI_BIN, args, { cwd: WORKDIR, env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(/*turbopackIgnore: true*/ CLI_BIN, args, {
+      cwd: WORKDIR,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     let buffer = '';
     let streamed = '';
     let finalResult = null;
@@ -1146,11 +1484,16 @@ function cliOnce({ system, prompt, model, onText, signal, reasoning, env: envIn 
         } catch {
           continue;
         }
-        if (evt.type === 'stream_event' && evt.event?.type === 'content_block_delta' && evt.event.delta?.type === 'text_delta') {
+        if (
+          evt.type === 'stream_event' &&
+          evt.event?.type === 'content_block_delta' &&
+          evt.event.delta?.type === 'text_delta'
+        ) {
           streamed += evt.event.delta.text;
           onText?.(evt.event.delta.text.length, streamed.length);
         } else if (evt.type === 'result') {
-          if (evt.is_error || evt.subtype !== 'success') errorText = evt.result || evt.subtype || 'Claude CLI returned an error';
+          if (evt.is_error || evt.subtype !== 'success')
+            errorText = evt.result || evt.subtype || 'Claude CLI returned an error';
           else finalResult = evt.result;
         }
       }
@@ -1163,7 +1506,8 @@ function cliOnce({ system, prompt, model, onText, signal, reasoning, env: envIn 
       signal?.removeEventListener('abort', onAbort);
       if (signal?.aborted) return reject(new Error('Cancelled'));
       if (errorText) {
-        // "Claude AI usage limit reached|1731100000" or "5-hour limit reached ∙ resets 3pm": switch, retry after the reset.
+        // "Claude AI usage limit reached|1731100000" or "5-hour limit reached ∙ resets 3pm":
+        // switch, retry after the reset.
         const limit = errorText.match(/usage limit reached\|(\d{9,})/i);
         if (limit || /usage limit|limit reached|rate.?limit|overloaded/i.test(errorText)) {
           const resetAt = limit ? Number(limit[1]) * 1000 : 0;
@@ -1181,7 +1525,10 @@ function cliOnce({ system, prompt, model, onText, signal, reasoning, env: envIn 
         return reject(new Error(errorText + hint));
       }
       const text = finalResult ?? streamed;
-      if (!text) return reject(new Error(`Claude CLI exited with code ${code}. ${stderr.slice(-800)}`.trim()));
+      if (!text)
+        return reject(
+          new Error(`Claude CLI exited with code ${code}. ${stderr.slice(-800)}`.trim()),
+        );
       resolve(text);
     });
     child.stdin.end(prompt);
@@ -1192,7 +1539,14 @@ const anthropicClients: Map<any, any> = new Map();
 function anthropicClient(cfg) {
   const k = `${cfg.key}|${cfg.baseUrl}`;
   if (!anthropicClients.has(k))
-    anthropicClients.set(k, new Anthropic({ apiKey: cfg.key, authToken: null, ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}) })); // authToken: null: never ANTHROPIC_AUTH_TOKEN from the environment
+    anthropicClients.set(
+      k,
+      new Anthropic({
+        apiKey: cfg.key,
+        authToken: null,
+        ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}),
+      }),
+    ); // authToken: null: never ANTHROPIC_AUTH_TOKEN from the environment
   return anthropicClients.get(k);
 }
 async function askViaAnthropic(opts) {
@@ -1200,28 +1554,41 @@ async function askViaAnthropic(opts) {
     return await anthropicOnce(opts, true);
   } catch (e) {
     // Models that don't take the effort / thinking settings: ask again without them.
-    if (e.httpStatus === 400 && /effort|output_config|thinking/i.test(e.message)) return anthropicOnce(opts, false);
+    if (e.httpStatus === 400 && /effort|output_config|thinking/i.test(e.message))
+      return anthropicOnce(opts, false);
     throw e;
   }
 }
-async function anthropicOnce({ system, prompt, model, onText, signal, cfg, reasoning, task, meter }: any, tuned) {
+async function anthropicOnce(
+  { system, prompt, model, onText, signal, cfg, reasoning, task, meter }: any,
+  tuned,
+) {
   const client = anthropicClient(cfg);
   const level = reasoning || 'fast';
   const params = {
     model,
     // Each task's output limit (lib/aitasks.ts), plus room to think when thinking is on.
     max_tokens: Math.min(64000, maxOutFor(task) + (tuned && level !== 'fast' ? 16000 : 0)),
-    // Prompt caching: the system prompt (rules, app context, guide) is the same across many calls, so it's cached and
-    // re-read at a fraction of the price. Prompts shorter than the model's minimum simply aren't cached.
+    // Prompt caching: the system prompt (rules, app context, guide) is the same across many calls,
+    // so it's cached and re-read at a fraction of the price. Prompts shorter than the model's
+    // minimum simply aren't cached.
     system: [{ type: 'text', text: String(system || ''), cache_control: { type: 'ephemeral' } }],
     // Fast: no extended thinking. Balanced / thorough: the model decides how much to think.
-    ...(tuned ? { ...(level === 'fast' ? {} : { thinking: { type: 'adaptive' } }), output_config: { effort: effortOf(level) } } : {}),
+    ...(tuned
+      ? {
+          ...(level === 'fast' ? {} : { thinking: { type: 'adaptive' } }),
+          output_config: { effort: effortOf(level) },
+        }
+      : {}),
     messages: [{ role: 'user', content: prompt }],
   };
   // Server-side refusal fallback is supported on the current Opus/Sonnet models.
   const useFallback = /^claude-(opus-5|sonnet-5-5|fable-5-1)/.test(model);
   const stream = useFallback
-    ? client.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, { signal })
+    ? client.beta.messages.stream(
+        { ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' },
+        { signal },
+      )
     : client.messages.stream(params, { signal });
   let total = 0;
   stream.on('text', (t) => {
@@ -1241,7 +1608,9 @@ async function anthropicOnce({ system, prompt, model, onText, signal, cfg, reaso
     });
   }
   if (msg.stop_reason === 'refusal') {
-    throw new Error(`Claude declined this request${msg.stop_details?.category ? ` (${msg.stop_details.category})` : ''}.`);
+    throw new Error(
+      `Claude declined this request${msg.stop_details?.category ? ` (${msg.stop_details.category})` : ''}.`,
+    );
   }
   noteTokens(msg.usage);
   if (meter && msg.usage)
@@ -1255,7 +1624,10 @@ async function anthropicOnce({ system, prompt, model, onText, signal, cfg, reaso
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('');
-  if (msg.stop_reason === 'max_tokens') throw new Error('Response hit the output limit. Try a smaller document or fewer tickets per run.');
+  if (msg.stop_reason === 'max_tokens')
+    throw new Error(
+      'Response hit the output limit. Try a smaller document or fewer tickets per run.',
+    );
   return text;
 }
 
@@ -1301,9 +1673,14 @@ async function reach(cfg, url, init) {
   } catch (e) {
     if (e.name === 'AbortError' || init?.signal?.aborted) throw e;
     const why = e.cause?.code || e.cause?.message || e.message;
-    throw Object.assign(new Error(`Couldn’t reach ${cfg.baseUrl} (${why}). Check the endpoint URL and that the server is running.`), {
-      status: 502,
-    });
+    throw Object.assign(
+      new Error(
+        `Couldn’t reach ${cfg.baseUrl} (${why}). Check the endpoint URL and that the server is running.`,
+      ),
+      {
+        status: 502,
+      },
+    );
   }
 }
 /** Chat completions with streaming, for OpenAI and every OpenAI-compatible API. */
@@ -1312,12 +1689,20 @@ async function askViaOpenAICompatible(opts) {
     return await openAIOnce(opts, true);
   } catch (e) {
     // Providers or models without reasoning_effort: ask again without it.
-    if (e.httpStatus === 400 && /reasoning|unrecognized|unsupported|not supported|unknown (field|parameter)|extra inputs/i.test(e.message))
+    if (
+      e.httpStatus === 400 &&
+      /reasoning|unrecognized|unsupported|not supported|unknown (field|parameter)|extra inputs/i.test(
+        e.message,
+      )
+    )
       return openAIOnce(opts, false);
     throw e;
   }
 }
-async function openAIOnce({ system, prompt, model, onText, signal, cfg, reasoning, task, meter }: any, tuned) {
+async function openAIOnce(
+  { system, prompt, model, onText, signal, cfg, reasoning, task, meter }: any,
+  tuned,
+) {
   const openai = cfg.id === 'openai';
   const res = await reach(cfg, `${cfg.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -1331,11 +1716,13 @@ async function openAIOnce({ system, prompt, model, onText, signal, cfg, reasonin
         { role: 'user', content: prompt },
       ],
       ...(tuned ? { reasoning_effort: effortOf(reasoning) } : {}),
-      // OpenAI itself: report token usage and cap the output (other OpenAI-compatible APIs differ, so left alone).
+      // OpenAI itself: report token usage and cap the output (other OpenAI-compatible APIs differ,
+      // so left alone).
       ...(openai
         ? {
             stream_options: { include_usage: true },
-            max_completion_tokens: maxOutFor(task) + (tuned && reasoning && reasoning !== 'fast' ? 16000 : 0),
+            max_completion_tokens:
+              maxOutFor(task) + (tuned && reasoning && reasoning !== 'fast' ? 16000 : 0),
           }
         : {}),
     }),
@@ -1376,7 +1763,11 @@ async function openAIOnce({ system, prompt, model, onText, signal, cfg, reasonin
         } catch {
           continue;
         }
-        if (j.error) throw Object.assign(new Error(`${cfg.label}: ${j.error.message || JSON.stringify(j.error)}`), { status: 502 });
+        if (j.error)
+          throw Object.assign(
+            new Error(`${cfg.label}: ${j.error.message || JSON.stringify(j.error)}`),
+            { status: 502 },
+          );
         if (j.usage) take(j.usage);
         const choice = j.choices?.[0];
         const delta = choice?.delta?.content;
@@ -1388,14 +1779,22 @@ async function openAIOnce({ system, prompt, model, onText, signal, cfg, reasonin
       }
     }
   }
-  if (finish === 'length') throw new Error('Response hit the output limit. Try a smaller document or fewer tickets per run.');
+  if (finish === 'length')
+    throw new Error(
+      'Response hit the output limit. Try a smaller document or fewer tickets per run.',
+    );
   if (finish === 'content_filter') throw new Error(`${cfg.label} declined this request.`);
   if (!text.trim())
-    throw Object.assign(new Error(`${cfg.label} returned an empty reply. Check that AI_MODEL is a chat model.`), { status: 502 });
+    throw Object.assign(
+      new Error(`${cfg.label} returned an empty reply. Check that AI_MODEL is a chat model.`),
+      { status: 502 },
+    );
   return text;
 }
 
-/** Model IDs a provider offers: { id } a saved one, { draft } unsaved settings, or the active one. */
+/**
+ * Model IDs a provider offers: { id } a saved one, { draft } unsaved settings, or the active one.
+ */
 export async function listModels(target) {
   const cfg = await targetConfig(target);
   if (!cfg?.id || (cfg.error && !cfg.keySet)) throw notReady(apiSetupMessage(cfg));
@@ -1407,7 +1806,10 @@ export async function listModels(target) {
     for await (const m of anthropicClient(cfg).models.list({ limit: 100 })) out.push(m.id);
     return out;
   }
-  const res = await reach(cfg, `${cfg.baseUrl}/models`, { headers: openAIHeaders(cfg), signal: AbortSignal.timeout(20000) });
+  const res = await reach(cfg, `${cfg.baseUrl}/models`, {
+    headers: openAIHeaders(cfg),
+    signal: AbortSignal.timeout(20000),
+  });
   if (!res.ok) throw await apiError(res, cfg);
   const j = await res.json();
   return (j.data || j.models || [])
@@ -1417,14 +1819,17 @@ export async function listModels(target) {
 }
 
 /**
- * Sends a tiny prompt. { id } tests one saved provider, { draft } unsaved settings; nothing = the normal path
- * (with switching). A failed API test also lists the models the key can use.
+ * Sends a tiny prompt. { id } tests one saved provider, { draft } unsaved settings; nothing = the
+ * normal path (with switching). A failed API test also lists the models the key can use.
  */
 export async function testConnection(target) {
   const one = Boolean(target?.id || target?.draft);
   const mode = one ? 'api' : aiMode();
   const started = Date.now();
-  const req = { system: 'You are a connection test. Follow the instruction exactly.', prompt: 'Reply with exactly: OK' };
+  const req = {
+    system: 'You are a connection test. Follow the instruction exactly.',
+    prompt: 'Reply with exactly: OK',
+  };
   let used = null;
   try {
     let reply;
@@ -1435,7 +1840,11 @@ export async function testConnection(target) {
       if (target.id) clearCooldown(target.id); // it works again
       used = nameOf(cfg);
     } else {
-      reply = await askAI({ ...req, model: mode === 'account' ? 'haiku' : undefined, onSwitch: () => {} });
+      reply = await askAI({
+        ...req,
+        model: mode === 'account' ? 'haiku' : undefined,
+        onSwitch: () => {},
+      });
       used = H.last?.label || null;
     }
     return { ok: true, mode, used, ms: Date.now() - started, reply: reply.trim().slice(0, 80) };
@@ -1467,10 +1876,13 @@ export function extractJson(text) {
 
 /** Nothing usable came back: no fields, or only empty ones. */
 const looksEmpty = (x) =>
-  x == null || (typeof x === 'object' && Object.values<any>(x).every((v) => v == null || v === '' || (Array.isArray(v) && !v.length)));
+  x == null ||
+  (typeof x === 'object' &&
+    Object.values<any>(x).every((v) => v == null || v === '' || (Array.isArray(v) && !v.length)));
 /**
- * Ask for JSON. Cheap first (Model routing → "Try Standard first"): work routed to High for a task marked escalate
- * runs on Standard, and only when that answer doesn't parse or comes back empty is it asked again on High.
+ * Ask for JSON. Cheap first (Model routing → "Try Standard first"): work routed to High for a task
+ * marked escalate runs on Standard, and only when that answer doesn't parse or comes back empty is
+ * it asked again on High.
  */
 export async function askJson(opts) {
   const task = AI_TASKS.find((t) => t.id === opts.task);
@@ -1504,7 +1916,10 @@ async function askJsonOnce(opts) {
   }
 }
 
-/** The Claude Code command and environment, for running it as a coding agent in a repository (local only). */
+/**
+ * The Claude Code command and environment, for running it as a coding agent in a repository (local
+ * only).
+ */
 export async function claudeCodeCommand() {
   const info = await cliInfo();
   if (!info.available)
@@ -1515,8 +1930,13 @@ export async function claudeCodeCommand() {
       { status: 400 },
     );
   if ((await accountStatus()).loggedIn === false)
-    throw Object.assign(new Error('Claude Code isn’t signed in on this computer. Run `claude` in a terminal and sign in.'), {
-      status: 400,
-    });
+    throw Object.assign(
+      new Error(
+        'Claude Code isn’t signed in on this computer. Run `claude` in a terminal and sign in.',
+      ),
+      {
+        status: 400,
+      },
+    );
   return { bin: CLI_BIN, env: cliEnv(), version: info.version };
 }

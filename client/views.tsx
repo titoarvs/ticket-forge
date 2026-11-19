@@ -1,5 +1,6 @@
 'use client';
-// Project views: Summary, Backlog, Board, Epics, Reports, Test cases, Test automation, Source, Settings.
+// Project views: Summary, Backlog, Board, Epics, Reports, Test cases, Test automation, Source,
+// Settings.
 import { memo, useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -50,7 +51,16 @@ import {
   release,
   type Any,
 } from './core';
-import { StatusCell, AssigneeCell, PointsCell, PriorityCell, MoreCell, rowContextMenu, openPop, setFlag } from './RowActions';
+import {
+  StatusCell,
+  AssigneeCell,
+  PointsCell,
+  PriorityCell,
+  MoreCell,
+  rowContextMenu,
+  openPop,
+  setFlag,
+} from './RowActions';
 import {
   Ico,
   I,
@@ -106,10 +116,13 @@ import { openDevOrder } from './DevPlan';
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
 const clearDrop = () =>
-  document.querySelectorAll('.drop, .drop-before, .no-drop').forEach((n) => n.classList.remove('drop', 'drop-before', 'no-drop'));
+  document
+    .querySelectorAll('.drop, .drop-before, .no-drop')
+    .forEach((n) => n.classList.remove('drop', 'drop-before', 'no-drop'));
 const canDrag = () => can('issue.edit') || can('sprint.manage') || can('epic.manage');
 /** The status a drop target would give the issue, if any. */
-const zoneStatus = (zone: Any) => zone?.status || (zone?.group?.startsWith('s:') ? zone.group.slice(2) : '');
+const zoneStatus = (zone: Any) =>
+  zone?.status || (zone?.group?.startsWith('s:') ? zone.group.slice(2) : '');
 /** Whether the dragged issue may be dropped here (custom workflow transitions). */
 const dropOk = (zone: Any) => {
   const st = zoneStatus(zone);
@@ -159,7 +172,8 @@ export function zoneDnd(zone: Any) {
       }
     },
     onDragLeave: (e: DragEvent<HTMLElement>) => {
-      if (!e.currentTarget.contains(e.relatedTarget as Node)) e.currentTarget.classList.remove('drop');
+      if (!e.currentTarget.contains(e.relatedTarget as Node))
+        e.currentTarget.classList.remove('drop');
     },
     onDrop: (e: DragEvent<HTMLElement>) => {
       e.preventDefault();
@@ -169,7 +183,15 @@ export function zoneDnd(zone: Any) {
   };
 }
 
-export function Header({ title, right, sub }: { title: string; right?: ReactNode; sub?: ReactNode }) {
+export function Header({
+  title,
+  right,
+  sub,
+}: {
+  title: string;
+  right?: ReactNode;
+  sub?: ReactNode;
+}) {
   return (
     <>
       <div className="crumbs">
@@ -187,8 +209,14 @@ export function Header({ title, right, sub }: { title: string; right?: ReactNode
   );
 }
 
-type FilterProps = { status?: boolean; group?: { value: string; options: [string, string][]; onChange: (v: string) => void } };
-/** The filter bar redraws only when what it shows changes (its menus are heavy to redraw on every change). */
+type FilterProps = {
+  status?: boolean;
+  group?: { value: string; options: [string, string][]; onChange: (v: string) => void };
+};
+/**
+ * The filter bar redraws only when what it shows changes (its menus are heavy to redraw on every
+ * change).
+ */
 export function FilterBar(props: FilterProps) {
   const sig = [
     JSON.stringify(S.filter),
@@ -216,7 +244,14 @@ const FilterBarView = memo(
     const people = peopleNames();
     return (
       <div className="toolbar">
-        <TF search sx={{ width: 220 }} id="fq" placeholder="Search issues" value={f.q} onChange={(e) => setF('q', e.target.value)} />
+        <TF
+          search
+          sx={{ width: 220 }}
+          id="fq"
+          placeholder="Search issues"
+          value={f.q}
+          onChange={(e) => setF('q', e.target.value)}
+        />
         {people.length > 0 && (
           <div className="avatars" role="group" aria-label="Filter by assignee">
             {people.slice(0, 6).map((n) => (
@@ -244,18 +279,33 @@ const FilterBarView = memo(
           <MenuItem value="">Type</MenuItem>
           {opts([...TYPES, 'Sub-task'])}
         </SF>
-        <SF filter aria-label="Priority" value={f.priority} onChange={(e) => setF('priority', e.target.value)}>
+        <SF
+          filter
+          aria-label="Priority"
+          value={f.priority}
+          onChange={(e) => setF('priority', e.target.value)}
+        >
           <MenuItem value="">Priority</MenuItem>
           {opts(PRIORITIES)}
         </SF>
         {status && (
-          <SF filter aria-label="Status" value={f.status} onChange={(e) => setF('status', e.target.value)}>
+          <SF
+            filter
+            aria-label="Status"
+            value={f.status}
+            onChange={(e) => setF('status', e.target.value)}
+          >
             <MenuItem value="">Status</MenuItem>
             {opts(statusNames())}
           </SF>
         )}
         {releases().length > 0 && (
-          <SF filter aria-label="Fix version" value={f.version || ''} onChange={(e) => setF('version', e.target.value)}>
+          <SF
+            filter
+            aria-label="Fix version"
+            value={f.version || ''}
+            onChange={(e) => setF('version', e.target.value)}
+          >
             <MenuItem value="">Version</MenuItem>
             {releases()
               .filter((r: Any) => r.status !== 'archived' || f.version === r.id)
@@ -304,7 +354,10 @@ export function epicProgress(e: Any) {
 export function ProgBar({ done, prog, total }: { done: number; prog: number; total: number }) {
   const w = (v: number) => `${total ? (v / total) * 100 : 0}%`;
   return (
-    <div className="prog" title={`${done} done · ${prog} in progress · ${total - done - prog} to do`}>
+    <div
+      className="prog"
+      title={`${done} done · ${prog} in progress · ${total - done - prog} to do`}
+    >
       {done > 0 && <i className="p-done" style={{ width: w(done) }} />}
       {prog > 0 && <i className="p-prog" style={{ width: w(prog) }} />}
     </div>
@@ -360,7 +413,12 @@ function Stack({ parts, total }: { parts: [string, number, string][]; total: num
         {parts
           .filter(([, v]) => v)
           .map(([l, v, c]) => (
-            <i key={l} className={c} style={{ width: `${(v / total) * 100}%` }} title={`${l}: ${v} (${Math.round((v / total) * 100)}%)`} />
+            <i
+              key={l}
+              className={c}
+              style={{ width: `${(v / total) * 100}%` }}
+              title={`${l}: ${v} (${Math.round((v / total) * 100)}%)`}
+            />
           ))}
       </div>
       <div className="legend">
@@ -374,7 +432,17 @@ function Stack({ parts, total }: { parts: [string, number, string][]; total: num
     </>
   );
 }
-const Tile = ({ icon, value, label, color }: { icon: string; value: ReactNode; label: ReactNode; color?: string }) => (
+const Tile = ({
+  icon,
+  value,
+  label,
+  color,
+}: {
+  icon: string;
+  value: ReactNode;
+  label: ReactNode;
+  color?: string;
+}) => (
   <div className="tile">
     <span className="ic" style={{ color }}>
       <Ico svg={icon} />
@@ -418,7 +486,11 @@ export function Summary() {
         <Tile
           icon={I.calendar}
           value={act ? act.name : 'No active sprint'}
-          label={act ? `${Math.max(0, daysLeft(act) ?? 0)} days left · ${act.goal || 'no goal'}` : `${p.sprints.length} sprints planned`}
+          label={
+            act
+              ? `${Math.max(0, daysLeft(act) ?? 0)} days left · ${act.goal || 'no goal'}`
+              : `${p.sprints.length} sprints planned`
+          }
         />
         <Tile
           icon={I.test}
@@ -430,7 +502,8 @@ export function Summary() {
         <div className="card">
           <h3>Status overview</h3>
           <p className="sub">
-            Issues by workflow category · {spSum(ts.filter(isDone))} of {spSum(ts)} story points done.
+            Issues by workflow category · {spSum(ts.filter(isDone))} of {spSum(ts)} story points
+            done.
           </p>
           {ts.length ? (
             <Stack
@@ -496,10 +569,15 @@ export function Summary() {
           <p className="sub">Latest changes across the project.</p>
           {recent.length ? (
             recent.map((h: Any) => (
-              <div key={`${h.t.id}-${h.id}`} className="act-mini" onClick={() => openDrawer('issue', h.t.id)}>
+              <div
+                key={`${h.t.id}-${h.id}`}
+                className="act-mini"
+                onClick={() => openDrawer('issue', h.t.id)}
+              >
                 <Avatar name={h.author} size={20} />
                 <span>
-                  <b>{h.author}</b> {historyText(h)} <span className="key">{h.t.key}</span> <span className="muted small">{ago(h.at)}</span>
+                  <b>{h.author}</b> {historyText(h)} <span className="key">{h.t.key}</span>{' '}
+                  <span className="muted small">{ago(h.at)}</span>
                 </span>
               </div>
             ))
@@ -540,7 +618,10 @@ export function Summary() {
         <div className="card wide">
           <h3>About this project</h3>
           {p.description ? (
-            <p className="sub" style={{ whiteSpace: 'pre-wrap', color: 'var(--text)', fontSize: 14 }}>
+            <p
+              className="sub"
+              style={{ whiteSpace: 'pre-wrap', color: 'var(--text)', fontSize: 14 }}
+            >
               {p.description}
             </p>
           ) : (
@@ -574,7 +655,10 @@ export function Summary() {
               )}
             </h3>
             <p className="sub">
-              {p.sourceName ? 'From the document this project was created from' : 'Recorded for this project'} ·{' '}
+              {p.sourceName
+                ? 'From the document this project was created from'
+                : 'Recorded for this project'}{' '}
+              ·{' '}
               <Link
                 href={`/p/${p.id}/settings`}
                 onClick={() => {
@@ -620,7 +704,12 @@ function backlogGroups() {
   const p = P();
   const list = filtered(p.tickets).filter((t: Any) => !isSub(t) || S.filter.type === 'Sub-task');
   if (S.groupBy === 'status')
-    return statusNames().map((s) => ({ id: `s:${s}`, kind: 'status', title: s, items: list.filter((t: Any) => t.status === s) }));
+    return statusNames().map((s) => ({
+      id: `s:${s}`,
+      kind: 'status',
+      title: s,
+      items: list.filter((t: Any) => t.status === s),
+    }));
   if (S.groupBy === 'none') return [{ id: 'all', kind: 'none', title: 'All issues', items: list }];
   if (S.groupBy === 'epic') {
     const groups: Any[] = p.epics.map((e: Any) => ({
@@ -630,10 +719,17 @@ function backlogGroups() {
       title: e.title,
       items: list.filter((t: Any) => t.epicId === e.id),
     }));
-    groups.push({ id: 'e:none', kind: 'epic', title: 'Issues without epic', items: list.filter((t: Any) => !epic(t.epicId)) });
+    groups.push({
+      id: 'e:none',
+      kind: 'epic',
+      title: 'Issues without epic',
+      items: list.filter((t: Any) => !epic(t.epicId)),
+    });
     return groups.filter((g) => g.items.length || (!filtersActive() && g.epic));
   }
-  const sp = [...openSprints()].sort((a: Any, b: Any) => (a.state === 'active' ? -1 : b.state === 'active' ? 1 : 0));
+  const sp = [...openSprints()].sort((a: Any, b: Any) =>
+    a.state === 'active' ? -1 : b.state === 'active' ? 1 : 0,
+  );
   const inOpen = (t: Any) => sp.some((s: Any) => s.id === t.sprintId);
   const groups: Any[] = sp.map((s: Any) => ({
     id: `sp:${s.id}`,
@@ -646,13 +742,17 @@ function backlogGroups() {
     id: 'sp:none',
     kind: 'sprint',
     title: 'Backlog',
-    items: list.filter((t: Any) => !inOpen(t) && !(sprint(t.sprintId)?.state === 'closed' && isDone(t))),
+    items: list.filter(
+      (t: Any) => !inOpen(t) && !(sprint(t.sprintId)?.state === 'closed' && isDone(t)),
+    ),
   });
   return groups;
 }
-const showChecks = () => can('issue.edit') || can('issue.delete') || can('sprint.manage') || can('test.run');
+const showChecks = () =>
+  can('issue.edit') || can('issue.delete') || can('sprint.manage') || can('test.run');
 
-// ---- selection, Jira-style: tick boxes, ⌘/Ctrl-click a row to add or remove it, Shift-click to select a range.
+// ---- selection, Jira-style: tick boxes, ⌘/Ctrl-click a row to add or remove it, Shift-click to
+// select a range.
 let lastPick: string | null = null;
 let visibleIds: string[] = [];
 function pickRange(id: string) {
@@ -672,7 +772,10 @@ function toggleCheck(id: string, on: boolean) {
   emit();
 }
 
-/** What a row shows, as one string: the row redraws only when this changes (thousands of rows stay fast). */
+/**
+ * What a row shows, as one string: the row redraws only when this changes (thousands of rows stay
+ * fast).
+ */
 function rowSig(
   t: Any,
   x: {
@@ -712,7 +815,9 @@ function rowSig(
     +x.popped,
   ].join('|');
 }
-/** Things every row depends on (workflow colours and transitions, permissions, the current user). */
+/**
+ * Things every row depends on (workflow colours and transitions, permissions, the current user).
+ */
 const pageSig = () =>
   `${JSON.stringify(P().workflow)}|${P().flowMode}|${S.user?.id}|${(S.user?.permissions || []).length}|${S.user?.name}|${releases()
     .map((r: Any) => r.id + r.name + r.status)
@@ -724,7 +829,9 @@ function rowData(t: Any, showEpic: boolean, compact: boolean, page: string) {
   const e = epic(t.epicId);
   const kids: Any[] = isSub(t) ? [] : kidMap.get(t.id) || [];
   const kc: [number, number] = [kids.filter(isDone).length, kids.length];
-  const blocked = (t.links || []).some((l: Any) => l.type === 'is blocked by' && byId.get(l.targetId) && !isDone(byId.get(l.targetId)));
+  const blocked = (t.links || []).some(
+    (l: Any) => l.type === 'is blocked by' && byId.get(l.targetId) && !isDone(byId.get(l.targetId)),
+  );
   const active = S.drawer?.kind === 'issue' && S.drawer.id === t.id;
   const checked = S.checked.has(t.id);
   const popped = Boolean(S.pop?.ids?.includes(t.id));
@@ -740,12 +847,28 @@ function rowData(t: Any, showEpic: boolean, compact: boolean, page: string) {
     sig: rowSig(t, { e, kids: kc, blocked, active, checked, showEpic, compact, popped }),
   };
 }
-export function IssueRow({ t, showEpic = true, zone, compact = false }: { t: Any; showEpic?: boolean; zone?: Any; compact?: boolean }) {
-  return <RowView {...rowData(t, showEpic, compact, pageSig())} zoneKey={zone ? JSON.stringify(zone) : ''} />;
+export function IssueRow({
+  t,
+  showEpic = true,
+  zone,
+  compact = false,
+}: {
+  t: Any;
+  showEpic?: boolean;
+  zone?: Any;
+  compact?: boolean;
+}) {
+  return (
+    <RowView
+      {...rowData(t, showEpic, compact, pageSig())}
+      zoneKey={zone ? JSON.stringify(zone) : ''}
+    />
+  );
 }
 /**
- * A group's rows. Skipped entirely when none of its rows changed (sig), so opening a menu, a toast or "Saved"
- * doesn't redraw hundreds of rows; when one row changes, only that row redraws (RowView).
+ * A group's rows. Skipped entirely when none of its rows changed (sig), so opening a menu, a toast
+ * or "Saved" doesn't redraw hundreds of rows; when one row changes, only that row redraws
+ * (RowView).
  */
 const GroupRows = memo(
   function GroupRows({ rows, zoneKey }: { rows: Any[]; zoneKey: string; sig: string }) {
@@ -847,7 +970,11 @@ const RowView = memo(
                 .filter(Boolean)
                 .slice(0, 2)
                 .map((r: Any) => (
-                  <span key={r.id} className={`ver-chip ${r.status === 'released' ? 'rel-done' : ''}`} title={`Fix version ${r.name}`}>
+                  <span
+                    key={r.id}
+                    className={`ver-chip ${r.status === 'released' ? 'rel-done' : ''}`}
+                    title={`Fix version ${r.name}`}
+                  >
                     {r.name}
                   </span>
                 ))}
@@ -895,7 +1022,10 @@ const RowView = memo(
   (a, b) => a.sig === b.sig && a.page === b.page && a.zoneKey === b.zoneKey && a.t === b.t,
 );
 
-/** The status lozenge and assignee avatar as buttons that open the row popup (also used on the Issues page). */
+/**
+ * The status lozenge and assignee avatar as buttons that open the row popup (also used on the
+ * Issues page).
+ */
 export { StatusCell as RowStatus, AssigneeCell as RowAssignee } from './RowActions';
 
 function InlineCreate({ group }: { group: string }) {
@@ -993,7 +1123,8 @@ const BulkBarView = memo(
       emit();
       toast(`${ids.length} issues ${label}`, 'ok', { action: { label: 'Undo', onClick: undo } });
     };
-    // With custom transitions, only issues allowed to move to that status change; the rest are reported.
+    // With custom transitions, only issues allowed to move to that status change; the rest are
+    // reported.
     const bulkStatus = (to: string) => {
       const ok = ids.filter((id) => canMove(ticket(id), to));
       const skipped = ids.length - ok.length;
@@ -1038,7 +1169,11 @@ const BulkBarView = memo(
             value=""
             onChange={(e) =>
               e.target.value &&
-              bulkSet('epicId', e.target.value === '__none' ? null : e.target.value, `moved to ${epic(e.target.value)?.title || 'No epic'}`)
+              bulkSet(
+                'epicId',
+                e.target.value === '__none' ? null : e.target.value,
+                `moved to ${epic(e.target.value)?.title || 'No epic'}`,
+              )
             }
           >
             <MenuItem value="">Move to epic…</MenuItem>
@@ -1076,7 +1211,10 @@ const BulkBarView = memo(
             <SF
               filter
               value=""
-              onChange={(e) => e.target.value && bulkSet('priority', e.target.value, `set to ${e.target.value} priority`)}
+              onChange={(e) =>
+                e.target.value &&
+                bulkSet('priority', e.target.value, `set to ${e.target.value} priority`)
+              }
             >
               <MenuItem value="">Priority…</MenuItem>
               {opts(PRIORITIES)}
@@ -1089,7 +1227,10 @@ const BulkBarView = memo(
                 Fix version…
               </button>
             )}
-            <button className="btn sm" onClick={() => setFlag(ids, !ids.every((id) => ticket(id)?.flagged))}>
+            <button
+              className="btn sm"
+              onClick={() => setFlag(ids, !ids.every((id) => ticket(id)?.flagged))}
+            >
               <Ico svg={I.flag} />
               {ids.every((id) => ticket(id)?.flagged) ? 'Remove flag' : 'Add flag'}
             </button>
@@ -1111,7 +1252,11 @@ const BulkBarView = memo(
           <button
             className="btn sm"
             onClick={() =>
-              runTests(p.tickets.filter((x: Any) => S.checked.has(x.id)).flatMap((x: Any) => x.testCases.map((tc: Any) => ({ t: x, tc }))))
+              runTests(
+                p.tickets
+                  .filter((x: Any) => S.checked.has(x.id))
+                  .flatMap((x: Any) => x.testCases.map((tc: Any) => ({ t: x, tc }))),
+              )
             }
           >
             <Ico svg={I.play} />
@@ -1160,7 +1305,10 @@ const BulkBarView = memo(
   (a, b) => a.sig === b.sig,
 );
 
-/** Rows drawn per group at first; "Show more" draws the next ones (a backlog of thousands opens at once). */
+/**
+ * Rows drawn per group at first; "Show more" draws the next ones (a backlog of thousands opens at
+ * once).
+ */
 const ROW_CAP = 200;
 export function Backlog() {
   useAutoTour('project');
@@ -1175,7 +1323,9 @@ export function Backlog() {
   S.rowCap ??= {};
   const capOf = (g: Any) => S.rowCap[g.id] || ROW_CAP;
   const page = pageSig();
-  visibleIds = groups.flatMap((g: Any) => (S.collapsed.has(g.id) ? [] : g.items.slice(0, capOf(g)).map((t: Any) => t.id)));
+  visibleIds = groups.flatMap((g: Any) =>
+    S.collapsed.has(g.id) ? [] : g.items.slice(0, capOf(g)).map((t: Any) => t.id),
+  );
   return (
     <>
       <Header
@@ -1291,7 +1441,10 @@ export function Backlog() {
                   {s && can('sprint.manage') && (
                     <>
                       {s.state === 'active' ? (
-                        <button className="btn sm" onClick={() => openModal(<CompleteSprintModal s={s} />)}>
+                        <button
+                          className="btn sm"
+                          onClick={() => openModal(<CompleteSprintModal s={s} />)}
+                        >
                           Complete sprint
                         </button>
                       ) : (
@@ -1312,7 +1465,12 @@ export function Backlog() {
                       >
                         <Ico svg={I.pencil} />
                       </button>
-                      <button className="icon-btn" title="Delete sprint" aria-label="Delete sprint" onClick={() => deleteSprint(s)}>
+                      <button
+                        className="icon-btn"
+                        title="Delete sprint"
+                        aria-label="Delete sprint"
+                        onClick={() => deleteSprint(s)}
+                      >
                         <Ico svg={I.trash} />
                       </button>
                     </>
@@ -1330,7 +1488,9 @@ export function Backlog() {
                   {g.items.length ? (
                     <div className="rows">
                       {(() => {
-                        const rows = g.items.slice(0, capOf(g)).map((t: Any) => rowData(t, g.kind !== 'epic', false, page));
+                        const rows = g.items
+                          .slice(0, capOf(g))
+                          .map((t: Any) => rowData(t, g.kind !== 'epic', false, page));
                         return (
                           <GroupRows
                             rows={rows}
@@ -1354,7 +1514,9 @@ export function Backlog() {
                     </div>
                   ) : (
                     <div className="drop-hint">
-                      {s ? 'Plan this sprint by dragging issues here from the backlog.' : 'No issues. Drag issues here or create one.'}
+                      {s
+                        ? 'Plan this sprint by dragging issues here from the backlog.'
+                        : 'No issues. Drag issues here or create one.'}
                     </div>
                   )}
                   {can('issue.create') && <InlineCreate group={g.id} />}
@@ -1396,7 +1558,10 @@ export function Backlog() {
             )
           }
         >
-          <p>Create issues one by one, or start a project from a requirements document and Claude writes them for you.</p>
+          <p>
+            Create issues one by one, or start a project from a requirements document and Claude
+            writes them for you.
+          </p>
         </EmptyState>
       )}
       {S.groupBy === 'epic' && !filtersActive() && can('epic.manage') && (
@@ -1421,7 +1586,12 @@ function EpicsAiMenu() {
     <Menu
       id="epics-ai"
       button={
-        <button className="btn ai" aria-haspopup="menu" aria-expanded={S.menu === 'epics-ai'} onClick={() => setMenu('epics-ai')}>
+        <button
+          className="btn ai"
+          aria-haspopup="menu"
+          aria-expanded={S.menu === 'epics-ai'}
+          onClick={() => setMenu('epics-ai')}
+        >
           <Ico svg={I.sparkle} />
           AI actions
           <Ico svg={I.chevron} />
@@ -1446,7 +1616,8 @@ function EpicsAiMenu() {
           {plan && feat('split') && (
             <button onClick={() => openSplitIssues()}>
               <Ico svg={I.subtask} />
-              Split issues<small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small>
+              Split issues
+              <small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small>
             </button>
           )}
         </>
@@ -1525,7 +1696,10 @@ export function Epics() {
                       {(() => {
                         const r = epicRange(e);
                         return r ? (
-                          <span className={r.derived ? 'muted' : ''} title={r.derived ? 'Estimated from its issues’ sprints' : undefined}>
+                          <span
+                            className={r.derived ? 'muted' : ''}
+                            title={r.derived ? 'Estimated from its issues’ sprints' : undefined}
+                          >
                             {fmtDate(`${r.start}T00:00:00`)} – {fmtDate(`${r.end}T00:00:00`)}
                           </span>
                         ) : (
@@ -1584,7 +1758,10 @@ export function Epics() {
             )
           }
         >
-          <p>Epics group related issues into larger pieces of work, so you can track progress feature by feature.</p>
+          <p>
+            Epics group related issues into larger pieces of work, so you can track progress feature
+            by feature.
+          </p>
         </EmptyState>
       )}
     </>
@@ -1600,7 +1777,11 @@ export function testRows() {
     t.testCases.forEach((tc: Any, i: number) => {
       if (f.status && tc.status !== f.status) return;
       if (f.type && tc.type !== f.type) return;
-      if (qq && ![tc.title, tc.expected, tcKey(t, i), t.key, t.title].join(' ').toLowerCase().includes(qq)) return;
+      if (
+        qq &&
+        ![tc.title, tc.expected, tcKey(t, i), t.key, t.title].join(' ').toLowerCase().includes(qq)
+      )
+        return;
       rows.push({ t, tc, i });
     });
   }
@@ -1670,8 +1851,19 @@ function TcCounts({ list }: { list: TcRow[] }) {
     </span>
   );
 }
-/** Test cases organized by feature (epic) and issue. Issues start collapsed unless a search or filter is on. */
-function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature: boolean; filtered: boolean }) {
+/**
+ * Test cases organized by feature (epic) and issue. Issues start collapsed unless a search or
+ * filter is on.
+ */
+function TestsGrouped({
+  rows,
+  byFeature,
+  filtered,
+}: {
+  rows: TcRow[];
+  byFeature: boolean;
+  filtered: boolean;
+}) {
   const p = P();
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const issues = new Map<string, { t: Any; list: TcRow[] }>();
@@ -1683,7 +1875,9 @@ function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature:
   const features: { key: string; epic: Any; issues: { t: Any; list: TcRow[] }[] }[] = [];
   if (byFeature) {
     for (const e of [...p.epics, null]) {
-      const its = [...issues.values()].filter((g) => (e ? g.t.epicId === e.id : !p.epics.some((x: Any) => x.id === g.t.epicId)));
+      const its = [...issues.values()].filter((g) =>
+        e ? g.t.epicId === e.id : !p.epics.some((x: Any) => x.id === g.t.epicId),
+      );
       if (its.length) features.push({ key: e ? e.id : 'none', epic: e, issues: its });
     }
   } else features.push({ key: 'all', epic: undefined, issues: [...issues.values()] });
@@ -1693,9 +1887,17 @@ function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature:
     const dflt = filtered || list.some((x) => x.tc.status === 'Fail');
     const o = isOpen(`i:${t.id}`, dflt);
     return (
-      <div key={t.id} className={`tg-issue ${list.some((x) => x.tc.status === 'Fail') ? 'has-fail' : ''}`}>
+      <div
+        key={t.id}
+        className={`tg-issue ${list.some((x) => x.tc.status === 'Fail') ? 'has-fail' : ''}`}
+      >
         <div className="res-head">
-          <button type="button" className={`as-h ${o ? '' : 'closed'}`} aria-expanded={o} onClick={() => toggle(`i:${t.id}`, dflt)}>
+          <button
+            type="button"
+            className={`as-h ${o ? '' : 'closed'}`}
+            aria-expanded={o}
+            onClick={() => toggle(`i:${t.id}`, dflt)}
+          >
             <Ico svg={I.chevron} />
             <TypeIcon type={t.type} />
             <span className="key">{t.key}</span>
@@ -1703,7 +1905,12 @@ function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature:
             <span className={`loz ${sCls(t.status)} tg-status`}>{t.status}</span>
           </button>
           <TcCounts list={list} />
-          <button className="icon-btn" title="Open the issue" aria-label={`Open ${t.key}`} onClick={() => openDrawer('issue', t.id)}>
+          <button
+            className="icon-btn"
+            title="Open the issue"
+            aria-label={`Open ${t.key}`}
+            onClick={() => openDrawer('issue', t.id)}
+          >
             <Ico svg={I.external} />
           </button>
           {can('test.run') && (
@@ -1735,7 +1942,9 @@ function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature:
                   <td className="key">{tcKey(t, i)}</td>
                   <td>{tc.title}</td>
                   <td className="muted">{tc.type}</td>
-                  <td className="muted">{(tc.acRef || []).map((n: number) => `AC${n}`).join(', ') || '–'}</td>
+                  <td className="muted">
+                    {(tc.acRef || []).map((n: number) => `AC${n}`).join(', ') || '–'}
+                  </td>
                   <td>
                     {tc.lastRun ? (
                       <RunLoz tc={tc} />
@@ -1765,7 +1974,8 @@ function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature:
       <div className="row tg-tools">
         <span className="muted small">
           {byFeature ? `${features.length} feature${features.length === 1 ? '' : 's'} · ` : ''}
-          {issues.size} issue{issues.size === 1 ? '' : 's'} · {rows.length} test case{rows.length === 1 ? '' : 's'}
+          {issues.size} issue{issues.size === 1 ? '' : 's'} · {rows.length} test case
+          {rows.length === 1 ? '' : 's'}
         </span>
         <span className="spacer" />
         <button className="btn sm subtle" onClick={() => expandAll(true)}>
@@ -1782,7 +1992,12 @@ function TestsGrouped({ rows, byFeature, filtered }: { rows: TcRow[]; byFeature:
         return (
           <section key={f.key} className="tg-feature">
             <div className="tg-feature-h">
-              <button type="button" className={`as-h ${o ? '' : 'closed'}`} aria-expanded={o} onClick={() => toggle(`f:${f.key}`, true)}>
+              <button
+                type="button"
+                className={`as-h ${o ? '' : 'closed'}`}
+                aria-expanded={o}
+                onClick={() => toggle(`f:${f.key}`, true)}
+              >
                 <Ico svg={I.chevron} />
                 {f.epic ? (
                   <>
@@ -1842,13 +2057,24 @@ export function Tests() {
         }
       />
       <div className="tiles">
-        <Tile icon={I.test} value={all.length} label={`test cases · ${all.filter((x: Any) => x.script).length} automated`} />
+        <Tile
+          icon={I.test}
+          value={all.length}
+          label={`test cases · ${all.filter((x: Any) => x.script).length} automated`}
+        />
         <Tile icon={I.check} value={c('Pass')} label="passed" color="#22a06b" />
         <Tile icon={I.close} value={c('Fail')} label="failed" color="var(--danger)" />
         <Tile icon={I.backlog} value={c('Not run') + c('Blocked')} label="not run or blocked" />
       </div>
       <div className="toolbar">
-        <TF search sx={{ width: 220 }} id="tq" placeholder="Search test cases" value={f.q} onChange={(e) => setF('q', e.target.value)} />
+        <TF
+          search
+          sx={{ width: 220 }}
+          id="tq"
+          placeholder="Search test cases"
+          value={f.q}
+          onChange={(e) => setF('q', e.target.value)}
+        />
         <SF
           filter
           aria-label="Epic"
@@ -1865,11 +2091,21 @@ export function Tests() {
             </MenuItem>
           ))}
         </SF>
-        <SF filter aria-label="Result" value={f.status} onChange={(e) => setF('status', e.target.value)}>
+        <SF
+          filter
+          aria-label="Result"
+          value={f.status}
+          onChange={(e) => setF('status', e.target.value)}
+        >
           <MenuItem value="">Result</MenuItem>
           {opts(TC_STATUS)}
         </SF>
-        <SF filter aria-label="Test type" value={f.type} onChange={(e) => setF('type', e.target.value)}>
+        <SF
+          filter
+          aria-label="Test type"
+          value={f.type}
+          onChange={(e) => setF('type', e.target.value)}
+        >
           <MenuItem value="">Test type</MenuItem>
           {opts(TC_TYPES)}
         </SF>
@@ -1894,7 +2130,11 @@ export function Tests() {
         </SF>
       </div>
       {rows.length && tcGroup() !== 'none' ? (
-        <TestsGrouped rows={rows} byFeature={tcGroup() === 'feature'} filtered={Boolean(f.q.trim() || f.status || f.type)} />
+        <TestsGrouped
+          rows={rows}
+          byFeature={tcGroup() === 'feature'}
+          filtered={Boolean(f.q.trim() || f.status || f.type)}
+        />
       ) : rows.length ? (
         <table className="tbl">
           <thead>
@@ -1920,7 +2160,9 @@ export function Tests() {
                   </span>
                 </td>
                 <td className="muted">{tc.type}</td>
-                <td className="muted">{(tc.acRef || []).map((n: number) => `AC${n}`).join(', ') || '–'}</td>
+                <td className="muted">
+                  {(tc.acRef || []).map((n: number) => `AC${n}`).join(', ') || '–'}
+                </td>
                 <td>
                   {tc.lastRun ? (
                     <RunLoz tc={tc} />
@@ -1969,8 +2211,8 @@ export function Tests() {
           }
         >
           <p>
-            Select issues in the backlog and choose <b>Write test cases</b>, or open an issue and use <b>Regenerate test cases</b>. Claude
-            plans them from the acceptance criteria.
+            Select issues in the backlog and choose <b>Write test cases</b>, or open an issue and
+            use <b>Regenerate test cases</b>. Claude plans them from the acceptance criteria.
           </p>
         </EmptyState>
       )}
@@ -1986,14 +2228,21 @@ function VelocityChart({ sprints }: { sprints: Any[] }) {
     L = 40,
     B = 36,
     T = 12;
-  const max = Math.max(1, ...sprints.flatMap((s) => [s.committedPoints || 0, s.completedPoints || 0]));
+  const max = Math.max(
+    1,
+    ...sprints.flatMap((s) => [s.committedPoints || 0, s.completedPoints || 0]),
+  );
   const step = Math.ceil(max / 4),
     top = step * 4;
   const y = (v: number) => T + (H - T - B) * (1 - v / top);
   const gw = (W - L - 8) / sprints.length;
   const bw = Math.min(28, gw / 3);
   const bar = (v: number, x: number, cls: string, label: string, name: string) => (
-    <path key={cls} d={`M${x},${y(0)} V${y(v) + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${y(0)} Z`} className={cls}>
+    <path
+      key={cls}
+      d={`M${x},${y(0)} V${y(v) + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${y(0)} Z`}
+      className={cls}
+    >
       <title>{`${name} · ${label}: ${v} points`}</title>
     </path>
   );
@@ -2040,12 +2289,15 @@ function VelocityChart({ sprints }: { sprints: Any[] }) {
   );
 }
 function Burndown({ s }: { s: Any }) {
-  if (!s?.startDate || !s?.endDate) return <p className="muted">Start a sprint with start and end dates to see its burndown.</p>;
+  if (!s?.startDate || !s?.endDate)
+    return <p className="muted">Start a sprint with start and end dates to see its burndown.</p>;
   const issues = P().tickets.filter((t: Any) => t.sprintId === s.id && !isSub(t));
   const total = s.committedPoints ?? spSum(issues);
   const doneAt = (t: Any) => {
     if (!isDone(t)) return null;
-    const h = [...t.history].reverse().find((x: Any) => x.field === 'status' && catOf(x.to) === 'done');
+    const h = [...t.history]
+      .reverse()
+      .find((x: Any) => x.field === 'status' && catOf(x.to) === 'done');
     return Date.parse(h?.at || t.updatedAt);
   };
   const start = new Date(`${s.startDate}T00:00:00`),
@@ -2076,13 +2328,26 @@ function Burndown({ s }: { s: Any }) {
   const top = Math.max(4, Math.ceil(total / 4) * 4);
   const x = (d: number) => L + (W - L - 12) * (d / days);
   const y = (v: number) => T + (H - T - B) * (1 - v / top);
-  const ticks = Array.from({ length: days + 1 }, (_, d) => d).filter((d) => d === 0 || d === days || d % Math.ceil(days / 6) === 0);
+  const ticks = Array.from({ length: days + 1 }, (_, d) => d).filter(
+    (d) => d === 0 || d === days || d % Math.ceil(days / 6) === 0,
+  );
   return (
     <>
-      <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label={`Burndown for ${s.name}`}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="chart"
+        role="img"
+        aria-label={`Burndown for ${s.name}`}
+      >
         {[0, 1, 2, 3, 4].map((i) => (
           <g key={i}>
-            <line x1={L} x2={W - 4} y1={y((top / 4) * i)} y2={y((top / 4) * i)} className="gridline" />
+            <line
+              x1={L}
+              x2={W - 4}
+              y1={y((top / 4) * i)}
+              y2={y((top / 4) * i)}
+              className="gridline"
+            />
             <text x={L - 6} y={y((top / 4) * i) + 4} textAnchor="end" className="axis">
               {(top / 4) * i}
             </text>
@@ -2094,7 +2359,10 @@ function Burndown({ s }: { s: Any }) {
           </text>
         ))}
         <line x1={x(0)} y1={y(total)} x2={x(days)} y2={y(0)} className="guide" />
-        <path d={pts.map((p2, i) => `${i ? 'L' : 'M'}${x(p2.d)},${y(p2.v)}`).join(' ')} className="series-1-line" />
+        <path
+          d={pts.map((p2, i) => `${i ? 'L' : 'M'}${x(p2.d)},${y(p2.v)}`).join(' ')}
+          className="series-1-line"
+        />
         {pts.map((p2) => (
           <circle key={p2.d} cx={x(p2.d)} cy={y(p2.v)} r={4} className="series-1 ring">
             <title>{`${fmtDate(start.getTime() + p2.d * 86400000)}: ${p2.v} points remaining`}</title>
@@ -2118,7 +2386,11 @@ export function Reports() {
   const p = P();
   const closed = p.sprints.filter((s: Any) => s.state === 'closed').slice(-7);
   const target = activeSprint() || closed[closed.length - 1];
-  const avg = closed.length ? Math.round(closed.reduce((s: number, x: Any) => s + (x.completedPoints || 0), 0) / closed.length) : 0;
+  const avg = closed.length
+    ? Math.round(
+        closed.reduce((s: number, x: Any) => s + (x.completedPoints || 0), 0) / closed.length,
+      )
+    : 0;
   return (
     <>
       <Header title="Reports" />
@@ -2126,14 +2398,17 @@ export function Reports() {
         <div className="card wide">
           <h3>Velocity</h3>
           <p className="sub">
-            Story points committed at sprint start versus completed, for the last {closed.length} completed sprints
+            Story points committed at sprint start versus completed, for the last {closed.length}{' '}
+            completed sprints
             {closed.length ? ` · average ${avg} points` : ''}.
           </p>
           <VelocityChart sprints={closed} />
         </div>
         <div className="card wide">
           <h3>Burndown{target ? ` · ${target.name}` : ''}</h3>
-          <p className="sub">Story points remaining each day of the sprint against an even guideline.</p>
+          <p className="sub">
+            Story points remaining each day of the sprint against an even guideline.
+          </p>
           <Burndown s={target} />
         </div>
         <div className="card wide">
@@ -2159,12 +2434,18 @@ export function Reports() {
                       {s.goal && <div className="muted small">{s.goal}</div>}
                     </td>
                     <td>
-                      <span className={`loz ${s.state === 'active' ? 's-inprogress' : s.state === 'closed' ? 's-done' : 's-todo'}`}>
+                      <span
+                        className={`loz ${s.state === 'active' ? 's-inprogress' : s.state === 'closed' ? 's-done' : 's-todo'}`}
+                      >
                         {s.state === 'future' ? 'Planned' : s.state}
                       </span>
                     </td>
-                    <td className="muted">{s.startDate ? `${fmtDate(s.startDate)} – ${fmtDate(s.endDate)}` : '–'}</td>
-                    <td className="num">{p.tickets.filter((t: Any) => t.sprintId === s.id && !isSub(t)).length}</td>
+                    <td className="muted">
+                      {s.startDate ? `${fmtDate(s.startDate)} – ${fmtDate(s.endDate)}` : '–'}
+                    </td>
+                    <td className="num">
+                      {p.tickets.filter((t: Any) => t.sprintId === s.id && !isSub(t)).length}
+                    </td>
                     <td className="num">{s.committedPoints ?? '–'}</td>
                     <td className="num">{s.completedPoints ?? '–'}</td>
                   </tr>
@@ -2210,13 +2491,18 @@ export function automationItems(scope: string) {
   return out;
 }
 
-/** Results tab: test cases grouped under their issue, with counts, search and a Run button per issue. */
+/**
+ * Results tab: test cases grouped under their issue, with counts, search and a Run button per
+ * issue.
+ */
 function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; run: Any }) {
   const [q, setQ] = useState('');
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const needle = q.trim().toLowerCase();
   const shown = needle
-    ? items.filter(({ t, tc, i }) => `${tcKey(t, i)} ${tc.title} ${t.key} ${t.title}`.toLowerCase().includes(needle))
+    ? items.filter(({ t, tc, i }) =>
+        `${tcKey(t, i)} ${tc.title} ${t.key} ${t.title}`.toLowerCase().includes(needle),
+      )
     : items;
   const groups: { t: Any; list: { t: Any; tc: Any; i: number }[] }[] = [];
   for (const it of shown) {
@@ -2224,11 +2510,13 @@ function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; 
     if (g) g.list.push(it);
     else groups.push({ t: it.t, list: [it] });
   }
-  // Many issues: start collapsed, except issues with failing tests (and when searching, everything that matches).
+  // Many issues: start collapsed, except issues with failing tests (and when searching, everything
+  // that matches).
   const many = groups.length > 8 && !needle;
   const failing = (list: Any[]) => list.some((x) => x.tc.lastRun && x.tc.lastRun.status !== 'Pass');
   const isClosedG = (g: Any) =>
-    closed[g.t.id] ?? (many && !failing(g.list) && !g.list.some((x: Any) => run?.running && run.current === x.tc.id));
+    closed[g.t.id] ??
+    (many && !failing(g.list) && !g.list.some((x: Any) => run?.running && run.current === x.tc.id));
   const allClosed = groups.length > 0 && groups.every(isClosedG);
   if (!items.length)
     return (
@@ -2269,12 +2557,15 @@ function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; 
           aria-label="Search test cases"
         />
         <span className="muted small">
-          {groups.length} issue{groups.length === 1 ? '' : 's'} · {shown.length} test case{shown.length === 1 ? '' : 's'}
+          {groups.length} issue{groups.length === 1 ? '' : 's'} · {shown.length} test case
+          {shown.length === 1 ? '' : 's'}
         </span>
         <button
           className="btn sm subtle"
           style={{ marginLeft: 'auto' }}
-          onClick={() => setClosed(allClosed ? {} : Object.fromEntries(groups.map((g) => [g.t.id, true])))}
+          onClick={() =>
+            setClosed(allClosed ? {} : Object.fromEntries(groups.map((g) => [g.t.id, true])))
+          }
         >
           {allClosed ? 'Expand all' : 'Collapse all'}
         </button>
@@ -2312,7 +2603,11 @@ function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; 
                 Open issue
               </button>
               {can('test.run') && (
-                <button className="btn sm" disabled={run?.running} onClick={() => runTests(list.map(({ t: tt, tc }) => ({ t: tt, tc })))}>
+                <button
+                  className="btn sm"
+                  disabled={run?.running}
+                  onClick={() => runTests(list.map(({ t: tt, tc }) => ({ t: tt, tc })))}
+                >
                   <Ico svg={I.play} />
                   Run {list.length}
                 </button>
@@ -2361,13 +2656,16 @@ function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; 
                             </span>
                           ) : tc.lastRun ? (
                             <>
-                              <RunLoz tc={tc} /> <span className="muted small">{ago(tc.lastRun.at)}</span>
+                              <RunLoz tc={tc} />{' '}
+                              <span className="muted small">{ago(tc.lastRun.at)}</span>
                             </>
                           ) : (
                             <span className="muted small">Never</span>
                           )}
                         </td>
-                        <td className="num muted">{tc.lastRun ? `${(tc.lastRun.durationMs / 1000).toFixed(1)}s` : '–'}</td>
+                        <td className="num muted">
+                          {tc.lastRun ? `${(tc.lastRun.durationMs / 1000).toFixed(1)}s` : '–'}
+                        </td>
                         <td style={{ textAlign: 'right' }}>
                           {can('test.run') && (
                             <button
@@ -2388,7 +2686,9 @@ function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; 
                         <tr key={`${tc.id}-err`} className="err-row">
                           <td />
                           <td colSpan={5}>
-                            <div className="err-box">{tc.lastRun.error.split('\n').slice(0, 4).join('\n')}</div>
+                            <div className="err-box">
+                              {tc.lastRun.error.split('\n').slice(0, 4).join('\n')}
+                            </div>
                             {tc.lastRun.screenshot && (
                               <button
                                 type="button"
@@ -2404,7 +2704,11 @@ function ResultsList({ items, run }: { items: { t: Any; tc: Any; i: number }[]; 
                                   )
                                 }
                               >
-                                <img src={tc.lastRun.screenshot} alt={`Screenshot of the failed test ${tc.title}`} loading="lazy" />
+                                <img
+                                  src={tc.lastRun.screenshot}
+                                  alt={`Screenshot of the failed test ${tc.title}`}
+                                  loading="lazy"
+                                />
                               </button>
                             )}
                           </td>
@@ -2441,7 +2745,8 @@ export function Automation() {
     emit();
   };
   const failing = p.tickets.reduce(
-    (n: number, t: Any) => n + t.testCases.filter((x: Any) => x.lastRun && x.lastRun.status !== 'Pass').length,
+    (n: number, t: Any) =>
+      n + t.testCases.filter((x: Any) => x.lastRun && x.lastRun.status !== 'Pass').length,
     0,
   );
   const items = automationItems(S.autoScope);
@@ -2513,13 +2818,21 @@ export function Automation() {
             <div className="warn-banner" style={{ marginBottom: 12 }}>
               <Ico svg={I.warn} />
               <span>Set the application URL so tests know where to run.</span>
-              <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setTab('settings')}>
+              <button
+                className="btn sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => setTab('settings')}
+              >
                 Open Settings
               </button>
             </div>
           )}
           <div className="tiles">
-            <Tile icon={I.bot} value={`${all.filter((x: Any) => x.script).length} / ${all.length}`} label="test cases automated" />
+            <Tile
+              icon={I.bot}
+              value={`${all.filter((x: Any) => x.script).length} / ${all.length}`}
+              label="test cases automated"
+            />
             <Tile
               icon={I.check}
               value={ran.filter((x: Any) => x.lastRun.status === 'Pass').length}
@@ -2649,11 +2962,16 @@ export function Automation() {
                       Ready: {eng.label} (Playwright {eng.version}).
                     </span>
                   ) : eng.serverless ? (
-                    <span className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+                    <span
+                      className="row"
+                      style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}
+                    >
                       <span className="dot bad" style={{ marginTop: 5 }} />
                       <span>
                         This server can’t run a browser (serverless hosting such as Vercel).{' '}
-                        {can('users.manage') ? 'Connect a remote browser below.' : 'Ask an administrator to connect a remote browser.'}
+                        {can('users.manage')
+                          ? 'Connect a remote browser below.'
+                          : 'Ask an administrator to connect a remote browser.'}
                       </span>
                     </span>
                   ) : (
@@ -2669,7 +2987,11 @@ export function Automation() {
                         )}
                       </span>
                       {eng.installed && can('users.manage') && (
-                        <button className="btn sm" style={{ marginTop: 6 }} onClick={installBrowser}>
+                        <button
+                          className="btn sm"
+                          style={{ marginTop: 6 }}
+                          onClick={installBrowser}
+                        >
                           Install Chromium
                         </button>
                       )}
@@ -2681,9 +3003,11 @@ export function Automation() {
               </div>
             </div>
             <p className="muted small" style={{ margin: '12px 0 0' }}>
-              The AI writes a Playwright script for each test case from its steps, the issue&apos;s acceptance criteria, the App setup and
-              snapshots of the app&apos;s pages, using your Claude account or, when that isn’t set up, the AI APIs connected in
-              Administration. Scripts run headless in the test browser; you can read and edit every script. Results update each test case.
+              The AI writes a Playwright script for each test case from its steps, the issue&apos;s
+              acceptance criteria, the App setup and snapshots of the app&apos;s pages, using your
+              Claude account or, when that isn’t set up, the AI APIs connected in Administration.
+              Scripts run headless in the test browser; you can read and edit every script. Results
+              update each test case.
             </p>
             <div className="row" style={{ marginTop: 10, gap: 16 }}>
               <span className="small" style={{ fontWeight: 600, color: 'var(--text-subtle)' }}>
@@ -2695,7 +3019,10 @@ export function Automation() {
                 checked={p.automation.onFail?.comment !== false}
                 onChange={(e: Any) =>
                   mutate((pp) => {
-                    pp.automation.onFail = { ...(pp.automation.onFail || {}), comment: e.target.checked };
+                    pp.automation.onFail = {
+                      ...(pp.automation.onFail || {}),
+                      comment: e.target.checked,
+                    };
                   })
                 }
               />
@@ -2705,7 +3032,10 @@ export function Automation() {
                 checked={p.automation.onFail?.notify !== false}
                 onChange={(e: Any) =>
                   mutate((pp) => {
-                    pp.automation.onFail = { ...(pp.automation.onFail || {}), notify: e.target.checked };
+                    pp.automation.onFail = {
+                      ...(pp.automation.onFail || {}),
+                      notify: e.target.checked,
+                    };
                   })
                 }
               />
@@ -2713,7 +3043,10 @@ export function Automation() {
                 <CB
                   label={
                     <>
-                      Self-healing <span className="muted">(repair scripts broken by page changes, then re-run)</span>
+                      Self-healing{' '}
+                      <span className="muted">
+                        (repair scripts broken by page changes, then re-run)
+                      </span>
                     </>
                   }
                   disabled={!can('project.settings')}
@@ -2729,14 +3062,18 @@ export function Automation() {
                 <CB
                   label={
                     <>
-                      Add an AI failure analysis <span className="muted">(cause, evidence, fix; uses the light model)</span>
+                      Add an AI failure analysis{' '}
+                      <span className="muted">(cause, evidence, fix; uses the light model)</span>
                     </>
                   }
                   disabled={!can('project.settings')}
                   checked={p.automation.onFail?.analyze !== false}
                   onChange={(e: Any) =>
                     mutate((pp) => {
-                      pp.automation.onFail = { ...(pp.automation.onFail || {}), analyze: e.target.checked };
+                      pp.automation.onFail = {
+                        ...(pp.automation.onFail || {}),
+                        analyze: e.target.checked,
+                      };
                     })
                   }
                 />
@@ -2752,7 +3089,10 @@ export function Automation() {
                 checked={p.automation.onPass?.comment !== false}
                 onChange={(e: Any) =>
                   mutate((pp) => {
-                    pp.automation.onPass = { ...(pp.automation.onPass || {}), comment: e.target.checked };
+                    pp.automation.onPass = {
+                      ...(pp.automation.onPass || {}),
+                      comment: e.target.checked,
+                    };
                   })
                 }
               />
@@ -2793,9 +3133,20 @@ export const lines = (v: string) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-// ---------------------------------------------------------------- failures (Test automation → Failures)
+// ---------------------------------------------------------------- failures (Test automation →
+// Failures)
 /** A failed test's screenshot, large. */
-export function ShotModal({ url, title, error, at }: { url: string; title: string; error?: string; at?: string }) {
+export function ShotModal({
+  url,
+  title,
+  error,
+  at,
+}: {
+  url: string;
+  title: string;
+  error?: string;
+  at?: string;
+}) {
   return (
     <Modal
       title={title}
@@ -2838,7 +3189,11 @@ function FailureCard({ t, tc, i }: { t: Any; tc: Any; i: number }) {
     }
     setLoading(true);
     try {
-      setHist((await api(`/api/projects/${p.id}/screenshots?tc=${encodeURIComponent(tc.id)}`)).filter((x: Any) => x.url !== r.screenshot));
+      setHist(
+        (await api(`/api/projects/${p.id}/screenshots?tc=${encodeURIComponent(tc.id)}`)).filter(
+          (x: Any) => x.url !== r.screenshot,
+        ),
+      );
     } catch (e: Any) {
       toast(e.message, 'err');
     } finally {
@@ -2851,9 +3206,15 @@ function FailureCard({ t, tc, i }: { t: Any; tc: Any; i: number }) {
         <button
           type="button"
           className="shot-thumb"
-          onClick={() => openModal(<ShotModal url={r.screenshot} title={title} error={r.error} at={r.at} />)}
+          onClick={() =>
+            openModal(<ShotModal url={r.screenshot} title={title} error={r.error} at={r.at} />)
+          }
         >
-          <img src={r.screenshot} alt={`Screenshot of the failed test ${tc.title}`} loading="lazy" />
+          <img
+            src={r.screenshot}
+            alt={`Screenshot of the failed test ${tc.title}`}
+            loading="lazy"
+          />
         </button>
       ) : (
         <div className="shot-thumb none">
@@ -2872,24 +3233,40 @@ function FailureCard({ t, tc, i }: { t: Any; tc: Any; i: number }) {
         <b className="fail-title" title={tc.title}>
           {tc.title}
         </b>
-        <button type="button" className="link-btn small fail-issue" onClick={() => openDrawer('issue', t.id)}>
+        <button
+          type="button"
+          className="link-btn small fail-issue"
+          onClick={() => openDrawer('issue', t.id)}
+        >
           <TypeIcon type={t.type} /> {t.key} {t.title}
         </button>
         {r.error && <pre className="err-box">{r.error.split('\n').slice(0, 5).join('\n')}</pre>}
         <div className="row" style={{ gap: 6, marginTop: 'auto' }}>
           {can('test.run') && (
-            <button className="btn sm" disabled={S.autoRun?.running} onClick={() => runTests([{ t, tc }])}>
+            <button
+              className="btn sm"
+              disabled={S.autoRun?.running}
+              onClick={() => runTests([{ t, tc }])}
+            >
               <Ico svg={I.play} />
               Run again
             </button>
           )}
           {tc.script && (
-            <button className="btn sm subtle" onClick={() => openModal(<ScriptModal tid={t.id} tcid={tc.id} />)}>
+            <button
+              className="btn sm subtle"
+              onClick={() => openModal(<ScriptModal tid={t.id} tcid={tc.id} />)}
+            >
               <Ico svg={I.bot} />
               Script
             </button>
           )}
-          <button className="btn sm subtle" style={{ marginLeft: 'auto' }} disabled={loading} onClick={loadHistory}>
+          <button
+            className="btn sm subtle"
+            style={{ marginLeft: 'auto' }}
+            disabled={loading}
+            onClick={loadHistory}
+          >
             {loading ? <Spinner /> : hist ? 'Hide history' : 'Earlier failures'}
           </button>
         </div>
@@ -2902,9 +3279,17 @@ function FailureCard({ t, tc, i }: { t: Any; tc: Any; i: number }) {
                   type="button"
                   className="shot-thumb xs"
                   title={`Failed ${new Date(h.created_at).toLocaleString()}`}
-                  onClick={() => openModal(<ShotModal url={h.url} title={title} error={h.error} at={h.created_at} />)}
+                  onClick={() =>
+                    openModal(
+                      <ShotModal url={h.url} title={title} error={h.error} at={h.created_at} />,
+                    )
+                  }
                 >
-                  <img src={h.url} alt={`Earlier failure, ${new Date(h.created_at).toLocaleString()}`} loading="lazy" />
+                  <img
+                    src={h.url}
+                    alt={`Earlier failure, ${new Date(h.created_at).toLocaleString()}`}
+                    loading="lazy"
+                  />
                 </button>
               ))}
             </div>
@@ -2934,8 +3319,8 @@ function Failures() {
   return (
     <>
       <p className="muted small" style={{ marginTop: 0 }}>
-        {fails.length} test{fails.length === 1 ? '' : 's'} failed on the last run. Screenshots are saved in the database for people with
-        access to this project (the last 5 per test).
+        {fails.length} test{fails.length === 1 ? '' : 's'} failed on the last run. Screenshots are
+        saved in the database for people with access to this project (the last 5 per test).
       </p>
       <div className="fail-grid">
         {fails.map(({ t, tc, i }: Any) => (

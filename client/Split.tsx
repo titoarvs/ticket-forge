@@ -1,7 +1,8 @@
 'use client';
-// Split issues into smaller ones, many at a time (Epics page → AI actions, or an epic's panel). Pick the issues (big ones
-// are ticked for you), the AI proposes small tickets for each or says why one is fine as it is, you review, then apply:
-// the first part keeps the original issue (key, history, comments, links), the others become new issues beside it.
+// Split issues into smaller ones, many at a time (Epics page → AI actions, or an epic's panel).
+// Pick the issues (big ones are ticked for you), the AI proposes small tickets for each or says why
+// one is fine as it is, you review, then apply: the first part keeps the original issue (key,
+// history, comments, links), the others become new issues beside it.
 import { useState } from 'react';
 import {
   S,
@@ -24,17 +25,27 @@ import {
 import { Ico, I, Modal, Spinner, TypeIcon, StatusLoz } from './ui';
 import { TA, CB, SF, MenuItem } from './fields';
 
-/** Worth splitting: estimated above 3 points, or not estimated with many acceptance criteria, many test cases or a long description. */
+/**
+ * Worth splitting: estimated above 3 points, or not estimated with many acceptance criteria, many
+ * test cases or a long description.
+ */
 export const isBig = (t: Any) =>
   t.storyPoints != null
     ? t.storyPoints > 3
-    : (t.acceptanceCriteria?.length || 0) > 6 || (t.testCases?.length || 0) >= 15 || String(t.description || '').length > 1200;
+    : (t.acceptanceCriteria?.length || 0) > 6 ||
+      (t.testCases?.length || 0) >= 15 ||
+      String(t.description || '').length > 1200;
 
 function SplitPicker({ epicId }: { epicId?: string }) {
   const p = P();
   const [scope, setScope] = useState(epicId || 'all');
-  const pool = p.tickets.filter((t: Any) => !isSub(t) && (scope === 'all' || (scope === 'none' ? !t.epicId : t.epicId === scope)));
-  const [pick, setPick] = useState<Record<string, boolean>>(() => Object.fromEntries(p.tickets.map((t: Any) => [t.id, isBig(t)])));
+  const pool = p.tickets.filter(
+    (t: Any) =>
+      !isSub(t) && (scope === 'all' || (scope === 'none' ? !t.epicId : t.epicId === scope)),
+  );
+  const [pick, setPick] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(p.tickets.map((t: Any) => [t.id, isBig(t)])),
+  );
   const [text, setText] = useState('');
   const chosen = pool.filter((t: Any) => pick[t.id]);
   const big = pool.filter(isBig).length;
@@ -60,12 +71,18 @@ function SplitPicker({ epicId }: { epicId?: string }) {
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        The AI splits each picked issue into small tickets (one testable behaviour each, 1–3 points, your team’s acceptance-criteria rules)
-        that cover exactly its scope, and shares out its test cases. Issues that are already small stay as they are. You review everything
-        before it changes.
+        The AI splits each picked issue into small tickets (one testable behaviour each, 1–3 points,
+        your team’s acceptance-criteria rules) that cover exactly its scope, and shares out its test
+        cases. Issues that are already small stay as they are. You review everything before it
+        changes.
       </p>
       <div className="row split-tools">
-        <SF filter value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Which issues">
+        <SF
+          filter
+          value={scope}
+          onChange={(e) => setScope(e.target.value)}
+          aria-label="Which issues"
+        >
           <MenuItem value="all">All epics</MenuItem>
           {p.epics.map((e: Any) => (
             <MenuItem key={e.id} value={e.id}>
@@ -76,14 +93,26 @@ function SplitPicker({ epicId }: { epicId?: string }) {
         </SF>
         <button
           className="btn sm subtle"
-          onClick={() => setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, isBig(t)])) })}
+          onClick={() =>
+            setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, isBig(t)])) })
+          }
         >
           Tick the big ones ({big})
         </button>
-        <button className="btn sm subtle" onClick={() => setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, true])) })}>
+        <button
+          className="btn sm subtle"
+          onClick={() =>
+            setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, true])) })
+          }
+        >
           All
         </button>
-        <button className="btn sm subtle" onClick={() => setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, false])) })}>
+        <button
+          className="btn sm subtle"
+          onClick={() =>
+            setPick({ ...pick, ...Object.fromEntries(pool.map((t: Any) => [t.id, false])) })
+          }
+        >
           None
         </button>
         <span className="spacer" />
@@ -94,7 +123,11 @@ function SplitPicker({ epicId }: { epicId?: string }) {
       <div className="split-list">
         {pool.map((t: Any) => (
           <label key={t.id} className={`split-row ${pick[t.id] ? '' : 'off'}`}>
-            <CB checked={Boolean(pick[t.id])} onChange={() => setPick({ ...pick, [t.id]: !pick[t.id] })} aria-label={`Split ${t.key}`} />
+            <CB
+              checked={Boolean(pick[t.id])}
+              onChange={() => setPick({ ...pick, [t.id]: !pick[t.id] })}
+              aria-label={`Split ${t.key}`}
+            />
             <TypeIcon type={t.type} />
             <span className="key">{t.key}</span>
             <span className="split-title">{t.title}</span>
@@ -141,7 +174,8 @@ async function runSplit(ids: string[], instruction: string) {
     });
     let out: Any = null;
     await readNdjson(res, (ev) => {
-      if (ev.type === 'progress') task.update({ detail: ev.message, done: ev.done, total: ev.total });
+      if (ev.type === 'progress')
+        task.update({ detail: ev.message, done: ev.done, total: ev.total });
       else if (ev.type === 'done') out = ev;
       else if (ev.type === 'error') throw new Error(ev.error);
     });
@@ -161,7 +195,9 @@ function SplitReview({ results }: { results: Any[] }) {
   const p = P();
   const splits = results.filter((r) => r.action === 'split');
   const kept = results.filter((r) => r.action !== 'split');
-  const [pick, setPick] = useState<Record<string, boolean>>(() => Object.fromEntries(splits.map((r) => [r.ticketId, true])));
+  const [pick, setPick] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(splits.map((r) => [r.ticketId, true])),
+  );
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const chosen = splits.filter((r) => pick[r.ticketId]);
   const pts = (list: Any[]) => list.reduce((n, x) => n + (x.storyPoints || 0), 0);
@@ -174,7 +210,8 @@ function SplitReview({ results }: { results: Any[] }) {
         if (i < 0) continue;
         const orig = pp.tickets[i];
         const tcs = orig.testCases || [];
-        const tcsFor = (part: Any) => part.testCaseIds.map((id: string) => tcs.find((c: Any) => c.id === id)).filter(Boolean);
+        const tcsFor = (part: Any) =>
+          part.testCaseIds.map((id: string) => tcs.find((c: Any) => c.id === id)).filter(Boolean);
         // The first part keeps the original issue: key, history, comments, PRs, links.
         const [first, ...rest] = r.parts;
         Object.assign(orig, {
@@ -225,7 +262,9 @@ function SplitReview({ results }: { results: Any[] }) {
       actions={[
         { label: 'Cancel' },
         {
-          label: chosen.length ? `Split ${chosen.length} issue${chosen.length === 1 ? '' : 's'}` : 'Nothing to split',
+          label: chosen.length
+            ? `Split ${chosen.length} issue${chosen.length === 1 ? '' : 's'}`
+            : 'Nothing to split',
           kind: 'primary',
           disabled: !chosen.length,
           onClick: apply,
@@ -234,7 +273,8 @@ function SplitReview({ results }: { results: Any[] }) {
     >
       <div className="sync-sum">
         <span>
-          <b>{splits.length}</b> to split into {splits.reduce((n, r) => n + r.parts.length, 0)} smaller issues
+          <b>{splits.length}</b> to split into {splits.reduce((n, r) => n + r.parts.length, 0)}{' '}
+          smaller issues
         </span>
         <span>{kept.length} fine as they are</span>
       </div>
@@ -274,7 +314,11 @@ function SplitReview({ results }: { results: Any[] }) {
                           {part.storyPoints ?? '–'}
                         </span>{' '}
                         <b>{part.title}</b>{' '}
-                        {k === 0 ? <span className="pg-badge">keeps {r.key}</span> : <span className="pg-badge dyn">new</span>}
+                        {k === 0 ? (
+                          <span className="pg-badge">keeps {r.key}</span>
+                        ) : (
+                          <span className="pg-badge dyn">new</span>
+                        )}
                       </div>
                       {part.userStory && (
                         <div className="small" style={{ fontStyle: 'italic' }}>
@@ -288,7 +332,8 @@ function SplitReview({ results }: { results: Any[] }) {
                       </ul>
                       {part.testCaseIds.length > 0 ? (
                         <div className="muted small">
-                          {part.testCaseIds.length} test case{part.testCaseIds.length > 1 ? 's' : ''}:{' '}
+                          {part.testCaseIds.length} test case
+                          {part.testCaseIds.length > 1 ? 's' : ''}:{' '}
                           {part.testCaseIds
                             .slice(0, 4)
                             .map((id: string) => tcTitle(t, id))
@@ -298,7 +343,8 @@ function SplitReview({ results }: { results: Any[] }) {
                         </div>
                       ) : (
                         <div className="warn-text small">
-                          No test cases yet: none of {r.key}’s test cases cover this. Write them after splitting.
+                          No test cases yet: none of {r.key}’s test cases cover this. Write them
+                          after splitting.
                         </div>
                       )}
                     </li>
@@ -314,7 +360,8 @@ function SplitReview({ results }: { results: Any[] }) {
             <ul className="split-kept small">
               {kept.map((r) => (
                 <li key={r.ticketId}>
-                  <span className="key">{r.key}</span> {p.tickets.find((x: Any) => x.id === r.ticketId)?.title}{' '}
+                  <span className="key">{r.key}</span>{' '}
+                  {p.tickets.find((x: Any) => x.id === r.ticketId)?.title}{' '}
                   <span className={r.action === 'error' ? 'warn-text' : 'muted'}>— {r.reason}</span>
                 </li>
               ))}

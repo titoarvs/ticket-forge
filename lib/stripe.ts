@@ -1,9 +1,10 @@
-// Stripe billing (SaaS): Checkout to subscribe, the Customer Portal to change card, plan or cancel, and the webhook
-// that keeps each workspace's plan in step with its subscription. Talks to Stripe's REST API directly (no SDK).
-//   STRIPE_SECRET_KEY        sk_test_… / sk_live_… (server only)
-//   STRIPE_WEBHOOK_SECRET    whsec_… for /api/stripe/webhook
-//   STRIPE_PRICE_PRO_MONTH, STRIPE_PRICE_PRO_YEAR, STRIPE_PRICE_TEAM_MONTH, STRIPE_PRICE_TEAM_YEAR   price ids
-//   STRIPE_API_BASE          only for tests against a local mock (default https://api.stripe.com)
+// Stripe billing (SaaS): Checkout to subscribe, the Customer Portal to change card, plan or cancel,
+// and the webhook that keeps each workspace's plan in step with its subscription. Talks to Stripe's
+// REST API directly (no SDK).
+//   STRIPE_SECRET_KEY sk_test_… / sk_live_… (server only) STRIPE_WEBHOOK_SECRET whsec_… for
+//   /api/stripe/webhook STRIPE_PRICE_PRO_MONTH, STRIPE_PRICE_PRO_YEAR, STRIPE_PRICE_TEAM_MONTH,
+//   STRIPE_PRICE_TEAM_YEAR price ids STRIPE_API_BASE only for tests against a local mock (default
+//   https://api.stripe.com)
 import crypto from 'node:crypto';
 import { qs } from './db';
 import { PLANS, priceIdFor, planForPrice, purchasable } from './plans';
@@ -23,10 +24,17 @@ function form(obj, prefix = '', out = new URLSearchParams()) {
   }
   return out;
 }
-/** One Stripe call. `key` is a secret key to try (checking credentials); otherwise the saved or environment key is used. */
+/**
+ * One Stripe call. `key` is a secret key to try (checking credentials); otherwise the saved or
+ * environment key is used.
+ */
 export async function stripe(method, path, params?, { idempotencyKey, key }: any = {}) {
   const secret = key || (await secretFor('stripe'));
-  if (!secret) throw err('Billing isn’t set up on this server yet (add Stripe in Administration → Billing).', 503);
+  if (!secret)
+    throw err(
+      'Billing isn’t set up on this server yet (add Stripe in Administration → Billing).',
+      503,
+    );
   const res = await fetch(`${base()}/v1/${path}`, {
     method,
     headers: {
@@ -38,7 +46,8 @@ export async function stripe(method, path, params?, { idempotencyKey, key }: any
     signal: AbortSignal.timeout(20000),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw err(`Stripe: ${body?.error?.message || res.statusText}`, res.status >= 500 ? 502 : 400);
+  if (!res.ok)
+    throw err(`Stripe: ${body?.error?.message || res.statusText}`, res.status >= 500 ? 502 : 400);
   return body;
 }
 
@@ -47,7 +56,10 @@ async function workspaceRow(ws) {
   if (!w) throw err('Workspace not found', 404);
   return w;
 }
-/** The workspace's Stripe customer, created on first use (one per workspace, so invoices carry its name). */
+/**
+ * The workspace's Stripe customer, created on first use (one per workspace, so invoices carry its
+ * name).
+ */
 async function ensureCustomer(ws, user) {
   const w = await workspaceRow(ws);
   if (w.stripe_customer_id) return w.stripe_customer_id;
@@ -57,18 +69,31 @@ async function ensureCustomer(ws, user) {
     { email: user.email, name: w.name, metadata: { workspace_id: ws } },
     { idempotencyKey: `customer-${ws}` },
   );
-  await qs('update workspaces set stripe_customer_id = $2 where id = $1 and stripe_customer_id is null', [ws, c.id]);
+  await qs(
+    'update workspaces set stripe_customer_id = $2 where id = $1 and stripe_customer_id is null',
+    [ws, c.id],
+  );
   return (await workspaceRow(ws)).stripe_customer_id || c.id;
 }
 
-/** A Stripe Checkout page to subscribe the workspace to `plan` (pro | team), billed monthly or yearly. */
+/**
+ * A Stripe Checkout page to subscribe the workspace to `plan` (pro | team), billed monthly or
+ * yearly.
+ */
 export async function checkoutUrl({ ws, user, plan, interval, appUrl }: any) {
   if (!PLANS[plan] || plan === 'free') throw err('Choose a paid plan.');
   if (!purchasable(plan)) throw err(`The ${PLANS[plan].name} plan can’t be bought any more.`);
   const price = priceIdFor(plan, interval === 'year' ? 'year' : 'month');
-  if (!price) throw err(`The ${PLANS[plan].name} plan isn’t available ${interval === 'year' ? 'yearly' : 'monthly'} yet.`, 503);
+  if (!price)
+    throw err(
+      `The ${PLANS[plan].name} plan isn’t available ${interval === 'year' ? 'yearly' : 'monthly'} yet.`,
+      503,
+    );
   const w = await workspaceRow(ws);
-  if (w.stripe_subscription_id && ['active', 'trialing', 'past_due'].includes(w.subscription_status)) {
+  if (
+    w.stripe_subscription_id &&
+    ['active', 'trialing', 'past_due'].includes(w.subscription_status)
+  ) {
     throw err('This workspace already has a subscription. Change the plan in Manage billing.', 409);
   }
   const customer = await ensureCustomer(ws, user);
@@ -89,20 +114,34 @@ export async function checkoutUrl({ ws, user, plan, interval, appUrl }: any) {
 /** The Stripe Customer Portal: change card or plan, see invoices, cancel. */
 export async function portalUrl({ ws, appUrl }: any) {
   const w = await workspaceRow(ws);
-  if (!w.stripe_customer_id) throw err('This workspace has no billing account yet. Choose a plan first.', 409);
-  const s = await stripe('POST', 'billing_portal/sessions', { customer: w.stripe_customer_id, return_url: `${appUrl}/admin/billing` });
+  if (!w.stripe_customer_id)
+    throw err('This workspace has no billing account yet. Choose a plan first.', 409);
+  const s = await stripe('POST', 'billing_portal/sessions', {
+    customer: w.stripe_customer_id,
+    return_url: `${appUrl}/admin/billing`,
+  });
   return s.url;
 }
 
-/** Cancels a Stripe subscription at the end of the period paid for: the plan stays until then, and the webhook ends it. */
+/**
+ * Cancels a Stripe subscription at the end of the period paid for: the plan stays until then, and
+ * the webhook ends it.
+ */
 export async function cancelAtPeriodEnd(subId, ws) {
-  await stripe('POST', `subscriptions/${encodeURIComponent(subId)}`, { cancel_at_period_end: 'true' });
+  await stripe('POST', `subscriptions/${encodeURIComponent(subId)}`, {
+    cancel_at_period_end: 'true',
+  });
   return syncSubscription(subId, ws);
 }
 
 // ---------------------------------------------------------------- webhook
 /** Checks the Stripe-Signature header (HMAC-SHA256 of "<timestamp>.<body>", within 5 minutes). */
-export function verifySignature(rawBody, header, secret = process.env.STRIPE_WEBHOOK_SECRET, toleranceSec = 300) {
+export function verifySignature(
+  rawBody,
+  header,
+  secret = process.env.STRIPE_WEBHOOK_SECRET,
+  toleranceSec = 300,
+) {
   if (!secret) throw err('The Stripe webhook isn’t set up (STRIPE_WEBHOOK_SECRET).', 503);
   const parts = Object.fromEntries(
     String(header || '')
@@ -127,22 +166,28 @@ export function verifySignature(rawBody, header, secret = process.env.STRIPE_WEB
   if (!ok) throw err('Bad signature', 400);
 }
 
-/** Writes a subscription's state to its workspace. The subscription is read back from Stripe, so the event's copy (possibly old) never decides. */
+/**
+ * Writes a subscription's state to its workspace. The subscription is read back from Stripe, so the
+ * event's copy (possibly old) never decides.
+ */
 async function syncSubscription(subId, hintWs = null) {
   const sub = await stripe('GET', `subscriptions/${encodeURIComponent(subId)}`);
   const ws =
     sub.metadata?.workspace_id ||
     hintWs ||
-    (await qs('select id from workspaces where stripe_customer_id = $1', [sub.customer])).rows[0]?.id;
+    (await qs('select id from workspaces where stripe_customer_id = $1', [sub.customer])).rows[0]
+      ?.id;
   if (!ws) return null;
   const item = sub.items?.data?.[0] || {};
   const end = item.current_period_end || sub.current_period_end; // newer API versions keep it on the item
   const ended = ['canceled', 'unpaid', 'incomplete_expired'].includes(sub.status);
-  // A subscription the workspace left (it changed plan and the old one was cancelled) must not undo the new one.
-  const cur = (await qs('select stripe_subscription_id from workspaces where id = $1', [ws])).rows[0];
+  // A subscription the workspace left (it changed plan and the old one was cancelled) must not undo
+  // the new one.
+  const cur = (await qs('select stripe_subscription_id from workspaces where id = $1', [ws]))
+    .rows[0];
   if (ended && cur?.stripe_subscription_id && cur.stripe_subscription_id !== sub.id) return ws;
-  // Plans the owner made in Administration → Billing carry their id and version in the subscription's metadata; the
-  // older env-configured prices map through planForPrice.
+  // Plans the owner made in Administration → Billing carry their id and version in the
+  // subscription's metadata; the older env-configured prices map through planForPrice.
   const plan = sub.metadata?.plan || planForPrice(item.price?.id) || 'free';
   const version = Number(sub.metadata?.plan_version) || null;
   await qs(
@@ -163,18 +208,27 @@ async function syncSubscription(subId, hintWs = null) {
   return ws;
 }
 
-/** Handles one verified event, once (Stripe may send it again). Returns what happened, for the log. */
+/**
+ * Handles one verified event, once (Stripe may send it again). Returns what happened, for the log.
+ */
 export async function handleEvent(ev) {
   const fresh = (
-    await qs('insert into billing_events (id, type) values ($1, $2) on conflict (id) do nothing returning id', [ev.id, ev.type])
+    await qs(
+      'insert into billing_events (id, type) values ($1, $2) on conflict (id) do nothing returning id',
+      [ev.id, ev.type],
+    )
   ).rows[0];
   if (!fresh) return { duplicate: true };
   const o = ev.data?.object || {};
   let ws = null;
   try {
     if (ev.type === 'checkout.session.completed' && o.mode === 'subscription' && o.subscription)
-      ws = await syncSubscription(o.subscription, o.client_reference_id || o.metadata?.workspace_id);
-    else if (/^customer\.subscription\.(created|updated|deleted|paused|resumed)$/.test(ev.type)) ws = await syncSubscription(o.id);
+      ws = await syncSubscription(
+        o.subscription,
+        o.client_reference_id || o.metadata?.workspace_id,
+      );
+    else if (/^customer\.subscription\.(created|updated|deleted|paused|resumed)$/.test(ev.type))
+      ws = await syncSubscription(o.id);
     else if (
       /^invoice\.(payment_failed|paid|payment_succeeded)$/.test(ev.type) &&
       (o.subscription || o.parent?.subscription_details?.subscription)

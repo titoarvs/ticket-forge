@@ -9,25 +9,47 @@ import { askJson } from './claude';
 import { agentInstructions } from './agents';
 import { healScript, healable } from './healing';
 import { contextBlock } from './appcontext';
-import { makeApp, maskSecrets, LOGOUT_RE, findLoginForm, describeLoginForm } from './app-helpers.mjs';
+import {
+  makeApp,
+  maskSecrets,
+  LOGOUT_RE,
+  findLoginForm,
+  describeLoginForm,
+} from './app-helpers.mjs';
 import { getRules, rulesText, getGuide, guideBlock } from './genrules';
 import { saveFailureShot } from './shots';
 import { ROOT, DATA_DIR, SERVERLESS, currentWs, DEFAULT_WS } from './db';
-import { pickBrowser, launch, describeBrowser, hideEndpoint, systemBrowser, explainConnectError, absoluteNavigation } from './browser.mjs';
+import {
+  pickBrowser,
+  launch,
+  describeBrowser,
+  hideEndpoint,
+  systemBrowser,
+  explainConnectError,
+  absoluteNavigation,
+} from './browser.mjs';
 import { runOne, runSettings } from './run-one.mjs';
 import { getRemoteBrowser } from './settings';
 import { dispatchRuns, checkRun } from './gh-actions';
 
 export const RUN_DIR = path.join(DATA_DIR, 'runs');
-/** Run screenshots of other workspaces start with "<workspace>--", so /runs/<file> only serves your own (app/runs). */
+/**
+ * Run screenshots of other workspaces start with "<workspace>--", so /runs/<file> only serves your
+ * own (app/runs).
+ */
 export const runPrefix = (ws = currentWs()) => (!ws || ws === DEFAULT_WS ? '' : `${ws}--`);
 fs.mkdirSync(RUN_DIR, { recursive: true });
 const RUNNER = path.join(ROOT, 'lib', 'runner.mjs');
 
-/** The browser tests use right now (remote, Playwright's Chromium, or Chrome/Edge on this computer), or null. */
+/**
+ * The browser tests use right now (remote, Playwright's Chromium, or Chrome/Edge on this computer),
+ * or null.
+ */
 export async function browserSpec() {
   const { chromium } = await import('@playwright/test');
-  return pickBrowser(chromium, await getRemoteBrowser().catch(() => null), { serverless: SERVERLESS });
+  return pickBrowser(chromium, await getRemoteBrowser().catch(() => null), {
+    serverless: SERVERLESS,
+  });
 }
 
 /** What to do when no test browser is available. */
@@ -42,11 +64,24 @@ export async function engineStatus() {
   try {
     await import('@playwright/test');
     installed = true;
-    version = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules', '@playwright', 'test', 'package.json'), 'utf8')).version;
+    version = JSON.parse(
+      fs.readFileSync(
+        path.join(ROOT, 'node_modules', '@playwright', 'test', 'package.json'),
+        'utf8',
+      ),
+    ).version;
   } catch {
     /* not installed */
   }
-  if (!installed) return { installed: false, browser: false, version: null, serverless: SERVERLESS, source: null, label: 'none' };
+  if (!installed)
+    return {
+      installed: false,
+      browser: false,
+      version: null,
+      serverless: SERVERLESS,
+      source: null,
+      label: 'none',
+    };
   const spec = await browserSpec().catch(() => null);
   return {
     installed,
@@ -72,7 +107,9 @@ export function installBrowser(onLine) {
     );
   return new Promise((resolve, reject) => {
     const cli = path.join(ROOT, 'node_modules', '@playwright', 'test', 'cli.js');
-    const child = spawn(/*turbopackIgnore: true*/ process.execPath, [cli, 'install', 'chromium'], { cwd: ROOT });
+    const child = spawn(/*turbopackIgnore: true*/ process.execPath, [cli, 'install', 'chromium'], {
+      cwd: ROOT,
+    });
     const pipe = (d) =>
       String(d)
         .split(/\r?\n/)
@@ -81,7 +118,11 @@ export function installBrowser(onLine) {
     child.stdout.on('data', pipe);
     child.stderr.on('data', pipe);
     child.on('error', reject);
-    child.on('close', (code) => (code === 0 ? resolve(undefined as any) : reject(new Error(`Browser install exited with code ${code}`))));
+    child.on('close', (code) =>
+      code === 0
+        ? resolve(undefined as any)
+        : reject(new Error(`Browser install exited with code ${code}`)),
+    );
   });
 }
 
@@ -89,7 +130,9 @@ export function installBrowser(onLine) {
 async function describe(page, maxEls = 350, maxText = 5000) {
   const title = await page.title().catch(() => '');
   const elements = await page
-    .locator('a, button, input, select, textarea, label, h1, h2, h3, [role], [data-testid], [aria-label]')
+    .locator(
+      'a, button, input, select, textarea, label, h1, h2, h3, [role], [data-testid], [aria-label]',
+    )
     .evaluateAll(
       (els, max) =>
         els
@@ -97,11 +140,24 @@ async function describe(page, maxEls = 350, maxText = 5000) {
           .map((el) => {
             const r = el.getBoundingClientRect();
             if (!r.width && !r.height) return null;
-            const attrs = ['id', 'name', 'type', 'placeholder', 'role', 'aria-label', 'data-testid', 'data-action', 'href']
+            const attrs = [
+              'id',
+              'name',
+              'type',
+              'placeholder',
+              'role',
+              'aria-label',
+              'data-testid',
+              'data-action',
+              'href',
+            ]
               .map((a) => (el.getAttribute(a) ? `${a}="${el.getAttribute(a).slice(0, 60)}"` : null))
               .filter(Boolean)
               .join(' ');
-            const text = el.type === 'password' ? '' : (el.innerText || el.value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+            const text =
+              el.type === 'password'
+                ? ''
+                : (el.innerText || el.value || '').trim().replace(/\s+/g, ' ').slice(0, 80);
             return `<${el.tagName.toLowerCase()}${attrs ? ` ${attrs}` : ''}>${text}`;
           })
           .filter(Boolean),
@@ -128,8 +184,9 @@ const pathOf = (u) => {
   }
 };
 /**
- * The hosted service (SaaS) runs test browsers on its own servers: the app under test must be on the public internet,
- * not a private or internal address (which would reach the server's own network). Self-hosted, anything goes.
+ * The hosted service (SaaS) runs test browsers on its own servers: the app under test must be on
+ * the public internet, not a private or internal address (which would reach the server's own
+ * network). Self-hosted, anything goes.
  */
 export async function assertPublicTarget(url) {
   if (!isSaas() || !url) return;
@@ -137,9 +194,15 @@ export async function assertPublicTarget(url) {
   try {
     u = new URL(url);
   } catch {
-    throw Object.assign(new Error('Enter the full address of the app to test, like https://staging.example.com.'), { status: 400 });
+    throw Object.assign(
+      new Error('Enter the full address of the app to test, like https://staging.example.com.'),
+      { status: 400 },
+    );
   }
-  if (!/^https?:$/.test(u.protocol)) throw Object.assign(new Error('The app to test must use http:// or https://.'), { status: 400 });
+  if (!/^https?:$/.test(u.protocol))
+    throw Object.assign(new Error('The app to test must use http:// or https://.'), {
+      status: 400,
+    });
   if (await isPrivateHost(u.hostname)) {
     throw Object.assign(
       new Error(
@@ -166,7 +229,10 @@ async function withBrowser(baseUrl, fn) {
     );
   }
   try {
-    const context = await browser.newContext({ baseURL: baseUrl, viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({
+      baseURL: baseUrl,
+      viewport: { width: 1280, height: 800 },
+    });
     absoluteNavigation(context, baseUrl);
     const page = await context.newPage();
     page.setDefaultTimeout(10000);
@@ -192,8 +258,9 @@ export async function snapshotPage(url) {
 }
 
 /**
- * What the AI sees before writing scripts: the start page (after signing in as `role`, when credentials are
- * saved) and each page in the App setup, so it can use real selectors on every page.
+ * What the AI sees before writing scripts: the start page (after signing in as `role`, when
+ * credentials are saved) and each page in the App setup, so it can use real selectors on every
+ * page.
  */
 export async function snapshotApp({ baseUrl, app = {}, role }: any) {
   return withBrowser(baseUrl, async (page, expect) => {
@@ -204,7 +271,9 @@ export async function snapshotApp({ baseUrl, app = {}, role }: any) {
         await makeApp(page, expect, app).loginAs(who.name);
         notes.push(`Signed in as ${who.name}.`);
       } catch (e) {
-        notes.push(`Signing in as ${who.name} failed: ${maskSecrets(e.message.split('\n')[0], app)}`);
+        notes.push(
+          `Signing in as ${who.name} failed: ${maskSecrets(e.message.split('\n')[0], app)}`,
+        );
         await page.goto('/').catch(() => {});
       }
     } else {
@@ -228,8 +297,9 @@ export async function snapshotApp({ baseUrl, app = {}, role }: any) {
 }
 
 /**
- * Finds the app's login form without signing in: the login page, and which field, password field and button
- * it uses. Nothing is typed or submitted. Returns { path, tried, fields: { user, pass, submit }, screenshot }.
+ * Finds the app's login form without signing in: the login page, and which field, password field
+ * and button it uses. Nothing is typed or submitted. Returns { path, tried, fields: { user, pass,
+ * submit }, screenshot }.
  */
 export async function detectLogin({ baseUrl, app = {} }: any) {
   const file = `${runPrefix()}login-form.png`;
@@ -283,8 +353,9 @@ export async function testLogin({ baseUrl, app = {}, role }: any) {
 }
 
 /**
- * Finds the app's pages by following links from the start page (after signing in as `role`). It only follows
- * links: it never clicks buttons or submits forms, and skips links that look like logging out or deleting.
+ * Finds the app's pages by following links from the start page (after signing in as `role`). It
+ * only follows links: it never clicks buttons or submits forms, and skips links that look like
+ * logging out or deleting.
  */
 export async function discoverPages({ baseUrl, app = {}, role, max = 30 }: any) {
   const SKIP = /delete|remove|destroy|unsubscribe|deactivate/i;
@@ -315,10 +386,16 @@ export async function discoverPages({ baseUrl, app = {}, role, max = 30 }: any) 
         if (role && here.replace(/\/+$/, '') === loginPath) continue; // bounced to the login page: not a real page for this role
         const info = await page.evaluate(() => ({
           title: document.title,
-          h1: (document.querySelector('h1')?.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 60),
+          h1: (document.querySelector('h1')?.innerText || '')
+            .trim()
+            .replace(/\s+/g, ' ')
+            .slice(0, 60),
           links: [...document.querySelectorAll('a[href]')].map((a: any) => ({
             href: a.href,
-            text: (a.innerText || a.getAttribute('aria-label') || a.title || '').trim().replace(/\s+/g, ' ').slice(0, 60),
+            text: (a.innerText || a.getAttribute('aria-label') || a.title || '')
+              .trim()
+              .replace(/\s+/g, ' ')
+              .slice(0, 60),
           })),
         }));
         const name = (via && via.length <= 40 ? via : '') || info.h1 || info.title || here;
@@ -332,7 +409,13 @@ export async function discoverPages({ baseUrl, app = {}, role, max = 30 }: any) 
             continue;
           }
           if (u.origin !== origin) continue;
-          if (LOGOUT_RE.test(l.text) || LOGOUT_RE.test(u.pathname) || SKIP.test(l.text) || SKIP.test(u.pathname)) continue;
+          if (
+            LOGOUT_RE.test(l.text) ||
+            LOGOUT_RE.test(u.pathname) ||
+            SKIP.test(l.text) ||
+            SKIP.test(u.pathname)
+          )
+            continue;
           if (/\.(pdf|zip|png|jpe?g|gif|svg|csv|xlsx?|docx?|txt)$/i.test(u.pathname)) continue;
           const next = `${u.pathname}${u.hash.startsWith('#/') ? u.hash : ''}`;
           if (!seen.has(next)) queue.push({ path: next, depth: depth + 1, via: l.text });
@@ -362,8 +445,10 @@ function appMapText(app: any, snapshot) {
       'Pages (open with await app.goto("<name>"); app.url("<name>") returns the path). Dynamic segments like :id need values:',
       'await app.goto("<name>", { id: 42 }). Get real ids by first opening the list page and reading a link or row when possible.',
     );
-    for (const p of pages) lines.push(`- "${p.name}" → ${p.path}${p.description ? `: ${p.description}` : ''}`);
-  } else lines.push("No pages are set up yet: navigate with page.goto('/path') and the links you see.");
+    for (const p of pages)
+      lines.push(`- "${p.name}" → ${p.path}${p.description ? `: ${p.description}` : ''}`);
+  } else
+    lines.push("No pages are set up yet: navigate with page.goto('/path') and the links you see.");
   if (roles.length) {
     lines.push(
       '',
@@ -377,9 +462,12 @@ function appMapText(app: any, snapshot) {
         : r.signIn === 'sso'
           ? `single sign-on${r.ssoButton ? ` via “${r.ssoButton}”` : ''}`
           : 'login form') + (r.totp ? ', MFA code filled automatically' : '');
-    const ready = (r) => (r.signIn === 'session' ? Boolean(r.session) : Boolean(r.username && r.password));
+    const ready = (r) =>
+      r.signIn === 'session' ? Boolean(r.session) : Boolean(r.username && r.password);
     for (const r of roles)
-      lines.push(`- "${r.name}"${r.description ? `: ${r.description}` : ''} (${how(r)})${ready(r) ? '' : ' (no credentials saved yet)'}`);
+      lines.push(
+        `- "${r.name}"${r.description ? `: ${r.description}` : ''} (${how(r)})${ready(r) ? '' : ' (no credentials saved yet)'}`,
+      );
     lines.push(`Login form: ${app.login?.path || 'found automatically'} (app.loginAs handles it).`);
   } else lines.push('', 'No user roles are set up: the app may not need signing in.');
   if (app.db?.name)
@@ -390,7 +478,8 @@ function appMapText(app: any, snapshot) {
       'Use it after the UI steps when the expected result is about saved data, with the exact names from the DATABASE SCHEMA. Never write data with it.',
     );
   if (app.notes) lines.push('', `Notes from the team: ${app.notes}`);
-  if (snapshot?.notes?.length) lines.push('', `While taking the snapshot: ${snapshot.notes.join(' ')}`);
+  if (snapshot?.notes?.length)
+    lines.push('', `While taking the snapshot: ${snapshot.notes.join(' ')}`);
   return lines.join('\n');
 }
 
@@ -415,14 +504,25 @@ Rules:
 - If the feature is clearly not present in the app, still write the steps that would verify it so the test fails with a clear message.
 - Always reply with a single valid JSON value and nothing else.`;
 
-/** What the AI is told before writing test scripts: the base instructions, team standards and guide. */
+/**
+ * What the AI is told before writing test scripts: the base instructions, team standards and guide.
+ */
 export function automationSystem(rules, guide) {
   const team = rulesText(rules, 'automation');
   return `${team ? `${SCRIPT_SYSTEM}\n\nTeam standards. Follow them exactly:\n${team}` : SCRIPT_SYSTEM}${guideBlock(guide, ['automation'])}`;
 }
 export const SCRIPT_BASE = () => SCRIPT_SYSTEM;
 
-export async function generateScripts({ ticket, tests, project, baseUrl, snapshot, ai, app = {}, notes = '' }: any) {
+export async function generateScripts({
+  ticket,
+  tests,
+  project,
+  baseUrl,
+  snapshot,
+  ai,
+  app = {},
+  notes = '',
+}: any) {
   const roleName = (id) => (app.roles || []).find((r) => r.id === id)?.name || undefined;
   const pageShots = (snapshot.pages || [])
     .map((p) =>
@@ -471,7 +571,10 @@ Return JSON: { "scripts": [ { "index": 0, "code": "await app.loginAs('…');\\n.
     ...ai,
     task: 'automation',
     reasoning: rules.reasoning,
-    system: automationSystem(rules, await getGuide()) + (await agentInstructions('feature-verification')) + contextBlock(project),
+    system:
+      automationSystem(rules, await getGuide()) +
+      (await agentInstructions('feature-verification')) +
+      contextBlock(project),
     prompt,
     brain: { projectId: project?.id, issues: [ticket], max: 4000 },
   });
@@ -487,9 +590,18 @@ Return JSON: { "scripts": [ { "index": 0, "code": "await app.loginAs('…');\\n.
 export function runScript({ code, baseUrl, tcId, timeoutMs, signal, app, browser = null }: any) {
   timeoutMs ??= runSettings(app?.run).testTimeoutSec * 1000;
   // Keep only the latest screenshot per test case.
-  for (const f of fs.readdirSync(RUN_DIR)) if (f.startsWith(`${runPrefix()}${tcId}-`)) fs.rmSync(path.join(RUN_DIR, f), { force: true });
+  for (const f of fs.readdirSync(RUN_DIR))
+    if (f.startsWith(`${runPrefix()}${tcId}-`)) fs.rmSync(path.join(RUN_DIR, f), { force: true });
   const file = `${runPrefix()}${tcId}-${Date.now()}.jpg`;
-  const input = { code, baseUrl, screenshotPath: path.join(RUN_DIR, file), timeoutMs, headless: true, app, browser };
+  const input = {
+    code,
+    baseUrl,
+    screenshotPath: path.join(RUN_DIR, file),
+    timeoutMs,
+    headless: true,
+    app,
+    browser,
+  };
   const finish = (r) => {
     // The local file; runAutomation stores failures in the database and removes it.
     r.localShot = r.screenshot ? path.join(RUN_DIR, file) : null;
@@ -500,11 +612,20 @@ export function runScript({ code, baseUrl, tcId, timeoutMs, signal, app, browser
   // Serverless hosting can't reliably start another process: run the script here, in this request.
   if (SERVERLESS) {
     return runOne(input, { signal })
-      .catch((e) => ({ status: 'Fail', error: String(e?.message || e).slice(0, 2000), durationMs: 0, logs: [], screenshot: null }))
+      .catch((e) => ({
+        status: 'Fail',
+        error: String(e?.message || e).slice(0, 2000),
+        durationMs: 0,
+        logs: [],
+        screenshot: null,
+      }))
       .then(finish);
   }
   return new Promise((resolve) => {
-    const child = spawn(/*turbopackIgnore: true*/ process.execPath, [RUNNER], { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(/*turbopackIgnore: true*/ process.execPath, [RUNNER], {
+      cwd: ROOT,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     let out = '',
       err = '';
     const kill = () => child.kill('SIGKILL');
@@ -538,8 +659,8 @@ export function runScript({ code, baseUrl, tcId, timeoutMs, signal, app, browser
 }
 
 /**
- * Full run. items: [{ ticket, tc }] where ticket = { id, key, title, userStory, acceptanceCriteria } and
- * tc = { id, title, steps, expected, preconditions, script }. emit(event) streams progress.
+ * Full run. items: [{ ticket, tc }] where ticket = { id, key, title, userStory, acceptanceCriteria
+ * } and tc = { id, title, steps, expected, preconditions, script }. emit(event) streams progress.
  */
 export async function runAutomation({
   items,
@@ -564,7 +685,9 @@ export async function runAutomation({
   });
   const needScripts = items.filter((it) => regenerate || !it.tc.script?.trim());
   if (needScripts.length) {
-    const firstRole = needScripts.map((it) => (app.roles || []).find((r) => r.id === it.tc.roleId)?.name).find(Boolean);
+    const firstRole = needScripts
+      .map((it) => (app.roles || []).find((r) => r.id === it.tc.roleId)?.name)
+      .find(Boolean);
     emit({
       type: 'phase',
       message: `Opening ${baseUrl} to learn ${app.pages?.length ? `its ${app.pages.length > 6 ? 'first 6' : app.pages.length} page${app.pages.length > 1 ? 's' : ''}` : 'the page'}…`,
@@ -574,7 +697,8 @@ export async function runAutomation({
       if (github && !spec) throw Object.assign(new Error('no local browser'), { noBrowser: true });
       snapshot = await snapshotApp({ baseUrl, app, role: firstRole });
     } catch (e) {
-      // On GitHub Actions without a browser here: write the scripts from the steps and the App setup (less exact).
+      // On GitHub Actions without a browser here: write the scripts from the steps and the App
+      // setup (less exact).
       if (github) {
         snapshot = {
           title: '',
@@ -595,13 +719,15 @@ export async function runAutomation({
                 .slice(0, 160)}); the scripts are written from the test steps and App setup.`,
         });
       } else {
-        // Without a look at the app no scripts can be written: those tests fail with the reason; the others still run.
+        // Without a look at the app no scripts can be written: those tests fail with the reason;
+        // the others still run.
         const why = `Could not open ${baseUrl} to write the scripts: ${hideEndpoint(maskSecrets(String(e.message || e).split('\n')[0], app), spec)}`;
         emit({ type: 'phase', level: 'err', message: why });
         for (const it of needScripts) it.noScriptReason = why;
       }
     }
-    for (const n of snapshot?.notes || []) emit({ type: 'phase', level: /failed/.test(n) ? 'warn' : undefined, message: n });
+    for (const n of snapshot?.notes || [])
+      emit({ type: 'phase', level: /failed/.test(n) ? 'warn' : undefined, message: n });
     const byTicket: Map<any, any> = new Map();
     for (const it of needScripts) {
       if (!snapshot) break;
@@ -613,7 +739,10 @@ export async function runAutomation({
     const worker = async () => {
       while (jobs.length && !signal?.aborted) {
         const { ticket, list } = jobs.shift();
-        emit({ type: 'phase', message: `AI is writing ${list.length} script${list.length > 1 ? 's' : ''} for ${ticket.key}…` });
+        emit({
+          type: 'phase',
+          message: `AI is writing ${list.length} script${list.length > 1 ? 's' : ''} for ${ticket.key}…`,
+        });
         try {
           const scripts = await generateScripts({
             ticket,
@@ -623,7 +752,11 @@ export async function runAutomation({
             snapshot,
             app,
             notes,
-            ai: { ...ai, signal, onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }) },
+            ai: {
+              ...ai,
+              signal,
+              onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }),
+            },
           });
           for (const s of scripts) {
             const it = list[s.index];
@@ -634,7 +767,11 @@ export async function runAutomation({
           }
         } catch (e) {
           if (signal?.aborted) return;
-          emit({ type: 'phase', level: 'warn', message: `Could not write scripts for ${ticket.key}: ${e.message}` });
+          emit({
+            type: 'phase',
+            level: 'warn',
+            message: `Could not write scripts for ${ticket.key}: ${e.message}`,
+          });
         }
         done += 1;
       }
@@ -652,7 +789,9 @@ export async function runAutomation({
         tcId: it.tc.id,
         result: {
           status: 'Fail',
-          error: it.noScriptReason || 'No automation script: the AI couldn’t write one (see the run log).',
+          error:
+            it.noScriptReason ||
+            'No automation script: the AI couldn’t write one (see the run log).',
           durationMs: 0,
           at: new Date().toISOString(),
           logs: [],
@@ -661,25 +800,51 @@ export async function runAutomation({
       continue;
     }
     emit({ type: 'start', ticketId: it.ticket.id, tcId: it.tc.id });
-    // Retries (Run settings): a test that passes on a later attempt is a pass, marked flaky so it gets looked at.
-    let result = await runScript({ code: it.tc.script, baseUrl, tcId: it.tc.id, signal, app, browser: spec });
+    // Retries (Run settings): a test that passes on a later attempt is a pass, marked flaky so it
+    // gets looked at.
+    let result = await runScript({
+      code: it.tc.script,
+      baseUrl,
+      tcId: it.tc.id,
+      signal,
+      app,
+      browser: spec,
+    });
     let attempt = 1;
-    while (result.status !== 'Pass' && attempt <= rs.retries && !signal?.aborted && !/No automation script/.test(result.error || '')) {
+    while (
+      result.status !== 'Pass' &&
+      attempt <= rs.retries &&
+      !signal?.aborted &&
+      !/No automation script/.test(result.error || '')
+    ) {
       attempt++;
       emit({
         type: 'phase',
         level: 'warn',
-        message: `${it.ticket.key}: “${String(it.tc.title || '').slice(0, 80)}” failed (${String(result.error || '')
+        message: `${it.ticket.key}: “${String(it.tc.title || '').slice(0, 80)}” failed (${String(
+          result.error || '',
+        )
           .split('\n')[0]
           .slice(0, 120)}). Retrying (${attempt - 1} of ${rs.retries})…`,
       });
       if (result.localShot) fs.rm(result.localShot, { force: true }, () => {});
-      result = await runScript({ code: it.tc.script, baseUrl, tcId: it.tc.id, signal, app, browser: spec });
+      result = await runScript({
+        code: it.tc.script,
+        baseUrl,
+        tcId: it.tc.id,
+        signal,
+        app,
+        browser: spec,
+      });
     }
     result.attempts = attempt;
-    // Self-healing Agent: a script that no longer matches the page is repaired and re-run once; kept only if it passes.
+    // Self-healing Agent: a script that no longer matches the page is repaired and re-run once;
+    // kept only if it passes.
     if (heal && healable(result) && !signal?.aborted) {
-      emit({ type: 'phase', message: `${it.ticket.key}: Self-healing agent is checking “${String(it.tc.title || '').slice(0, 70)}”…` });
+      emit({
+        type: 'phase',
+        message: `${it.ticket.key}: Self-healing agent is checking “${String(it.tc.title || '').slice(0, 70)}”…`,
+      });
       try {
         const h = await healScript({
           ticket: it.ticket,
@@ -687,10 +852,21 @@ export async function runAutomation({
           result,
           baseUrl,
           project,
-          ai: { ...ai, signal, onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }) },
+          ai: {
+            ...ai,
+            signal,
+            onSwitch: (message) => emit({ type: 'phase', level: 'warn', message }),
+          },
         });
         if (h.healable) {
-          const again = await runScript({ code: h.code, baseUrl, tcId: it.tc.id, signal, app, browser: spec });
+          const again = await runScript({
+            code: h.code,
+            baseUrl,
+            tcId: it.tc.id,
+            signal,
+            app,
+            browser: spec,
+          });
           if (again.status === 'Pass') {
             if (result.localShot) fs.rm(result.localShot, { force: true }, () => {});
             again.healed = {
@@ -703,8 +879,18 @@ export async function runAutomation({
             };
             again.attempts = attempt + 1;
             it.tc.script = h.code;
-            emit({ type: 'script', ticketId: it.ticket.id, tcId: it.tc.id, code: h.code, healed: true });
-            emit({ type: 'phase', level: 'pass', message: `${it.ticket.key}: self-healed and passed (${h.reason})` });
+            emit({
+              type: 'script',
+              ticketId: it.ticket.id,
+              tcId: it.tc.id,
+              code: h.code,
+              healed: true,
+            });
+            emit({
+              type: 'phase',
+              level: 'pass',
+              message: `${it.ticket.key}: self-healed and passed (${h.reason})`,
+            });
             result = again;
           } else {
             if (again.localShot) fs.rm(again.localShot, { force: true }, () => {});
@@ -717,15 +903,27 @@ export async function runAutomation({
           }
         } else {
           result.healAttempt = { reason: h.reason, notHealable: true };
-          emit({ type: 'phase', message: `${it.ticket.key}: not a script problem, left failing (${h.reason})` });
+          emit({
+            type: 'phase',
+            message: `${it.ticket.key}: not a script problem, left failing (${h.reason})`,
+          });
         }
       } catch (e) {
-        if (!signal?.aborted) emit({ type: 'phase', level: 'warn', message: `Self-healing couldn’t check ${it.ticket.key}: ${e.message}` });
+        if (!signal?.aborted)
+          emit({
+            type: 'phase',
+            level: 'warn',
+            message: `Self-healing couldn’t check ${it.ticket.key}: ${e.message}`,
+          });
       }
     }
     if (result.status === 'Pass' && attempt > 1) {
       result.flaky = true;
-      emit({ type: 'phase', level: 'warn', message: `${it.ticket.key}: passed on attempt ${attempt} — flaky, worth a look.` });
+      emit({
+        type: 'phase',
+        level: 'warn',
+        message: `${it.ticket.key}: passed on attempt ${attempt} — flaky, worth a look.`,
+      });
     }
     // Failures: keep the screenshot in the database. Passes: nothing to keep.
     const local = result.localShot;
@@ -741,7 +939,11 @@ export async function runAutomation({
           user,
         });
       } catch (e) {
-        emit({ type: 'phase', level: 'warn', message: `Couldn’t save the screenshot: ${e.message}` });
+        emit({
+          type: 'phase',
+          level: 'warn',
+          message: `Couldn’t save the screenshot: ${e.message}`,
+        });
       }
     } else if (result.status === 'Pass' && local) {
       fs.rm(local, { force: true }, () => {});
@@ -753,9 +955,10 @@ export async function runAutomation({
 }
 
 /**
- * The run on GitHub Actions: sends the scripts (encrypted), follows the workflow run, then records the results
- * like a local run. When `github.deadline` (serverless request limit) comes first, emits { type: 'pending' } with
- * what's needed to collect the results later (POST /api/automation/github { action: 'collect' }).
+ * The run on GitHub Actions: sends the scripts (encrypted), follows the workflow run, then records
+ * the results like a local run. When `github.deadline` (serverless request limit) comes first,
+ * emits { type: 'pending' } with what's needed to collect the results later (POST
+ * /api/automation/github { action: 'collect' }).
  */
 async function runOnGitHub({ items, baseUrl, project, emit, signal, app, user, rs, github }: any) {
   const ready = items.filter((it) => it.tc.script?.trim());
@@ -767,7 +970,9 @@ async function runOnGitHub({ items, baseUrl, project, emit, signal, app, user, r
         tcId: it.tc.id,
         result: {
           status: 'Fail',
-          error: it.noScriptReason || 'No automation script: the AI couldn’t write one (see the run log).',
+          error:
+            it.noScriptReason ||
+            'No automation script: the AI couldn’t write one (see the run log).',
           durationMs: 0,
           at: new Date().toISOString(),
           logs: [],
@@ -781,7 +986,10 @@ async function runOnGitHub({ items, baseUrl, project, emit, signal, app, user, r
     code: it.tc.script,
     label: `${it.ticket.key} ${String(it.tc.title || '').slice(0, 90)}`,
   }));
-  emit({ type: 'phase', message: `Sending ${tests.length} test${tests.length === 1 ? '' : 's'} to GitHub Actions (${github.repo})…` });
+  emit({
+    type: 'phase',
+    message: `Sending ${tests.length} test${tests.length === 1 ? '' : 's'} to GitHub Actions (${github.repo})…`,
+  });
   const runs = await dispatchRuns({
     repo: github.repo,
     ref: github.ref,
@@ -793,7 +1001,8 @@ async function runOnGitHub({ items, baseUrl, project, emit, signal, app, user, r
     timeoutMs: rs.testTimeoutSec * 1000,
     tests,
   });
-  for (const it of ready) emit({ type: 'start', ticketId: it.ticket.id, tcId: it.tc.id, queued: true });
+  for (const it of ready)
+    emit({ type: 'start', ticketId: it.ticket.id, tcId: it.tc.id, queued: true });
   emit({
     type: 'phase',
     message:
@@ -805,7 +1014,16 @@ async function runOnGitHub({ items, baseUrl, project, emit, signal, app, user, r
 }
 
 /** Polls the runs until each is done (or the deadline / stop), recording results as they arrive. */
-export async function followGitHubRuns({ runs, github, project, user, emit, signal, items = [], baseUrl = '' }: any) {
+export async function followGitHubRuns({
+  runs,
+  github,
+  project,
+  user,
+  emit,
+  signal,
+  items = [],
+  baseUrl = '',
+}: any) {
   const byTc: any = new Map(items.map((it) => [it.tc.id, it]));
   const said: Map<any, any> = new Map();
   const left = new Set(runs.map((r) => r.runId));
@@ -830,7 +1048,11 @@ export async function followGitHubRuns({ runs, github, project, user, emit, sign
         emit({ type: 'phase', message: `${note}${st.url ? ` ${st.url}` : ''}`, url: st.url });
       }
       if (st.state === 'error') {
-        emit({ type: 'phase', level: 'warn', message: `Couldn’t check the GitHub run: ${st.message}` });
+        emit({
+          type: 'phase',
+          level: 'warn',
+          message: `Couldn’t check the GitHub run: ${st.message}`,
+        });
         continue;
       }
       if (st.state === 'failed') {
@@ -884,7 +1106,11 @@ export async function followGitHubRuns({ runs, github, project, user, emit, sign
               user,
             });
           } catch (e) {
-            emit({ type: 'phase', level: 'warn', message: `Couldn’t save the screenshot: ${e.message}` });
+            emit({
+              type: 'phase',
+              level: 'warn',
+              message: `Couldn’t save the screenshot: ${e.message}`,
+            });
           }
         }
         if (result.flaky)

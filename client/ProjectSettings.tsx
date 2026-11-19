@@ -1,8 +1,22 @@
 'use client';
-// Project settings, organised like Jira's: a section menu on the left (Details, People, Workflow, Danger zone),
-// one section at a time, each made of labelled cards with a short explanation. Changes save automatically.
+// Project settings, organised like Jira's: a section menu on the left (Details, People, Workflow,
+// Danger zone), one section at a time, each made of labelled cards with a short explanation.
+// Changes save automatically.
 import Link from 'next/link';
-import { S, emit, P, can, mutate, setField, uid, ago, hashColor, COLORS, saveUi, type Any } from './core';
+import {
+  S,
+  emit,
+  P,
+  can,
+  mutate,
+  setField,
+  uid,
+  ago,
+  hashColor,
+  COLORS,
+  saveUi,
+  type Any,
+} from './core';
 import { Ico, I, Avatar, SetCard } from './ui';
 import { canDeleteProject, openDeleteProject, ONLY_OWNERS } from './DeleteProject';
 import { TF, TA } from './fields';
@@ -38,7 +52,8 @@ function Details({ ed }: { ed: boolean }) {
     mutate((pp) => {
       const old = pp.key;
       pp.key = key;
-      for (const x of [...pp.tickets, ...pp.epics]) if (x.key?.startsWith(`${old}-`)) x.key = `${key}-${x.key.slice(old.length + 1)}`;
+      for (const x of [...pp.tickets, ...pp.epics])
+        if (x.key?.startsWith(`${old}-`)) x.key = `${key}-${x.key.slice(old.length + 1)}`;
     });
   const issues = p.tickets.length,
     tests = p.tickets.reduce((n: number, t: Any) => n + t.testCases.length, 0);
@@ -60,9 +75,17 @@ function Details({ ed }: { ed: boolean }) {
   };
   return (
     <>
-      <SetCard id="project" title="Project" desc="How the project appears in the project list and in issue keys.">
+      <SetCard
+        id="project"
+        title="Project"
+        desc="How the project appears in the project list and in issue keys."
+      >
         <div className="set-identity">
-          <span className="proj-avatar lg" style={{ background: hashColor(p.key, COLORS) }} aria-hidden>
+          <span
+            className="proj-avatar lg"
+            style={{ background: hashColor(p.key, COLORS) }}
+            aria-hidden
+          >
             {p.key.slice(0, 2)}
           </span>
           <div className="set-fields">
@@ -82,7 +105,8 @@ function Details({ ed }: { ed: boolean }) {
                 }}
               />
               <small id="key-help" className="muted">
-                Issues are numbered like <b>{p.key}-12</b>. Changing the key renames every issue and epic key.
+                Issues are numbered like <b>{p.key}-12</b>. Changing the key renames every issue and
+                epic key.
               </small>
             </label>
           </div>
@@ -146,7 +170,12 @@ function Details({ ed }: { ed: boolean }) {
         {p.sourceName && (
           <label className="field">
             <span>Summary of the document</span>
-            <TA disabled={!ed} value={p.summary || ''} rows={4} onChange={(e) => set('summary', e.target.value)} />
+            <TA
+              disabled={!ed}
+              value={p.summary || ''}
+              rows={4}
+              onChange={(e) => set('summary', e.target.value)}
+            />
           </label>
         )}
         <div className="set-lists">
@@ -201,7 +230,8 @@ function Details({ ed }: { ed: boolean }) {
                   <b>{d.name}</b>
                 </Link>
                 <span className="muted small">
-                  {(d.issueIds || []).length} issues · {(d.openQuestions || []).length} open questions
+                  {(d.issueIds || []).length} issues · {(d.openQuestions || []).length} open
+                  questions
                   {d.addedAt ? ` · added ${ago(d.addedAt)}` : ''}
                 </span>
                 {d.summary && <p className="small">{d.summary}</p>}
@@ -249,7 +279,10 @@ function People({ ed }: { ed: boolean }) {
       m.name = val;
     });
   const others = p.members.filter((m: Any) => !S.people.some((u: Any) => u.name === m.name));
-  const add = () => mutate((pp) => pp.members.push({ id: uid(), name: `Person ${pp.members.length + 1}`, email: '', role: '' }));
+  const add = () =>
+    mutate((pp) =>
+      pp.members.push({ id: uid(), name: `Person ${pp.members.length + 1}`, email: '', role: '' }),
+    );
   return (
     <>
       <SetCard
@@ -337,7 +370,12 @@ function People({ ed }: { ed: boolean }) {
                     <td>
                       <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
                         <Avatar name={m.name} />
-                        <CommitInput disabled={!ed} value={m.name} aria-label="Name" onCommit={(v) => renameMember(m, v)} />
+                        <CommitInput
+                          disabled={!ed}
+                          value={m.name}
+                          aria-label="Name"
+                          onCommit={(v) => renameMember(m, v)}
+                        />
                       </span>
                     </td>
                     <td>
@@ -393,7 +431,8 @@ function People({ ed }: { ed: boolean }) {
           </div>
         ) : (
           <p className="muted small set-empty">
-            No one yet.{ed ? ' Add a person to assign them issues without giving them an account.' : ''}
+            No one yet.
+            {ed ? ' Add a person to assign them issues without giving them an account.' : ''}
           </p>
         )}
       </SetCard>
@@ -419,7 +458,12 @@ function Danger() {
       desc="Removes the project with all of its epics, issues, sprints, test cases, source documents and failure screenshots from everyone’s project list. Only the creator and owners can delete it."
       right={
         <span title={allowed ? undefined : ONLY_OWNERS}>
-          <button className="btn danger" onClick={del} disabled={!allowed} aria-describedby={allowed ? undefined : 'delete-owner-only'}>
+          <button
+            className="btn danger"
+            onClick={del}
+            disabled={!allowed}
+            aria-describedby={allowed ? undefined : 'delete-owner-only'}
+          >
             <Ico svg={I.trash} />
             Delete project
           </button>
@@ -432,7 +476,8 @@ function Danger() {
         </p>
       )}
       <p className="muted small set-note">
-        Want a copy first? Use <b>Export → Project backup (.json)</b>. You can import it again from the projects page.
+        Want a copy first? Use <b>Export → Project backup (.json)</b>. You can import it again from
+        the projects page.
       </p>
     </SetCard>
   );
@@ -442,7 +487,10 @@ export function Settings() {
   const ed = can('project.settings');
   // Sections with their own permission are hidden from people who don't have it.
   // Database: also for people who set up repositories, so they can add their own database there.
-  const own: Record<string, string[]> = { code: ['project.repo'], database: ['project.database', 'project.repo'] };
+  const own: Record<string, string[]> = {
+    code: ['project.repo'],
+    database: ['project.database', 'project.repo'],
+  };
   const sections = SECTIONS.filter(([k]) => !own[k] || own[k].some(can));
   const cur = sections.find(([k]) => k === S.setTab)?.[0] || 'details';
   const go = (k: string) => {
@@ -489,7 +537,8 @@ export function Settings() {
             <div className="warn-banner">
               <Ico svg={I.warn} />
               <span>
-                You can view these settings. To change them, ask an administrator for the <b>Project settings</b> permission.
+                You can view these settings. To change them, ask an administrator for the{' '}
+                <b>Project settings</b> permission.
               </span>
             </div>
           )}

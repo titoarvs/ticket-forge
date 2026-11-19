@@ -1,8 +1,8 @@
 'use client';
-// Releases (Jira "versions"): plan what ships together. Each version has a name, dates and a description; issues get
-// it as their Fix version. The list shows each version's progress, the detail its issues, what still blocks the
-// release (open issues, open pull requests, failing tests) and release notes. Releasing a version asks where its
-// unfinished issues go.
+// Releases (Jira "versions"): plan what ships together. Each version has a name, dates and a
+// description; issues get it as their Fix version. The list shows each version's progress, the
+// detail its issues, what still blocks the release (open issues, open pull requests, failing tests)
+// and release notes. Releasing a version asks where its unfinished issues go.
 import { useState } from 'react';
 import {
   P,
@@ -27,16 +27,31 @@ import {
   release,
   type Any,
 } from './core';
-import { Ico, I, Modal, EmptyState, TypeIcon, PriorityIcon, Avatar, StatusLoz, Confirm } from './ui';
+import {
+  Ico,
+  I,
+  Modal,
+  EmptyState,
+  TypeIcon,
+  PriorityIcon,
+  Avatar,
+  StatusLoz,
+  Confirm,
+} from './ui';
 import { TF, TA, SF, MenuItem, DateF, CB } from './fields';
 import { openDrawer } from './actions';
 import { Header } from './views';
 
 const today = () => new Date().toISOString().slice(0, 10);
-const STATUS_LABEL: Record<string, string> = { unreleased: 'Unreleased', released: 'Released', archived: 'Archived' };
+const STATUS_LABEL: Record<string, string> = {
+  unreleased: 'Unreleased',
+  released: 'Released',
+  archived: 'Archived',
+};
 const canRelease = () => can('sprint.manage') || can('project.settings');
 /** Issues (not sub-tasks) with this fix version. */
-export const releaseIssues = (id: string) => P().tickets.filter((t: Any) => !isSub(t) && (t.fixVersions || []).includes(id));
+export const releaseIssues = (id: string) =>
+  P().tickets.filter((t: Any) => !isSub(t) && (t.fixVersions || []).includes(id));
 const overdue = (r: Any) => r.status === 'unreleased' && r.releaseDate && r.releaseDate < today();
 
 function Progress({ items }: { items: Any[] }) {
@@ -49,12 +64,16 @@ function Progress({ items }: { items: Any[] }) {
         {done > 0 && <i className="p-done" style={{ width: `${(done / n) * 100}%` }} />}
         {prog > 0 && <i className="p-prog" style={{ width: `${(prog / n) * 100}%` }} />}
       </div>
-      <span className="muted small">{items.length ? `${done} of ${items.length} done` : 'No issues'}</span>
+      <span className="muted small">
+        {items.length ? `${done} of ${items.length} done` : 'No issues'}
+      </span>
     </div>
   );
 }
 const RelLoz = ({ r }: { r: Any }) => (
-  <span className={`loz ${r.status === 'released' ? 't-pass' : r.status === 'archived' ? '' : overdue(r) ? 't-fail' : 's-inprogress'}`}>
+  <span
+    className={`loz ${r.status === 'released' ? 't-pass' : r.status === 'archived' ? '' : overdue(r) ? 't-fail' : 's-inprogress'}`}
+  >
     {overdue(r) ? 'Overdue' : STATUS_LABEL[r.status] || r.status}
   </span>
 );
@@ -68,7 +87,9 @@ export function ReleaseModal({ r }: { r?: Any }) {
     releaseDate: r?.releaseDate || '',
   }));
   const set = (k: string, v: Any) => setF((x: Any) => ({ ...x, [k]: v }));
-  const taken = releases().some((x: Any) => x.id !== r?.id && x.name.trim().toLowerCase() === f.name.trim().toLowerCase());
+  const taken = releases().some(
+    (x: Any) => x.id !== r?.id && x.name.trim().toLowerCase() === f.name.trim().toLowerCase(),
+  );
   const badDates = f.startDate && f.releaseDate && f.releaseDate < f.startDate;
   const ok = f.name.trim() && !taken && !badDates;
   const save = () => {
@@ -79,7 +100,14 @@ export function ReleaseModal({ r }: { r?: Any }) {
           p.releases.find((x: Any) => x.id === r.id),
           { ...f, name: f.name.trim() },
         );
-      else p.releases.push({ id: uid(), ...f, name: f.name.trim(), status: 'unreleased', createdAt: nowIso() });
+      else
+        p.releases.push({
+          id: uid(),
+          ...f,
+          name: f.name.trim(),
+          status: 'unreleased',
+          createdAt: nowIso(),
+        });
     });
     closeModal();
     toast(r ? `Saved ${f.name.trim()}` : `Created version ${f.name.trim()}`);
@@ -87,11 +115,19 @@ export function ReleaseModal({ r }: { r?: Any }) {
   return (
     <Modal
       title={r ? `Edit ${r.name}` : 'Create version'}
-      actions={[{ label: 'Cancel' }, { label: r ? 'Save' : 'Create', kind: 'primary', disabled: !ok, onClick: save }]}
+      actions={[
+        { label: 'Cancel' },
+        { label: r ? 'Save' : 'Create', kind: 'primary', disabled: !ok, onClick: save },
+      ]}
     >
       <label className="field">
         <span>Name</span>
-        <TF autoFocus value={f.name} placeholder="e.g. 1.4.0 or Payroll Q4" onChange={(e) => set('name', e.target.value)} />
+        <TF
+          autoFocus
+          value={f.name}
+          placeholder="e.g. 1.4.0 or Payroll Q4"
+          onChange={(e) => set('name', e.target.value)}
+        />
         {taken && <span className="field-warn">A version with this name already exists.</span>}
       </label>
       <div className="grid2">
@@ -107,7 +143,12 @@ export function ReleaseModal({ r }: { r?: Any }) {
       {badDates && <p className="field-warn">The release date is before the start date.</p>}
       <label className="field">
         <span>Description</span>
-        <TA rows={3} value={f.description} placeholder="What this release is about" onChange={(e) => set('description', e.target.value)} />
+        <TA
+          rows={3}
+          value={f.description}
+          placeholder="What this release is about"
+          onChange={(e) => set('description', e.target.value)}
+        />
       </label>
     </Modal>
   );
@@ -137,7 +178,10 @@ function ReleaseNowModal({ r }: { r: Any }) {
     );
   };
   return (
-    <Modal title={`Release ${r.name}`} actions={[{ label: 'Cancel' }, { label: 'Release', kind: 'primary', onClick: go }]}>
+    <Modal
+      title={`Release ${r.name}`}
+      actions={[{ label: 'Cancel' }, { label: 'Release', kind: 'primary', onClick: go }]}
+    >
       <label className="field">
         <span>Release date</span>
         <DateF value={date} onChange={setDate} />
@@ -204,12 +248,27 @@ function AddIssuesModal({ r }: { r: Any }) {
       wide
       actions={[
         { label: 'Cancel' },
-        { label: picked.size ? `Add ${picked.size}` : 'Add', kind: 'primary', disabled: !picked.size, onClick: add },
+        {
+          label: picked.size ? `Add ${picked.size}` : 'Add',
+          kind: 'primary',
+          disabled: !picked.size,
+          onClick: add,
+        },
       ]}
     >
       <div className="row" style={{ gap: 8, marginBottom: 8 }}>
-        <TF search autoFocus value={q} placeholder="Search issues by key or summary" onChange={(e) => setQ(e.target.value)} />
-        <CB label="Include done" checked={showDone} onChange={(e: Any) => setShowDone(e.target.checked)} />
+        <TF
+          search
+          autoFocus
+          value={q}
+          placeholder="Search issues by key or summary"
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <CB
+          label="Include done"
+          checked={showDone}
+          onChange={(e: Any) => setShowDone(e.target.checked)}
+        />
       </div>
       <div className="rel-pick">
         {list.length ? (
@@ -242,7 +301,9 @@ export function releaseNotes(r: Any) {
   const done = releaseIssues(r.id).filter(isDone);
   const sec = (title: string, types: string[]) => {
     const l = done.filter((t: Any) => types.includes(t.type));
-    return l.length ? `## ${title}\n${l.map((t: Any) => `- ${t.title} (${t.key})`).join('\n')}\n` : '';
+    return l.length
+      ? `## ${title}\n${l.map((t: Any) => `- ${t.title} (${t.key})`).join('\n')}\n`
+      : '';
   };
   const date = r.releaseDate
     ? ` (${new Date(`${r.releaseDate}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })})`
@@ -265,9 +326,13 @@ function ReleaseDetail({ r, back }: { r: Any; back: () => void }) {
   const edit = can('issue.edit') || manage;
   const open = items.filter((t: Any) => !isDone(t));
   const openPrs = items.flatMap((t: Any) =>
-    (t.prs || []).filter((x: Any) => ['Open', 'Draft'].includes(x.status)).map((x: Any) => ({ t, x })),
+    (t.prs || [])
+      .filter((x: Any) => ['Open', 'Draft'].includes(x.status))
+      .map((x: Any) => ({ t, x })),
   );
-  const failing = items.flatMap((t: Any) => t.testCases.filter((tc: Any) => tc.status === 'Fail').map((tc: Any) => ({ t, tc })));
+  const failing = items.flatMap((t: Any) =>
+    t.testCases.filter((tc: Any) => tc.status === 'Fail').map((tc: Any) => ({ t, tc })),
+  );
   const [tab, setTab] = useState<'issues' | 'notes'>('issues');
   const remove = (t: Any) =>
     mutate(() =>
@@ -317,7 +382,9 @@ function ReleaseDetail({ r, back }: { r: Any; back: () => void }) {
       </div>
       <p className="muted" style={{ marginTop: -6 }}>
         {r.startDate ? `${fmtDate(r.startDate)} – ` : ''}
-        {r.releaseDate ? `${r.status === 'released' ? 'Released' : 'Release'} ${fmtDate(r.releaseDate)}` : 'No release date'}
+        {r.releaseDate
+          ? `${r.status === 'released' ? 'Released' : 'Release'} ${fmtDate(r.releaseDate)}`
+          : 'No release date'}
         {r.description ? ` · ${r.description}` : ''}
       </p>
       <div className="rel-cards">
@@ -333,7 +400,9 @@ function ReleaseDetail({ r, back }: { r: Any; back: () => void }) {
             {open.length} unfinished issue{open.length === 1 ? '' : 's'}
           </h3>
           <p className="muted small">
-            {open.length ? 'Moved to another version (or out of this one) when you release.' : 'Everything in this version is done.'}
+            {open.length
+              ? 'Moved to another version (or out of this one) when you release.'
+              : 'Everything in this version is done.'}
           </p>
         </div>
         <div className={`card ${openPrs.length ? 'warn' : ''}`}>
@@ -354,7 +423,9 @@ function ReleaseDetail({ r, back }: { r: Any; back: () => void }) {
             {failing.length} failing test{failing.length === 1 ? '' : 's'}
           </h3>
           <p className="muted small">
-            {failing.length ? [...new Set(failing.map(({ t }: Any) => t.key))].slice(0, 6).join(', ') : 'No failing tests on these issues.'}
+            {failing.length
+              ? [...new Set(failing.map(({ t }: Any) => t.key))].slice(0, 6).join(', ')
+              : 'No failing tests on these issues.'}
           </p>
         </div>
       </div>
@@ -391,7 +462,10 @@ function ReleaseDetail({ r, back }: { r: Any; back: () => void }) {
             <button
               className="btn sm"
               onClick={() =>
-                saveBlob(new Blob([notes], { type: 'text/markdown' }), `${P().key}-${r.name.replace(/[^\w.-]+/g, '-')}-release-notes.md`)
+                saveBlob(
+                  new Blob([notes], { type: 'text/markdown' }),
+                  `${P().key}-${r.name.replace(/[^\w.-]+/g, '-')}-release-notes.md`,
+                )
               }
             >
               <Ico svg={I.download} />
@@ -417,7 +491,10 @@ function ReleaseDetail({ r, back }: { r: Any; back: () => void }) {
             )
           }
         >
-          <p>Add issues here, or set the Fix version on an issue, from the row menu or the selection bar in the backlog.</p>
+          <p>
+            Add issues here, or set the Fix version on an issue, from the row menu or the selection
+            bar in the backlog.
+          </p>
         </EmptyState>
       ) : (
         cats.map(([cat, label]) => {
@@ -480,7 +557,8 @@ export function Releases() {
     .filter((x: Any) => show === 'all' || x.status === show)
     .sort(
       (a: Any, b: Any) =>
-        (a.releaseDate || '9999').localeCompare(b.releaseDate || '9999') || a.name.localeCompare(b.name, undefined, { numeric: true }),
+        (a.releaseDate || '9999').localeCompare(b.releaseDate || '9999') ||
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
     );
   const n = (s: string) => all.filter((x: Any) => x.status === s).length;
   const setStatus = (x: Any, status: string) =>
@@ -529,7 +607,8 @@ export function Releases() {
         }
       />
       <p className="muted" style={{ marginTop: -6 }}>
-        Plan what ships together: give issues a Fix version, follow each version’s progress, release it and share the release notes.
+        Plan what ships together: give issues a Fix version, follow each version’s progress, release
+        it and share the release notes.
       </p>
       <div className="tabbar rel-tabs" role="tablist">
         {[
@@ -563,8 +642,8 @@ export function Releases() {
           }
         >
           <p>
-            Create a version (for example 1.0 or “Payroll Q4”), then add issues to it. Releasing it records what shipped and gives you
-            release notes.
+            Create a version (for example 1.0 or “Payroll Q4”), then add issues to it. Releasing it
+            records what shipped and gives you release notes.
           </p>
         </EmptyState>
       ) : !list.length ? (
@@ -611,17 +690,27 @@ export function Releases() {
                       {manage && (
                         <>
                           {x.status === 'unreleased' && (
-                            <button className="btn sm" onClick={() => openModal(<ReleaseNowModal r={x} />)}>
+                            <button
+                              className="btn sm"
+                              onClick={() => openModal(<ReleaseNowModal r={x} />)}
+                            >
                               Release
                             </button>
                           )}
                           {x.status === 'released' && (
-                            <button className="btn sm subtle" onClick={() => setStatus(x, 'archived')}>
+                            <button
+                              className="btn sm subtle"
+                              onClick={() => setStatus(x, 'archived')}
+                            >
                               Archive
                             </button>
                           )}
                           {x.status !== 'unreleased' && (
-                            <button className="btn sm subtle" onClick={() => setStatus(x, 'unreleased')} title="Move back to unreleased">
+                            <button
+                              className="btn sm subtle"
+                              onClick={() => setStatus(x, 'unreleased')}
+                              title="Move back to unreleased"
+                            >
                               Unrelease
                             </button>
                           )}
@@ -633,7 +722,12 @@ export function Releases() {
                           >
                             <Ico svg={I.pencil} />
                           </button>
-                          <button className="icon-btn" title="Delete" aria-label={`Delete ${x.name}`} onClick={() => del(x)}>
+                          <button
+                            className="icon-btn"
+                            title="Delete"
+                            aria-label={`Delete ${x.name}`}
+                            onClick={() => del(x)}
+                          >
                             <Ico svg={I.trash} />
                           </button>
                         </>

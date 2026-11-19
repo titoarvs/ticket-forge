@@ -1,8 +1,22 @@
 'use client';
-// Test automation → Settings → GitHub Actions: run the Playwright tests on GitHub's machines instead of this server.
-// Setup sets a repository secret and opens a pull request with the workflow; once it's merged, runs go there.
+// Test automation → Settings → GitHub Actions: run the Playwright tests on GitHub's machines
+// instead of this server.
+// Setup sets a repository secret and opens a pull request with the workflow; once it's merged, runs
+// go there.
 import { useEffect, useState } from 'react';
-import { P, api, can, mutate, toast, ago, useStore, runPlace, setRunPlace, isDeployed, type Any } from './core';
+import {
+  P,
+  api,
+  can,
+  mutate,
+  toast,
+  ago,
+  useStore,
+  runPlace,
+  setRunPlace,
+  isDeployed,
+  type Any,
+} from './core';
 import { Ico, I, Spinner } from './ui';
 import { TF } from './fields';
 import { collectGitHubRun } from './actions';
@@ -25,7 +39,9 @@ export function GitHubRunner() {
     setBusy('check');
     setError('');
     try {
-      const st = await api(`/api/automation/github?projectId=${encodeURIComponent(p.id)}&repo=${encodeURIComponent(r.trim())}`);
+      const st = await api(
+        `/api/automation/github?projectId=${encodeURIComponent(p.id)}&repo=${encodeURIComponent(r.trim())}`,
+      );
       setStatus(st);
       if (!ref) setRef(st.defaultBranch || 'main');
     } catch (e: Any) {
@@ -51,12 +67,19 @@ export function GitHubRunner() {
     setBusy('setup');
     setError('');
     try {
-      const r = await api('/api/automation/github', { method: 'POST', body: { action: 'setup', projectId: p.id, repo: repo.trim() } });
-      saveCfg({ setupPr: r.pr, setupAt: new Date().toISOString() });
-      toast(`${r.created ? 'Opened' : 'Updated'} pull request #${r.pr.number}. Merge it, then press Check.`, 'ok', {
-        title: 'Runner ready to merge',
-        action: { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') },
+      const r = await api('/api/automation/github', {
+        method: 'POST',
+        body: { action: 'setup', projectId: p.id, repo: repo.trim() },
       });
+      saveCfg({ setupPr: r.pr, setupAt: new Date().toISOString() });
+      toast(
+        `${r.created ? 'Opened' : 'Updated'} pull request #${r.pr.number}. Merge it, then press Check.`,
+        'ok',
+        {
+          title: 'Runner ready to merge',
+          action: { label: 'Open', onClick: () => window.open(r.pr.url, '_blank', 'noopener') },
+        },
+      );
       await check();
     } catch (e: Any) {
       setError(e.message);
@@ -73,20 +96,32 @@ export function GitHubRunner() {
         <Ico svg={I.pr} />
         <b>GitHub Actions</b>
         <span className="muted small">
-          {on ? 'Tests run on GitHub Actions' : status?.ready ? 'Ready' : 'Run tests on GitHub’s machines'}
+          {on
+            ? 'Tests run on GitHub Actions'
+            : status?.ready
+              ? 'Ready'
+              : 'Run tests on GitHub’s machines'}
         </span>
       </div>
       <p className="muted small" style={{ margin: '4px 0 10px' }}>
-        Run the Playwright tests on GitHub instead of this server: no browser needed here (works on Vercel), free for public repositories
-        and within your plan’s Actions minutes for private ones. TicketForge sends each run encrypted (scripts and test passwords) to a
-        workflow in the repository, then reads the results back. Each run takes about a minute to start. It uses the project’s GitHub token
-        (Project settings → Code & GitHub) or your <code>gh</code> sign-in; the token needs Actions, Contents, Pull requests, Secrets and
-        Workflows (read and write) on the repository.
+        Run the Playwright tests on GitHub instead of this server: no browser needed here (works on
+        Vercel), free for public repositories and within your plan’s Actions minutes for private
+        ones. TicketForge sends each run encrypted (scripts and test passwords) to a workflow in the
+        repository, then reads the results back. Each run takes about a minute to start. It uses the
+        project’s GitHub token (Project settings → Code & GitHub) or your <code>gh</code> sign-in;
+        the token needs Actions, Contents, Pull requests, Secrets and Workflows (read and write) on
+        the repository.
       </p>
       <div className="rb-form">
         <label className="field" style={{ flex: 2, margin: 0 }}>
           <span>Repository</span>
-          <TF value={repo} disabled={!ed} spellCheck={false} placeholder="owner/name" onChange={(e) => setRepo(e.target.value)} />
+          <TF
+            value={repo}
+            disabled={!ed}
+            spellCheck={false}
+            placeholder="owner/name"
+            onChange={(e) => setRepo(e.target.value)}
+          />
         </label>
         <label className="field" style={{ flex: 1, margin: 0 }}>
           <span>Branch</span>
@@ -148,7 +183,8 @@ export function GitHubRunner() {
             <a href={status.setupPr.url} target="_blank" rel="noopener noreferrer">
               pull request #{status.setupPr.number}
             </a>{' '}
-            into {status.defaultBranch}, then press Check. GitHub only starts workflows that are on the default branch.
+            into {status.defaultBranch}, then press Check. GitHub only starts workflows that are on
+            the default branch.
           </span>
         </div>
       )}
@@ -161,7 +197,11 @@ export function GitHubRunner() {
             onChange={(e) => {
               if (e.target.checked && ed) saveCfg();
               setRunPlace(e.target.checked ? 'github' : 'local');
-              toast(e.target.checked ? 'Tests and code jobs now run on GitHub Actions' : 'Tests and code jobs run on this computer again');
+              toast(
+                e.target.checked
+                  ? 'Tests and code jobs now run on GitHub Actions'
+                  : 'Tests and code jobs run on this computer again',
+              );
             }}
           />
           <span>
@@ -193,7 +233,11 @@ export function GitHubRunner() {
             ) : null}
             .
           </span>
-          <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => collectGitHubRun()}>
+          <button
+            className="btn sm"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => collectGitHubRun()}
+          >
             Collect results
           </button>
           {ed && (

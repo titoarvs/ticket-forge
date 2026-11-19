@@ -1,6 +1,7 @@
 'use client';
-// Administration → Generation → Generation guide: a Markdown document (glossary, conventions, example tickets and
-// test cases) that the AI uses as reference context, so generated work matches the team's language and structure.
+// Administration → Generation → Generation guide: a Markdown document (glossary, conventions,
+// example tickets and test cases) that the AI uses as reference context, so generated work matches
+// the team's language and structure.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, toast, openModal, ago, type Any } from './core';
 import { Ico, I, Confirm, Spinner, ErrorState } from './ui';
@@ -49,7 +50,8 @@ One or two sentences: what the product is and who uses it.
 - Don't add tickets for analytics, notifications or mobile unless the document asks for them.
 `;
 
-// ---------------------------------------------------------------- a small, safe Markdown preview (no HTML injection)
+// ---------------------------------------------------------------- a small, safe Markdown preview
+// (no HTML injection)
 function inline(text: string, key = ''): ReactNode[] {
   const out: ReactNode[] = [];
   const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_|\[[^\]]+\]\([^)\s]+\))/g;
@@ -156,7 +158,8 @@ export function Markdown({ text }: { text: string }) {
     if (/^\s*([-*+]|\d+[.)])\s+/.test(l)) {
       const ordered = /^\s*\d+[.)]\s+/.test(l);
       const items: string[] = [];
-      while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
+      while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i]))
+        items.push(lines[i++].replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
       const L = ordered ? 'ol' : 'ul';
       blocks.push(
         <L key={k}>
@@ -168,8 +171,19 @@ export function Markdown({ text }: { text: string }) {
       continue;
     }
     const para: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*>|\s*\||\s*([-*+]|\d+[.)])\s+)/.test(lines[i])) para.push(lines[i++]);
-    blocks.push(<p key={k}>{para.flatMap((x, j) => (j ? [<br key={`br${j}`} />, ...inline(x, `${k}${j}`)] : inline(x, `${k}${j}`)))}</p>);
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^(#{1,4}\s|```|\s*>|\s*\||\s*([-*+]|\d+[.)])\s+)/.test(lines[i])
+    )
+      para.push(lines[i++]);
+    blocks.push(
+      <p key={k}>
+        {para.flatMap((x, j) =>
+          j ? [<br key={`br${j}`} />, ...inline(x, `${k}${j}`)] : inline(x, `${k}${j}`),
+        )}
+      </p>,
+    );
   }
   return <div className="md">{blocks}</div>;
 }
@@ -217,9 +231,17 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
   const max = data.max;
   const cur = draft || (g ? { text: g.text, name: g.name, applyTo: g.applyTo } : null);
   const dirty =
-    Boolean(draft) && (!g || draft.text !== g.text || draft.name !== g.name || JSON.stringify(draft.applyTo) !== JSON.stringify(g.applyTo));
+    Boolean(draft) &&
+    (!g ||
+      draft.text !== g.text ||
+      draft.name !== g.name ||
+      JSON.stringify(draft.applyTo) !== JSON.stringify(g.applyTo));
   const start = (text: string, name: string, edit = false) => {
-    setDraft({ text, name, applyTo: g?.applyTo || { tickets: true, tests: true, automation: false } });
+    setDraft({
+      text,
+      name,
+      applyTo: g?.applyTo || { tickets: true, tests: true, automation: false },
+    });
     setMode(edit ? 'edit' : 'preview');
   };
   const importFile = async (f?: File) => {
@@ -230,7 +252,10 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
     }
     const text = await f.text();
     if (text.length > max) {
-      toast(`That file has ${text.length.toLocaleString()} characters; the limit is ${max.toLocaleString()}. Shorten it first.`, 'err');
+      toast(
+        `That file has ${text.length.toLocaleString()} characters; the limit is ${max.toLocaleString()}. Shorten it first.`,
+        'err',
+      );
       return;
     }
     start(text, f.name);
@@ -266,11 +291,15 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
     );
   const download = () => {
     const url = URL.createObjectURL(new Blob([cur.text], { type: 'text/markdown' }));
-    const a = Object.assign(document.createElement('a'), { href: url, download: cur.name || 'generation-guide.md' });
+    const a = Object.assign(document.createElement('a'), {
+      href: url,
+      download: cur.name || 'generation-guide.md',
+    });
     a.click();
     URL.revokeObjectURL(url);
   };
-  const setApply = (k: string, v: boolean) => setDraft({ ...cur, applyTo: { ...cur.applyTo, [k]: v } });
+  const setApply = (k: string, v: boolean) =>
+    setDraft({ ...cur, applyTo: { ...cur.applyTo, [k]: v } });
   const picker = (
     <input
       ref={fileRef}
@@ -288,8 +317,9 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
     <div className="card wide guide-card">
       <h3>Generation guide</h3>
       <p className="sub">
-        A Markdown document the AI reads before writing: your glossary, roles, conventions and example tickets and test cases. It makes
-        generated work use your words and look the same every time.
+        A Markdown document the AI reads before writing: your glossary, roles, conventions and
+        example tickets and test cases. It makes generated work use your words and look the same
+        every time.
       </p>
       {picker}
       {!cur ? (
@@ -297,14 +327,19 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
           <Ico svg={I.doc} size={28} />
           <div>
             <b>No guide yet</b>
-            <div className="muted small">Import a .md file, or start from the template and fill in your own terms and examples.</div>
+            <div className="muted small">
+              Import a .md file, or start from the template and fill in your own terms and examples.
+            </div>
           </div>
           <div className="row" style={{ gap: 8, marginLeft: 'auto' }}>
             <button className="btn primary" onClick={() => fileRef.current?.click()}>
               <Ico svg={I.upload} />
               Import .md file
             </button>
-            <button className="btn" onClick={() => start(GUIDE_TEMPLATE, 'generation-guide.md', true)}>
+            <button
+              className="btn"
+              onClick={() => start(GUIDE_TEMPLATE, 'generation-guide.md', true)}
+            >
               Start from the template
             </button>
           </div>
@@ -355,11 +390,22 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
               Use it for
             </span>
             {APPLY.map(([k, label]) => (
-              <CB key={k} label={label} checked={Boolean(cur.applyTo?.[k])} onChange={(e: Any) => setApply(k, e.target.checked)} />
+              <CB
+                key={k}
+                label={label}
+                checked={Boolean(cur.applyTo?.[k])}
+                onChange={(e: Any) => setApply(k, e.target.checked)}
+              />
             ))}
           </div>
           {mode === 'edit' ? (
-            <TA mono spellCheck={false} value={cur.text} max={520} onChange={(e) => setDraft({ ...cur, text: e.target.value })} />
+            <TA
+              mono
+              spellCheck={false}
+              value={cur.text}
+              max={520}
+              onChange={(e) => setDraft({ ...cur, text: e.target.value })}
+            />
           ) : (
             <div className="guide-preview">
               <Markdown text={cur.text} />
@@ -367,7 +413,11 @@ export function GuideCard({ onChange }: { onChange?: () => void } = {}) {
           )}
           <div className="row" style={{ gap: 8, marginTop: 12 }}>
             {dirty && (
-              <button className="btn primary" disabled={!!busy || !cur.text.trim() || cur.text.length > max} onClick={save}>
+              <button
+                className="btn primary"
+                disabled={!!busy || !cur.text.trim() || cur.text.length > max}
+                onClick={save}
+              >
                 {busy === 'save' ? (
                   <>
                     <Spinner />

@@ -1,8 +1,8 @@
 'use client';
-// The TicketForge agents in the app: the catalog (from /api/agents), the agent card, and "Hire": what happens when
-// you put an agent to work on an epic. Generators open the writers that already exist (test cases, new issues,
-// test runs); document agents write their document and save it on the epic; code
-// agents open Code Jobs in a new tab (TF-124) for one of the epic's issues.
+// The TicketForge agents in the app: the catalog (from /api/agents), the agent card, and "Hire":
+// what happens when you put an agent to work on an epic. Generators open the writers that already
+// exist (test cases, new issues, test runs); document agents write their document and save it on
+// the epic; code agents open Code Jobs in a new tab (TF-124) for one of the epic's issues.
 import { useEffect, useState } from 'react';
 import {
   S,
@@ -96,7 +96,11 @@ export function AgentCard({
         <span className="agent-chip">{a.workspaceLabel}</span>
         {a.step && <span className="agent-chip step">{a.step}</span>}
         {a.custom && <span className="agent-chip step">Custom</span>}
-        {a.runner === 'testing' && <span className={`agent-chip ${a.enabled ? 'step' : ''}`}>{a.enabled ? 'On in test runs' : 'Off'}</span>}
+        {a.runner === 'testing' && (
+          <span className={`agent-chip ${a.enabled ? 'step' : ''}`}>
+            {a.enabled ? 'On in test runs' : 'Off'}
+          </span>
+        )}
       </div>
       <footer className="agent-foot">
         {onDetails && (
@@ -144,7 +148,12 @@ async function runDoc(epic: Any, a: Any, instructions: string) {
     mutate(() => {
       epic.agentDocs = {
         ...(epic.agentDocs || {}),
-        [a.id]: { name: a.name, markdown: md, generatedAt: new Date().toISOString(), generatedBy: me() },
+        [a.id]: {
+          name: a.name,
+          markdown: md,
+          generatedAt: new Date().toISOString(),
+          generatedBy: me(),
+        },
       };
     });
     toast(`${a.name} is ready: ${epic.title}`, 'ok', {
@@ -190,9 +199,10 @@ function DocHireModal({ epic, a }: { epic: Any; a: Any }) {
         </div>
       </div>
       <p className="muted small">
-        It reads <b>{epic.title}</b>: the epic, {P().tickets.filter((t: Any) => t.epicId === epic.id).length} issues with their status and
-        test results, and the documents other agents wrote. What it can’t know becomes <i>[To confirm: …]</i>.
-        {had ? ' The current document is replaced (you can undo).' : ''}
+        It reads <b>{epic.title}</b>: the epic,{' '}
+        {P().tickets.filter((t: Any) => t.epicId === epic.id).length} issues with their status and
+        test results, and the documents other agents wrote. What it can’t know becomes{' '}
+        <i>[To confirm: …]</i>.{had ? ' The current document is replaced (you can undo).' : ''}
       </p>
       <label className="field">
         <span>Extra instructions (optional)</span>
@@ -232,7 +242,12 @@ function DocViewModal({ epic, a }: { epic: Any; a: Any }) {
       actions={[
         { label: 'Close' },
         { label: 'Download .md', onClick: () => download(file, d.markdown) },
-        { label: 'Download .docx', kind: 'primary', onClick: () => downloadDocx(epic, a), hidden: !can('export') },
+        {
+          label: 'Download .docx',
+          kind: 'primary',
+          onClick: () => downloadDocx(epic, a),
+          hidden: !can('export'),
+        },
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
@@ -253,7 +268,8 @@ function PickIssueModal({ epic, a }: { epic: Any; a: Any }) {
   return (
     <Modal title={`Hire ${a.name} for an issue`} actions={[{ label: 'Cancel' }]}>
       <p className="muted small" style={{ marginTop: 0 }}>
-        {a.summary} It works on one issue at a time, in its own branch and git worktree. Pick the issue:
+        {a.summary} It works on one issue at a time, in its own branch and git worktree. Pick the
+        issue:
       </p>
       <div className="pick-list">
         {issues.map((t: Any) => (
@@ -274,8 +290,8 @@ function PickIssueModal({ epic, a }: { epic: Any; a: Any }) {
       </div>
       {a.id === 'review-panel' && (
         <p className="muted small">
-          The Review Panel reviews a code job’s changes: start Build a Ticket on the issue, then choose <b>Review panel</b> when the diff is
-          ready.
+          The Review Panel reviews a code job’s changes: start Build a Ticket on the issue, then
+          choose <b>Review panel</b> when the diff is ready.
         </p>
       )}
     </Modal>
@@ -287,7 +303,8 @@ function PickIssueModal({ epic, a }: { epic: Any; a: Any }) {
 export function hireAgent(a: Any, epic: Any) {
   if (!a.enabled) return toast(`${a.name} is turned off in Administration → Agents.`, 'err');
   const issues = P().tickets.filter((t: Any) => t.epicId === epic.id);
-  if (a.runner === 'code' || a.runner === 'panel') return openModal(<PickIssueModal epic={epic} a={a} />);
+  if (a.runner === 'code' || a.runner === 'panel')
+    return openModal(<PickIssueModal epic={epic} a={a} />);
   if (a.runner === 'document') return openModal(<DocHireModal epic={epic} a={a} />);
   switch (a.use) {
     case 'tickets':

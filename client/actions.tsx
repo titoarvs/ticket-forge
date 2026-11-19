@@ -67,7 +67,14 @@ export const findTc = (tid: string, tcid: string) => {
   return { t, tc: t?.testCases.find((x: Any) => x.id === tcid) };
 };
 export const openDrawer = (kind: 'issue' | 'epic', id: string) => {
-  Object.assign(S, { drawer: { kind, id }, menu: null, subForm: false, linkForm: false, prForm: false, cmtEdit: null });
+  Object.assign(S, {
+    drawer: { kind, id },
+    menu: null,
+    subForm: false,
+    linkForm: false,
+    prForm: false,
+    cmtEdit: null,
+  });
   emit();
 };
 
@@ -92,7 +99,8 @@ export async function exportAs(fmt: string) {
   try {
     const res = await api(`/api/export/${fmt}`, { method: 'POST', body: P(), raw: true });
     const blob = await res.blob();
-    const name = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || `export.${fmt}`;
+    const name =
+      res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || `export.${fmt}`;
     const url = URL.createObjectURL(blob);
     const link = Object.assign(document.createElement('a'), { href: url, download: name });
     document.body.append(link);
@@ -203,13 +211,20 @@ export function confirmDeleteIssue(t: Any) {
   );
 }
 export function addEpic() {
-  const ne = { id: uid(), key: nextEpicKey(), title: 'New epic', description: '', color: COLORS[P().epics.length % COLORS.length] };
+  const ne = {
+    id: uid(),
+    key: nextEpicKey(),
+    title: 'New epic',
+    description: '',
+    color: COLORS[P().epics.length % COLORS.length],
+  };
   mutate((p) => p.epics.push(ne));
   openDrawer('epic', ne.id);
 }
 export function delEpic(ep: Any, withIssues: boolean) {
   mutate((p) => {
-    if (withIssues) deleteIssues(p.tickets.filter((x: Any) => x.epicId === ep.id).map((x: Any) => x.id));
+    if (withIssues)
+      deleteIssues(p.tickets.filter((x: Any) => x.epicId === ep.id).map((x: Any) => x.id));
     else
       p.tickets.forEach((x: Any) => {
         if (x.epicId === ep.id) setField(x, 'epicId', null);
@@ -228,7 +243,11 @@ export function DeleteEpicModal({ ep }: { ep: Any }) {
       actions={[
         { label: 'Cancel' },
         ...(n ? [{ label: 'Delete epic and its issues', onClick: () => delEpic(ep, true) }] : []),
-        { label: n ? 'Delete epic, keep issues' : 'Delete', kind: 'danger' as const, onClick: () => delEpic(ep, false) },
+        {
+          label: n ? 'Delete epic, keep issues' : 'Delete',
+          kind: 'danger' as const,
+          onClick: () => delEpic(ep, false),
+        },
       ]}
     >
       <p>
@@ -298,7 +317,8 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
     assignee: '',
     another: false,
   });
-  const set = (k: string) => (e: Any) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const set = (k: string) => (e: Any) =>
+    setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const isEpic = f.type === 'Epic';
   const create = () => {
     if (!f.title.trim()) return;
@@ -345,7 +365,11 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
     closeModal();
     writeWithClaude({
       idea,
-      fields: { epicId: f.epicId || null, sprintId: f.sprintId || null, assignee: f.assignee.trim() },
+      fields: {
+        epicId: f.epicId || null,
+        sprintId: f.sprintId || null,
+        assignee: f.assignee.trim(),
+      },
       type: f.type === 'Story' ? null : f.type,
     });
   };
@@ -359,12 +383,18 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
       }
       actions={[
         { label: 'Cancel' },
-        { label: '✨ Write with Claude', kind: 'ai', onClick: withClaude, hidden: isEpic || !can('ai.use') },
+        {
+          label: '✨ Write with Claude',
+          kind: 'ai',
+          onClick: withClaude,
+          hidden: isEpic || !can('ai.use'),
+        },
         { label: 'Create', kind: 'primary', onClick: create, disabled: !f.title.trim() },
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span>
+        Required fields are marked with an asterisk{' '}
+        <span style={{ color: 'var(--danger)' }}>*</span>
       </p>
       <div className="grid2">
         <label className="field">
@@ -447,7 +477,12 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
           </label>
           <label className="field">
             <span>Assignee</span>
-            <PeopleF placeholder="Unassigned" value={f.assignee} onChange={(v) => setF({ ...f, assignee: v })} options={peopleNames()} />
+            <PeopleF
+              placeholder="Unassigned"
+              value={f.assignee}
+              onChange={(v) => setF({ ...f, assignee: v })}
+              options={peopleNames()}
+            />
           </label>
           <label className="field">
             <span>Reporter</span>
@@ -458,7 +493,9 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
     </Modal>
   );
 }
-/** An issue as AI requests need it: no history, comments, scripts or run results (smaller requests). */
+/**
+ * An issue as AI requests need it: no history, comments, scripts or run results (smaller requests).
+ */
 export const aiTicket = (t: Any) => ({
   ...t,
   history: [],
@@ -469,15 +506,34 @@ export const aiTicket = (t: Any) => ({
 export function openCreateIssue(epicId?: string) {
   if (!P() || !can('issue.create')) return;
   const cur =
-    epicId || (S.drawer?.kind === 'epic' ? S.drawer.id : '') || (S.filter.epic && S.filter.epic !== 'none' ? S.filter.epic : '') || '';
+    epicId ||
+    (S.drawer?.kind === 'epic' ? S.drawer.id : '') ||
+    (S.filter.epic && S.filter.epic !== 'none' ? S.filter.epic : '') ||
+    '';
   openModal(<CreateIssueModal epicId={cur} />);
 }
 
-export async function writeWithClaude({ idea, fields = {}, type }: { idea: string; fields?: Any; type?: string | null }) {
-  const answers = await askFirst({ kind: 'new-ticket', subject: 'the new issue', epicId: fields.epicId, text: idea });
+export async function writeWithClaude({
+  idea,
+  fields = {},
+  type,
+}: {
+  idea: string;
+  fields?: Any;
+  type?: string | null;
+}) {
+  const answers = await askFirst({
+    kind: 'new-ticket',
+    subject: 'the new issue',
+    epicId: fields.epicId,
+    text: idea,
+  });
   if (answers === null) return;
   const res = await withBusy('Claude is writing the issue…', () =>
-    api('/api/ai/new-ticket', { method: 'POST', body: aiBody({ epicId: fields.epicId, idea, answers, projectId: P().id }) }),
+    api('/api/ai/new-ticket', {
+      method: 'POST',
+      body: aiBody({ epicId: fields.epicId, idea, answers, projectId: P().id }),
+    }),
   );
   if (!res) return;
   const nt = applyAi(newTicket({ ...fields }), res.ticket);
@@ -530,7 +586,9 @@ export function NewWithClaudeModal({ epicId = '' }: { epicId?: string }) {
           placeholder="e.g. Customers can export their order history as a PDF"
         />
       </label>
-      <p className="muted small">Claude writes the summary, user story, description, acceptance criteria and test cases.</p>
+      <p className="muted small">
+        Claude writes the summary, user story, description, acceptance criteria and test cases.
+      </p>
     </Modal>
   );
 }
@@ -566,7 +624,10 @@ export async function runTicketAi(t: Any, op: string, instruction?: string) {
   });
   if (answers === null) return;
   const res = await withBusy(AI_LABEL[op], () =>
-    api('/api/ai/ticket', { method: 'POST', body: aiBody({ action: op, ticket: aiTicket(t), projectId: P().id, instruction, answers }) }),
+    api('/api/ai/ticket', {
+      method: 'POST',
+      body: aiBody({ action: op, ticket: aiTicket(t), projectId: P().id, instruction, answers }),
+    }),
   );
   if (!res) return;
   if (op === 'split') {
@@ -592,7 +653,11 @@ function TicketSummary({ t, other }: { t: Any; other?: Any }) {
         ))}
       </div>
       <p style={{ margin: '0 0 8px', fontWeight: 600 }}>{t.title}</p>
-      {t.userStory && <p style={{ margin: '0 0 8px', fontStyle: 'italic', color: 'var(--text-subtle)' }}>{t.userStory}</p>}
+      {t.userStory && (
+        <p style={{ margin: '0 0 8px', fontStyle: 'italic', color: 'var(--text-subtle)' }}>
+          {t.userStory}
+        </p>
+      )}
       <h5>Acceptance criteria ({t.acceptanceCriteria.length})</h5>
       <ol className="small">
         {t.acceptanceCriteria.map((a: string, i: number) => (
@@ -643,7 +708,8 @@ function ReviewTicket({ before, after, op }: { before: Any; after: Any; op: stri
         </div>
       </div>
       <p className="small muted" style={{ margin: '12px 0 0' }}>
-        Highlighted criteria are new or reworded. You can keep editing after accepting, and ⌘Z undoes it.
+        Highlighted criteria are new or reworded. You can keep editing after accepting, and ⌘Z
+        undoes it.
       </p>
     </Modal>
   );
@@ -665,7 +731,14 @@ function ReviewSplit({ orig, parts }: { orig: Any; parts: Any[] }) {
               logEvent(first, `split into ${parts.length} issues with Claude`);
               p.tickets.splice(i, 1, first);
               parts.slice(1).forEach((pt, k) => {
-                const r = applyAi(newTicket({ epicId: orig.epicId, sprintId: orig.sprintId, assignee: orig.assignee }), pt);
+                const r = applyAi(
+                  newTicket({
+                    epicId: orig.epicId,
+                    sprintId: orig.sprintId,
+                    assignee: orig.assignee,
+                  }),
+                  pt,
+                );
                 p.tickets.splice(i + 1 + k, 0, r);
                 addLink(first, 'relates to', r);
               });
@@ -745,7 +818,10 @@ export function RegroupModal() {
             closeModal();
             const proj = { ...P(), tickets: P().tickets.filter((x: Any) => !isSub(x)) };
             const res = await withBusy('Claude is re-organizing epics…', () =>
-              api('/api/ai/regroup', { method: 'POST', body: aiBody({ project: proj, instruction: v.trim() }) }),
+              api('/api/ai/regroup', {
+                method: 'POST',
+                body: aiBody({ project: proj, instruction: v.trim() }),
+              }),
             );
             if (res) openModal(<ReviewRegroup proposed={res.epics} />);
           },
@@ -753,7 +829,8 @@ export function RegroupModal() {
       ]}
     >
       <p style={{ marginTop: 0 }}>
-        Claude proposes a new set of epics and assigns every issue to one. You review the result before anything changes.
+        Claude proposes a new set of epics and assigns every issue to one. You review the result
+        before anything changes.
       </p>
       <label className="field">
         <span>Guidance (optional)</span>
@@ -797,7 +874,9 @@ function ReviewRegroup({ proposed }: { proposed: Any[] }) {
                   if (t) setField(t, 'epicId', e.id);
                 }
               pp.tickets.sort(
-                (a: Any, b: Any) => pp.epics.findIndex((e: Any) => e.id === a.epicId) - pp.epics.findIndex((e: Any) => e.id === b.epicId),
+                (a: Any, b: Any) =>
+                  pp.epics.findIndex((e: Any) => e.id === a.epicId) -
+                  pp.epics.findIndex((e: Any) => e.id === b.epicId),
               );
             });
             S.drawer = null;
@@ -834,15 +913,20 @@ function ReviewRegroup({ proposed }: { proposed: Any[] }) {
     </Modal>
   );
 }
-/** What the AI writes test cases from: when it hasn't changed, writing them again gives the same kind of result. */
+/**
+ * What the AI writes test cases from: when it hasn't changed, writing them again gives the same
+ * kind of result.
+ */
 const testInputHash = (t: Any) => {
   let h = 5381;
-  for (const c of JSON.stringify([t.title, t.userStory, t.description, t.acceptanceCriteria])) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0;
+  for (const c of JSON.stringify([t.title, t.userStory, t.description, t.acceptanceCriteria]))
+    h = ((h * 33) ^ c.charCodeAt(0)) >>> 0;
   return h.toString(36);
 };
 /**
- * Writes test cases for the selected issues, 5 issues per AI request. Issues whose summary, story, description and
- * acceptance criteria haven't changed since their test cases were written are skipped (offered as "Write them anyway").
+ * Writes test cases for the selected issues, 5 issues per AI request. Issues whose summary, story,
+ * description and acceptance criteria haven't changed since their test cases were written are
+ * skipped (offered as "Write them anyway").
  */
 export async function bulkTests(force = false) {
   const all = [...S.checked].filter((id: string) => ticket(id)) as string[];
@@ -882,7 +966,8 @@ export async function bulkTests(force = false) {
   let written = 0;
   const missed: string[] = [];
   await withBusy(`Claude is writing test cases for ${ids.length} issues…`, async () => {
-    // About how much this costs, from the average test-writing request so far (5 issues per request).
+    // About how much this costs, from the average test-writing request so far (5 issues per
+    // request).
     const est = await api('/api/admin/ai/usage?estimate=tests').catch(() => null);
     const calls = Math.ceil(ids.length / 5);
     setBusy(
@@ -941,7 +1026,9 @@ export async function linkPr(t: Any, url: string) {
     return false;
   }
   try {
-    const info = await api(`/api/pr-info?url=${encodeURIComponent(url)}&projectId=${encodeURIComponent(P().id)}`);
+    const info = await api(
+      `/api/pr-info?url=${encodeURIComponent(url)}&projectId=${encodeURIComponent(P().id)}`,
+    );
     S.prForm = false;
     mutate(() => {
       t.prs.push({ id: uid(), ...info, checkedAt: nowIso() });
@@ -954,13 +1041,19 @@ export async function linkPr(t: Any, url: string) {
     return false;
   }
 }
-/** Reads the request again from GitHub / GitLab. quiet: no toasts (background refresh); returns whether it was read. */
+/**
+ * Reads the request again from GitHub / GitLab. quiet: no toasts (background refresh); returns
+ * whether it was read.
+ */
 export async function refreshPr(t: Any, prId: string, { quiet = false } = {}) {
   const r = t.prs.find((x: Any) => x.id === prId);
   if (!r) return false;
   try {
-    const info = await api(`/api/pr-info?url=${encodeURIComponent(r.url)}&projectId=${encodeURIComponent(P().id)}`);
-    // Only what was really read from GitHub/GitLab replaces what's saved: a placeholder never overwrites the real title or branch.
+    const info = await api(
+      `/api/pr-info?url=${encodeURIComponent(r.url)}&projectId=${encodeURIComponent(P().id)}`,
+    );
+    // Only what was really read from GitHub/GitLab replaces what's saved: a placeholder never
+    // overwrites the real title or branch.
     if (!info.fetched) {
       mutate(() => {
         r.checkedAt = nowIso();
@@ -991,7 +1084,9 @@ export async function refreshPr(t: Any, prId: string, { quiet = false } = {}) {
     return false;
   }
 }
-/** Adds a comment: plain text, or rich text from the comment editor ({ doc, text, attachments }). */
+/**
+ * Adds a comment: plain text, or rich text from the comment editor ({ doc, text, attachments }).
+ */
 export function saveComment(t: Any, v: string | { doc: Any; text: string; attachments: Any[] }) {
   const rich = typeof v === 'string' ? null : v;
   const body = (rich ? rich.text : String(v)).trim();
@@ -1021,13 +1116,22 @@ export function SprintModal({ s, mode }: { s: Any; mode: 'start' | 'edit' }) {
   });
   const issues = P().tickets.filter((x: Any) => x.sprintId === s.id && !isSub(x));
   const withDur = (next: Any) =>
-    next.dur !== 'custom' && next.start ? { ...next, end: dateInput(Date.parse(next.start) + Number(next.dur) * 7 * 86400000) } : next;
+    next.dur !== 'custom' && next.start
+      ? { ...next, end: dateInput(Date.parse(next.start) + Number(next.dur) * 7 * 86400000) }
+      : next;
   const submit = () => {
     if (!f.name.trim()) return;
-    if (f.start && f.end && f.end < f.start) return toast('The end date must be after the start date.', 'err');
-    if (mode === 'start' && activeSprint() && activeSprint().id !== s.id) return toast('Complete the active sprint first.', 'err');
+    if (f.start && f.end && f.end < f.start)
+      return toast('The end date must be after the start date.', 'err');
+    if (mode === 'start' && activeSprint() && activeSprint().id !== s.id)
+      return toast('Complete the active sprint first.', 'err');
     mutate(() => {
-      Object.assign(s, { name: f.name.trim(), startDate: f.start, endDate: f.end, goal: f.goal.trim() });
+      Object.assign(s, {
+        name: f.name.trim(),
+        startDate: f.start,
+        endDate: f.end,
+        goal: f.goal.trim(),
+      });
       if (mode === 'start') {
         s.state = 'active';
         s.committedPoints = spSum(issues);
@@ -1043,11 +1147,15 @@ export function SprintModal({ s, mode }: { s: Any; mode: 'start' | 'edit' }) {
   return (
     <Modal
       title={mode === 'start' ? `Start ${s.name}` : `Edit ${s.name}`}
-      actions={[{ label: 'Cancel' }, { label: mode === 'start' ? 'Start' : 'Update', kind: 'primary', onClick: submit }]}
+      actions={[
+        { label: 'Cancel' },
+        { label: mode === 'start' ? 'Start' : 'Update', kind: 'primary', onClick: submit },
+      ]}
     >
       {mode === 'start' && (
         <p style={{ marginTop: 0 }}>
-          <b>{issues.length}</b> issues ({spSum(issues)} story points) will be included in this sprint.
+          <b>{issues.length}</b> issues ({spSum(issues)} story points) will be included in this
+          sprint.
         </p>
       )}
       <label className="field">
@@ -1079,7 +1187,11 @@ export function SprintModal({ s, mode }: { s: Any; mode: 'start' | 'edit' }) {
       </div>
       <label className="field">
         <span>Sprint goal</span>
-        <TA value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} placeholder="What should this sprint achieve?" />
+        <TA
+          value={f.goal}
+          onChange={(e) => setF({ ...f, goal: e.target.value })}
+          placeholder="What should this sprint achieve?"
+        />
       </label>
     </Modal>
   );
@@ -1113,7 +1225,11 @@ export function CompleteSprintModal({ s }: { s: Any }) {
                 p.sprints.push(ns);
                 target = ns.id;
               }
-              Object.assign(s, { state: 'closed', completedAt: nowIso(), completedPoints: spSum(done) });
+              Object.assign(s, {
+                state: 'closed',
+                completedAt: nowIso(),
+                completedPoints: spSum(done),
+              });
               open.forEach((x: Any) => setField(x, 'sprintId', target));
             });
             closeModal();
@@ -1124,8 +1240,8 @@ export function CompleteSprintModal({ s }: { s: Any }) {
       ]}
     >
       <p style={{ marginTop: 0 }}>
-        This sprint has <b>{done.length}</b> completed issue{done.length === 1 ? '' : 's'} ({spSum(done)} points) and <b>{open.length}</b>{' '}
-        open issue{open.length === 1 ? '' : 's'}.
+        This sprint has <b>{done.length}</b> completed issue{done.length === 1 ? '' : 's'} (
+        {spSum(done)} points) and <b>{open.length}</b> open issue{open.length === 1 ? '' : 's'}.
       </p>
       {open.length ? (
         <label className="field">
@@ -1148,7 +1264,16 @@ export function CompleteSprintModal({ s }: { s: Any }) {
 }
 export function createSprint() {
   const n = P().sprints.length + 1;
-  mutate((p) => p.sprints.push({ id: uid(), name: `${p.key} Sprint ${n}`, goal: '', state: 'future', startDate: '', endDate: '' }));
+  mutate((p) =>
+    p.sprints.push({
+      id: uid(),
+      name: `${p.key} Sprint ${n}`,
+      goal: '',
+      state: 'future',
+      startDate: '',
+      endDate: '',
+    }),
+  );
   toast(`Created ${P().key} Sprint ${n}`);
 }
 export function deleteSprint(s: Any) {
@@ -1188,7 +1313,8 @@ function BaseUrlModal({ resolve }: { resolve: (v: string | null) => void }) {
           label: 'Save and run',
           kind: 'primary',
           onClick: () => {
-            if (!/^https?:\/\/\S+$/i.test(v.trim())) return toast('Enter a full URL starting with http:// or https://', 'err');
+            if (!/^https?:\/\/\S+$/i.test(v.trim()))
+              return toast('Enter a full URL starting with http:// or https://', 'err');
             mutate((p) => {
               p.automation.baseUrl = v.trim();
             });
@@ -1199,21 +1325,30 @@ function BaseUrlModal({ resolve }: { resolve: (v: string | null) => void }) {
       ]}
     >
       <p style={{ marginTop: 0 }}>
-        Enter the URL of the application under test. Claude writes Playwright scripts against it and they run in a headless browser on this
-        machine.
+        Enter the URL of the application under test. Claude writes Playwright scripts against it and
+        they run in a headless browser on this machine.
       </p>
       <label className="field">
         <span>
           Application URL <span className="req">*</span>
         </span>
-        <TF autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="http://localhost:3000" />
+        <TF
+          autoFocus
+          value={v}
+          onChange={(e) => setV(e.target.value)}
+          placeholder="http://localhost:3000"
+        />
       </label>
     </Modal>
   );
 }
-const askBaseUrl = () => new Promise<string | null>((resolve) => openModal(<BaseUrlModal resolve={resolve} />));
+const askBaseUrl = () =>
+  new Promise<string | null>((resolve) => openModal(<BaseUrlModal resolve={resolve} />));
 
-/** Tests run on GitHub Actions when it's set up for the project and you run on GitHub (always, on the deployed app). */
+/**
+ * Tests run on GitHub Actions when it's set up for the project and you run on GitHub (always, on
+ * the deployed app).
+ */
 export const runsOnGitHub = () => runPlace() === 'github' && Boolean(P().automation?.github?.repo);
 
 /** One event of a test run stream (also used when collecting a GitHub Actions run later). */
@@ -1248,7 +1383,8 @@ function runEvent(ev: Any, run: Any, push: (m: string, l?: string) => void, base
       message: `${label} — ${ev.result.status}${ev.result.durationMs ? ` (${(ev.result.durationMs / 1000).toFixed(1)}s)` : ''}${ev.result.runner === 'github' ? ' · GitHub Actions' : ''}`,
       level: ev.result.status === 'Pass' ? 'pass' : 'fail',
     };
-    if (run.log[run.log.length - 1]?.message.startsWith('Running ')) run.log[run.log.length - 1] = msg;
+    if (run.log[run.log.length - 1]?.message.startsWith('Running '))
+      run.log[run.log.length - 1] = msg;
     else run.log.push(msg);
     mutate((pp: Any) => {
       if (ev.result.healed) {
@@ -1274,8 +1410,10 @@ async function finishRun(run: Any, push: (m: string, l?: string) => void) {
   run.running = false;
   run.current = null;
   emit();
-  if (run.pending) toast('Still running on GitHub Actions: results are collected when it finishes.', 'warn');
-  else toast(`Test run finished · ${run.pass} passed · ${run.fail} failed`, run.fail ? 'err' : 'ok');
+  if (run.pending)
+    toast('Still running on GitHub Actions: results are collected when it finishes.', 'warn');
+  else
+    toast(`Test run finished · ${run.pass} passed · ${run.fail} failed`, run.fail ? 'err' : 'ok');
   if (run.report) {
     // The server added automated comments: save our results, then pull them in.
     await saveNow();
@@ -1336,10 +1474,14 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
     }
   }
   if (github && P().automation.ghPending)
-    return toast('A GitHub Actions run is still being collected. Wait for it, or collect it on Test automation.', 'err');
+    return toast(
+      'A GitHub Actions run is still being collected. Wait for it, or collect it on Test automation.',
+      'err',
+    );
   const baseUrl = P().automation.baseUrl || (await askBaseUrl());
   if (!baseUrl) return;
-  // Running tests starts straight away: no questions first (scripts that are missing are written from the App setup).
+  // Running tests starts straight away: no questions first (scripts that are missing are written
+  // from the App setup).
   const { run, push } = newRun(
     list.length,
     `Running ${list.length} test${list.length > 1 ? 's' : ''} against ${baseUrl}${github ? ` on GitHub Actions (${P().automation.github.repo})` : ''}`,
@@ -1359,7 +1501,13 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
         runOn: github ? 'github' : undefined,
         project: { id: P().id, name: P().name, summary: P().summary },
         items: list.map(({ t, tc }) => ({
-          ticket: { id: t.id, key: t.key, title: t.title, userStory: t.userStory, acceptanceCriteria: t.acceptanceCriteria },
+          ticket: {
+            id: t.id,
+            key: t.key,
+            title: t.title,
+            userStory: t.userStory,
+            acceptanceCriteria: t.acceptanceCriteria,
+          },
           tc: {
             id: tc.id,
             title: tc.title,
@@ -1373,19 +1521,28 @@ export async function runTests(list: { t: Any; tc: Any }[], { regenerate = false
     });
     await readNdjson(res, (ev) => runEvent(ev, run, push, baseUrl));
   } catch (e: Any) {
-    push(e.name === 'AbortError' ? 'Run stopped' : e.message, e.name === 'AbortError' ? 'warn' : 'err');
+    push(
+      e.name === 'AbortError' ? 'Run stopped' : e.message,
+      e.name === 'AbortError' ? 'warn' : 'err',
+    );
   } finally {
     await finishRun(run, push);
   }
   if (run.pending) collectGitHubRun();
 }
 
-/** Collects a GitHub Actions run that outlived its request (the server waits up to ~4 minutes per call). */
+/**
+ * Collects a GitHub Actions run that outlived its request (the server waits up to ~4 minutes per
+ * call).
+ */
 export async function collectGitHubRun() {
   const pending = P().automation?.ghPending;
   if (!pending || S.autoRun?.running) return;
   const n = pending.runs.reduce((k: number, r: Any) => k + (r.tcIds?.length || 0), 0);
-  const { run, push } = newRun(n, `Collecting ${n} test result${n === 1 ? '' : 's'} from GitHub Actions (${pending.repo})…`);
+  const { run, push } = newRun(
+    n,
+    `Collecting ${n} test result${n === 1 ? '' : 's'} from GitHub Actions (${pending.repo})…`,
+  );
   try {
     const res = await api('/api/automation/github', {
       method: 'POST',
@@ -1394,14 +1551,18 @@ export async function collectGitHubRun() {
       body: { action: 'collect', projectId: P().id, pending },
     });
     run.pending = null;
-    await readNdjson(res, (ev) => runEvent(ev, run, push, pending.baseUrl || P().automation.baseUrl));
+    await readNdjson(res, (ev) =>
+      runEvent(ev, run, push, pending.baseUrl || P().automation.baseUrl),
+    );
     if (!run.pending)
       mutate((pp: Any) => {
         delete pp.automation.ghPending;
       });
   } catch (e: Any) {
     push(
-      e.name === 'AbortError' ? 'Stopped collecting (the run keeps going on GitHub; collect it later).' : e.message,
+      e.name === 'AbortError'
+        ? 'Stopped collecting (the run keeps going on GitHub; collect it later).'
+        : e.message,
       e.name === 'AbortError' ? 'warn' : 'err',
     );
   } finally {
@@ -1467,8 +1628,8 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
       ]}
     >
       <p className="muted small" style={{ marginTop: 0 }}>
-        Body of <code>{'async ({ page, expect, baseURL }) => { … }'}</code> — runs with Playwright against{' '}
-        {P().automation.baseUrl || 'your app'}.
+        Body of <code>{'async ({ page, expect, baseURL }) => { … }'}</code> — runs with Playwright
+        against {P().automation.baseUrl || 'your app'}.
       </p>
       <TA
         mono
@@ -1489,7 +1650,11 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
                 mutate(() => {
                   tc.script = tc.healed.previous;
                   tc.healed = null;
-                  logEvent(t, `reverted the self-healed script of ${tcKey(t, t.testCases.indexOf(tc))}`, 'Automation');
+                  logEvent(
+                    t,
+                    `reverted the self-healed script of ${tcKey(t, t.testCases.indexOf(tc))}`,
+                    'Automation',
+                  );
                 });
                 setCode(tc.script);
                 toast('Reverted to the script before healing');
@@ -1522,7 +1687,11 @@ export function AiSettingsModal() {
     setBusy('refresh');
     await refreshStatus(0, true);
     setBusy('');
-    toast(aiInactive(S.status) ? 'Checked again: the AI is still inactive' : 'Checked again: the AI is ready');
+    toast(
+      aiInactive(S.status)
+        ? 'Checked again: the AI is still inactive'
+        : 'Checked again: the AI is ready',
+    );
   };
   // Administrators: forget the usage-limit pauses and use the main AI again right away.
   const retryMain = async () => {
@@ -1536,7 +1705,15 @@ export function AiSettingsModal() {
     setBusy('');
   };
   const account = st.mode === 'account';
-  const models = ['opus', 'sonnet', 'haiku', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'];
+  const models = [
+    'opus',
+    'sonnet',
+    'haiku',
+    'claude-opus-5-5',
+    'claude-sonnet-5-5',
+    'claude-haiku-5-5',
+    'claude-fable-5-1',
+  ];
   const admin = can('users.manage');
   const goAdmin = (
     <Link href="/admin/ai" onClick={() => closeModal()}>
@@ -1582,11 +1759,18 @@ export function AiSettingsModal() {
               <b>Ready.</b>
             </>
           )}
-          {S.statusAt ? <span className="muted"> Checked {ago(new Date(S.statusAt).toISOString())}.</span> : null}
+          {S.statusAt ? (
+            <span className="muted"> Checked {ago(new Date(S.statusAt).toISOString())}.</span>
+          ) : null}
         </span>
         <span className="spacer" />
         {inactive && admin && st.switched && (
-          <button className="btn sm" disabled={!!busy} onClick={retryMain} title="Clear the usage-limit pause and use the main AI again">
+          <button
+            className="btn sm"
+            disabled={!!busy}
+            onClick={retryMain}
+            title="Clear the usage-limit pause and use the main AI again"
+          >
             {busy === 'retry' ? (
               <>
                 <Spinner />
@@ -1597,7 +1781,11 @@ export function AiSettingsModal() {
             )}
           </button>
         )}
-        <button className={`btn sm ${inactive ? 'primary' : ''}`} disabled={!!busy || S.statusBusy} onClick={refresh}>
+        <button
+          className={`btn sm ${inactive ? 'primary' : ''}`}
+          disabled={!!busy || S.statusBusy}
+          onClick={refresh}
+        >
           {busy === 'refresh' ? (
             <>
               <Spinner />
@@ -1611,8 +1799,14 @@ export function AiSettingsModal() {
           )}
         </button>
       </div>
-      <div className="row small" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', marginBottom: 12 }}>
-        <span className={`dot ${st.ready ? (st.switched ? 'warn' : 'ok') : 'bad'}`} style={{ marginTop: 5 }} />
+      <div
+        className="row small"
+        style={{ flexWrap: 'nowrap', alignItems: 'flex-start', marginBottom: 12 }}
+      >
+        <span
+          className={`dot ${st.ready ? (st.switched ? 'warn' : 'ok') : 'bad'}`}
+          style={{ marginTop: 5 }}
+        />
         <span>
           {account ? (
             <>
@@ -1622,7 +1816,11 @@ export function AiSettingsModal() {
                 <>
                   <br />
                   It hit its usage limit (resets{' '}
-                  {new Date(st.account.cooldown.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })})
+                  {new Date(st.account.cooldown.until).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                  )
                   {st.switched ? (
                     <>
                       , so TicketForge is using <b>{st.label}</b> until then
@@ -1638,12 +1836,14 @@ export function AiSettingsModal() {
                   <br />
                   {st.account?.cli?.available ? (
                     <>
-                      Claude Code isn’t signed in: run <code>claude</code> in a terminal and sign in.
+                      Claude Code isn’t signed in: run <code>claude</code> in a terminal and sign
+                      in.
                     </>
                   ) : (
                     <>
-                      Claude Code isn’t installed: run <code>npm install -g @anthropic-ai/claude-code</code>, then <code>claude</code> to
-                      sign in.
+                      Claude Code isn’t installed: run{' '}
+                      <code>npm install -g @anthropic-ai/claude-code</code>, then{' '}
+                      <code>claude</code> to sign in.
                     </>
                   )}
                 </>
@@ -1669,7 +1869,8 @@ export function AiSettingsModal() {
             </>
           ) : (
             <>
-              <b>No AI API is set up</b> for this address.{admin ? <> Set it up in {goAdmin}.</> : ' Ask an administrator to set it up.'}
+              <b>No AI API is set up</b> for this address.
+              {admin ? <> Set it up in {goAdmin}.</> : ' Ask an administrator to set it up.'}
             </>
           )}
           <br />
@@ -1683,24 +1884,32 @@ export function AiSettingsModal() {
       {account ? (
         st.routingOn ? (
           <p className="small muted" style={{ marginBottom: 0 }}>
-            <b>Model routing is on:</b> each kind of work uses the model your administrator set for it (for example a lighter model for
-            epics and failure notes){admin ? <>; see {goAdmin} → Model routing</> : ''}.
+            <b>Model routing is on:</b> each kind of work uses the model your administrator set for
+            it (for example a lighter model for epics and failure notes)
+            {admin ? <>; see {goAdmin} → Model routing</> : ''}.
           </p>
         ) : (
           <>
             <label className="field">
               <span>Claude model — leave blank for the default</span>
-              <PeopleF avatars={false} value={model} onChange={setModel} options={models} placeholder={st.model || 'opus'} />
+              <PeopleF
+                avatars={false}
+                value={model}
+                onChange={setModel}
+                options={models}
+                placeholder={st.model || 'opus'}
+              />
             </label>
             <p className="small muted" style={{ marginBottom: 0 }}>
-              Aliases like <code>opus</code> or <code>sonnet</code> use the newest model your Claude Code knows (<code>claude update</code>{' '}
-              gets the latest).
+              Aliases like <code>opus</code> or <code>sonnet</code> use the newest model your Claude
+              Code knows (<code>claude update</code> gets the latest).
             </p>
           </>
         )
       ) : (
         <p className="small muted" style={{ marginBottom: 0 }}>
-          The provider and model are set with environment variables on the server{admin ? <>; see {goAdmin}</> : ''}.
+          The provider and model are set with environment variables on the server
+          {admin ? <>; see {goAdmin}</> : ''}.
         </p>
       )}
     </Modal>
