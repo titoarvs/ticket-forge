@@ -129,6 +129,48 @@ export async function generateDraft(projectId: string, user, input: any, write?:
 }
 
 /**
+ * Writes one issue inside a transaction that already took the project's version (`pr`, the row `update projects set
+ * version = version + 1 … returning version, data`): next key, first workflow status, at the end of the backlog, with
+ * rev and updated_by set like any issue save. `data` is the ticket's fields (id and key are made here). Shared by
+ * approveDraft and the chatbot (lib/chat.ts), so both write issues the same way.
+ */
+export async function insertIssue(t, projectId: string, pr, user, data, via: string) {
+  const prefix = String((await t.query('select key from projects where id = $1', [projectId])).rows[0].key);
+  const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`);
+  const rows = (await t.query("select data->>'key' as key, position from issues where project_id = $1", [projectId])).rows;
+  const max = rows.reduce((m, r) => Math.max(m, Number(String(r.key || '').match(re)?.[1] || 0)), 0);
+  const maxPos = rows.reduce((m, r) => Math.max(m, Number(r.position)), -1);
+  const now = new Date().toISOString();
+  const epics = Array.isArray(pr.data?.epics) ? pr.data.epics : [];
+  const issue = {
+    ...data,
+    id: uid(),
+    key: `${prefix}-${max + 1}`,
+    epicId: epics.some((e: any) => e.id === data.epicId) ? data.epicId : null,
+    sprintId: null,
+    parentId: null,
+    status: pr.data?.workflow?.[0]?.name || 'To Do',
+    assignee: '',
+    reporter: user.name || '',
+    links: [],
+    prs: [],
+    comments: [],
+    history: [{ id: uid(), at: now, author: user.name || '', field: 'created', text: `created the issue from ${via}` }],
+    createdAt: now,
+    updatedAt: now,
+  };
+  await t.query('insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)', [
+    projectId,
+    issue.id,
+    maxPos + 1,
+    JSON.stringify(issue),
+    user.id,
+    pr.version,
+  ]);
+  return issue;
+}
+
+/**
  * Approves a draft: it becomes an issue (next key, first workflow status, at the end of the backlog) in one transaction
  * that also takes the project's version, so other people's browsers pick it up. Needs the issue.create permission.
  */
@@ -145,38 +187,7 @@ export async function approveDraft(projectId: string, draftId: string, user) {
     const d = (await t.query('select * from ticket_drafts where project_id = $1 and id = $2 for update', [projectId, draftId])).rows[0];
     if (!d) throw new HttpError(404, 'Draft not found');
     if (d.status !== 'draft') throw new HttpError(409, `That draft was already ${d.status}.`);
-    const prefix = String((await t.query('select key from projects where id = $1', [projectId])).rows[0].key);
-    const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`);
-    const rows = (await t.query("select data->>'key' as key, position from issues where project_id = $1", [projectId])).rows;
-    const max = rows.reduce((m, r) => Math.max(m, Number(String(r.key || '').match(re)?.[1] || 0)), 0);
-    const maxPos = rows.reduce((m, r) => Math.max(m, Number(r.position)), -1);
-    const now = new Date().toISOString();
-    const epics = Array.isArray(pr.data?.epics) ? pr.data.epics : [];
-    const issue = {
-      ...d.data,
-      id: uid(),
-      key: `${prefix}-${max + 1}`,
-      epicId: epics.some((e: any) => e.id === d.data.epicId) ? d.data.epicId : null,
-      sprintId: null,
-      parentId: null,
-      status: pr.data?.workflow?.[0]?.name || 'To Do',
-      assignee: '',
-      reporter: user.name || '',
-      links: [],
-      prs: [],
-      comments: [],
-      history: [{ id: uid(), at: now, author: user.name || '', field: 'created', text: `created the issue from an AI helper draft` }],
-      createdAt: now,
-      updatedAt: now,
-    };
-    await t.query('insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)', [
-      projectId,
-      issue.id,
-      maxPos + 1,
-      JSON.stringify(issue),
-      user.id,
-      pr.version,
-    ]);
+    const issue = await insertIssue(t, projectId, pr, user, d.data, 'an AI helper draft');
     await t.query("update ticket_drafts set status = 'approved', decided_by = $3, decided_at = now(), issue_id = $4 where project_id = $1 and id = $2", [
       projectId,
       draftId,
