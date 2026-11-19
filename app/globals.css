@@ -18020,14 +18020,15 @@ hr.sep {
   }
 }
 
-/* Project AI helper (TF-125, client/ProjectHelper.tsx): a chat panel docked bottom right on every project page, beside the
-   help chatbot's button. It reuses the chat message and input styles above. */
-.helper {
+/* Project AI chatbot (TF-128, client/ProjectChat.tsx): a chat panel docked bottom right on every project page, beside the
+   help chatbot's button (it replaced the AI helper panel of TF-125). It reuses the chat message styles above; the draft
+   preview is a small form under the assistant's message. */
+.pchat {
   position: fixed;
   right: 84px;
   bottom: 24px;
   z-index: 170;
-  width: min(380px, calc(100vw - 108px));
+  width: min(400px, calc(100vw - 108px));
   display: flex;
   flex-direction: column;
   background: var(--overlay);
@@ -18036,95 +18037,104 @@ hr.sep {
   box-shadow: var(--shadow-overlay);
   overflow: hidden;
 }
-.helper.open {
-  height: min(520px, calc(100vh - 120px));
+.pchat.open {
+  height: min(600px, calc(100vh - 120px));
 }
-.helper-h {
+.pchat-h {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
 }
-.helper.open .helper-h {
+.pchat.open .pchat-h {
   border-bottom: 1px solid var(--border);
 }
-.helper-log {
+.pchat-log {
   flex: 1;
   overflow: auto;
   padding: 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+.pchat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pchat-turn.me {
+  align-items: flex-end;
+}
+.pchat-in {
+  display: flex;
+  align-items: flex-end;
   gap: 8px;
-}
-.helper-modes {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px 0;
+  padding: 10px 12px;
   border-top: 1px solid var(--border);
 }
-.helper .chat-in {
-  border-top: 0;
-  flex-wrap: wrap;
+.pchat-in textarea,
+.pchat-f input,
+.pchat-f textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
 }
-.helper .chat-in .select {
-  flex: 0 1 140px;
+.pchat-in textarea {
+  flex: 1;
+  resize: none;
 }
-.helper-results {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
+.pchat-in textarea:focus-visible,
+.pchat-f input:focus-visible,
+.pchat-f textarea:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+.pchat-f input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.pchat-draft {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.helper-results li {
-  display: flex;
-  flex-direction: column;
-}
-.helper-results .link-btn {
-  text-align: left;
-  color: var(--brand);
-}
-.helper-sub,
-.helper-note {
-  color: var(--text-subtlest);
-  font-size: 12px;
-}
-.helper-drafts {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.helper-draft {
-  padding: 8px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
 }
-.helper-actions {
+.pchat-draft .loz {
+  align-self: flex-start;
+}
+.pchat-f {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.pchat-f > span {
+  color: var(--text-subtlest);
+  font-size: 12px;
+}
+.pchat-row {
+  display: flex;
+  gap: 8px;
+}
+.pchat-actions {
   display: flex;
   gap: 6px;
-  margin-top: 6px;
 }
-.helper-settings table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.helper-settings th,
-.helper-settings td {
-  padding: 4px 6px;
-  text-align: center;
-}
-.helper-settings th:first-child,
-.helper-settings td:first-child {
-  text-align: left;
+.pchat-hint {
+  color: var(--text-subtlest);
+  font-size: 12px;
 }
 @media (max-width: 640px) {
-  .helper {
+  .pchat {
     right: 16px;
     bottom: 76px;
     width: calc(100vw - 32px);

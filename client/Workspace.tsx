@@ -31,7 +31,7 @@ import { RowPop } from './RowActions';
 import { Settings } from './ProjectSettings';
 import { Sources } from './Sources';
 import { Drawer } from './Drawer';
-import { ProjectHelper } from './ProjectHelper';
+import { ProjectChat } from './ProjectChat';
 import { Timeline } from './Timeline';
 import { Board } from './Board';
 import { TestManagement } from './TestRepo';
@@ -472,7 +472,7 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
       <div className="main">
         <section className="view">{feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}</section>
         <Drawer />
-        <ProjectHelper />
+        <ProjectChat />
       </div>
       <RowPop />
     </div>

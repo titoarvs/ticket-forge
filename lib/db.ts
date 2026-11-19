@@ -827,7 +827,7 @@ create table if not exists drive_docs (
   primary key (project_id, epic_id, kind, doc_key)
 );
 create index if not exists drive_docs_queue on drive_docs(state, next_attempt_at);
--- AI helper (client/ProjectHelper.tsx, lib/helper.ts). helper_perms: what each person may do with the helper in one
+-- AI helper (lib/helper.ts, its panel was replaced by the chatbot below). helper_perms: what each person may do with the helper in one
 -- project (search, generate, assign). No row means the defaults (search only). ticket_drafts: tickets the helper
 -- generated. They are not issues: a draft only becomes an issue when a person approves it. Its status is draft,
 -- approved or discarded, and issue_id is the issue it became. (No semicolons in these comments: PGlite splits on them.)
@@ -856,6 +856,19 @@ create table if not exists ticket_drafts (
   primary key (project_id, id)
 );
 create index if not exists ticket_drafts_status on ticket_drafts(project_id, status, created_at desc);
+-- AI chatbot (client/ProjectChat.tsx, lib/chat.ts). chat_messages: one person's conversation with the assistant in one
+-- project, restored when the panel opens. role is user or assistant, and content is the text. An assistant message
+-- that proposed an issue also keeps the draft preview in draft (it is not an issue until the person clicks Create).
+create table if not exists chat_messages (
+  id bigserial primary key,
+  project_id text not null references projects(id) on delete cascade,
+  user_id text not null,
+  role text not null,
+  content text not null default '',
+  draft jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_messages_thread on chat_messages(project_id, user_id, id);
 `;
 
 // Older TicketForge versions sharing the database (another server not updated yet) don't record issue and section
@@ -1035,6 +1048,7 @@ export const TABLES = [
   'drive_docs',
   'helper_perms',
   'ticket_drafts',
+  'chat_messages',
   'api_tokens',
 ];
 const FUNCS = [
@@ -1073,7 +1087,7 @@ end $$;
 grant ${APP_ROLE} to current_user;
 grant usage on schema public to ${APP_ROLE};
 grant select, insert, update, delete on table ${TABLES.join(', ')} to ${APP_ROLE};
-grant usage, select on sequence activity_id_seq, issue_versions_id_seq, ai_usage_id_seq, legal_acceptances_id_seq to ${APP_ROLE};
+grant usage, select on sequence activity_id_seq, issue_versions_id_seq, ai_usage_id_seq, legal_acceptances_id_seq, chat_messages_id_seq to ${APP_ROLE};
 
 create or replace function tf_uid() returns text language sql stable set search_path = public
   as $f$ select nullif(current_setting('app.user_id', true), '') $f$;
@@ -1175,7 +1189,7 @@ create policy tf_system_only on usage_counters for all to ${APP_ROLE} using (tf_
 -- Workspace isolation, added on top of every rule above (restrictive): rows of another workspace never show, even to
 -- someone with access to "all projects". System work stays inside the request's workspace in the app code.
 ${['projects', 'roles', 'invites'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using (tf_system() or workspace_id = tf_ws()) with check (tf_system() or workspace_id = tf_ws())`).join(';\n')};
-${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs', 'helper_perms', 'ticket_drafts'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
+${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs', 'helper_perms', 'ticket_drafts', 'chat_messages'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
 create policy tf_all on code_jobs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_notes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_state for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
@@ -1183,6 +1197,7 @@ create policy tf_all on coding_specs for all to ${APP_ROLE} using (${ACCESS('pro
 create policy tf_all on spec_changes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on drive_docs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on ticket_drafts for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_own on chat_messages for all to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or user_id = tf_uid())) with check (${ACCESS('project_id')} and (select tf_system() or user_id = tf_uid()));
 create policy tf_select on helper_perms for select to ${APP_ROLE} using (${ACCESS('project_id')});
 create policy tf_write on helper_perms for all to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or tf_can('project.settings'))) with check (${ACCESS('project_id')} and (select tf_system() or tf_can('project.settings')));
 create policy tf_select on notifications for select to ${APP_ROLE} using (tf_system() or user_id = tf_uid());

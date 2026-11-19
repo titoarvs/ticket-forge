@@ -1167,9 +1167,17 @@ In **Add feature with AI**, each new epic in the review step has **Save as draft
 - **Publish** (in the draft's panel) removes the draft flag, so it becomes a real epic. A draft with an empty title can't be published: the app shows a message, and the server refuses a save that does it with **400**.
 - **Notifications:** saving or publishing sends an in-app notification (the bell, kinds `epic-draft-saved` and `epic-published`) to the person who saved the draft and to the project owner, once each. `POST /api/projects/:id/epic-drafts` (`lib/epic-drafts.ts`) sends it after checking what was saved.
 
-## AI helper in every project (search, generate and assign tickets)
+## AI chatbot in every project (drafts issues)
 
-Every project page has an **AI helper** chat panel (bottom right, beside the help chatbot; `client/ProjectHelper.tsx`, `lib/helper.ts`). Pick **Search**, **Generate** or **Assign** and type:
+Every project page (and so the refine board) has an **AI helper** chat panel (bottom right, beside the help chatbot; `client/ProjectChat.tsx`, `lib/chat.ts`). It replaced the earlier helper panel (below) and doesn't sit beside it. Any workspace user who can open the project can use it:
+- **Ask:** type what you need; the assistant (the same AI call as *New issue*) answers with a **draft preview**: title, description, type, story points, priority and acceptance criteria. Asking again while a draft is open refines that draft. Nothing is written to `issues` at this point. Chat design follows common LLM chat apps (Tambo AI was only inspiration; no chat SDK is used).
+- **Edit and Create:** every field of the preview can be edited. **Create** saves one issue in the current project (next key, first workflow status, end of the backlog, `rev` and `updated_by` set, new project version, activity entry; needs *Create issues*) and closes the preview. **Create is disabled while the title is empty**, and the server refuses it too (**400**). **Discard** closes the preview. `POST /api/projects/:id/chat/:messageId` `{ action: 'create' | 'discard', draft }`.
+- **History:** messages are saved in `chat_messages` (`project_id`, `user_id`, `role`, `content`, `draft`, `created_at`) per person and per project, and restored when the panel opens (`GET /api/projects/:id/chat`). Row-level security and the query both limit rows to the signed-in person, so nobody sees another person's messages, and another project starts empty.
+- **Metering:** each request is an AI call, so it adds one row to `ai_usage` (`user_id`, `project_id`, `workspace_id`) and counts against the plan's AI actions like any AI action. When the plan's limit is reached the server answers **402** (limit), the panel shows a limit notice, the request is not sent to the assistant and nothing is saved. No limit values or plan tiers changed. Tests: `tests/tf-128-ai-chatbot.test.ts`.
+
+### Earlier AI helper (TF-125): server only
+
+The helper's server side (`lib/helper.ts`, `/api/projects/:id/helper`) is still there, but the panel that used it was replaced by the chatbot. It had **Search**, **Generate** and **Assign**:
 - **Access:** every call is checked on the server. A person who can't open the project (it isn't on their `workspace_members.project_access` list) gets **404 Project not found** and no project data. Only people who can open the project are offered as assignees, and the server refuses anyone else.
 - **Per-person settings:** `helper_perms` holds search, generate and assign for each person in each project. With no row, search is on and generate and assign are off; workspace owners can do everything. People with *Edit project settings* change them in the panel (**Access**) or with `GET/PUT /api/projects/:id/helper/permissions`. A refused action shows the server's message in the chat and changes nothing. No role definitions change.
 - **Search:** tickets of this project whose key, title, user story or description contain the text.
