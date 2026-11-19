@@ -65,8 +65,8 @@ export async function status() {
 }
 // ---------------------------------------------------------------- OAuth (authorization code +
 // refresh token)
-G.__tfGdrivePending ??= new Map();
 // state → { userId, ws, expiresAt }
+G.__tfGdrivePending ??= new Map();
 const PENDING: Map<string, any> = G.__tfGdrivePending;
 /**
  * The Google consent page to send the owner to. `redirectUri` is this server's

@@ -842,8 +842,8 @@ function recordUsage(o, { text = '', ms = 0, cached = false, ok = true }: any) {
     });
 }
 /** This month's API spend against the budget (cached for a minute). */
-const B: any = wsCache('__tfAiBudgetWs', () => ({ at: 0, spent: 0 }));
 // per workspace
+const B: any = wsCache('__tfAiBudgetWs', () => ({ at: 0, spent: 0 }));
 export async function budgetState(routing) {
   const limit = routing?.budget?.monthlyUsd || 0;
   if (!limit) return { limit: 0, spent: 0, pct: 0, over: false, near: false };

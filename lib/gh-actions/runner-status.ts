@@ -11,8 +11,8 @@ export const WORKFLOW = 'ticketforge-tests.yml';
 export const SECRET = 'TICKETFORGE_RUN_KEY';
 export const SETUP_BRANCH = 'ticketforge/test-runner';
 const RUNNER_VERSION = 3;
-export const MAX_INPUT = 60_000;
 // GitHub limits workflow_dispatch inputs to 65,535 characters in all
+export const MAX_INPUT = 60_000;
 const RUNNER_SOURCES = ['run-one.mjs', 'app-helpers.mjs', 'browser.mjs', 'totp.mjs'];
 // GitHub Enterprise Server: set TICKETFORGE_GITHUB_API (e.g. https://github.example.com/api/v3).
 const API = String(process.env.TICKETFORGE_GITHUB_API || 'https://api.github.com').replace(

@@ -18,22 +18,22 @@ export type FNode = {
   rows?: Any[];
   data?: Any;
 };
+// task group node
 export const GW = 252,
   ROW = 30,
   HEAD = 40;
-// task group node
+// tier node
 export const TW = 214,
   TH = 112;
-// tier node
+// configuration node
 export const CW = 214,
   CH = 76;
-// configuration node
+// router node
 export const RW = 176,
   RH = 96;
-// router node
+// provider node
 export const PW = 256,
   PH = 108;
-// provider node
 export const TIER: Record<string, { label: string; hint: string; color: string }> = {
   high: { label: 'High', hint: 'Best quality, most usage', color: '#8b5cf6' },
   standard: { label: 'Standard', hint: 'Good quality, moderate usage', color: '#2f7bf5' },

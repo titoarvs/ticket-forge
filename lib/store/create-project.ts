@@ -16,8 +16,8 @@ export const META_PERM = {
   testRepo: ['test.run', 'issue.edit'],
   dbSchema: ['project.database'],
 };
-export const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
 // the existing priority values (the same as the client's and lib/model.ts)
+export const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
 export const SYSTEM_AUTHORS = new Set(['Automation', 'Development', 'Claude']);
 /** A draft epic (saved AI output) can't be published without a title. */
 export const NO_DRAFT_TITLE = 'Give the draft a title before you publish it.';

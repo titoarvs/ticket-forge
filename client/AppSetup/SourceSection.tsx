@@ -17,8 +17,8 @@ export const ago = (t: string) => {
         ? `${Math.round(m / 60)} h ago`
         : `${Math.round(m / 1440)} d ago`;
 };
-const checked: Record<string, number> = {};
 // project id → last automatic check (per browser session)
+const checked: Record<string, number> = {};
 
 /** Compares a scan with the pages: new routes, pages whose route is gone, and the rest. */
 export function diffRoutes(a: Any, scan: Any) {

@@ -5,9 +5,8 @@ import { ACCEPTED_DOCS, LEGAL_VERSIONS } from '../legal/versions';
 import { scrypt, SESSION_DAYS } from './session-cookie';
 import { sweepExpired } from './create-invites';
 
-// wait before the same pending invite can be sent again
-export const INVITE_MAX_SENDS = 5;
 // times one invite can be sent in total (first send + resends)
+export const INVITE_MAX_SENDS = 5;
 export const RESET_HOURS = 2;
 export const newId = () => crypto.randomUUID();
 export const token = () => crypto.randomBytes(32).toString('base64url');

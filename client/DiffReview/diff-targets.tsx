@@ -12,8 +12,8 @@ export const DIFF_TARGETS: [string, string, string][] = [
 ];
 export const targetLabel = (t: string) => DIFF_TARGETS.find((x) => x[0] === t)?.[1] || t;
 export const VIEW_KEY = 'tf.diff.view';
-export const NARROW = 760;
 // below this width the panel shows one column and a file menu
+export const NARROW = 760;
 export const fmt = (n: number) => n.toLocaleString();
 export const split = (path: string) => {
   const i = path.lastIndexOf('/');
