@@ -5,11 +5,14 @@
 //                                      "disable" = no SSL. Empty falls back to ?sslmode= in the URL.
 //   PG_POOL_MAX                        connections each server keeps open (default 5)
 //   PG_CONNECT_TIMEOUT_MS              how long start-up waits for the first connection (default 10000)
+//   PG_ACQUIRE_TIMEOUT_MS              how long a request waits for a free pooled connection before a retryable 503
+//                                      (default 15000), so a traffic spike can't queue requests without end
 
 export type DbEnv = Record<string, string | undefined>;
 
 export const DEFAULT_POOL_MAX = 5;
 export const DEFAULT_CONNECT_TIMEOUT_MS = 10000;
+export const DEFAULT_ACQUIRE_TIMEOUT_MS = 15000;
 
 /** The configured connection string, or '' when the built-in local database is used. */
 export const databaseUrl = (env: DbEnv = process.env) => (env.DATABASE_URL || env.SUPABASE_DB_URL || '').trim();
@@ -98,6 +101,7 @@ export function pgConfig(url: string, env: DbEnv = process.env) {
     connectionString: withoutSslParams(url),
     ssl: sslFor(url, env),
     max: positive(env.PG_POOL_MAX, DEFAULT_POOL_MAX),
+    connectionTimeoutMillis: positive(env.PG_ACQUIRE_TIMEOUT_MS, DEFAULT_ACQUIRE_TIMEOUT_MS),
   };
 }
 export const connectTimeoutMs = (env: DbEnv = process.env) => positive(env.PG_CONNECT_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS);

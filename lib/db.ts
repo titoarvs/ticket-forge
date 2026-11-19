@@ -78,11 +78,16 @@ const SQL_LOG = process.env.TICKETFORGE_SQL_LOG === '1';
 export const authGen = () => G.authGen || 0;
 // Only changes that can affect a sign-in already cached count: new sessions, new users and the "last signed in"
 // time don't, so thousands of people signing in don't keep emptying everyone's cached sign-in.
-const AUTH_WRITE = /^\s*(update|delete\s+from)\s+(users|roles|sessions|workspace_members|workspaces)\b/i;
-const AUTH_SKIP = /^\s*update\s+users\s+set\s+last_login_at\s*=\s*now\(\)\s+where\s+id\s*=\s*\$1\s*$/i;
+// The table name may be quoted: Drizzle writes `update "workspaces" set …`.
+const AUTH_WRITE = /^\s*(update|delete\s+from)\s+"?(users|roles|sessions|workspace_members|workspaces)\b/i;
+const AUTH_SKIP = [
+  /^\s*update\s+users\s+set\s+last_login_at\s*=\s*now\(\)\s+where\s+id\s*=\s*\$1\s*$/i,
+  // The expired-session sweep (auth.ts): a cached sign-in already stops at its session's expiry, so nothing to drop.
+  /^\s*delete\s+from\s+sessions\s+where\s+token_hash\s+in\s+\(select\s+token_hash\s+from\s+sessions\s+where\s+expires_at\s*<\s*now\(\)/i,
+];
 const noteWrite = (sql) => {
   const s = String(sql);
-  if (AUTH_WRITE.test(s) && !AUTH_SKIP.test(s)) G.authGen = (G.authGen || 0) + 1;
+  if (AUTH_WRITE.test(s) && !AUTH_SKIP.some((re) => re.test(s))) G.authGen = (G.authGen || 0) + 1;
 };
 
 // Speed: a database far away (Supabase over the internet) costs a round trip per message. Instead of sending
@@ -226,6 +231,14 @@ const POOL_HINT =
   "(default 5), or point DATABASE_URL at the host's transaction-mode pooler, which TicketForge supports.";
 const explain = (e) => {
   if (/EMAXCONNSESSION|max clients reached/i.test(e?.message || '')) e.message = `${e.message}. ${POOL_HINT}`;
+  // Every connection of this server's pool stayed busy for PG_ACQUIRE_TIMEOUT_MS: answer "busy, retry" instead of letting
+  // requests queue without end under a traffic spike. The statement never reached the database.
+  if (/timeout exceeded when trying to connect/i.test(e?.message || ''))
+    return Object.assign(new Error('The server is busy. Try again in a moment.'), {
+      status: 503,
+      cause: e,
+      extra: { code: 'db-busy', retry: true },
+    });
   return e;
 };
 
@@ -306,7 +319,10 @@ async function connect() {
             throw explain(e);
           });
       },
-      rows: (sql, params) => inTx(pool, (query) => query(sql, params, { array: true }), isWrite(sql)),
+      rows: (sql, params) =>
+        inTx(pool, (query) => query(sql, params, { array: true }), isWrite(sql)).catch((e) => {
+          throw explain(e);
+        }),
       tx: (fn) => {
         const t0 = SQL_LOG && performance.now();
         return inTx(pool, (query) => fn({ query }))
@@ -683,6 +699,12 @@ create table if not exists schema_migrations (
 alter table sessions add column if not exists workspace_id text;
 alter table roles add column if not exists workspace_id text not null default 'default';
 alter table invites add column if not exists workspace_id text not null default 'default';
+-- Scale: sign-out everywhere, disabling a person and deleting a user (cascade) look sessions up by person, the
+-- expired-session sweep looks them up by expiry, and re-sending an invite looks it up by workspace and email.
+create index if not exists sessions_user on sessions(user_id);
+create index if not exists sessions_expires on sessions(expires_at);
+create index if not exists password_resets_user on password_resets(user_id);
+create index if not exists invites_ws_email on invites(workspace_id, email);
 alter table projects add column if not exists workspace_id text not null default 'default';
 create index if not exists projects_workspace on projects(workspace_id, updated_at desc);
 -- Soft delete: an archived project is hidden from everyone and can be restored by the app owner (archived_at = null).

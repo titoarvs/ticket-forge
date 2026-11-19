@@ -227,12 +227,15 @@ export async function api(
   let res = await fetch(url, opts);
   // The database is moving to another host (docs/postgres-host-migration.md): the server refused this request before
   // running it, so asking again is safe. The retry reaches a server that already uses the new host.
+  // "db-busy" (every database connection of that server was taken during a spike) is retried for reads only: a write
+  // may have run part of its work before the busy answer.
+  const read = method === 'GET' || method === 'HEAD';
   for (let attempt = 1; res.status === 503 && attempt <= 8; attempt++) {
     const moved = await res
       .clone()
       .json()
       .then(
-        (b: Any) => b?.code === 'db-moved',
+        (b: Any) => b?.code === 'db-moved' || (read && b?.code === 'db-busy' && attempt <= 3),
         () => false,
       );
     if (!moved) break;

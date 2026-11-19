@@ -31,6 +31,19 @@ const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 export const has = (u, perm) => Boolean(u && (u.is_owner || (u.permissions || []).includes(perm)));
 // Workspaces: a project belongs to one workspace for good, so which one is remembered (ids are unique everywhere).
 const projWs = (globalThis.__tfProjWs ??= new Map());
+// Bounded, so a server that has seen millions of projects doesn't keep them all in memory: past the cap the oldest
+// tenth is forgotten (Maps keep insertion order) and read again from the database when next needed.
+const PROJ_WS_MAX = 100000;
+const rememberWs = (projectId, ws) => {
+  if (projWs.size >= PROJ_WS_MAX && !projWs.has(projectId)) {
+    let n = PROJ_WS_MAX / 10;
+    for (const k of projWs.keys()) {
+      projWs.delete(k);
+      if (--n <= 0) break;
+    }
+  }
+  projWs.set(projectId, ws);
+};
 const otherWs = (u, projectId) => {
   const w = projWs.get(projectId);
   return Boolean(w && u?.workspace_id && w !== u.workspace_id);
@@ -39,7 +52,7 @@ const otherWs = (u, projectId) => {
 export async function projectWorkspace(projectId) {
   if (projWs.has(projectId)) return projWs.get(projectId);
   const r = (await qs('select workspace_id from projects where id = $1', [projectId])).rows[0];
-  if (r) projWs.set(projectId, r.workspace_id);
+  if (r) rememberWs(projectId, r.workspace_id);
   return r ? r.workspace_id : null;
 }
 export const canAccess = (u, projectId) =>
@@ -128,7 +141,7 @@ export async function listProjects(user) {
     from projects p where p.workspace_id = $1 and p.archived_at is null order by p.updated_at desc`,
     [ws],
   );
-  for (const r of rows) projWs.set(r.id, ws);
+  for (const r of rows) rememberWs(r.id, ws);
   return rows.filter((r) => canAccess(user, r.id));
 }
 
@@ -290,7 +303,7 @@ export async function createProject(p, user) {
     ]);
     user.project_access = access;
   }
-  projWs.set(p.id, ws);
+  rememberWs(p.id, ws);
   return getProject(p.id);
 }
 

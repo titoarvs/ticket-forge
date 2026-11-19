@@ -7,7 +7,7 @@
 // Self-hosted, and the service's own default workspace, have no limits.
 // Every feature is open to every plan (TF-101): only a positive number is a limit that stops anything. A plan value of
 // 0 used to mean "not included in this plan"; it is no longer a gate, so the feature works on every plan.
-import { asSystem, currentWs, DEFAULT_WS } from './db';
+import { asSystem, authGen, currentWs, DEFAULT_WS } from './db';
 import { orm, workspaces, projects, workspaceMembers, invites, files, screenshots, usageCounters, eq, and, isNull, gt, sql } from './orm';
 import { isSaas } from './platform';
 import { PLANS, LIMIT_DEFS } from './plans';
@@ -30,7 +30,32 @@ const enforced = (limit) => limit != null && limit > 0;
 /** Runs a Drizzle query in system context (these counts are about the whole workspace, whoever asks). */
 const sys = <T>(run: () => PromiseLike<T>): Promise<T> => asSystem(async () => await run());
 /** The workspace's plan facts. The keys stay snake_case, as the plan code below reads them. */
-const planRow = async (ws): Promise<any> =>
+// In hosted mode every API request checks the workspace's plan (lockStatus). Remember it briefly, like signed-in users
+// (auth.ts): a change to workspaces on this server drops it at once (authGen); another server's change shows within
+// PLAN_CACHE_MS. Trial ends are compared with the clock on every call, so a cached row still locks on time.
+const PLAN_CACHE_MS = 15000;
+const PLAN_CACHE_MAX = 50000;
+const planCache: Map<string, { w: any; at: number; gen: number }> = ((globalThis as any).__tfPlanCache ??= new Map());
+const planRow = async (ws): Promise<any> => {
+  const now = Date.now(),
+    gen = authGen();
+  const hit = planCache.get(ws);
+  if (hit && hit.gen === gen && now - hit.at < PLAN_CACHE_MS) return hit.w;
+  const w = await readPlanRow(ws);
+  if (w) {
+    if (planCache.size >= PLAN_CACHE_MAX) {
+      let n = PLAN_CACHE_MAX / 10;
+      for (const k of planCache.keys()) {
+        planCache.delete(k);
+        if (--n <= 0) break;
+      }
+    }
+    planCache.delete(ws);
+    planCache.set(ws, { w, at: now, gen });
+  }
+  return w;
+};
+const readPlanRow = async (ws): Promise<any> =>
   (
     await sys(() =>
       orm

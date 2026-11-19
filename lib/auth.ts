@@ -326,7 +326,24 @@ export async function createSession(userId, userAgent = '', ws = null) {
     ws,
   ]);
   await q('update users set last_login_at = now() where id = $1', [userId]);
+  sweepExpired();
   return { token: t, maxAge: SESSION_DAYS * 86400 };
+}
+// Every sign-in adds a session row that stays after it expires; with many people the table (and its indexes) would grow
+// for good. Sign-ins also clear out expired ones: at most every 10 minutes per server, in batches, so a sweep never
+// locks many rows at once or slows the sign-in that triggered it (not awaited).
+const SWEEP_MS = 10 * 60000;
+const SWEEP_BATCH = 5000;
+const sweep = (globalThis.__tfSessionSweep ??= { at: 0 });
+function sweepExpired() {
+  if (Date.now() - sweep.at < SWEEP_MS) return;
+  sweep.at = Date.now();
+  q(`delete from sessions where token_hash in (select token_hash from sessions where expires_at < now() limit ${SWEEP_BATCH})`).catch(
+    () => {},
+  );
+  q(
+    `delete from password_resets where token_hash in (select token_hash from password_resets where expires_at < now() - interval '1 day' limit ${SWEEP_BATCH})`,
+  ).catch(() => {});
 }
 // Every API request looks up who is signed in. Remember the answer briefly so a page load (several requests at
 // once) costs one database round trip, not one per request. Any change to users, roles, memberships or sessions
@@ -393,10 +410,10 @@ export async function createApiToken(user, { name, expiresInDays }: any = {}) {
   if (!Number.isInteger(days) || days < 1 || days > API_TOKEN_MAX_DAYS)
     throw new HttpError(400, `Expiry must be a whole number of days from 1 to ${API_TOKEN_MAX_DAYS}.`);
   const active = (
-    await q('select count(*)::int n from api_tokens where user_id = $1 and workspace_id = $2 and revoked_at is null and (expires_at is null or expires_at > now())', [
-      user.id,
-      user.workspace_id,
-    ])
+    await q(
+      'select count(*)::int n from api_tokens where user_id = $1 and workspace_id = $2 and revoked_at is null and (expires_at is null or expires_at > now())',
+      [user.id, user.workspace_id],
+    )
   ).rows[0].n;
   if (active >= API_TOKEN_MAX_ACTIVE) throw new HttpError(400, `You already have ${API_TOKEN_MAX_ACTIVE} active tokens. Revoke one first.`);
   const raw = `${API_TOKEN_PREFIX}${token()}`;
@@ -447,16 +464,30 @@ export async function apiTokenUser(raw) {
   const r = rows[0];
   if (!r || r.status !== 'active') return null;
   // "Last used" is only for the person's token list: written at most once a minute per token.
-  await q("update api_tokens set last_used_at = now() where id = $1 and (last_used_at is null or last_used_at < now() - interval '1 minute')", [
-    r.token_id,
-  ]).catch(() => {});
+  await q(
+    "update api_tokens set last_used_at = now() where id = $1 and (last_used_at is null or last_used_at < now() - interval '1 minute')",
+    [r.token_id],
+  ).catch(() => {});
   return r;
 }
 
-// Simple in-memory throttle for login / forgot-password.
+// Simple in-memory throttle for login / forgot-password. Keys (addresses, emails) whose attempts are all outside the
+// window are dropped once the map gets big, so a flood of different keys can't grow server memory without end.
 const attempts: Map<any, any> = new Map();
+const ATTEMPT_KEYS_MAX = 20000;
 export function throttle(key, limit = 8, windowMs = 15 * 60000) {
   const now = Date.now();
+  if (attempts.size >= ATTEMPT_KEYS_MAX) {
+    for (const [k, list] of attempts) if (!list.length || now - list[list.length - 1] >= windowMs) attempts.delete(k);
+    // Still full (a flood inside one window): forget the oldest tenth (Maps keep insertion order).
+    if (attempts.size >= ATTEMPT_KEYS_MAX) {
+      let n = ATTEMPT_KEYS_MAX / 10;
+      for (const k of attempts.keys()) {
+        attempts.delete(k);
+        if (--n <= 0) break;
+      }
+    }
+  }
   const list = (attempts.get(key) || []).filter((t) => now - t < windowMs);
   if (list.length >= limit) throw new HttpError(429, 'Too many attempts. Wait a few minutes and try again.');
   list.push(now);
