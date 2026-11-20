@@ -56,6 +56,7 @@ async function gh(path: string, token: string, { method = 'GET', body }: any = {
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(20000),
   });
   if (res.ok) return { data: await res.json(), more: /rel="next"/.test(res.headers.get('link') || '') };
   const left = res.headers.get('x-ratelimit-remaining');
@@ -205,6 +206,58 @@ async function tokenFor(projectId: string) {
     );
   return token;
 }
+/**
+ * TF-134: files a GitHub issue for a new ticket in the project's linked repository. Returns the
+ * `ticket.github` link. Throws HttpError with a readable message when GitHub can't be used.
+ */
+export async function createGithubIssue(projectId: string, title: string, description: string) {
+  const token = (await getProjectSecret(projectId, 'githubToken')) || process.env.GITHUB_TOKEN || '';
+  if (!token)
+    throw new HttpError(
+      400,
+      'GitHub connection missing: add a personal access token in settings (Project settings → Code & GitHub) to create tickets.',
+    );
+  const pr = (
+    await q('select data from projects where id = $1 and archived_at is null', [projectId])
+  ).rows[0];
+  const repo = pr?.data?.githubSync?.repo;
+  if (!repo)
+    throw new HttpError(
+      400,
+      'GitHub connection missing: link a GitHub repository in Project settings → Code & GitHub.',
+    );
+  let data: any;
+  try {
+    ({ data } = await gh(`repos/${repo}/issues`, token, {
+      method: 'POST',
+      body: { title, body: description },
+    }));
+  } catch (e: any) {
+    if (e instanceof HttpError) {
+      if (e.status === 400) throw new HttpError(400, `GitHub connection problem: ${e.message}`);
+      throw e;
+    }
+    throw new HttpError(504, 'GitHub connection problem: GitHub didn’t respond. Try again.');
+  }
+  const g: any = fromGithub(data);
+  const now = new Date().toISOString();
+  return {
+    repo,
+    number: g.number,
+    url: g.url,
+    updatedAt: g.updatedAt,
+    syncedAt: now,
+    base: {
+      title: g.title,
+      description: g.description,
+      labels: g.labels,
+      assignee: '',
+      milestone: '',
+      state: g.state,
+    },
+  };
+}
+
 // ---------------------------------------------------------------- link a repository
 /** "owner/name" from that or a github.com address. */
 export function parseRepo(input: any) {
