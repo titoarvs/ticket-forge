@@ -52,6 +52,20 @@ async function createWithGithub(fields: Any) {
   }
 }
 
+/**
+ * For tickets made in the browser: files their GitHub issue first when the project has a
+ * repository linked (TF-134). Returns the link for `ticket.github`, null when no repository is
+ * linked; throws (with GitHub's reason) when it couldn't be filed.
+ */
+export async function githubIssueFor(title: string, description: string) {
+  if (!P().githubSync?.repo) return null;
+  const r = await api(`/api/projects/${encodeURIComponent(P().id)}/github-sync`, {
+    method: 'POST',
+    body: { action: 'create-issue', title, description },
+  });
+  return r.github || null;
+}
+
 export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
   const p = P();
   const [rich, setRich] = useState<RichValue | null>(null);
@@ -303,12 +317,21 @@ export async function writeWithClaude({
   if (!res) return;
   const nt = applyAi(newTicket({ ...fields }), res.ticket);
   if (type) nt.type = type;
+  // With a repository linked the GitHub issue comes first: if it can't be filed, no ticket is made.
+  try {
+    const github = await githubIssueFor(nt.title, nt.description || '');
+    if (github) nt.github = github;
+  } catch (e: Any) {
+    toast(`Not created: ${e.message}`, 'err');
+    return;
+  }
   mutate((p) => {
     p.tickets.push(nt);
     addMember(fields.assignee);
   });
   openDrawer('issue', nt.id);
-  toast(`Claude created ${nt.key}`);
+  const gh = nt.github?.number ? ` and GitHub issue #${nt.github.number}` : '';
+  toast(`Claude created ${nt.key}${gh}`);
 }
 export function NewWithClaudeModal({ epicId = '' }: { epicId?: string }) {
   const p = P();

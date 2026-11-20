@@ -169,6 +169,23 @@ export async function createProjectIssue(user: any, projectId: string, input: an
   return { issue: out.issue };
 }
 
+/**
+ * TF-134 for issues written in the browser (Write issue with AI): files the GitHub issue for a
+ * ticket about to be created, when the project has a repository linked. Returns { github }, the
+ * link to put on the ticket (null when no repository is linked).
+ */
+export async function fileGithubIssue(user: any, projectId: string, input: any) {
+  requireAccess(user, projectId);
+  requirePerm(user, 'issue.create');
+  const title = String(input?.title ?? '').trim();
+  if (!title) throw new HttpError(400, 'Title is required.');
+  if (title.length > 200) throw new HttpError(400, 'Title must be at most 200 characters.');
+  const description = String(input?.description ?? '')
+    .trim()
+    .slice(0, 20000);
+  return { github: await createGithubIssue(projectId, title, description) };
+}
+
 export async function projectExists(id: string) {
   return !!(await q('select 1 from projects where id = $1', [id])).rows[0];
 }
