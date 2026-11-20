@@ -13,7 +13,8 @@ export const GET = api(async () => {
   return { currencies: CURRENCIES, intervals: INTERVALS, plans: await listBillingPlans() };
 });
 
-// Creates a plan: name, price, currency (PHP or USD), recurring cycle, free-plan option and trial days.
+// Creates a plan: name, price, currency (PHP or USD), recurring cycle, free-plan option and trial
+// days.
 export const POST = api(async (req) => {
   const u = await platformOwner();
   hosted();

@@ -1,6 +1,6 @@
 import { api, perm, body, HttpError } from '@/lib/server/http';
 import * as store from '@/lib/store';
-import { markdownToDocx } from '@/lib/md-docx';
+import { epicDocx, docxResponse } from '@/lib/epic-docx';
 
 export const maxDuration = 60;
 
@@ -12,8 +12,18 @@ export const POST = api(async (req, p) => {
   const project = await store.getProject(p.id);
   const epic = project.epics.find((e: any) => e.id === b.epicId);
   const doc = epic?.agentDocs?.[String(b.agentId || '')];
-  if (!doc?.markdown) throw new HttpError(404, 'That document isn’t saved on this epic yet. Wait a moment for it to save, then try again.');
-  const buf = await markdownToDocx(doc.markdown, { title: `${doc.name || b.agentId} – ${epic.title}` });
-  const name = `${doc.name || b.agentId} - ${epic.title}.docx`.replace(/[\\/:*?"<>|]+/g, ' ');
-  return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'Content-Length': String(buf.length), 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' } });
+  if (!doc?.markdown)
+    throw new HttpError(
+      404,
+      'That document isn’t saved on this epic yet. Wait a moment for it to save, then try again.',
+    );
+  const { name, buf } = await epicDocx({
+    kind: 'agent',
+    project,
+    epic,
+    doc,
+    agentId: String(b.agentId),
+    user,
+  });
+  return docxResponse(name, buf);
 });

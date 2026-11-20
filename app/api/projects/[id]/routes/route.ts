@@ -9,10 +9,14 @@ import { setProjectSecret, getProjectSecret, hasProjectSecret } from '@/lib/secr
 
 export const GET = api(async (_req, p) => {
   store.requireAccess(await authed(), p.id);
-  return { hasToken: await hasProjectSecret(p.id, 'githubToken'), canReadFolders: !SERVERLESS && Boolean((currentContext() as any).local) };
+  return {
+    hasToken: await hasProjectSecret(p.id, 'githubToken'),
+    canReadFolders: !SERVERLESS && Boolean((currentContext() as any).local),
+  };
 });
 
-// { action: 'scan', kind: 'github' | 'folder', location, branch } · { action: 'saveToken', token } · { action: 'clearToken' }
+// { action: 'scan', kind: 'github' | 'folder', location, branch } · { action: 'saveToken', token }
+// · { action: 'clearToken' }
 export const POST = api(async (req, p) => {
   const user = await perm('project.settings');
   store.requireAccess(user, p.id);
@@ -24,16 +28,33 @@ export const POST = api(async (req, p) => {
     return { hasToken: Boolean(token) };
   }
   const location = String(b.location || '').trim();
-  if (!location) throw new HttpError(400, b.kind === 'folder' ? 'Enter the folder path.' : 'Enter the repository.');
+  if (!location)
+    throw new HttpError(
+      400,
+      b.kind === 'folder' ? 'Enter the folder path.' : 'Enter the repository.',
+    );
   let reader;
   if (b.kind === 'folder') {
     // Reading folders is only for the computer TicketForge runs on, opened there (localhost).
-    if (SERVERLESS || !(currentContext() as any).local) throw new HttpError(400, 'Folders can only be scanned when TicketForge runs on your own computer and is opened at localhost. Use a GitHub repository instead.');
+    if (SERVERLESS || !(currentContext() as any).local)
+      throw new HttpError(
+        400,
+        'Folders can only be scanned when TicketForge runs on your own computer and is opened at localhost. Use a GitHub repository instead.',
+      );
     reader = localReader(location);
   } else {
-    reader = await githubReader(location, { branch: String(b.branch || '').trim(), token: await getProjectSecret(p.id, 'githubToken') });
+    reader = await githubReader(location, {
+      branch: String(b.branch || '').trim(),
+      token: await getProjectSecret(p.id, 'githubToken'),
+    });
   }
   const files = await reader.list();
   const res = await scanCodebase(files, reader.read);
-  return { ...res, label: reader.label, files: files.length, truncated: Boolean((reader as any).truncated), at: new Date().toISOString() };
+  return {
+    ...res,
+    label: reader.label,
+    files: files.length,
+    truncated: Boolean((reader as any).truncated),
+    at: new Date().toISOString(),
+  };
 });

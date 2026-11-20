@@ -1,14 +1,31 @@
-import { api, authed, perm, body, HttpError, startSession, endSession, clientIp, appUrl, aiOpts, ndjson } from '@/lib/server/http';
+import { api, perm, body, HttpError } from '@/lib/server/http';
 import * as store from '@/lib/store';
-import { toCsvTickets, toCsvTestCases, toCsvJira, toXlsx, toDocx, toPdf, toHtml, slug } from '@/lib/exporters';
+import {
+  toCsvTickets,
+  toCsvTestCases,
+  toCsvJira,
+  toXlsx,
+  toDocx,
+  toPdf,
+  toHtml,
+  slug,
+} from '@/lib/exporters';
 import { assignKeys } from '@/lib/model';
 
 const EXPORTS: Record<string, { ext: string; type: string; fn: (p: any) => any }> = {
   csv: { ext: 'tickets.csv', type: 'text/csv; charset=utf-8', fn: toCsvTickets },
   'csv-tests': { ext: 'test-cases.csv', type: 'text/csv; charset=utf-8', fn: toCsvTestCases },
   'csv-jira': { ext: 'jira-import.csv', type: 'text/csv; charset=utf-8', fn: toCsvJira },
-  xlsx: { ext: 'xlsx', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fn: toXlsx },
-  docx: { ext: 'docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fn: toDocx },
+  xlsx: {
+    ext: 'xlsx',
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    fn: toXlsx,
+  },
+  docx: {
+    ext: 'docx',
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    fn: toDocx,
+  },
   pdf: { ext: 'pdf', type: 'application/pdf', fn: toPdf },
   html: { ext: 'html', type: 'text/html; charset=utf-8', fn: toHtml },
   json: { ext: 'json', type: 'application/json', fn: (p) => JSON.stringify(p, null, 2) },
@@ -22,5 +39,10 @@ export const POST = api(async (req, p) => {
   if (b?.id) await store.requireProject(user, b.id);
   const project = assignKeys(b);
   const out = await ex.fn(project);
-  return new Response(out, { headers: { 'Content-Type': ex.type, 'Content-Disposition': `attachment; filename="${slug(project.name)}.${ex.ext}"` } });
+  return new Response(out, {
+    headers: {
+      'Content-Type': ex.type,
+      'Content-Disposition': `attachment; filename="${slug(project.name)}.${ex.ext}"`,
+    },
+  });
 });

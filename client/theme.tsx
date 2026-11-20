@@ -1,13 +1,15 @@
 'use client';
-// MUI theme matched to the design tokens in globals.css. Dark is the default; people can switch to light
-// (stored per browser). The mode is the data-theme attribute on <html>, which globals.css also keys off.
+// MUI theme matched to the design tokens in globals.css. Dark is the default; people can switch to
+// light (stored per browser). The mode is the data-theme attribute on <html>, which globals.css
+// also keys off.
 import type { ReactNode } from 'react';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter';
 import { ThemeProvider, createTheme, useColorScheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
-const FONT = 'var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif';
+const FONT =
+  'var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif';
 
 export const theme = createTheme({
   cssVariables: { colorSchemeSelector: 'data-theme' },
@@ -52,7 +54,10 @@ export const theme = createTheme({
           '&:hover': { backgroundColor: 'var(--bg-sunken)' },
           '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--border-input)' },
           '&.Mui-focused': { backgroundColor: 'var(--bg)' },
-          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--border-focus)', borderWidth: 2 },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--border-focus)',
+            borderWidth: 2,
+          },
           '&.Mui-disabled': { backgroundColor: 'var(--bg-sunken)' },
           '&.Mui-disabled .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--border)' },
         },
@@ -65,10 +70,25 @@ export const theme = createTheme({
       styleOverrides: { select: { minHeight: 20, display: 'flex', alignItems: 'center', gap: 6 } },
     },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
-    MuiPopover: { styleOverrides: { paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', border: '1px solid var(--border)', borderRadius: 8 } } },
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: 'var(--overlay)',
+          boxShadow: 'var(--shadow-overlay)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+        },
+      },
+    },
     MuiAutocomplete: {
       styleOverrides: {
-        paper: { backgroundColor: 'var(--overlay)', boxShadow: 'var(--shadow-overlay)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 14 },
+        paper: {
+          backgroundColor: 'var(--overlay)',
+          boxShadow: 'var(--shadow-overlay)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          fontSize: 14,
+        },
         inputRoot: { padding: '2px 8px !important' },
         input: { padding: '4px 0 !important' },
         option: { gap: 8, minHeight: 32 },
@@ -77,19 +97,33 @@ export const theme = createTheme({
     MuiMenuItem: {
       styleOverrides: {
         root: {
-          fontSize: 14, minHeight: 32, gap: 8, borderLeft: '2px solid transparent',
+          fontSize: 14,
+          minHeight: 32,
+          gap: 8,
+          borderLeft: '2px solid transparent',
           '&:hover': { backgroundColor: 'var(--hover)', borderLeftColor: 'var(--selected-text)' },
-          '&.Mui-selected, &.Mui-selected:hover': { backgroundColor: 'var(--selected-bg)', color: 'var(--selected-text)' },
+          '&.Mui-selected, &.Mui-selected:hover': {
+            backgroundColor: 'var(--selected-bg)',
+            color: 'var(--selected-text)',
+          },
         },
       },
     },
-    MuiCheckbox: { defaultProps: { size: 'small' }, styleOverrides: { root: { padding: 4, color: 'var(--border-input)' } } },
-    MuiRadio: { defaultProps: { size: 'small' }, styleOverrides: { root: { padding: 4, color: 'var(--border-input)' } } },
-    MuiFormControlLabel: { styleOverrides: { root: { marginLeft: -4, marginRight: 0, gap: 4 }, label: { fontSize: 14 } } },
+    MuiCheckbox: {
+      defaultProps: { size: 'small' },
+      styleOverrides: { root: { padding: 4, color: 'var(--border-input)' } },
+    },
+    MuiRadio: {
+      defaultProps: { size: 'small' },
+      styleOverrides: { root: { padding: 4, color: 'var(--border-input)' } },
+    },
+    MuiFormControlLabel: {
+      styleOverrides: { root: { marginLeft: -4, marginRight: 0, gap: 4 }, label: { fontSize: 14 } },
+    },
   },
 });
 
-export const MODE_KEY = 'tf-theme';
+const MODE_KEY = 'tf-theme';
 
 /** Switches between the dark (default) and light themes. */
 export function useThemeMode() {
@@ -101,7 +135,12 @@ export function useThemeMode() {
 export default function ThemeRegistry({ children }: { children: ReactNode }) {
   return (
     <AppRouterCacheProvider options={{ key: 'mui' }}>
-      <ThemeProvider theme={theme} defaultMode="dark" modeStorageKey={MODE_KEY} disableTransitionOnChange>
+      <ThemeProvider
+        theme={theme}
+        defaultMode="dark"
+        modeStorageKey={MODE_KEY}
+        disableTransitionOnChange
+      >
         <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
       </ThemeProvider>
     </AppRouterCacheProvider>

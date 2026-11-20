@@ -9,6 +9,9 @@ export const POST = api(async (req) => {
   auth.throttle(`signup:${ip}`, 5, 60 * 60000);
   const h = await headers();
   const r = await auth.signup(b, { ip, userAgent: h.get('user-agent') || '' });
-  if (r.user) { await startSession(r.user.id, r.user.workspace_id); return { user: auth.publicUser(r.user) }; }
+  if (r.user) {
+    await startSession(r.user.id, r.user.workspace_id);
+    return { user: auth.publicUser(r.user) };
+  }
   return { requested: true };
 });

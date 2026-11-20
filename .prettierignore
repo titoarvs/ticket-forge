@@ -1,0 +1,14 @@
+# Not formatted: dependencies, build output, local data, the old app, generated files and docs.
+node_modules
+.next
+.next-*
+out
+build
+data
+legacy
+drizzle
+coverage
+package-lock.json
+lib/schema
+lib/relations.ts
+*.md

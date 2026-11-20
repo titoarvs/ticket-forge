@@ -1,14 +1,24 @@
-// Self-healing Agent: when an automated test fails because the page changed (a renamed button, a moved field, a new
-// step, a missing wait on an assertion), it reads the page as it was at the failure and rewrites the script. The caller
-// re-runs the healed script once and keeps it only if it passes. Real product bugs are never "healed": the agent must
-// not change what the test proves (its assertions on the expected result).
+// Self-healing Agent: when an automated test fails because the page changed (a renamed button, a
+// moved field, a new step, a missing wait on an assertion), it reads the page as it was at the
+// failure and rewrites the script. The caller re-runs the healed script once and keeps it only if
+// it passes. Real product bugs are never "healed": the agent must not change what the test proves
+// (its assertions on the expected result).
 import { askJson } from './claude';
 import { agentInstructions } from './agents';
 import { contextBlock } from './appcontext';
 
-const clip = (s, n) => { const t = String(s ?? '').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+const clip = (s, n) => {
+  const t = String(s ?? '').trim();
+  return t.length > n ? `${t.slice(0, n)}…` : t;
+};
 /** Failures the agent can't help with: no script, stopped, the browser or app unreachable. */
-export const healable = (r) => r && r.status !== 'Pass' && r.page && !/No automation script|Run stopped|Couldn’t connect|ERR_CONNECTION|net::ERR|ECONNREFUSED|Target page, context or browser has been closed/i.test(r.error || '');
+export const healable = (r) =>
+  r &&
+  r.status !== 'Pass' &&
+  r.page &&
+  !/No automation script|Run stopped|Couldn’t connect|ERR_CONNECTION|net::ERR|ECONNREFUSED|Target page, context or browser has been closed/i.test(
+    r.error || '',
+  );
 
 const SYSTEM = `You are a Playwright test-maintenance engineer (a self-healing agent, like BrowserStack's).
 A test script failed. Decide if it failed because the SCRIPT no longer matches the page (renamed or moved element,
@@ -22,8 +32,15 @@ Never weaken, remove or loosen an assertion to make a test pass. Return JSON onl
 
 /** Returns { healable, reason, code }. */
 export async function healScript({ ticket, tc, result, baseUrl, project, ai = {} }: any) {
-  const steps = Array.isArray(tc.steps) ? tc.steps.map((s, i) => `${i + 1}. ${typeof s === 'string' ? s : s?.action || ''}`).join('\n') : String(tc.steps || '');
-  const res = await askJson({ ...ai, task: 'healing', reasoning: 'fast', system: SYSTEM + await agentInstructions('self-healing') + contextBlock(project), prompt: `App: ${project?.name || ''} at ${baseUrl}
+  const steps = Array.isArray(tc.steps)
+    ? tc.steps.map((s, i) => `${i + 1}. ${typeof s === 'string' ? s : s?.action || ''}`).join('\n')
+    : String(tc.steps || '');
+  const res = await askJson({
+    ...ai,
+    task: 'healing',
+    reasoning: 'fast',
+    system: SYSTEM + (await agentInstructions('self-healing')) + contextBlock(project),
+    prompt: `App: ${project?.name || ''} at ${baseUrl}
 Issue ${ticket.key}: ${ticket.title}
 Acceptance criteria:
 ${(ticket.acceptanceCriteria || []).map((a, i) => `AC${i + 1}. ${clip(a, 200)}`).join('\n') || '(none)'}
@@ -44,9 +61,23 @@ Visible text:
 ${clip(result.page?.text, 1500)}
 Interactive elements (tag[role][type][data-testid] "accessible name"):
 ${clip(result.page?.elements, 5000) || '(not captured)'}
-${result.logs?.length ? `\nBrowser log:\n${result.logs.slice(-15).map((l) => `- ${clip(l, 200)}`).join('\n')}` : ''}
+${
+  result.logs?.length
+    ? `\nBrowser log:\n${result.logs
+        .slice(-15)
+        .map((l) => `- ${clip(l, 200)}`)
+        .join('\n')}`
+    : ''
+}
 
-Return JSON: { "healable": true | false, "reason": "one sentence: what changed on the page, or why it's an app problem", "code": "the full repaired script body, only when healable" }` });
-  const code = String(res.code || '').replace(/^```(?:js|javascript|ts)?\s*|```\s*$/g, '').trim();
-  return { healable: Boolean(res.healable) && code.length > 20 && code !== String(tc.script || '').trim(), reason: clip(res.reason, 300), code };
+Return JSON: { "healable": true | false, "reason": "one sentence: what changed on the page, or why it's an app problem", "code": "the full repaired script body, only when healable" }`,
+  });
+  const code = String(res.code || '')
+    .replace(/^```(?:js|javascript|ts)?\s*|```\s*$/g, '')
+    .trim();
+  return {
+    healable: Boolean(res.healable) && code.length > 20 && code !== String(tc.script || '').trim(),
+    reason: clip(res.reason, 300),
+    code,
+  };
 }

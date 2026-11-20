@@ -8,5 +8,10 @@ export const GET = api(async (req) => {
   if (!u.is_owner) throw new HttpError(403, 'Only the workspace owner can change the plan.');
   if (!billingOn()) throw new HttpError(400, 'Plans are only used on the hosted service.');
   const q = new URL(req.url).searchParams;
-  return checkoutResult({ ws: u.workspace_id, result: q.get('result') || '', plan: q.get('plan') || '', interval: q.get('interval') || 'month' });
+  return checkoutResult({
+    ws: u.workspace_id,
+    result: q.get('result') || '',
+    plan: q.get('plan') || '',
+    interval: q.get('interval') || 'month',
+  });
 });
