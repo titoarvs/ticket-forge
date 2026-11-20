@@ -5,6 +5,7 @@ import { HttpError, listUsers } from './auth';
 import { requireAccess, requirePerm, noteVersion, canAccess } from './store';
 import { notify } from './notify';
 import { uid } from './model';
+import { createGithubIssue } from './github-sync';
 
 export const ISSUE_TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 
@@ -28,6 +29,9 @@ export async function createProjectIssue(user: any, projectId: string, input: an
     .filter((x: string) => /^\w{1,40}$/.test(x))
     .slice(0, 20);
   const wanted = String(input?.status ?? '').trim();
+
+  // TF-134: file the GitHub issue first, so a GitHub failure leaves no ticket behind.
+  const github = await createGithubIssue(projectId, title, description);
 
   const out = await tx(async (t) => {
     const pr = (
@@ -81,6 +85,7 @@ export async function createProjectIssue(user: any, projectId: string, input: an
       history: [{ id: uid(), at: now, author: user.name || '', field: 'created', text: 'created the issue' }],
       createdAt: now,
       updatedAt: now,
+      github,
     };
     await t.query(
       'insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)',

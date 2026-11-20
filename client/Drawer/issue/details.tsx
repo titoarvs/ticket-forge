@@ -190,6 +190,20 @@ export function IssueDetails({ t, edit, e }: IssueProps & { e: Any }) {
           <span className="dev-sum">
             <DevSummary t={t} edit={edit} />
           </span>
+          {t.github?.number && (
+            <>
+              <span className="label">GitHub</span>
+              <span className="dev-sum">
+                {t.github.url ? (
+                  <a href={t.github.url} target="_blank" rel="noreferrer">
+                    #{t.github.number}
+                  </a>
+                ) : (
+                  `#${t.github.number}`
+                )}
+              </span>
+            </>
+          )}
           <span className="label">Tests</span>
           <span className="dev-sum">
             <TestSummary t={t} />

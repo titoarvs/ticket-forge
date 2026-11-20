@@ -19,6 +19,7 @@ export function CreateIssueForm() {
   const [busy, setBusy] = useState(false);
   const [ai, setAi] = useState(false);
   const [tried, setTried] = useState(false);
+  const [error, setError] = useState('');
   const set = (k: string) => (e: Any) => setF((x) => ({ ...x, [k]: e.target.value }));
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export function CreateIssueForm() {
     setTried(true);
     if (!pid || !f.title.trim() || !f.type) return;
     setBusy(true);
+    setError('');
     try {
       const ids: string[] = [];
       for (const file of files) {
@@ -86,6 +88,7 @@ export function CreateIssueForm() {
       closeModal();
       pullRemote?.({ quiet: true });
     } catch (e: Any) {
+      setError(e.message || 'Couldn’t create the issue.');
       toast(e.message, 'err');
     } finally {
       setBusy(false);
@@ -158,6 +161,11 @@ export function CreateIssueForm() {
             />
           </label>
         </>
+      )}
+      {error && (
+        <p role="alert" style={err}>
+          {error}
+        </p>
       )}
     </Modal>
   );
