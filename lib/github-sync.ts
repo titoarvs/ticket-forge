@@ -6,6 +6,8 @@
 //   used to match on re-import, plus a snapshot (`base`) of the mapped fields as of the last sync.
 // - Mapping: title → title, body → description, labels → labels, assignee → assignee, milestone →
 //   epic (created when missing), open / closed → the project's first / "done" workflow status.
+//   An issue filed from Ticket Forge has a Jira-style body (lib/github-body.ts): only its marked
+//   description part maps to the ticket, and a description change rewrites the whole layout.
 // - Conflicts: a field changed on both sides since the last sync takes the newer side's value
 //   (GitHub's updated_at against the ticket's updatedAt; a tie goes to GitHub) and the ticket's
 //   activity gets a "Sync conflict" entry. Fields changed on one side only are copied across.
@@ -18,6 +20,7 @@ import { statsOf } from './store/create-project';
 import { insertVersions } from './store/patch-project';
 import { EPIC_COLORS, uid } from './model';
 import { getProjectSecret } from './secrets';
+import { ticketBody, descriptionOf, isTicketBody, type TicketForBody } from './github-body';
 
 export const ONLY_OWNERS =
   'Only the project owner or a Super Admin can link a GitHub repository or import from GitHub.';
@@ -99,7 +102,8 @@ const fromGithub = (i: any) => ({
   createdAt: i.created_at || '',
   updatedAt: i.updated_at || '',
   title: clean(i.title),
-  description: clean(i.body),
+  description: descriptionOf(i.body),
+  formatted: isTicketBody(i.body),
   labels: (i.labels || []).map((l: any) => clean(typeof l === 'string' ? l : l?.name)).filter(Boolean),
   assigneeLogin: i.assignee?.login || i.assignees?.[0]?.login || '',
   milestone: clean(i.milestone?.title),
@@ -212,12 +216,14 @@ async function tokenFor(projectId: string) {
  * only in Ticket Forge). Throws HttpError with a readable message when a linked repository can't
  * be used.
  */
-export async function createGithubIssue(projectId: string, title: string, description: string) {
+export async function createGithubIssue(projectId: string, ticket: TicketForBody & { epicId?: any }) {
   const pr = (
     await q('select data from projects where id = $1 and archived_at is null', [projectId])
   ).rows[0];
   const repo = pr?.data?.githubSync?.repo;
   if (!repo) return null;
+  const title = clean(ticket.title);
+  const epic = (pr.data.epics || []).find((e: any) => e.id === ticket.epicId)?.title || '';
   const token = (await getProjectSecret(projectId, 'githubToken')) || process.env.GITHUB_TOKEN || '';
   if (!token)
     throw new HttpError(
@@ -228,7 +234,7 @@ export async function createGithubIssue(projectId: string, title: string, descri
   try {
     ({ data } = await gh(`repos/${repo}/issues`, token, {
       method: 'POST',
-      body: { title, body: description },
+      body: { title, body: ticketBody(ticket, epic) },
     }));
   } catch (e: any) {
     if (e instanceof HttpError) {
@@ -454,6 +460,9 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
       // differs in is written to GitHub next (sync) or at the next sync (import).
       const stale = JSON.stringify(d.github.base) !== JSON.stringify(mapped) || d.github.updatedAt !== g.updatedAt;
       d.github = { ...d.github, ...meta() };
+      // A Jira-style body is rewritten whole, so the layout stays around the new description.
+      if ('description' in plan.push && g.formatted)
+        plan.push.description = ticketBody(d, epics.find((e) => e.id === d.epicId)?.title || '');
       if (Object.keys(plan.push).length && mode === 'sync')
         pushes.push({ id: d.id, key: d.key, number: g.number, fields: plan.push });
       if (applied.length || plan.conflicts.length || stale) {

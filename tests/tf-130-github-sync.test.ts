@@ -70,9 +70,9 @@ globalThis.fetch = (async (url: any, init: any = {}) => {
 
 // ---------------------------------------------------------------- helpers
 const tickets = async () =>
-  (
-    await D.q("select data from issues where project_id = 'p1' order by position")
-  ).rows.map((r) => r.data);
+  (await D.q("select data from issues where project_id = 'p1' order by position")).rows.map(
+    (r) => r.data,
+  );
 const project = async () => (await D.q("select data from projects where id = 'p1'")).rows[0].data;
 const setTicket = (id: string, patch: any) =>
   D.q("update issues set data = data || $2::jsonb where project_id = 'p1' and id = $1", [
@@ -138,10 +138,19 @@ test('AC1: a malformed repository name is refused', async () => {
 // ---------------------------------------------------------------- AC 5: permission
 test('AC5: a user who is neither the project owner nor a Super Admin cannot link or import', async () => {
   issues = [issue(1)];
-  await assert.rejects(as(() => G.linkRepo(member, 'p1', REPO)), /Only the project owner or a Super Admin/);
+  await assert.rejects(
+    as(() => G.linkRepo(member, 'p1', REPO)),
+    /Only the project owner or a Super Admin/,
+  );
   await link();
-  await assert.rejects(as(() => G.syncIssues(member, 'p1')), /Only the project owner or a Super Admin/);
-  await assert.rejects(as(() => G.syncIssues(member, 'p1', 'sync')), /Only the project owner or a Super Admin/);
+  await assert.rejects(
+    as(() => G.syncIssues(member, 'p1')),
+    /Only the project owner or a Super Admin/,
+  );
+  await assert.rejects(
+    as(() => G.syncIssues(member, 'p1', 'sync')),
+    /Only the project owner or a Super Admin/,
+  );
   assert.equal((await tickets()).length, 0);
 });
 test('AC5: a Super Admin can link and import in a project they did not create', async () => {
@@ -151,7 +160,10 @@ test('AC5: a Super Admin can link and import in a project they did not create', 
   assert.equal(r.created, 1);
 });
 test('importing before a repository is linked asks for the link first', async () => {
-  await assert.rejects(as(() => G.syncIssues(owner, 'p1')), /Link a GitHub repository first/);
+  await assert.rejects(
+    as(() => G.syncIssues(owner, 'p1')),
+    /Link a GitHub repository first/,
+  );
 });
 
 // ---------------------------------------------------------------- AC 2 and 6: import and mapping
@@ -181,15 +193,17 @@ test('AC2 and AC6: every issue becomes a ticket with mapped fields and an epic n
   assert.equal(a.status, 'To Do'); // open → the first status
 });
 test('AC6: a milestone that already has an epic reuses it', async () => {
-  await D.q(
-    "update projects set data = data || $1::jsonb where id = 'p1'",
-    [JSON.stringify({ epics: [{ id: 'e1', key: 'SH-E1', title: 'V1.0' }] })],
-  );
+  await D.q("update projects set data = data || $1::jsonb where id = 'p1'", [
+    JSON.stringify({ epics: [{ id: 'e1', key: 'SH-E1', title: 'V1.0' }] }),
+  ]);
   issues = [issue(1), issue(2)];
   await link();
   const r: any = await as(() => G.syncIssues(owner, 'p1'));
   assert.deepEqual(r.epicsCreated, []);
-  assert.deepEqual((await tickets()).map((t) => t.epicId), ['e1', 'e1']);
+  assert.deepEqual(
+    (await tickets()).map((t) => t.epicId),
+    ['e1', 'e1'],
+  );
   assert.equal((await project()).epics.length, 1);
 });
 
@@ -254,7 +268,7 @@ test('AC4: when the Ticket Forge change is newer it wins, is written to GitHub, 
   const again: any = await as(() => G.syncIssues(owner, 'p1', 'sync'));
   assert.deepEqual([again.conflicts, again.pushed, again.updated], [0, 0, 0]);
 });
-test('two-way sync: a change made only in Ticket Forge is written to GitHub; only GitHub\'s is copied', async () => {
+test("two-way sync: a change made only in Ticket Forge is written to GitHub; only GitHub's is copied", async () => {
   issues = [issue(1), issue(2)];
   await link();
   await as(() => G.syncIssues(owner, 'p1'));
@@ -276,4 +290,30 @@ test('an import never writes to GitHub', async () => {
   await as(() => G.syncIssues(owner, 'p1', 'import'));
   assert.equal(patched.length, 0);
   assert.equal((await tickets())[0].title, 'Only in Ticket Forge');
+});
+
+test('a Jira-style issue from Ticket Forge maps only its description, and a change rewrites the layout', async () => {
+  const B = await import('../lib/github-body');
+  issues = [
+    issue(7, {
+      body: B.ticketBody({
+        title: 'Issue 7',
+        description: 'Old text',
+        acceptanceCriteria: ['Given a, when b, then c'],
+      }),
+      milestone: null,
+      labels: [],
+      assignee: null,
+    }),
+  ];
+  await link();
+  await as(() => G.syncIssues(owner, 'p1', 'import'));
+  const [t] = await tickets();
+  assert.equal(t.description, 'Old text');
+  await setTicket(t.id, { description: 'New text', updatedAt: T(30) });
+  await as(() => G.syncIssues(owner, 'p1', 'sync'));
+  const body = patched.at(-1).body.body;
+  assert.match(body, /<!-- tf:description -->\nNew text\n<!-- \/tf:description -->/);
+  assert.match(body, /### Description/);
+  assert.equal((await tickets())[0].description, 'New text');
 });
