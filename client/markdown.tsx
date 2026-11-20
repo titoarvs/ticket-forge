@@ -1,7 +1,8 @@
-// A small, safe Markdown renderer with no hooks, so it works in server components (the public legal pages) as well as
-// in the app. Supports headings (with anchor ids), paragraphs, lists, tables, quotes, **bold**, *italic*, `code` and
-// links to this site (/…), https:// pages and mailto:, fenced code blocks, and Obsidian [[wikilinks]] (rendered by the
-// `wikilink` callback when given, else as plain text). Anything else renders as plain text: no raw HTML.
+// A small, safe Markdown renderer with no hooks, so it works in server components (the public legal
+// pages) as well as in the app. Supports headings (with anchor ids), paragraphs, lists, tables,
+// quotes, **bold**, *italic*, `code` and links to this site (/…), https:// pages and mailto:,
+// fenced code blocks, and Obsidian [[wikilinks]] (rendered by the `wikilink` callback when given,
+// else as plain text). Anything else renders as plain text: no raw HTML.
 import type { ReactNode } from 'react';
 
 const slug = (s: string) =>
@@ -78,7 +79,11 @@ function inline(text: string, key: string, o: Opts = {}): ReactNode[] {
       const href = safeHref(m[8]);
       out.push(
         href ? (
-          <a key={k} href={href} {...(/^https:/i.test(href) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+          <a
+            key={k}
+            href={href}
+            {...(/^https:/i.test(href) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          >
             {m[7]}
           </a>
         ) : (
@@ -93,7 +98,15 @@ function inline(text: string, key: string, o: Opts = {}): ReactNode[] {
 }
 
 /** `baseLevel`: the HTML level of a Markdown "#" heading (2 makes "## A" an <h3>). */
-export function MarkdownDoc({ text, baseLevel = 1, wikilink }: { text: string; baseLevel?: number; wikilink?: WikiLink }) {
+export function MarkdownDoc({
+  text,
+  baseLevel = 1,
+  wikilink,
+}: {
+  text: string;
+  baseLevel?: number;
+  wikilink?: WikiLink;
+}) {
   const o: Opts = { wikilink };
   const lines = String(text || '')
     .replace(/\r\n/g, '\n')
@@ -177,7 +190,8 @@ export function MarkdownDoc({ text, baseLevel = 1, wikilink }: { text: string; b
     if (/^\s*([-*+]|\d+[.)])\s+/.test(l)) {
       const ordered = /^\s*\d+[.)]\s+/.test(l);
       const items: string[] = [];
-      while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
+      while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i]))
+        items.push(lines[i++].replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
       const L = ordered ? 'ol' : 'ul';
       blocks.push(
         <L key={k}>
@@ -189,7 +203,11 @@ export function MarkdownDoc({ text, baseLevel = 1, wikilink }: { text: string; b
       continue;
     }
     const para: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|\s*>|\s*\||\s*([-*+]|\d+[.)])\s|\s*(```|~~~))/.test(lines[i]))
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^(#{1,4}\s|\s*>|\s*\||\s*([-*+]|\d+[.)])\s|\s*(```|~~~))/.test(lines[i])
+    )
       para.push(lines[i++].trim());
     blocks.push(<p key={k}>{inline(para.join(' '), k, o)}</p>);
   }
@@ -198,4 +216,7 @@ export function MarkdownDoc({ text, baseLevel = 1, wikilink }: { text: string; b
 
 /** The ## headings of a document, for a table of contents. */
 export const headingsOf = (text: string) =>
-  [...String(text || '').matchAll(/^##\s+(.+)$/gm)].map((m) => ({ id: slug(m[1]), title: m[1].replace(/\*\*/g, '') }));
+  [...String(text || '').matchAll(/^##\s+(.+)$/gm)].map((m) => ({
+    id: slug(m[1]),
+    title: m[1].replace(/\*\*/g, ''),
+  }));

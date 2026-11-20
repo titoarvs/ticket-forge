@@ -1,6 +1,7 @@
 'use client';
-// Test automation → Settings → Test browser (administrators): the browser tests use, and a remote browser to
-// connect. Needed on serverless hosting (Vercel), where no browser can run; optional anywhere else.
+// Test automation → Settings → Test browser (administrators): the browser tests use, and a remote
+// browser to connect. Needed on serverless hosting (Vercel), where no browser can run; optional
+// anywhere else.
 import { useEffect, useState } from 'react';
 import { S, emit, api, toast, ago, type Any } from './core';
 import { Ico, I, Spinner, Confirm } from './ui';
@@ -38,7 +39,11 @@ export function RemoteBrowser() {
     }
   };
   const testIt = () =>
-    run('test', async () => setTest(await api('/api/admin/browser', { method: 'POST', body: url ? { url, protocol } : {} })));
+    run('test', async () =>
+      setTest(
+        await api('/api/admin/browser', { method: 'POST', body: url ? { url, protocol } : {} }),
+      ),
+    );
   const save = () =>
     run('save', async () => {
       const d = await api('/api/admin/browser', { method: 'PUT', body: { url, protocol } });
@@ -76,17 +81,20 @@ export function RemoteBrowser() {
         <Ico svg={I.external} />
         <b>Remote browser</b>
         <span className="label-chip">Administrators</span>
-        <span className="muted small">{r ? 'Connected' : data?.engine?.serverless ? 'Needed on this server' : 'Optional'}</span>
+        <span className="muted small">
+          {r ? 'Connected' : data?.engine?.serverless ? 'Needed on this server' : 'Optional'}
+        </span>
       </div>
       <p className="muted small" style={{ margin: '4px 0 10px' }}>
         Run tests in a hosted browser instead of on this server, for example{' '}
         <a href="https://www.browserless.io" target="_blank" rel="noopener noreferrer">
           Browserless
         </a>
-        , or your own machine running <code>npx playwright run-server</code>. Required on serverless hosting such as Vercel. The address is
-        stored encrypted and never shown again. For Browserless use{' '}
-        <code>wss://production-sfo.browserless.io/chromium/playwright?token=…</code> (other regions: <code>production-lon</code>,{' '}
-        <code>production-ams</code>); a REST address such as <code>…/function?token=…</code> is corrected automatically.
+        , or your own machine running <code>npx playwright run-server</code>. Required on serverless
+        hosting such as Vercel. The address is stored encrypted and never shown again. For
+        Browserless use <code>wss://production-sfo.browserless.io/chromium/playwright?token=…</code>{' '}
+        (other regions: <code>production-lon</code>, <code>production-ams</code>); a REST address
+        such as <code>…/function?token=…</code> is corrected automatically.
       </p>
       {r && !edit && (
         <div className="rb-current">
@@ -182,7 +190,8 @@ export function RemoteBrowser() {
             <Ico svg={I.check} />
             <span>
               Works: {test.browser}
-              {test.version ? ` (browser ${test.version})` : ''}, opened a page in {(test.ms / 1000).toFixed(1)} s.
+              {test.version ? ` (browser ${test.version})` : ''}, opened a page in{' '}
+              {(test.ms / 1000).toFixed(1)} s.
               {test.corrected
                 ? ' The address was a Browserless REST address, so the browser connection for it was used instead (same token).'
                 : ''}

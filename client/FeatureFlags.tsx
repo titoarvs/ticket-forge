@@ -1,6 +1,7 @@
 'use client';
-// Administration → Features (owner only): lock or unlock any feature for everyone. A locked feature disappears from
-// the app and its API routes refuse requests until it's unlocked. Each change applies right away.
+// Administration → Features (owner only): lock or unlock any feature for everyone. A locked feature
+// disappears from the app and its API routes refuse requests until it's unlocked. Each change
+// applies right away.
 import { useEffect, useState } from 'react';
 import { S, api, toast, ago, emit, type Any } from './core';
 import { Ico, I, Spinner, ErrorState, EmptyState } from './ui';
@@ -26,7 +27,12 @@ export function FeaturesTab() {
   if (!S.user?.isOwner)
     return (
       <div className="card">
-        <EmptyState compact icon={I.settings} tone="neutral" title="Only the owner can change features">
+        <EmptyState
+          compact
+          icon={I.settings}
+          tone="neutral"
+          title="Only the owner can change features"
+        >
           <p>Ask the owner of this TicketForge to lock or unlock features.</p>
         </EmptyState>
       </div>
@@ -72,7 +78,9 @@ export function FeaturesTab() {
       f.locked ? `${f.label} unlocked for everyone` : `${f.label} locked for everyone`,
     );
   const ql = q.trim().toLowerCase();
-  const list: Any[] = data.features.filter((f: Any) => !ql || `${f.label} ${f.desc} ${f.group}`.toLowerCase().includes(ql));
+  const list: Any[] = data.features.filter(
+    (f: Any) => !ql || `${f.label} ${f.desc} ${f.group}`.toLowerCase().includes(ql),
+  );
   const groups = [...new Set(list.map((f) => f.group))] as string[];
   const lockedN = data.features.filter((f: Any) => f.locked).length;
 
@@ -83,17 +91,26 @@ export function FeaturesTab() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3>Features</h3>
             <p className="sub" style={{ marginBottom: 10 }}>
-              Lock a feature to turn it off for everyone. It disappears from the app, and its server routes refuse requests, until you
-              unlock it. Projects and their data are never deleted: unlocking brings everything back as it was.
+              Lock a feature to turn it off for everyone. It disappears from the app, and its server
+              routes refuse requests, until you unlock it. Projects and their data are never
+              deleted: unlocking brings everything back as it was.
             </p>
           </div>
         </div>
         <div className="row ff-tools">
-          <TF filter value={q} placeholder="Search features" onChange={(e) => setQ(e.target.value)} aria-label="Search features" />
+          <TF
+            filter
+            value={q}
+            placeholder="Search features"
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Search features"
+          />
           <span className="spacer" />
           <span className="muted small">
             {lockedN ? `${lockedN} locked` : 'Everything is on'}
-            {data.updatedAt ? ` · changed ${ago(data.updatedAt)}${data.updatedBy ? ` by ${data.updatedBy}` : ''}` : ''}
+            {data.updatedAt
+              ? ` · changed ${ago(data.updatedAt)}${data.updatedBy ? ` by ${data.updatedBy}` : ''}`
+              : ''}
           </span>
           {lockedN > 0 && (
             <button
@@ -101,7 +118,11 @@ export function FeaturesTab() {
               disabled={!!busy}
               onClick={() =>
                 set(
-                  Object.fromEntries(data.features.filter((f: Any) => f.locked).map((f: Any) => [f.id, { locked: false }])),
+                  Object.fromEntries(
+                    data.features
+                      .filter((f: Any) => f.locked)
+                      .map((f: Any) => [f.id, { locked: false }]),
+                  ),
                   'Every feature unlocked',
                 )
               }

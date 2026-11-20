@@ -1,12 +1,20 @@
 'use client';
-// Google Drive storage. DriveTab is Administration → Google Drive (Super Admin only, behind the "gdrive" feature flag):
-// connect one Google account for the workspace and select the folder documents are saved to. DriveState is the badge that
-// shows each document's save state (saved, queued, failed) next to it.
+// Google Drive storage. DriveTab is Administration → Google Drive (Super Admin only, behind the
+// "gdrive" feature flag): connect one Google account for the workspace and select the folder
+// documents are saved to. DriveState is the badge that shows each document's save state (saved,
+// queued, failed) next to it.
 import { useEffect, useState } from 'react';
 import { S, P, toast, openModal, ago, feat, useStore, type Any } from './core';
 import { Ico, I, Spinner, ErrorState, EmptyState, Confirm } from './ui';
 import { TF } from './fields';
-import { getDriveStatus, startDriveConnect, selectDriveFolder, listDriveFiles, disconnectDrive, getDocumentStates } from './api/gdrive';
+import {
+  getDriveStatus,
+  startDriveConnect,
+  selectDriveFolder,
+  listDriveFiles,
+  disconnectDrive,
+  getDocumentStates,
+} from './api/gdrive';
 
 /** Administration → Google Drive. */
 export function DriveTab() {
@@ -50,7 +58,12 @@ export function DriveTab() {
   if (!S.user?.isOwner)
     return (
       <div className="card">
-        <EmptyState compact icon={I.settings} tone="neutral" title="Only the Super Admin can set up Google Drive">
+        <EmptyState
+          compact
+          icon={I.settings}
+          tone="neutral"
+          title="Only the Super Admin can set up Google Drive"
+        >
           <p>Ask the owner of this TicketForge to connect Google Drive.</p>
         </EmptyState>
       </div>
@@ -96,7 +109,8 @@ export function DriveTab() {
   };
   const connect = () => run('connect', startDriveConnect, '');
   const select = async () => {
-    if (await run('folder', () => selectDriveFolder(folder.trim()), 'Document folder selected')) setFolder('');
+    if (await run('folder', () => selectDriveFolder(folder.trim()), 'Document folder selected'))
+      setFolder('');
   };
 
   return (
@@ -104,11 +118,14 @@ export function DriveTab() {
       <div className="card wide">
         <h3>Connection</h3>
         <p className="sub">
-          Connect one Google account for the whole workspace. Generated and uploaded project documents are then saved to a folder of its
-          Drive instead of TicketForge storage. Sign-in tokens stay on the server.
+          Connect one Google account for the whole workspace. Generated and uploaded project
+          documents are then saved to a folder of its Drive instead of TicketForge storage. Sign-in
+          tokens stay on the server.
         </p>
         <div className="row" style={{ alignItems: 'center', gap: 8 }}>
-          <span className={`loz ${st.connected ? 't-pass' : 's-todo'}`}>{st.connected ? 'Connected' : 'Not connected'}</span>
+          <span className={`loz ${st.connected ? 't-pass' : 's-todo'}`}>
+            {st.connected ? 'Connected' : 'Not connected'}
+          </span>
           {st.connected && (
             <span className="muted small">
               {st.account?.email || 'Google account'}
@@ -152,7 +169,8 @@ export function DriveTab() {
         </div>
         {!st.configured && (
           <p className="muted small" style={{ marginBottom: 0 }}>
-            Google Drive isn’t set up on this server yet: set <code>TICKETFORGE_GDRIVE_CLIENT_ID</code> and{' '}
+            Google Drive isn’t set up on this server yet: set{' '}
+            <code>TICKETFORGE_GDRIVE_CLIENT_ID</code> and{' '}
             <code>TICKETFORGE_GDRIVE_CLIENT_SECRET</code> (a Google OAuth client) first.
           </p>
         )}
@@ -160,8 +178,8 @@ export function DriveTab() {
       <div className="card wide">
         <h3>Document folder</h3>
         <p className="sub">
-          Paste the link of the Drive folder to save documents in. Only this folder is stored and used: TicketForge never opens other
-          folders.
+          Paste the link of the Drive folder to save documents in. Only this folder is stored and
+          used: TicketForge never opens other folders.
         </p>
         <div className="row" style={{ alignItems: 'center', gap: 8 }}>
           <TF
@@ -172,7 +190,11 @@ export function DriveTab() {
             onChange={(e: Any) => setFolder(e.target.value)}
             sx={{ flex: 1, minWidth: 260 }}
           />
-          <button className="btn primary" disabled={!st.connected || !!busy || !folder.trim()} onClick={select}>
+          <button
+            className="btn primary"
+            disabled={!st.connected || !!busy || !folder.trim()}
+            onClick={select}
+          >
             {busy === 'folder' ? (
               <>
                 <Spinner />
@@ -195,14 +217,16 @@ export function DriveTab() {
         )}
         {st.connected && !st.folder && (
           <p className="muted small" style={{ marginBottom: 0 }}>
-            No folder selected yet: documents keep going to TicketForge storage until you select one.
+            No folder selected yet: documents keep going to TicketForge storage until you select
+            one.
           </p>
         )}
         {st.folder && (
           <>
             <p className="muted small" style={{ marginBottom: 4 }}>
-              A save that fails is queued and retried in the background (up to {st.maxRetries} retries, waiting longer each time). After
-              that the document shows as failed and the people who wrote it are told to contact you.
+              A save that fails is queued and retried in the background (up to {st.maxRetries}{' '}
+              retries, waiting longer each time). After that the document shows as failed and the
+              people who wrote it are told to contact you.
             </p>
             <div className="muted small">
               <b>Latest files in this folder</b>
@@ -248,11 +272,21 @@ function states(epicId: string, fresh: boolean): Promise<Any[]> {
 }
 
 /**
- * The Google Drive save state of one document of an epic: saved, queued (being retried) or failed (contact the Super
- * Admin). `kind` is agent; `docKey` is the agent id. `again`
- * changes when the document is written again, so the state is read again. Shows nothing when Google Drive is off.
+ * The Google Drive save state of one document of an epic: saved, queued (being retried) or failed
+ * (contact the Super Admin). `kind` is agent; `docKey` is the agent id. `again` changes when the
+ * document is written again, so the state is read again. Shows nothing when Google Drive is off.
  */
-export function DriveState({ epic, kind, docKey = '', again = '' }: { epic: Any; kind: string; docKey?: string; again?: string }) {
+export function DriveState({
+  epic,
+  kind,
+  docKey = '',
+  again = '',
+}: {
+  epic: Any;
+  kind: string;
+  docKey?: string;
+  again?: string;
+}) {
   useStore();
   const on = Boolean(S.flags) && feat('gdrive');
   const [doc, setDoc] = useState<Any>(null);
@@ -276,10 +310,20 @@ export function DriveState({ epic, kind, docKey = '', again = '' }: { epic: Any;
     return () => clearTimeout(t);
   }, [doc, tick]);
   if (!on || !doc) return null;
-  const retry = doc.state === 'queued' ? ` · retry ${Math.min(doc.retries + 1, doc.maxRetries)} of ${doc.maxRetries} pending` : '';
+  const retry =
+    doc.state === 'queued'
+      ? ` · retry ${Math.min(doc.retries + 1, doc.maxRetries)} of ${doc.maxRetries} pending`
+      : '';
   return (
-    <span className="row" style={{ gap: 6, alignItems: 'center' }} data-drive-state={doc.state} title={doc.error || undefined}>
-      <span className={`loz ${doc.state === 'saved' ? 't-pass' : doc.state === 'failed' ? 't-fail' : 's-inprogress'}`}>
+    <span
+      className="row"
+      style={{ gap: 6, alignItems: 'center' }}
+      data-drive-state={doc.state}
+      title={doc.error || undefined}
+    >
+      <span
+        className={`loz ${doc.state === 'saved' ? 't-pass' : doc.state === 'failed' ? 't-fail' : 's-inprogress'}`}
+      >
         {doc.state === 'saved'
           ? 'Saved to Google Drive'
           : doc.state === 'failed'

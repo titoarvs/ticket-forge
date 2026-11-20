@@ -1,6 +1,7 @@
 'use client';
-// Your avatar → My AI: your own Claude subscription for your own AI requests and code jobs. The token is stored
-// encrypted and only you can use it; everyone else sets up their own (or uses the team's AI).
+// Your avatar → My AI: your own Claude subscription for your own AI requests and code jobs. The
+// token is stored encrypted and only you can use it; everyone else sets up their own (or uses the
+// team's AI).
 import { useEffect, useState } from 'react';
 import { api, toast, ago, closeModal, type Any } from './core';
 import { Ico, I, Modal, Spinner } from './ui';
@@ -11,12 +12,22 @@ export function MyAiModal() {
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState('');
   const [test, setTest] = useState<Any>(null);
-  const [v, setV] = useState<Any>({ enabled: true, model: 'sonnet', teamFallback: true, codeJobs: true });
+  const [v, setV] = useState<Any>({
+    enabled: true,
+    model: 'sonnet',
+    teamFallback: true,
+    codeJobs: true,
+  });
   useEffect(() => {
     api('/api/me/ai')
       .then((r) => {
         setD(r);
-        setV({ enabled: r.enabled, model: r.model, teamFallback: r.teamFallback, codeJobs: r.codeJobs });
+        setV({
+          enabled: r.enabled,
+          model: r.model,
+          teamFallback: r.teamFallback,
+          codeJobs: r.codeJobs,
+        });
       })
       .catch((e) => toast(e.message, 'err'));
   }, []);
@@ -24,7 +35,10 @@ export function MyAiModal() {
   const save = async (clear = false) => {
     setBusy(clear ? 'clear' : 'save');
     try {
-      const r = await api('/api/me/ai', { method: 'PUT', body: clear ? { clear: true } : { token: token.trim() || undefined, ...v } });
+      const r = await api('/api/me/ai', {
+        method: 'PUT',
+        body: clear ? { clear: true } : { token: token.trim() || undefined, ...v },
+      });
       setD({ ...d, ...r });
       setToken('');
       toast(clear ? 'Your token is removed' : 'My AI saved');
@@ -39,7 +53,12 @@ export function MyAiModal() {
     setBusy('test');
     setTest(null);
     try {
-      setTest(await api('/api/me/ai', { method: 'POST', body: { token: token.trim() || undefined, model: 'haiku' } }));
+      setTest(
+        await api('/api/me/ai', {
+          method: 'POST',
+          body: { token: token.trim() || undefined, model: 'haiku' },
+        }),
+      );
     } catch (e: Any) {
       setTest({ ok: false, error: e.message });
     } finally {
@@ -60,7 +79,12 @@ export function MyAiModal() {
       wide
       actions={[
         { label: 'Close' },
-        { label: busy === 'save' ? 'Saving…' : 'Save', kind: 'primary', disabled: !!busy || !d || Boolean(bad), onClick: () => save() },
+        {
+          label: busy === 'save' ? 'Saving…' : 'Save',
+          kind: 'primary',
+          disabled: !!busy || !d || Boolean(bad),
+          onClick: () => save(),
+        },
       ]}
       left={
         d?.hasToken ? (
@@ -86,20 +110,24 @@ export function MyAiModal() {
                   <b>Your Claude subscription is set up</b>
                   <span className="muted small">
                     Token ends with {d.hint}
-                    {d.updatedAt ? ` · saved ${ago(d.updatedAt)}` : ''} · {v.enabled ? 'in use for your AI requests' : 'turned off'}
+                    {d.updatedAt ? ` · saved ${ago(d.updatedAt)}` : ''} ·{' '}
+                    {v.enabled ? 'in use for your AI requests' : 'turned off'}
                   </span>
                 </>
               ) : (
                 <>
                   <b>Not set up</b>
-                  <span className="muted small">Your AI requests use the team’s AI (Administration → AI).</span>
+                  <span className="muted small">
+                    Your AI requests use the team’s AI (Administration → AI).
+                  </span>
                 </>
               )}
             </div>
           </div>
           <p className="small" style={{ margin: '12px 0 8px' }}>
-            Use <b>your own Claude Pro or Max plan</b> for your AI requests: it’s stored encrypted, only you can use it, and nobody else’s
-            requests ever touch it. Each person sets up their own here.
+            Use <b>your own Claude Pro or Max plan</b> for your AI requests: it’s stored encrypted,
+            only you can use it, and nobody else’s requests ever touch it. Each person sets up their
+            own here.
           </p>
           <ol className="small ck-steps">
             <li>
@@ -110,7 +138,8 @@ export function MyAiModal() {
             </li>
             <li>Sign in with your Claude account in the browser window it opens.</li>
             <li>
-              Paste the token it prints (it starts with <code>sk-ant-oat01-</code>; shown once, valid for a year).
+              Paste the token it prints (it starts with <code>sk-ant-oat01-</code>; shown once,
+              valid for a year).
             </li>
           </ol>
           <div className="dev-path">
@@ -118,13 +147,21 @@ export function MyAiModal() {
               type="password"
               autoComplete="off"
               value={token}
-              placeholder={d.hasToken ? `Saved, ends with ${d.hint}. Paste a new one to replace it` : 'sk-ant-oat01-…'}
+              placeholder={
+                d.hasToken
+                  ? `Saved, ends with ${d.hint}. Paste a new one to replace it`
+                  : 'sk-ant-oat01-…'
+              }
               onChange={(e) => {
                 setToken(e.target.value);
                 setTest(null);
               }}
             />
-            <button className="btn" disabled={!!busy || Boolean(bad) || (!token.trim() && !d.hasToken)} onClick={run}>
+            <button
+              className="btn"
+              disabled={!!busy || Boolean(bad) || (!token.trim() && !d.hasToken)}
+              onClick={run}
+            >
               {busy === 'test' ? (
                 <>
                   <Spinner />
@@ -136,7 +173,10 @@ export function MyAiModal() {
             </button>
           </div>
           {bad && (
-            <small className="bad-text">That isn’t a subscription token (they start with sk-ant-oat01-). API keys don’t go here.</small>
+            <small className="bad-text">
+              That isn’t a subscription token (they start with sk-ant-oat01-). API keys don’t go
+              here.
+            </small>
           )}
           {test &&
             (test.ok ? (

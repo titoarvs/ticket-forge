@@ -1,6 +1,7 @@
-// TF-129: the spike's findings, the rules for setting an issue's layer (frontend, backend or both), are recorded in
-// docs/ticket-layer-rules.md. Run with `npm test`. These tests check that the note covers each rule, the worked examples
-// and the open questions, and that it uses the same values as the app (LAYERS in lib/layers.ts).
+// TF-129: the spike's findings, the rules for setting an issue's layer (frontend, backend or both),
+// are recorded in docs/ticket-layer-rules.md. Run with `npm test`. These tests check that the note
+// covers each rule, the worked examples and the open questions, and that it uses the same values as
+// the app (LAYERS in lib/layers.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -29,7 +30,8 @@ test('the note uses exactly the layer values the app uses', () => {
   assert.ok(m, 'LAYERS not found in lib/layers.ts');
   const values = [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1]);
   assert.deepEqual(values, ['frontend', 'backend', 'both']);
-  for (const v of values) assert.match(note, new RegExp(`\\| \`${v}\` \\|`), `value ${v} not described`);
+  for (const v of values)
+    assert.match(note, new RegExp(`\\| \`${v}\` \\|`), `value ${v} not described`);
 });
 
 test('the decision rules cover frontend, backend and both, and pick exactly one value', () => {
@@ -72,5 +74,8 @@ test('the note lists open questions', () => {
 });
 
 test('the README links the note', () => {
-  assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /\(docs\/ticket-layer-rules\.md\)/);
+  assert.match(
+    fs.readFileSync(path.join(root, 'README.md'), 'utf8'),
+    /\(docs\/ticket-layer-rules\.md\)/,
+  );
 });

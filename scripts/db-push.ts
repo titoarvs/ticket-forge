@@ -1,5 +1,7 @@
-// Copies everything from the local database (data/db) to the database in DATABASE_URL (e.g. Supabase).
-// Rows that already exist there are left alone. Usage: set DATABASE_URL in .env, then `npm run db:push`.
+// Copies everything from the local database (data/db) to the database in DATABASE_URL (e.g.
+// Supabase).
+// Rows that already exist there are left alone. Usage: set DATABASE_URL in .env, then `npm run
+// db:push`.
 import path from 'node:path';
 import fs from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';

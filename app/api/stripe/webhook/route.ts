@@ -2,8 +2,8 @@ import { ready } from '@/lib/server/http';
 import { asSystem } from '@/lib/db';
 import { verifySignature, handleEvent } from '@/lib/stripe';
 
-// Stripe → TicketForge: subscription changes. Not a normal API route: Stripe signs the raw body, which must be read
-// as-is (not parsed) to check the signature, and there's no signed-in user.
+// Stripe → TicketForge: subscription changes. Not a normal API route: Stripe signs the raw body,
+// which must be read as-is (not parsed) to check the signature, and there's no signed-in user.
 export async function POST(req: Request) {
   const raw = await req.text();
   try {

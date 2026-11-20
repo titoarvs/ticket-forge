@@ -19,17 +19,21 @@ if (before.done) {
   process.exit(0);
 }
 console.log('kind values in the tables (only psd, fbd and ard are deleted):');
-for (const [t, kinds] of Object.entries(before.kinds)) console.log(`  ${t}: ${kinds.length ? kinds.join(', ') : '(no rows)'}`);
+for (const [t, kinds] of Object.entries(before.kinds))
+  console.log(`  ${t}: ${kinds.length ? kinds.join(', ') : '(no rows)'}`);
 console.log(confirm ? 'Deleting:' : 'Would delete:');
 for (const [what, count] of Object.entries(before.counts)) console.log(`  ${what}: ${count}`);
 
 if (!confirm) {
-  console.log('\nNothing was changed. Take a backup of this database, then run it again with --confirm to delete permanently.');
+  console.log(
+    '\nNothing was changed. Take a backup of this database, then run it again with --confirm to delete permanently.',
+  );
   process.exit(0);
 }
 
 const result = await tx(({ query }: any) => removePsdFbdArd(query));
-if (result.skipped) console.log(`${MIGRATION_ID} was recorded by another run in the meantime: nothing was changed.`);
+if (result.skipped)
+  console.log(`${MIGRATION_ID} was recorded by another run in the meantime: nothing was changed.`);
 else {
   console.log('Deleted:');
   for (const [what, count] of Object.entries(result.counts)) console.log(`  ${what}: ${count}`);

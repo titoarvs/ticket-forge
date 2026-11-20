@@ -1,13 +1,29 @@
 'use client';
-// Epic drafts: an AI-generated epic saved to review later. A draft is an epic with `draft: true` that keeps the AI's
-// output as generated (`aiOriginal`) for reference. It shows in the epic list with a Draft badge, its title and
-// description can be edited, and Publish turns it into a real epic. The creator and the project owner are notified.
-import { S, P, api, toast, mutate, saveNow, can, me, nextEpicKey, COLORS, nowIso, type Any } from './core';
+// Epic drafts: an AI-generated epic saved to review later. A draft is an epic with `draft: true`
+// that keeps the AI's output as generated (`aiOriginal`) for reference. It shows in the epic list
+// with a Draft badge, its title and description can be edited, and Publish turns it into a real
+// epic. The creator and the project owner are notified.
+import {
+  S,
+  P,
+  api,
+  toast,
+  mutate,
+  saveNow,
+  can,
+  me,
+  nextEpicKey,
+  COLORS,
+  nowIso,
+  type Any,
+} from './core';
 
 const NO_TITLE = 'Give the draft a title before you publish it.';
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Saves pending changes and waits until they are stored (the notification checks what is stored). */
+/**
+ * Saves pending changes and waits until they are stored (the notification checks what is stored).
+ */
 async function flush() {
   for (let i = 0; i < 20; i++) {
     await saveNow();
@@ -16,7 +32,10 @@ async function flush() {
   }
 }
 const notifyDraft = (epicId: string, event: 'saved' | 'published') =>
-  api(`/api/projects/${encodeURIComponent(P().id)}/epic-drafts`, { method: 'POST', body: { epicId, event } });
+  api(`/api/projects/${encodeURIComponent(P().id)}/epic-drafts`, {
+    method: 'POST',
+    body: { epicId, event },
+  });
 
 /** The AI epic and the issues it planned, as generated. Kept unchanged on the draft. */
 const originalOf = (e: Any, items: Any[]) =>
@@ -36,7 +55,10 @@ const originalOf = (e: Any, items: Any[]) =>
     }),
   );
 
-/** Save as draft: stores the generated epic (e) and its planned issues (items) as a draft epic. Returns true when it was saved. */
+/**
+ * Save as draft: stores the generated epic (e) and its planned issues (items) as a draft epic.
+ * Returns true when it was saved.
+ */
 export async function saveEpicDraft(e: Any, items: Any[]): Promise<boolean> {
   if (!can('epic.manage')) {
     toast('Your role can’t create epics, so it can’t save drafts.', 'err');
@@ -102,7 +124,9 @@ export function DraftReference({ e }: { e: Any }) {
         <h3>Original AI output</h3>
       </div>
       <details className="feat-q" data-testid="draft-reference">
-        <summary className="small">Shown as the AI wrote it, for reference. Edits to the epic above don’t change it.</summary>
+        <summary className="small">
+          Shown as the AI wrote it, for reference. Edits to the epic above don’t change it.
+        </summary>
         <p>
           <b>{o.title}</b>
         </p>
@@ -143,7 +167,11 @@ export function DraftBanner({ e }: { e: Any }) {
       <DraftBadge />
       <span>This epic is a draft. Review and edit it, then publish it to make it a real epic.</span>
       {can('epic.manage') && (
-        <button className="btn sm primary" style={{ marginLeft: 'auto' }} onClick={() => publishEpicDraft(e)}>
+        <button
+          className="btn sm primary"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => publishEpicDraft(e)}
+        >
           Publish
         </button>
       )}

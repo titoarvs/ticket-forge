@@ -1,13 +1,15 @@
-// Feature flags: the owner can lock any feature (Administration → Features). A locked feature is hidden in the app and
-// its API routes refuse requests for everyone (owners included) until the owner unlocks it. Stored in app_meta.
+// Feature flags: the owner can lock any feature (Administration → Features). A locked feature is
+// hidden in the app and its API routes refuse requests for everyone (owners included) until the
+// owner unlocks it. Stored in app_meta.
 import { getMeta, setMeta } from './appmeta';
 import { wsKey, wsCache } from './wsmeta';
 
 /**
- * The features. `api`: pathname patterns of the API routes that belong to it (checked for every request by the API
- * wrapper); `views`: the project pages it owns (hidden from the navigation when locked); `perms`: permissions that
- * mean nothing while it's locked (the app hides every control behind them). `off`: a feature still being rolled out: it
- * starts locked and the owner turns it on (unlocks it) when the workspace is ready.
+ * The features. `api`: pathname patterns of the API routes that belong to it (checked for every
+ * request by the API wrapper); `views`: the project pages it owns (hidden from the navigation when
+ * locked); `perms`: permissions that mean nothing while it's locked (the app hides every control
+ * behind them). `off`: a feature still being rolled out: it starts locked and the owner turns it on
+ * (unlocks it) when the workspace is ready.
  */
 export const FEATURES = [
   // Planning
@@ -19,7 +21,13 @@ export const FEATURES = [
     views: ['issues'],
   },
   { id: 'board', group: 'Planning', label: 'Board', desc: 'The sprint board.', views: ['board'] },
-  { id: 'timeline', group: 'Planning', label: 'Timeline', desc: 'Epics and sprints on a timeline.', views: ['timeline'] },
+  {
+    id: 'timeline',
+    group: 'Planning',
+    label: 'Timeline',
+    desc: 'Epics and sprints on a timeline.',
+    views: ['timeline'],
+  },
   {
     id: 'releases',
     group: 'Planning',
@@ -35,8 +43,20 @@ export const FEATURES = [
     views: ['activity'],
     api: [/^\/api\/projects\/[^/]+\/activity(\/|$)/],
   },
-  { id: 'reports', group: 'Planning', label: 'Reports', desc: 'Sprint and progress reports.', views: ['reports'] },
-  { id: 'source', group: 'Planning', label: 'Source documents', desc: 'Requirement documents attached to the project.', views: ['source'] },
+  {
+    id: 'reports',
+    group: 'Planning',
+    label: 'Reports',
+    desc: 'Sprint and progress reports.',
+    views: ['reports'],
+  },
+  {
+    id: 'source',
+    group: 'Planning',
+    label: 'Source documents',
+    desc: 'Requirement documents attached to the project.',
+    views: ['source'],
+  },
   // AI
   {
     id: 'ai',
@@ -73,7 +93,13 @@ export const FEATURES = [
     api: [/^\/api\/projects\/[^/]+\/split(\/|$)/],
   },
   // Quality
-  { id: 'tests', group: 'Quality', label: 'Test cases page', desc: 'Test cases grouped by feature.', views: ['tests'] },
+  {
+    id: 'tests',
+    group: 'Quality',
+    label: 'Test cases page',
+    desc: 'Test cases grouped by feature.',
+    views: ['tests'],
+  },
   {
     id: 'testmgmt',
     group: 'Quality',
@@ -95,7 +121,12 @@ export const FEATURES = [
       /^\/api\/screenshots\//,
     ],
   },
-  { id: 'failure-analysis', group: 'Quality', label: 'AI failure analysis', desc: 'The AI root-cause note on failed automated tests.' },
+  {
+    id: 'failure-analysis',
+    group: 'Quality',
+    label: 'AI failure analysis',
+    desc: 'The AI root-cause note on failed automated tests.',
+  },
   {
     id: 'reposync',
     group: 'Quality',
@@ -151,8 +182,9 @@ const KEY = 'feature_flags';
 const C: any = wsCache('__tfFlagsWs');
 
 /**
- * { locked: { [id]: { at, by, note } }, unlocked: { [id]: { at, by } }, updatedBy, updatedAt } — cached for 15 s so other
- * server instances follow. `unlocked` is only for features that start locked (`off`): they stay locked until it lists them.
+ * { locked: { [id]: { at, by, note } }, unlocked: { [id]: { at, by } }, updatedBy, updatedAt } —
+ * cached for 15 s so other server instances follow. `unlocked` is only for features that start
+ * locked (`off`): they stay locked until it lists them.
  */
 export async function getFlags({ fresh = false }: any = {}) {
   if (!fresh && C.v !== undefined && Date.now() - C.at < 15000) return C.v;
@@ -171,15 +203,25 @@ export async function getFlags({ fresh = false }: any = {}) {
   }
   const locked: any = {};
   for (const [id, x] of Object.entries<any>(v?.locked || {}))
-    if (IDS.has(id)) locked[id] = { at: x?.at || null, by: x?.by || null, note: String(x?.note || '').slice(0, 300) };
+    if (IDS.has(id))
+      locked[id] = {
+        at: x?.at || null,
+        by: x?.by || null,
+        note: String(x?.note || '').slice(0, 300),
+      };
   const unlocked: any = {};
-  for (const [id, x] of Object.entries<any>(v?.unlocked || {})) if (IDS.has(id)) unlocked[id] = { at: x?.at || null, by: x?.by || null };
-  for (const f of FEATURES as any[]) if (f.off && !unlocked[f.id]) locked[f.id] = { at: null, by: null, note: 'Not turned on yet.' };
+  for (const [id, x] of Object.entries<any>(v?.unlocked || {}))
+    if (IDS.has(id)) unlocked[id] = { at: x?.at || null, by: x?.by || null };
+  for (const f of FEATURES as any[])
+    if (f.off && !unlocked[f.id]) locked[f.id] = { at: null, by: null, note: 'Not turned on yet.' };
   C.v = { locked, unlocked, updatedBy: v?.updatedBy || null, updatedAt: v?.updatedAt || null };
   C.at = Date.now();
   return C.v;
 }
-/** Lock or unlock features: changes = { [id]: { locked: boolean, note? } }. Owner only (checked by the route). */
+/**
+ * Lock or unlock features: changes = { [id]: { locked: boolean, note? } }. Owner only (checked by
+ * the route).
+ */
 export async function setFlags(actor, changes) {
   const cur = await getFlags({ fresh: true });
   const locked = { ...cur.locked };
@@ -190,7 +232,8 @@ export async function setFlags(actor, changes) {
     if ((FEATURES as any[]).find((f) => f.id === id).off) {
       // Starts locked: turning it on is remembered in `unlocked`; locking it again forgets that.
       if (c?.locked) delete unlocked[id];
-      else unlocked[id] = { at: unlocked[id]?.at || at, by: unlocked[id]?.by || actor?.name || null };
+      else
+        unlocked[id] = { at: unlocked[id]?.at || at, by: unlocked[id]?.by || actor?.name || null };
     } else if (c?.locked)
       locked[id] = {
         at: locked[id]?.at || at,
@@ -208,20 +251,30 @@ export async function isLocked(id) {
   return Boolean((await getFlags()).locked[id]);
 }
 
-/** The locked feature that owns this API path, if any. Owner settings, auth and the flags route itself are never locked. */
+/**
+ * The locked feature that owns this API path, if any. Owner settings, auth and the flags route
+ * itself are never locked.
+ */
 export async function lockedFeatureFor(pathname) {
   if (/^\/api\/(auth|admin|features|status|notifications)(\/|$)/.test(pathname)) return null;
   const { locked } = await getFlags();
   if (!Object.keys(locked).length) return null;
-  return FEATURES.find((f) => locked[f.id] && (f.api || []).some((re) => re.test(pathname))) || null;
+  return (
+    FEATURES.find((f) => locked[f.id] && (f.api || []).some((re) => re.test(pathname))) || null
+  );
 }
-export const lockedMessage = (f) => `${f.label} is locked by the owner. Ask the owner to unlock it in Administration → Features.`;
+export const lockedMessage = (f) =>
+  `${f.label} is locked by the owner. Ask the owner to unlock it in Administration → Features.`;
 
 /** For the browser: the catalog (without the route patterns) and what's locked. */
 export async function publicFlags() {
   const v = await getFlags();
   return {
-    features: FEATURES.map(({ api: _api, ...f }: any) => ({ ...f, locked: Boolean(v.locked[f.id]), lock: v.locked[f.id] || null })),
+    features: FEATURES.map(({ api: _api, ...f }: any) => ({
+      ...f,
+      locked: Boolean(v.locked[f.id]),
+      lock: v.locked[f.id] || null,
+    })),
     locked: Object.keys(v.locked),
     updatedBy: v.updatedBy,
     updatedAt: v.updatedAt,

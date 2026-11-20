@@ -1,9 +1,11 @@
-// Development order: the order to build an epic's or a sprint's issues in. Hard rules come from the issues themselves
-// (an issue that "is blocked by" another comes after it), then priority, what the other issues need first, the
-// frontend / backend layer and story points decide among the issues that are free to start. Jev (Administration → AI →
-// Decisions), when it is on, adds two small typed decisions per issue: which other issue it needs first (pick one) and
-// how early it should be built (a 0-9 rating). What Jev isn't sure about goes to the AI; when the AI fails too, the
-// rules alone decide. Nothing is saved here: the app shows the order and the person applies it to the backlog.
+// Development order: the order to build an epic's or a sprint's issues in. Hard rules come from the
+// issues themselves (an issue that "is blocked by" another comes after it), then priority, what the
+// other issues need first, the frontend / backend layer and story points decide among the issues
+// that are free to start. Jev (Administration → AI → Decisions), when it is on, adds two small
+// typed decisions per issue: which other issue it needs first (pick one) and how early it should be
+// built (a 0-9 rating). What Jev isn't sure about goes to the AI; when the AI fails too, the rules
+// alone decide. Nothing is saved here: the app shows the order and the person applies it to the
+// backlog.
 import { askJson } from './claude';
 import { jevEnabled, jevStatus, jevDecide } from './jev';
 export { applyOrder } from './reorder';
@@ -15,10 +17,15 @@ const clip = (s: any, n: number) => {
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
 const PRIORITY: Record<string, number> = { Highest: 4, High: 3, Medium: 2, Low: 1, Lowest: 0 };
-/** At most this many issues are ordered at once (Jev's pick-one questions take up to 255 options). */
+/**
+ * At most this many issues are ordered at once (Jev's pick-one questions take up to 255 options).
+ */
 export const MAX_ORDER = 80;
 
-/** What the AI or Jev added for one issue: other issues it needs first (ids) and how early to build it (0 last … 9 first). */
+/**
+ * What the AI or Jev added for one issue: other issues it needs first (ids) and how early to build
+ * it (0 last … 9 first).
+ */
 export type Hint = { prereqs?: string[]; urgency?: number; source?: 'jev' | 'ai'; why?: string };
 export type Ordered = {
   ticketId: string;
@@ -43,22 +50,38 @@ const isDoneIn = (project: any, t: any) => {
 };
 
 /**
- * The issues to order: the given ids (or an epic's or sprint's issues), top level only (a sub-task goes with its parent),
- * open ones in the order they now have in the backlog. Done issues are returned apart.
+ * The issues to order: the given ids (or an epic's or sprint's issues), top level only (a sub-task
+ * goes with its parent), open ones in the order they now have in the backlog. Done issues are
+ * returned apart.
  */
-export function issuesFor(project: any, { ticketIds, epicId, sprintId }: { ticketIds?: string[]; epicId?: string; sprintId?: string }) {
+export function issuesFor(
+  project: any,
+  { ticketIds, epicId, sprintId }: { ticketIds?: string[]; epicId?: string; sprintId?: string },
+) {
   const all: any[] = project?.tickets || [];
   const ids = Array.isArray(ticketIds) && ticketIds.length ? new Set(ticketIds.map(String)) : null;
-  const picked = all.filter((t) => (ids ? ids.has(t.id) : epicId ? t.epicId === epicId : sprintId ? t.sprintId === sprintId : false));
+  const picked = all.filter((t) =>
+    ids ? ids.has(t.id) : epicId ? t.epicId === epicId : sprintId ? t.sprintId === sprintId : false,
+  );
   const pickedIds = new Set(picked.map((t) => t.id));
-  const top = picked.filter((t) => !(t.parentId && pickedIds.has(t.parentId)) && !(epicId && !ids && t.parentId));
-  return { open: top.filter((t) => !isDoneIn(project, t)), done: top.filter((t) => isDoneIn(project, t)) };
+  const top = picked.filter(
+    (t) => !(t.parentId && pickedIds.has(t.parentId)) && !(epicId && !ids && t.parentId),
+  );
+  return {
+    open: top.filter((t) => !isDoneIn(project, t)),
+    done: top.filter((t) => isDoneIn(project, t)),
+  };
 }
 
-/** Hard dependencies inside the list, from the issues' links: { [ticketId]: Set of ticketIds it waits for }. */
+/**
+ * Hard dependencies inside the list, from the issues' links: { [ticketId]: Set of ticketIds it
+ * waits for }.
+ */
 export function hardDeps(tickets: any[]) {
   const ids = new Set(tickets.map((t) => t.id));
-  const deps: Record<string, Set<string>> = Object.fromEntries(tickets.map((t) => [t.id, new Set<string>()]));
+  const deps: Record<string, Set<string>> = Object.fromEntries(
+    tickets.map((t) => [t.id, new Set<string>()]),
+  );
   for (const t of tickets) {
     for (const l of t.links || []) {
       if (!ids.has(l.targetId) || l.targetId === t.id) continue;
@@ -69,7 +92,9 @@ export function hardDeps(tickets: any[]) {
   return deps;
 }
 
-/** Can `to` already reach `from` through the dependencies (so adding from → to would make a loop)? */
+/**
+ * Can `to` already reach `from` through the dependencies (so adding from → to would make a loop)?
+ */
 function reaches(deps: Record<string, Set<string>>, start: string, goal: string) {
   const seen = new Set<string>(),
     stack = [start];
@@ -84,19 +109,27 @@ function reaches(deps: Record<string, Set<string>>, start: string, goal: string)
 }
 
 /**
- * The development order (pure: no database, no AI). `hints` are the AI's or Jev's suggestions per ticket id; a suggested
- * prerequisite that would make a loop with the links is ignored. Returns { order, loops, outside }:
- * order[i].reason is one short line for the screen; loops lists issues whose links block each other; outside lists open
- * blockers that aren't in the list.
+ * The development order (pure: no database, no AI). `hints` are the AI's or Jev's suggestions per
+ * ticket id; a suggested prerequisite that would make a loop with the links is ignored. Returns {
+ * order, loops, outside }: order[i].reason is one short line for the screen; loops lists issues
+ * whose links block each other; outside lists open blockers that aren't in the list.
  */
 export function orderTickets(
   tickets: any[],
-  { hints = {}, project = null, all = null }: { hints?: Record<string, Hint>; project?: any; all?: any[] | null } = {},
+  {
+    hints = {},
+    project = null,
+    all = null,
+  }: { hints?: Record<string, Hint>; project?: any; all?: any[] | null } = {},
 ) {
   const byId = new Map(tickets.map((t) => [t.id, t]));
   const deps = hardDeps(tickets);
-  const hard: Record<string, Set<string>> = Object.fromEntries(Object.entries(deps).map(([k, v]) => [k, new Set(v)]));
-  const suggested: Record<string, Set<string>> = Object.fromEntries(tickets.map((t) => [t.id, new Set<string>()]));
+  const hard: Record<string, Set<string>> = Object.fromEntries(
+    Object.entries(deps).map(([k, v]) => [k, new Set(v)]),
+  );
+  const suggested: Record<string, Set<string>> = Object.fromEntries(
+    tickets.map((t) => [t.id, new Set<string>()]),
+  );
   for (const t of tickets) {
     for (const p of hints[t.id]?.prereqs || []) {
       if (!byId.has(p) || p === t.id || deps[t.id].has(p) || reaches(deps, p, t.id)) continue;
@@ -114,7 +147,9 @@ export function orderTickets(
       .filter((x: any) => x && !isDoneIn(project, x));
     if (out.length) outside[t.id] = out.map(keyOf);
   }
-  const dependents: Record<string, Set<string>> = Object.fromEntries(tickets.map((t) => [t.id, new Set<string>()]));
+  const dependents: Record<string, Set<string>> = Object.fromEntries(
+    tickets.map((t) => [t.id, new Set<string>()]),
+  );
   for (const [id, ds] of Object.entries(deps)) for (const d of ds) dependents[d].add(id);
   const downstream = (id: string) => {
     const seen = new Set<string>(),
@@ -132,7 +167,10 @@ export function orderTickets(
   const index = new Map(tickets.map((t, i) => [t.id, i]));
   const score = (t: any) => {
     const h = hints[t.id];
-    const pts = Number.isFinite(Number(t.storyPoints)) && t.storyPoints != null ? Math.min(13, Number(t.storyPoints)) : 3;
+    const pts =
+      Number.isFinite(Number(t.storyPoints)) && t.storyPoints != null
+        ? Math.min(13, Number(t.storyPoints))
+        : 3;
     return (
       (PRIORITY[t.priority] ?? 2) * 10 +
       downstream(t.id) * 8 +
@@ -151,36 +189,52 @@ export function orderTickets(
     const left = tickets.filter((t) => !placed.has(t.id));
     const ready = left.filter((t) => [...deps[t.id]].every((d) => placed.has(d)));
     let next: any;
-    if (ready.length) next = ready.reduce((a, b) => ((scores.get(b.id) as number) > (scores.get(a.id) as number) ? b : a));
+    if (ready.length)
+      next = ready.reduce((a, b) =>
+        (scores.get(b.id) as number) > (scores.get(a.id) as number) ? b : a,
+      );
     else {
       // The links block each other: start with the most important issue of the loop, and say so.
-      next = left.reduce((a, b) => ((scores.get(b.id) as number) > (scores.get(a.id) as number) ? b : a));
-      loops.push(left.filter((t) => reaches(hard, t.id, next.id) && reaches(hard, next.id, t.id)).map(keyOf));
+      next = left.reduce((a, b) =>
+        (scores.get(b.id) as number) > (scores.get(a.id) as number) ? b : a,
+      );
+      loops.push(
+        left.filter((t) => reaches(hard, t.id, next.id) && reaches(hard, next.id, t.id)).map(keyOf),
+      );
     }
     placed.add(next.id);
     order.push(next);
   }
   const names = (ids: Iterable<string>) => [...ids].map((x) => keyOf(byId.get(x)));
-  const list = (ks: string[]) => (ks.length <= 3 ? ks.join(', ') : `${ks.slice(0, 3).join(', ')} and ${ks.length - 3} more`);
+  const list = (ks: string[]) =>
+    ks.length <= 3 ? ks.join(', ') : `${ks.slice(0, 3).join(', ')} and ${ks.length - 3} more`;
   const out: Ordered[] = order.map((t, i) => {
     const h = hints[t.id];
     const waits = names(hard[t.id]),
       sugg = names(suggested[t.id]),
       unblocks = names(dependents[t.id]);
     const reasons: string[] = [];
-    if (unblocks.length) reasons.push(`${unblocks.length === 1 ? `${unblocks[0]} needs` : `${list(unblocks)} need`} it first`);
+    if (unblocks.length)
+      reasons.push(
+        `${unblocks.length === 1 ? `${unblocks[0]} needs` : `${list(unblocks)} need`} it first`,
+      );
     if (waits.length) reasons.push(`after ${list(waits)} (blocked by)`);
-    if (sugg.length) reasons.push(`after ${list(sugg)} (${h?.source === 'jev' ? 'Jev' : 'AI'}: builds on it)`);
+    if (sugg.length)
+      reasons.push(`after ${list(sugg)} (${h?.source === 'jev' ? 'Jev' : 'AI'}: builds on it)`);
     if (outside[t.id]) reasons.push(`still blocked by ${list(outside[t.id])}, outside this list`);
-    if (loops.some((l) => l.includes(keyOf(t)))) reasons.push('its links block each other: check them');
+    if (loops.some((l) => l.includes(keyOf(t))))
+      reasons.push('its links block each other: check them');
     if (PRIORITY[t.priority] >= 3) reasons.push(`${t.priority} priority`);
     if (hasFrontend && t.layer === 'backend') reasons.push('backend: the screens build on it');
     else if (hasFrontend && t.layer === 'both') reasons.push('API and screen together');
     if (typeof h?.urgency === 'number' && (h.urgency >= 7 || h.urgency <= 2))
-      reasons.push(`${h.source === 'jev' ? 'Jev' : 'AI'} rates it ${h.urgency >= 7 ? 'early' : 'late'} (${h.urgency}/9)`);
+      reasons.push(
+        `${h.source === 'jev' ? 'Jev' : 'AI'} rates it ${h.urgency >= 7 ? 'early' : 'late'} (${h.urgency}/9)`,
+      );
     if (t.storyPoints != null && Number(t.storyPoints) <= 2)
       reasons.push(`small (${t.storyPoints} pt${Number(t.storyPoints) === 1 ? '' : 's'})`);
-    else if (t.storyPoints != null && Number(t.storyPoints) >= 8) reasons.push(`large (${t.storyPoints} pts)`);
+    else if (t.storyPoints != null && Number(t.storyPoints) >= 8)
+      reasons.push(`large (${t.storyPoints} pts)`);
     if (!reasons.length) reasons.push(`no dependencies; ${t.priority || 'Medium'} priority`);
     const reason = reasons.join('; ');
     return {
@@ -217,11 +271,23 @@ const realDeciders: Required<Deciders> = {
 };
 
 /**
- * The AI's or Jev's hints for the issues: { hints, engine: 'jev' | 'ai' | 'jev+ai' | 'rules', byJev, note }.
- * Jev first (when on): one pick-one question (which listed issue it needs first, or none) and one 0-9 rating per issue,
- * 25 issues per call. Issues Jev isn't sure about go to the AI in one call. When both fail the rules decide alone.
+ * The AI's or Jev's hints for the issues: { hints, engine: 'jev' | 'ai' | 'jev+ai' | 'rules',
+ * byJev, note }.
+ * Jev first (when on): one pick-one question (which listed issue it needs first, or none) and one
+ * 0-9 rating per issue, 25 issues per call. Issues Jev isn't sure about go to the AI in one call.
+ * When both fail the rules decide alone.
  */
-export async function orderHints({ project, tickets, ai = {}, use }: { project: any; tickets: any[]; ai?: any; use?: Deciders }) {
+export async function orderHints({
+  project,
+  tickets,
+  ai = {},
+  use,
+}: {
+  project: any;
+  tickets: any[];
+  ai?: any;
+  use?: Deciders;
+}) {
   const d = { ...realDeciders, ...(use || {}) };
   const hints: Record<string, Hint> = {};
   const byKey = new Map(tickets.map((t) => [keyOf(t), t]));
@@ -273,7 +339,10 @@ export async function orderHints({ project, tickets, ai = {}, use }: { project: 
         for (const t of chunk) {
           const need: any = r.answers[`${keyOf(t)}.needs`],
             early: any = r.answers[`${keyOf(t)}.early`];
-          const needOk = need?.choice && (need.confidence ?? 0) >= min && (need.choice === 'none' || byKey.has(need.choice));
+          const needOk =
+            need?.choice &&
+            (need.confidence ?? 0) >= min &&
+            (need.choice === 'none' || byKey.has(need.choice));
           const earlyOk = typeof early?.score === 'number' && (early.confidence ?? 0) >= min;
           if (!needOk || !earlyOk) {
             left.push(t);
@@ -333,24 +402,42 @@ Decide for: ${rest.map(keyOf).join(', ')}`,
 }
 
 /**
- * The suggested development order of an epic's or sprint's issues (or the given ids), with a reason per issue.
- * { order, done, loops, engine, byJev, byAi, note, summary }.
+ * The suggested development order of an epic's or sprint's issues (or the given ids), with a reason
+ * per issue. { order, done, loops, engine, byJev, byAi, note, summary }.
  */
-export async function planOrder({ project, ticketIds, epicId, sprintId, ai = {}, smart = true, use }: any) {
+export async function planOrder({
+  project,
+  ticketIds,
+  epicId,
+  sprintId,
+  ai = {},
+  smart = true,
+  use,
+}: any) {
   const { open, done } = issuesFor(project, { ticketIds, epicId, sprintId });
   if (!open.length)
     throw Object.assign(
-      new Error(done.length ? 'Every issue here is done: nothing left to order.' : 'There are no issues to order here.'),
+      new Error(
+        done.length
+          ? 'Every issue here is done: nothing left to order.'
+          : 'There are no issues to order here.',
+      ),
       { status: 400 },
     );
   if (open.length > MAX_ORDER)
     throw Object.assign(
-      new Error(`That’s ${open.length} open issues; order at most ${MAX_ORDER} at once (pick a smaller epic or sprint).`),
+      new Error(
+        `That’s ${open.length} open issues; order at most ${MAX_ORDER} at once (pick a smaller epic or sprint).`,
+      ),
       { status: 400 },
     );
-  const h = smart ? await orderHints({ project, tickets: open, ai, use }) : { hints: {}, engine: 'rules', byJev: 0, byAi: 0, note: '' };
+  const h = smart
+    ? await orderHints({ project, tickets: open, ai, use })
+    : { hints: {}, engine: 'rules', byJev: 0, byAi: 0, note: '' };
   const { order, loops } = orderTickets(open, { hints: h.hints, project });
-  const by = { jev: 'Jev', ai: 'the AI', 'jev+ai': 'Jev and the AI', rules: 'the rules' }[h.engine as 'jev'];
+  const by = { jev: 'Jev', ai: 'the AI', 'jev+ai': 'Jev and the AI', rules: 'the rules' }[
+    h.engine as 'jev'
+  ];
   const summary = `${order.length} issue${order.length === 1 ? '' : 's'} ordered by links, priority, layer and size${h.engine === 'rules' ? '' : `, with hints from ${by}${h.byJev ? ` (Jev decided ${h.byJev})` : ''}`}.${loops.length ? ` ${loops.length} set${loops.length === 1 ? '' : 's'} of issues block each other.` : ''}`;
   return {
     order,

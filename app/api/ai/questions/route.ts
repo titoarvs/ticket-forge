@@ -11,7 +11,8 @@ export const POST = api(async (req) => {
     await store.requireProject(user, String(b.projectId));
     project = await store.getProject(String(b.projectId));
   }
-  if (!project && !['project'].includes(String(b.kind)) && !b.text) throw new HttpError(400, 'Open a project first.');
+  if (!project && !['project'].includes(String(b.kind)) && !b.text)
+    throw new HttpError(400, 'Open a project first.');
   const ids = new Set((Array.isArray(b.ticketIds) ? b.ticketIds : []).map(String));
   const tickets = project && ids.size ? project.tickets.filter((t: any) => ids.has(t.id)) : [];
   return clarifyQuestions({

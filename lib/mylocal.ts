@@ -1,5 +1,6 @@
-// Each person's own local copy of a project's repositories. The project shares which repository it is (name, base
-// branch, branch prefix…) but the folder on disk is the person's own: a teammate's path doesn't exist on your computer.
+// Each person's own local copy of a project's repositories. The project shares which repository it
+// is (name, base branch, branch prefix…) but the folder on disk is the person's own: a teammate's
+// path doesn't exist on your computer.
 // Stored per person (user_prefs), so everyone can set theirs up without changing the project.
 import fs from 'node:fs';
 import { currentContext, SERVERLESS } from './db';
@@ -20,9 +21,10 @@ export async function myLocal(projectId: string, userId = currentContext().user?
 }
 
 /**
- * The project as this person's computer sees it: dev.localPath / devBackend.localPath are their own folder; when they
- * haven't set one, the project's shared path counts only if it exists on this computer (so the person who set the
- * project up keeps working, and nobody is pointed at someone else's folder).
+ * The project as this person's computer sees it: dev.localPath / devBackend.localPath are their own
+ * folder; when they haven't set one, the project's shared path counts only if it exists on this
+ * computer (so the person who set the project up keeps working, and nobody is pointed at someone
+ * else's folder).
  */
 export async function withMyLocal(project: any, userId = currentContext().user?.id) {
   if (SERVERLESS || !userId || !project) return project;
@@ -30,7 +32,8 @@ export async function withMyLocal(project: any, userId = currentContext().user?.
   const pick = (side: 'frontend' | 'backend', dev: any) => {
     if (!dev) return dev;
     const own = mine[side];
-    if (own?.path) return { ...dev, localPath: own.path, ...(own.source ? { source: own.source } : {}) };
+    if (own?.path)
+      return { ...dev, localPath: own.path, ...(own.source ? { source: own.source } : {}) };
     return dev.localPath && !exists(dev.localPath) ? { ...dev, localPath: '' } : dev;
   };
   const out = { ...project };

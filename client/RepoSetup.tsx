@@ -1,5 +1,6 @@
 'use client';
-// Project settings → Code & GitHub → Repository setup (TF-110): link this project's local repository and connect GitHub.
+// Project settings → Code & GitHub → Repository setup (TF-110): link this project's local
+// repository and connect GitHub.
 // The server checks each value first; only accepted values are saved on this project.
 import { useState } from 'react';
 import { P, api, mutate, toast, type Any } from './core';
@@ -15,7 +16,10 @@ export function RepoSetupCard() {
   const savePath = async () => {
     setBusy('path');
     try {
-      const r = await api(`/api/projects/${p.id}/repo`, { method: 'POST', body: { localPath: dir } });
+      const r = await api(`/api/projects/${p.id}/repo`, {
+        method: 'POST',
+        body: { localPath: dir },
+      });
       mutate((pp: Any) => {
         pp.dev = { ...(pp.dev || {}), localPath: r.localPath };
       });
@@ -30,9 +34,15 @@ export function RepoSetupCard() {
   const connect = async () => {
     setBusy('gh');
     try {
-      const r = await api(`/api/projects/${p.id}/repo`, { method: 'POST', body: { githubToken: token } });
+      const r = await api(`/api/projects/${p.id}/repo`, {
+        method: 'POST',
+        body: { githubToken: token },
+      });
       mutate((pp: Any) => {
-        pp.dev = { ...(pp.dev || {}), github: { login: r.account.login, name: r.account.name, at: new Date().toISOString() } };
+        pp.dev = {
+          ...(pp.dev || {}),
+          github: { login: r.account.login, name: r.account.name, at: new Date().toISOString() },
+        };
       });
       setToken('');
       toast(`Connected as @${r.account.login}`, 'ok', { title: 'GitHub connected' });
@@ -50,7 +60,11 @@ export function RepoSetupCard() {
     >
       <label className="field">
         <span>Local repository path</span>
-        <TF value={dir} placeholder="/Users/me/code/my-app" onChange={(e) => setDir(e.target.value)} />
+        <TF
+          value={dir}
+          placeholder="/Users/me/code/my-app"
+          onChange={(e) => setDir(e.target.value)}
+        />
         <small className="muted">
           {p.dev?.localPath ? (
             <>
@@ -62,7 +76,11 @@ export function RepoSetupCard() {
         </small>
       </label>
       <div className="row" style={{ gap: 8, margin: '8px 0 16px' }}>
-        <button className="btn primary sm" disabled={!dir.trim() || Boolean(busy)} onClick={savePath}>
+        <button
+          className="btn primary sm"
+          disabled={!dir.trim() || Boolean(busy)}
+          onClick={savePath}
+        >
           {busy === 'path' ? (
             <>
               <Spinner />
@@ -75,7 +93,12 @@ export function RepoSetupCard() {
       </div>
       <label className="field">
         <span>GitHub token</span>
-        <TF type="password" value={token} placeholder="ghp_…" onChange={(e) => setToken(e.target.value)} />
+        <TF
+          type="password"
+          value={token}
+          placeholder="ghp_…"
+          onChange={(e) => setToken(e.target.value)}
+        />
         <small className="muted">
           {gh?.login ? (
             <>

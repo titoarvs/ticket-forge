@@ -4,8 +4,9 @@ import { planOrder } from '@/lib/devorder';
 
 export const maxDuration = 300;
 
-// The suggested development order of an epic's or sprint's issues (lib/devorder.ts), with a reason per issue. Nothing is
-// saved here: the app shows the order and the person applies it to the backlog (a normal save of the ticket order).
+// The suggested development order of an epic's or sprint's issues (lib/devorder.ts), with a reason
+// per issue. Nothing is saved here: the app shows the order and the person applies it to the
+// backlog (a normal save of the ticket order).
 export const POST = api(async (req, p) => {
   const b = await body(req);
   const smart = b.smart !== false;

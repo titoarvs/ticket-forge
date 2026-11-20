@@ -1,7 +1,8 @@
 'use client';
-// Project settings → App context: the project's "app knowledge" brief, built once from the code and documents and
-// included in every AI prompt for this project. It saves AI usage (the AI stops re-discovering the app each time, and
-// the brief is cached by the provider) and makes answers use the app's real names. You can edit it.
+// Project settings → App context: the project's "app knowledge" brief, built once from the code and
+// documents and included in every AI prompt for this project. It saves AI usage (the AI stops
+// re-discovering the app each time, and the brief is cached by the provider) and makes answers use
+// the app's real names. You can edit it.
 import { useEffect, useState } from 'react';
 import { P, api, aiBody, mutate, toast, ago, can, readNdjson, startTask, type Any } from './core';
 import { Ico, I, SetCard, Spinner } from './ui';
@@ -25,7 +26,11 @@ export function AppContextSettings({ ed }: { ed: boolean }) {
     setBusy(true);
     const task = startTask('Building the app context', { kind: 'ai' });
     try {
-      const res = await api(`/api/projects/${p.id}/context`, { method: 'POST', raw: true, body: aiBody({}) });
+      const res = await api(`/api/projects/${p.id}/context`, {
+        method: 'POST',
+        raw: true,
+        body: aiBody({}),
+      });
       let out: Any = null;
       await readNdjson(res, (ev) => {
         if (ev.type === 'progress') task.update({ detail: ev.message });
@@ -38,7 +43,9 @@ export function AppContextSettings({ ed }: { ed: boolean }) {
       });
       setText(out.md);
       task.finish(`${Math.round(out.chars / 100) / 10}k characters`);
-      toast('Every AI action in this project now starts from this app context.', 'ok', { title: 'App context ready' });
+      toast('Every AI action in this project now starts from this app context.', 'ok', {
+        title: 'App context ready',
+      });
     } catch (e: Any) {
       task.fail(`Couldn’t build the app context: ${e.message}`);
     } finally {
@@ -47,7 +54,12 @@ export function AppContextSettings({ ed }: { ed: boolean }) {
   };
   const saveEdit = () => {
     mutate((pp: Any) => {
-      pp.appContext = { ...(pp.appContext || {}), md: text.slice(0, 12000), chars: text.length, editedAt: new Date().toISOString() };
+      pp.appContext = {
+        ...(pp.appContext || {}),
+        md: text.slice(0, 12000),
+        chars: text.length,
+        editedAt: new Date().toISOString(),
+      };
     });
     setEdit(false);
     toast('App context saved');
@@ -79,10 +91,13 @@ export function AppContextSettings({ ed }: { ed: boolean }) {
         {ctx ? (
           <>
             <div className="ctx-meta small">
-              <span className={`loz ${stale ? 't-blocked' : 't-pass'}`}>{stale ? 'Code changed since' : 'In use'}</span>
+              <span className={`loz ${stale ? 't-blocked' : 't-pass'}`}>
+                {stale ? 'Code changed since' : 'In use'}
+              </span>
               <span className="muted">
                 Built {ago(ctx.at)}
-                {ctx.editedAt ? ` · edited ${ago(ctx.editedAt)}` : ''} · {Math.round((ctx.chars || ctx.md.length) / 100) / 10}k characters
+                {ctx.editedAt ? ` · edited ${ago(ctx.editedAt)}` : ''} ·{' '}
+                {Math.round((ctx.chars || ctx.md.length) / 100) / 10}k characters
               </span>
               {ctx.sources && (
                 <span className="muted">
@@ -90,10 +105,15 @@ export function AppContextSettings({ ed }: { ed: boolean }) {
                   {ctx.sources.pages
                     ? `${ctx.sources.pages} pages, ${ctx.sources.endpoints} endpoints, ${ctx.sources.models} data models, `
                     : ''}
-                  {ctx.sources.issues} issues{ctx.sources.docs ? `, ${ctx.sources.docs} documents` : ''}
+                  {ctx.sources.issues} issues
+                  {ctx.sources.docs ? `, ${ctx.sources.docs} documents` : ''}
                 </span>
               )}
-              {stale && <span className="warn-text">The code has new commits: rebuild so the AI knows about them.</span>}
+              {stale && (
+                <span className="warn-text">
+                  The code has new commits: rebuild so the AI knows about them.
+                </span>
+              )}
             </div>
             {edit ? (
               <>

@@ -24,7 +24,8 @@ export async function notify({ userId, projectId, issueId, kind, title, body, li
   });
 }
 export async function listNotifications(userId) {
-  // One query (every open browser polls this): the latest 50 and, over all of the user's notifications, the unread count.
+  // One query (every open browser polls this): the latest 50 and, over all of the user's
+  // notifications, the unread count.
   // The keys stay snake_case: they are what the browser receives.
   const rows = await orm
     .select({
@@ -56,11 +57,20 @@ export async function markRead(userId, ids) {
 }
 
 /**
- * After a save: an in-app notification for the person an issue was assigned to, or whose assigned issue changed
- * priority. Nobody else is told, and nobody is told about what they did themselves.
- * changes: [{ issueId, key, title, assignee, assigneeChanged, priority }] (assignee is the person's name).
+ * After a save: an in-app notification for the person an issue was assigned to, or whose assigned
+ * issue changed priority. Nobody else is told, and nobody is told about what they did themselves.
+ * changes: [{ issueId, key, title, assignee, assigneeChanged, priority }] (assignee is the person's
+ * name).
  */
-export async function notifyIssueChanges({ projectId, actor, changes }: { projectId: string; actor: any; changes: any[] }) {
+export async function notifyIssueChanges({
+  projectId,
+  actor,
+  changes,
+}: {
+  projectId: string;
+  actor: any;
+  changes: any[];
+}) {
   if (!changes.length) return;
   const users = (await listUsers()).filter((u) => u.status === 'active');
   for (const c of changes) {
@@ -70,7 +80,9 @@ export async function notifyIssueChanges({ projectId, actor, changes }: { projec
     const user =
       name &&
       users.find(
-        (u) => u.name.trim().toLowerCase() === name && canAccess({ is_owner: u.isOwner, project_access: u.projectAccess }, projectId),
+        (u) =>
+          u.name.trim().toLowerCase() === name &&
+          canAccess({ is_owner: u.isOwner, project_access: u.projectAccess }, projectId),
       );
     if (!user || user.id === actor?.id) continue;
     const by = actor?.name || 'Someone';
@@ -79,7 +91,9 @@ export async function notifyIssueChanges({ projectId, actor, changes }: { projec
       projectId,
       issueId: c.issueId,
       kind: c.assigneeChanged ? 'issue-assigned' : 'issue-priority',
-      title: c.assigneeChanged ? `${by} assigned ${c.key} to you` : `${by} changed the priority of ${c.key} to ${c.priority}`,
+      title: c.assigneeChanged
+        ? `${by} assigned ${c.key} to you`
+        : `${by} changed the priority of ${c.key} to ${c.priority}`,
       body: c.title,
       link: `/p/${projectId}/backlog?issue=${encodeURIComponent(c.issueId)}`,
     });
@@ -87,15 +101,30 @@ export async function notifyIssueChanges({ projectId, actor, changes }: { projec
 }
 
 /**
- * After a test run: one automated comment per issue with its results (passed and failed), and for failures a
- * notification (in-app + email) to the issue's assignee. results: Map(issueId -> [{ tcId, result }]).
- * Settings: automation.onFail { comment, notify } and automation.onPass { comment } (all on by default).
+ * After a test run: one automated comment per issue with its results (passed and failed), and for
+ * failures a notification (in-app + email) to the issue's assignee. results: Map(issueId -> [{
+ * tcId, result }]).
+ * Settings: automation.onFail { comment, notify } and automation.onPass { comment } (all on by
+ * default).
  */
-export async function reportRun({ projectId, results, runner, baseUrl, appUrl, analyze = null, say = (_m) => {} }: any) {
+export async function reportRun({
+  projectId,
+  results,
+  runner,
+  baseUrl,
+  appUrl,
+  analyze = null,
+  say = (_m) => {},
+}: any) {
   const out = { commented: [], notified: [], emailed: [], skipped: [], analyzed: 0 };
   if (!projectId || !results.size) return out;
   const project = await getProject(projectId);
-  const onFail = { comment: true, notify: true, analyze: true, ...(project.automation?.onFail || {}) };
+  const onFail = {
+    comment: true,
+    notify: true,
+    analyze: true,
+    ...(project.automation?.onFail || {}),
+  };
   const onPass = { comment: true, ...(project.automation?.onPass || {}) };
   const users = (await listUsers()).filter((u) => u.status === 'active');
   const at = new Date().toISOString();
@@ -142,10 +171,17 @@ export async function reportRun({ projectId, results, runner, baseUrl, appUrl, a
     const body = n
       ? `${who}${n} of ${total} automated test${total > 1 ? 's' : ''} failed in a run by ${runner.name} against ${baseUrl}:\n` +
         items
-          .map((f) => `• ${f.key} ${f.title}\n  ${oneLine(f.error, 400) || 'Failed'}${f.analysis ? `\n${analysisText(f.analysis)}` : ''}`)
+          .map(
+            (f) =>
+              `• ${f.key} ${f.title}\n  ${oneLine(f.error, 400) || 'Failed'}${f.analysis ? `\n${analysisText(f.analysis)}` : ''}`,
+          )
           .join('\n')
       : `All ${total} automated test${total > 1 ? 's' : ''} passed in a run by ${runner.name} against ${baseUrl}:\n` +
-        all.map((f) => `• ${f.key} ${f.title}${f.healed ? ` (self-healed: ${f.healed.reason})` : ''}`).join('\n');
+        all
+          .map(
+            (f) => `• ${f.key} ${f.title}${f.healed ? ` (self-healed: ${f.healed.reason})` : ''}`,
+          )
+          .join('\n');
 
     if (n ? onFail.comment : onPass.comment) {
       await appendComment(projectId, issueId, {
@@ -173,9 +209,13 @@ export async function reportRun({ projectId, results, runner, baseUrl, appUrl, a
 
     const name = t.assignee.trim().toLowerCase();
     const user = users.find(
-      (u) => u.name.trim().toLowerCase() === name && canAccess({ is_owner: u.isOwner, project_access: u.projectAccess }, projectId),
+      (u) =>
+        u.name.trim().toLowerCase() === name &&
+        canAccess({ is_owner: u.isOwner, project_access: u.projectAccess }, projectId),
     );
-    const email = user?.email || (project.members || []).find((m) => m.name.trim().toLowerCase() === name)?.email;
+    const email =
+      user?.email ||
+      (project.members || []).find((m) => m.name.trim().toLowerCase() === name)?.email;
     const title = `${n} automated test${n > 1 ? 's' : ''} failed on ${t.key}`;
     if (user) {
       const why = items
@@ -199,7 +239,10 @@ export async function reportRun({ projectId, results, runner, baseUrl, appUrl, a
         intro:
           `Hi ${t.assignee},\n\nAn automated test run by ${runner.name} against ${baseUrl} found failures on ${t.key}, which is assigned to you:\n\n` +
           items
-            .map((f) => `• ${f.key} ${f.title}\n  ${f.error || 'Failed'}${f.analysis ? `\n\n${analysisText(f.analysis)}` : ''}`)
+            .map(
+              (f) =>
+                `• ${f.key} ${f.title}\n  ${f.error || 'Failed'}${f.analysis ? `\n\n${analysisText(f.analysis)}` : ''}`,
+            )
             .join('\n\n'),
         button: `Open ${t.key}`,
         url: link,

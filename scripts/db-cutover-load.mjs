@@ -1,14 +1,18 @@
-// Keeps using TicketForge while the database moves to another host, and checks nothing failed and nothing was lost.
-// Run it before and during `npm run db:migrate-host -- cutover`; see docs/postgres-host-migration.md.
+// Keeps using TicketForge while the database moves to another host, and checks nothing failed and
+// nothing was lost.
+// Run it before and during `npm run db:migrate-host -- cutover`; see
+// docs/postgres-host-migration.md.
 //
 //   Sign in, copy the value of the `tf_session` cookie, then:
-//   TF_COOKIE=<cookie> PROJECT_ID=<project id> [BASE_URL=http://localhost:5173] [DURATION_S=120] [RATE=5] \
+//   TF_COOKIE=<cookie> PROJECT_ID=<project id> [BASE_URL=http://localhost:5173] [DURATION_S=120]
+//   [RATE=5] \
 //     npm run db:cutover-load
 //     Writes one new issue per tick (and reads the project), for DURATION_S seconds. A request the server refuses because
 //     the database just moved (503 "db-moved") is retried like the browser does; anything else counts as failed.
 //     Prints the totals and writes a ledger of every issue the app confirmed (data/cutover-load.json).
 //
-//   TF_COOKIE=<cookie> PROJECT_ID=<project id> BASE_URL=<app on the new host> npm run db:cutover-load -- --check
+//   TF_COOKIE=<cookie> PROJECT_ID=<project id> BASE_URL=<app on the new host> npm run
+//   db:cutover-load -- --check
 //     Reads the project from the app on the new host and fails when any confirmed issue is missing.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +32,10 @@ const headers = { 'Content-Type': 'application/json', Cookie: `tf_session=${COOK
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const url = `${BASE}/api/projects/${encodeURIComponent(PROJECT)}`;
 
-/** One request; a "database moved" 503 was refused before it ran, so it is asked again (as client/core.ts does). */
+/**
+ * One request; a "database moved" 503 was refused before it ran, so it is asked again (as
+ * client/core.ts does).
+ */
 async function call(path_, init) {
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(path_, { ...init, headers });
@@ -54,9 +61,13 @@ if (process.argv.includes('--check')) {
   }
   const have = new Set((await res.json()).tickets.map((t) => t.id));
   const missing = ledger.confirmed.filter((id) => !have.has(id));
-  console.log(`${ledger.confirmed.length - missing.length} of ${ledger.confirmed.length} confirmed issues found on ${BASE}.`);
+  console.log(
+    `${ledger.confirmed.length - missing.length} of ${ledger.confirmed.length} confirmed issues found on ${BASE}.`,
+  );
   if (missing.length) {
-    console.error(`LOST: ${missing.length} issue(s), for example ${missing.slice(0, 5).join(', ')}`);
+    console.error(
+      `LOST: ${missing.length} issue(s), for example ${missing.slice(0, 5).join(', ')}`,
+    );
     process.exit(1);
   }
   process.exit(0);
@@ -131,8 +142,13 @@ for (let n = 1; Date.now() < end; n++) {
 await Promise.all(inflight);
 
 fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
-fs.writeFileSync(LEDGER, JSON.stringify({ runId, base: BASE, project: PROJECT, confirmed, failed, sent, reads }, null, 2));
-console.log(`Writes sent: ${sent}, confirmed: ${confirmed.length}. Reads: ${reads}. Failed requests: ${failed}.`);
+fs.writeFileSync(
+  LEDGER,
+  JSON.stringify({ runId, base: BASE, project: PROJECT, confirmed, failed, sent, reads }, null, 2),
+);
+console.log(
+  `Writes sent: ${sent}, confirmed: ${confirmed.length}. Reads: ${reads}. Failed requests: ${failed}.`,
+);
 for (const f of failures) console.error(`  ${f}`);
 console.log(`Ledger: ${LEDGER}. After the move, run with --check against the app on the new host.`);
 process.exit(failed ? 1 : 0);

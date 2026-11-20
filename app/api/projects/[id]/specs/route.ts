@@ -4,8 +4,9 @@ import { generateSpecs } from '@/lib/specgen';
 
 export const maxDuration = 300;
 
-// Coding specs of a project (or of one epic with ?epicId=): the prompts, the files they touch, the overlaps between
-// them and the project's overlap and reviewer settings. Everyone with access sees them.
+// Coding specs of a project (or of one epic with ?epicId=): the prompts, the files they touch, the
+// overlaps between them and the project's overlap and reviewer settings. Everyone with access sees
+// them.
 export const GET = api(async (req, p) => {
   const user = await authed();
   store.requireAccess(user, p.id);
@@ -17,7 +18,8 @@ export const GET = api(async (req, p) => {
   };
 });
 
-// Generate coding specs: one prompt per ticket of the epic, saved as drafts (an earlier spec of the same ticket is replaced).
+// Generate coding specs: one prompt per ticket of the epic, saved as drafts (an earlier spec of the
+// same ticket is replaced).
 export const POST = api(async (req, p) => {
   const user = await perm('ai.use', 'issue.edit');
   store.requireAccess(user, p.id);

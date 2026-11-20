@@ -4,8 +4,8 @@ import { runDocAgent } from '@/lib/agentdocs';
 import { ensureAgent } from '@/lib/agents';
 import { saveGeneratedToDrive } from '@/lib/epic-docx';
 
-// A document agent (Kick Off, Demo, Deploy…) writes its document for one epic. Nothing is saved here: the app
-// stores it on the epic, like the Problem Statement and Feature Brief.
+// A document agent (Kick Off, Demo, Deploy…) writes its document for one epic. Nothing is saved
+// here: the app stores it on the epic, like the Problem Statement and Feature Brief.
 export const maxDuration = 300;
 
 export const POST = api(async (req, p) => {
@@ -16,9 +16,15 @@ export const POST = api(async (req, p) => {
   const b = await body(req);
   const project = await store.getProject(p.id);
   if (!project.epics.some((e: any) => e.id === b.epicId))
-    throw new HttpError(404, 'That epic isn’t in this project (save first if you just created it).');
+    throw new HttpError(
+      404,
+      'That epic isn’t in this project (save first if you just created it).',
+    );
   return ndjson(req, async (send) => {
-    send({ type: 'progress', message: 'Reading the epic, its documents, issues and test results…' });
+    send({
+      type: 'progress',
+      message: 'Reading the epic, its documents, issues and test results…',
+    });
     const out = await runDocAgent({
       project,
       epicId: String(b.epicId),

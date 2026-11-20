@@ -16,7 +16,12 @@ const check = process.argv.includes('--check');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tf-drizzle-'));
 const fileOf = (table) => table.replace(/_/g, '-');
 try {
-  const env = { ...process.env, TICKETFORGE_DATA: path.join(tmp, 'data'), DATABASE_URL: '', SUPABASE_DB_URL: '' };
+  const env = {
+    ...process.env,
+    TICKETFORGE_DATA: path.join(tmp, 'data'),
+    DATABASE_URL: '',
+    SUPABASE_DB_URL: '',
+  };
   execFileSync(
     process.execPath,
     [
@@ -32,7 +37,12 @@ try {
   const cfg = path.join(tmp, 'drizzle.json');
   fs.writeFileSync(
     cfg,
-    JSON.stringify({ dialect: 'postgresql', driver: 'pglite', dbCredentials: { url: path.join(tmp, 'data', 'db') }, out }),
+    JSON.stringify({
+      dialect: 'postgresql',
+      driver: 'pglite',
+      dbCredentials: { url: path.join(tmp, 'data', 'db') },
+      out,
+    }),
   );
   execFileSync(path.join(root, 'node_modules/.bin/drizzle-kit'), ['pull', `--config=${cfg}`], {
     cwd: root,
@@ -52,7 +62,10 @@ try {
   const files = {
     'lib/relations.ts':
       banner +
-      fs.readFileSync(path.join(out, 'relations.ts'), 'utf8').replace(/\t/g, '  ').replace('from "./schema"', 'from "./schema/index"'),
+      fs
+        .readFileSync(path.join(out, 'relations.ts'), 'utf8')
+        .replace(/\t/g, '  ')
+        .replace('from "./schema"', 'from "./schema/index"'),
     'lib/schema/bytea.ts': `${banner}import { customType } from "drizzle-orm/pg-core"\n\n/** bytea: binary data as a Node Buffer. */\nexport const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });\n`,
   };
 
@@ -75,7 +88,8 @@ try {
     if (/\bsql`/.test(t.text)) imports.push('import { sql } from "drizzle-orm"');
     if (/\bbytea\(/.test(t.text)) imports.push('import { bytea } from "./bytea"');
     for (const o of tables)
-      if (o.id !== t.id && new RegExp(`\\b${o.id}\\.`).test(t.text)) imports.push(`import { ${o.id} } from "./${fileOf(o.name)}"`);
+      if (o.id !== t.id && new RegExp(`\\b${o.id}\\.`).test(t.text))
+        imports.push(`import { ${o.id} } from "./${fileOf(o.name)}"`);
     files[`lib/schema/${fileOf(t.name)}.ts`] = `${banner}${imports.join('\n')}\n\n${t.text}`;
   }
   files['lib/schema/index.ts'] = `${banner}export * from "./bytea"\n${tables

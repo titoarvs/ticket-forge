@@ -1,6 +1,7 @@
-// Generation rules: the team's standard for tickets, test cases and automation scripts, set by an administrator
-// in Administration → Generation. Every generation gets them as instructions; a few are also enforced in code
-// (story points, ticket types, labels, test-case count and titles) so results stay consistent.
+// Generation rules: the team's standard for tickets, test cases and automation scripts, set by an
+// administrator in Administration → Generation. Every generation gets them as instructions; a few
+// are also enforced in code (story points, ticket types, labels, test-case count and titles) so
+// results stay consistent.
 import { getMeta, setMeta, deleteMeta } from './appmeta';
 import { wsKey, wsCache } from './wsmeta';
 
@@ -38,8 +39,9 @@ export const DEFAULT_RULES = {
     testDataPrefix: 'QA',
     oneFlow: true,
   },
-  // Test management (the test repository and test plans): how repository tests are written and plans are built.
-  // `standard` names the corporate standard the fields started from (istqb, xray, bdd, browserstack, custom).
+  // Test management (the test repository and test plans): how repository tests are written and
+  // plans are built. `standard` names the corporate standard the fields started from (istqb, xray,
+  // bdd, browserstack, custom).
   testmgmt: {
     standard: 'xray',
     format: 'steps', // steps · gherkin · both (Gherkin for user-facing behaviour, steps for the rest)
@@ -51,9 +53,11 @@ export const DEFAULT_RULES = {
     testData: true,
     preconditions: true,
     gherkinStyle: 'declarative', // declarative (business language) · imperative (UI actions)
-    priorityRule: 'High: money, security, legal or data loss. Medium: core flows. Low: cosmetic or rare.',
+    priorityRule:
+      'High: money, security, legal or data loss. Medium: core flows. Low: cosmetic or rare.',
     labels: 'smoke, regression, security, ui, api, integration, negative, edge',
-    planRules: 'A smoke plan has at most 15 tests. A regression plan includes every High-priority test in scope.',
+    planRules:
+      'A smoke plan has at most 15 tests. A regression plan includes every High-priority test in scope.',
     custom: '',
   },
   custom: '',
@@ -73,10 +77,14 @@ export function normalizeRules(r: any = {}) {
     t = r.tickets || {},
     s = r.tests || {},
     a = r.automation || {};
-  const scale = (Array.isArray(t.pointScale) ? t.pointScale : String(t.pointScale ?? '').split(/[\s,]+/))
+  const scale = (
+    Array.isArray(t.pointScale) ? t.pointScale : String(t.pointScale ?? '').split(/[\s,]+/)
+  )
     .map(Number)
     .filter((n) => Number.isFinite(n) && n > 0 && n <= 100);
-  const pointScale: any = scale.length ? [...new Set(scale)].sort((x: any, y: any) => x - y) : D.tickets.pointScale;
+  const pointScale: any = scale.length
+    ? [...new Set(scale)].sort((x: any, y: any) => x - y)
+    : D.tickets.pointScale;
   const types = (Array.isArray(t.types) ? t.types : []).filter((x) => TICKET_TYPES.includes(x));
   const acMin = int(t.acMin, 1, 15, D.tickets.acMin);
   return {
@@ -96,7 +104,9 @@ export function normalizeRules(r: any = {}) {
         Math.min(D.tickets.maxPoints, pointScale[pointScale.length - 1]),
       ),
       types: types.length ? types : D.tickets.types,
-      defaultPriority: ['Highest', 'High', 'Medium', 'Low'].includes(t.defaultPriority) ? t.defaultPriority : D.tickets.defaultPriority,
+      defaultPriority: ['Highest', 'High', 'Medium', 'Low'].includes(t.defaultPriority)
+        ? t.defaultPriority
+        : D.tickets.defaultPriority,
       descriptionSections: text(t.descriptionSections, 200, D.tickets.descriptionSections),
       maxLabels: int(t.maxLabels, 0, 10, D.tickets.maxLabels),
     },
@@ -112,7 +122,10 @@ export function normalizeRules(r: any = {}) {
     automation: {
       roleLocators: bool(a.roleLocators, D.automation.roleLocators),
       noHardWaits: bool(a.noHardWaits, D.automation.noHardWaits),
-      testDataPrefix: text(a.testDataPrefix, 20, D.automation.testDataPrefix).replace(/[^\w-]/g, ''),
+      testDataPrefix: text(a.testDataPrefix, 20, D.automation.testDataPrefix).replace(
+        /[^\w-]/g,
+        '',
+      ),
       oneFlow: bool(a.oneFlow, D.automation.oneFlow),
     },
     testmgmt: (() => {
@@ -120,7 +133,9 @@ export function normalizeRules(r: any = {}) {
         T = D.testmgmt;
       const stepsMin = int(m.stepsMin, 1, 30, T.stepsMin);
       return {
-        standard: ['istqb', 'xray', 'bdd', 'browserstack', 'custom'].includes(m.standard) ? m.standard : T.standard,
+        standard: ['istqb', 'xray', 'bdd', 'browserstack', 'custom'].includes(m.standard)
+          ? m.standard
+          : T.standard,
         format: TM_FORMATS.includes(m.format) ? m.format : T.format,
         titleFormat: text(m.titleFormat, 120, T.titleFormat),
         perIssue: int(m.perIssue, 1, 20, T.perIssue),
@@ -154,7 +169,9 @@ export async function getRules({ fresh = false }: any = {}) {
     /* database not ready */
   }
   C.v = normalizeRules(saved?.rules || {});
-  C.meta = saved ? { updatedBy: saved.updatedBy || null, updatedAt: saved.updatedAt || null } : null;
+  C.meta = saved
+    ? { updatedBy: saved.updatedBy || null, updatedAt: saved.updatedAt || null }
+    : null;
   C.at = Date.now();
   return C.v;
 }
@@ -164,7 +181,11 @@ export async function rulesMeta() {
 }
 export async function saveRules(actor, rules) {
   const v = normalizeRules(rules);
-  await setMeta(wsKey(KEY), { rules: v, updatedBy: actor?.name || null, updatedAt: new Date().toISOString() });
+  await setMeta(wsKey(KEY), {
+    rules: v,
+    updatedBy: actor?.name || null,
+    updatedAt: new Date().toISOString(),
+  });
   C.v = v;
   C.meta = { updatedBy: actor?.name || null, updatedAt: new Date().toISOString() };
   C.at = Date.now();
@@ -179,7 +200,8 @@ export async function resetRules() {
 }
 
 // ---------------------------------------------------------------- rules as instructions
-const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
+const list = (xs) =>
+  xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '';
 
 /** The rules as plain instructions for the AI. part: 'tickets' | 'tests' | 'automation'. */
 export function rulesText(r, part) {
@@ -191,16 +213,26 @@ export function rulesText(r, part) {
         'Only include what the document asks for: no extra features, nice-to-haves or speculative tickets. Put anything unclear in openQuestions.',
       );
     out.push(`Titles: imperative, at most ${t.titleMaxWords} words (e.g. "Export orders to CSV").`);
-    out.push(t.userStory ? 'User story: "As a <role>, I want <goal>, so that <benefit>." on every Story.' : 'Leave userStory empty.');
+    out.push(
+      t.userStory
+        ? 'User story: "As a <role>, I want <goal>, so that <benefit>." on every Story.'
+        : 'Leave userStory empty.',
+    );
     out.push(
       `Acceptance criteria: ${t.acMin}-${t.acMax} per ticket, ${t.acFormat === 'gwt' ? 'each one "Given …, when …, then …"' : 'each a short, testable statement (no Given/When/Then)'}.`,
     );
-    out.push(`Story points: only ${t.pointScale.join(', ')}. Anything bigger than ${t.maxPoints} must be split into smaller tickets.`);
+    out.push(
+      `Story points: only ${t.pointScale.join(', ')}. Anything bigger than ${t.maxPoints} must be split into smaller tickets.`,
+    );
     out.push(`Ticket types: only ${list(t.types)}.`);
     out.push(`Priority: ${t.defaultPriority} unless the document clearly says otherwise.`);
     if (t.descriptionSections)
-      out.push(`Description: short sections in this order: ${t.descriptionSections} (one or two lines each, "Section: text").`);
-    out.push(t.maxLabels ? `Labels: at most ${t.maxLabels}, lowercase, one word each.` : 'No labels.');
+      out.push(
+        `Description: short sections in this order: ${t.descriptionSections} (one or two lines each, "Section: text").`,
+      );
+    out.push(
+      t.maxLabels ? `Labels: at most ${t.maxLabels}, lowercase, one word each.` : 'No labels.',
+    );
   }
   if (part === 'tests') {
     const s = r.tests;
@@ -212,19 +244,30 @@ export function rulesText(r, part) {
     out.push(
       `Exactly ${s.perTicket} test case${s.perTicket === 1 ? '' : 's'} per ticket${kinds.length ? `, including at least ${list(kinds.slice(0, s.perTicket))}` : ''}. Cover every acceptance criterion across them.`,
     );
-    if (s.titlePrefix) out.push(`Test titles start with "${s.titlePrefix} …" (e.g. "${s.titlePrefix} a cashier can open an order").`);
-    out.push(`Steps: one user action per step, imperative ("Click Save"), at most ${s.maxSteps} steps.`);
+    if (s.titlePrefix)
+      out.push(
+        `Test titles start with "${s.titlePrefix} …" (e.g. "${s.titlePrefix} a cashier can open an order").`,
+      );
+    out.push(
+      `Steps: one user action per step, imperative ("Click Save"), at most ${s.maxSteps} steps.`,
+    );
     out.push('Expected result: one observable outcome the user sees.');
     out.push(
-      s.preconditions ? 'Always fill preconditions (write "None" if there are none).' : 'Leave preconditions empty unless essential.',
+      s.preconditions
+        ? 'Always fill preconditions (write "None" if there are none).'
+        : 'Leave preconditions empty unless essential.',
     );
   }
   if (part === 'automation') {
     const a = r.automation;
     if (a.roleLocators)
-      out.push('Locators, in this order: getByRole, getByLabel, getByPlaceholder, getByText, getByTestId; CSS only as a last resort.');
-    if (a.noHardWaits) out.push('Never use page.waitForTimeout or fixed sleeps; rely on web-first assertions.');
-    if (a.testDataPrefix) out.push(`Name any data the test creates "${a.testDataPrefix}-" + Date.now().`);
+      out.push(
+        'Locators, in this order: getByRole, getByLabel, getByPlaceholder, getByText, getByTestId; CSS only as a last resort.',
+      );
+    if (a.noHardWaits)
+      out.push('Never use page.waitForTimeout or fixed sleeps; rely on web-first assertions.');
+    if (a.testDataPrefix)
+      out.push(`Name any data the test creates "${a.testDataPrefix}-" + Date.now().`);
     if (a.oneFlow) out.push('Script only the flow the test case describes; no extra checks.');
   }
   if (part === 'testmgmt') {
@@ -247,14 +290,22 @@ export function rulesText(r, part) {
     if (m.titleFormat) out.push(`Titles follow the pattern "${m.titleFormat}".`);
     if (m.format !== 'gherkin') {
       out.push(`Steps: ${m.stepsMin}-${m.stepsMax} per test, one action each, imperative.`);
-      out.push(m.expectedEveryStep ? 'Every step has its own expected result.' : 'Only the final step needs an expected result.');
+      out.push(
+        m.expectedEveryStep
+          ? 'Every step has its own expected result.'
+          : 'Only the final step needs an expected result.',
+      );
       out.push(
         m.testData
           ? 'Put concrete test data (values, accounts, amounts) in the Data column, never inside the action.'
           : 'Leave the Data column empty unless a value is essential.',
       );
     }
-    out.push(m.preconditions ? 'Always state preconditions (the state before the test).' : 'Preconditions only when essential.');
+    out.push(
+      m.preconditions
+        ? 'Always state preconditions (the state before the test).'
+        : 'Preconditions only when essential.',
+    );
     out.push(
       `Write about ${m.perIssue} tests per issue: the main flow, then negative and edge cases, covering every acceptance criterion.`,
     );
@@ -267,7 +318,8 @@ export function rulesText(r, part) {
     if (m.planRules) out.push(`Plan rules: ${m.planRules}`);
     if (m.custom) out.push(`Company rules: ${m.custom}`);
   }
-  if (r.custom && !['automation', 'testmgmt', 'testplan'].includes(part)) out.push(`Team rules: ${r.custom}`);
+  if (r.custom && !['automation', 'testmgmt', 'testplan'].includes(part))
+    out.push(`Team rules: ${r.custom}`);
   return out.map((x) => `- ${x}`).join('\n');
 }
 
@@ -278,41 +330,56 @@ export function standardsBlock(r, parts = ['tickets', 'tests']) {
 }
 
 // ---------------------------------------------------------------- enforced in code
-const nearest = (n, scale) => scale.reduce((b, x) => (Math.abs(x - n) < Math.abs(b - n) ? x : b), scale[0]);
+const nearest = (n, scale) =>
+  scale.reduce((b, x) => (Math.abs(x - n) < Math.abs(b - n) ? x : b), scale[0]);
 const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 
-/** Story points on the scale, allowed types, default priority, labels, test-case count and titles. */
+/**
+ * Story points on the scale, allowed types, default priority, labels, test-case count and titles.
+ */
 export function applyTicketRules(t, r) {
   const R = r.tickets;
   const out = { ...t };
-  if (Number.isFinite(out.storyPoints) && out.storyPoints > 0) out.storyPoints = nearest(out.storyPoints, R.pointScale);
-  if (out.type !== 'Sub-task' && !R.types.includes(out.type)) out.type = R.types.includes('Story') ? 'Story' : R.types[0];
+  if (Number.isFinite(out.storyPoints) && out.storyPoints > 0)
+    out.storyPoints = nearest(out.storyPoints, R.pointScale);
+  if (out.type !== 'Sub-task' && !R.types.includes(out.type))
+    out.type = R.types.includes('Story') ? 'Story' : R.types[0];
   if (!out.priority) out.priority = R.defaultPriority;
   out.labels = (out.labels || [])
     .map((l) => String(l).toLowerCase().replace(/\s+/g, '-'))
     .filter(Boolean)
     .slice(0, R.maxLabels);
-  if (Array.isArray(out.testCases)) out.testCases = out.testCases.map((tc) => applyTestRules(tc, r));
+  if (Array.isArray(out.testCases))
+    out.testCases = out.testCases.map((tc) => applyTestRules(tc, r));
   return out;
 }
 export function applyTestRules(tc, r) {
   const p = r.tests.titlePrefix;
   if (!p || !tc.title) return tc;
-  if (tc.title.toLowerCase().startsWith(p.toLowerCase())) return { ...tc, title: p + tc.title.slice(p.length) };
+  if (tc.title.toLowerCase().startsWith(p.toLowerCase()))
+    return { ...tc, title: p + tc.title.slice(p.length) };
   return { ...tc, title: `${p} ${lowerFirst(tc.title)}` };
 }
 /** Keeps at most the standard number of test cases for a ticket. */
 export const capTests = (list, r) => (list || []).slice(0, r.tests.perTicket);
 
-// ---------------------------------------------------------------- generation guide (Markdown)
-// An administrator can import a Markdown document (glossary, conventions, example tickets and test cases) that
-// the AI gets as reference context, so wording and structure match the team's way of working.
+// ---------------------------------------------------------------- generation guide (Markdown) An
+// administrator can import a Markdown document (glossary, conventions, example tickets and test
+// cases) that the AI gets as reference context, so wording and structure match the team's way of
+// working.
 export const GUIDE_MAX = 60000;
 const GUIDE_KEY = 'generation_guide';
 const GC: any = wsCache('__tfGuideWs');
-const cleanApply = (a: any = {}) => ({ tickets: a.tickets !== false, tests: a.tests !== false, automation: a.automation === true });
+const cleanApply = (a: any = {}) => ({
+  tickets: a.tickets !== false,
+  tests: a.tests !== false,
+  automation: a.automation === true,
+});
 
-/** The guide in force, or null: { text, name, chars, applyTo: { tickets, tests, automation }, updatedBy, updatedAt }. */
+/**
+ * The guide in force, or null: { text, name, chars, applyTo: { tickets, tests, automation },
+ * updatedBy, updatedAt }.
+ */
 export async function getGuide({ fresh = false }: any = {}) {
   if (!fresh && GC.v !== undefined && Date.now() - GC.at < 30000) return GC.v;
   let v = null;
@@ -354,7 +421,9 @@ export async function clearGuide() {
   GC.v = null;
   GC.at = Date.now();
 }
-/** The guide as AI context, when it applies to any of `parts` ('tickets' | 'tests' | 'automation'). */
+/**
+ * The guide as AI context, when it applies to any of `parts` ('tickets' | 'tests' | 'automation').
+ */
 export function guideBlock(guide, parts) {
   if (!guide?.text || !parts.some((p) => guide.applyTo?.[p])) return '';
   return `\n\nTeam generation guide (Markdown). Use it as the reference for terms, wording, structure and examples, and keep your output uniform with it. Where it conflicts with the team standards above, the standards win:\n<guide name="${guide.name}">\n${guide.text}\n</guide>`;

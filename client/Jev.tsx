@@ -1,6 +1,7 @@
 'use client';
-// Administration → AI → Decisions: Jev (TypeSafe AI), a fast model for decisions (choose an option, yes/no) that the AI
-// would otherwise answer. Off by default; when off, unreachable or unsure, the AI answers as before.
+// Administration → AI → Decisions: Jev (TypeSafe AI), a fast model for decisions (choose an option,
+// yes/no) that the AI would otherwise answer. Off by default; when off, unreachable or unsure, the
+// AI answers as before.
 import { useEffect, useState } from 'react';
 import { api, toast, type Any } from './core';
 import { Ico, I, Spinner, ErrorState } from './ui';
@@ -59,12 +60,14 @@ export function DecisionsSection() {
           <a href="https://docs.typesafe.ai" target="_blank" rel="noopener noreferrer">
             TypeSafe AI
           </a>
-          , answers fixed-format questions (pick one of several options, yes or no) with probabilities in a fraction of a second, for far
-          less than a general AI. It can’t write text, so it only takes the small classification calls: <b>frontend, backend or both</b> for
-          each issue, <b>which automated tests are worth running</b>, the <b>development order</b> of an epic or sprint (which issue needs
-          another first, how early to build it), and, before code jobs run on several issues at once,{' '}
-          <b>which issues will edit the same code</b>. What it isn’t sure about, and anything when it is off or unreachable, goes to your AI
-          as before.
+          , answers fixed-format questions (pick one of several options, yes or no) with
+          probabilities in a fraction of a second, for far less than a general AI. It can’t write
+          text, so it only takes the small classification calls: <b>frontend, backend or both</b>{' '}
+          for each issue, <b>which automated tests are worth running</b>, the{' '}
+          <b>development order</b> of an epic or sprint (which issue needs another first, how early
+          to build it), and, before code jobs run on several issues at once,{' '}
+          <b>which issues will edit the same code</b>. What it isn’t sure about, and anything when
+          it is off or unreachable, goes to your AI as before.
         </p>
         <div className={`gha-row ${d.configured ? 'ok' : ''}`}>
           <span className="gha-icon">
@@ -75,14 +78,19 @@ export function DecisionsSection() {
               <>
                 <b>{d.enabled ? 'On' : 'Key saved, turned off'}</b>
                 <span className="muted small">
-                  {d.keySource === 'env' ? 'Using TYPESAFE_API_KEY from the server' : `Key ends with ${d.keyEnd}`} · model {d.model}
+                  {d.keySource === 'env'
+                    ? 'Using TYPESAFE_API_KEY from the server'
+                    : `Key ends with ${d.keyEnd}`}{' '}
+                  · model {d.model}
                   {d.updatedAt ? ` · saved ${new Date(d.updatedAt).toLocaleDateString()}` : ''}
                 </span>
               </>
             ) : (
               <>
                 <b>Not set up</b>
-                <span className="muted small">Early access: get an API key at console.typesafe.ai → Keys.</span>
+                <span className="muted small">
+                  Early access: get an API key at console.typesafe.ai → Keys.
+                </span>
               </>
             )}
           </div>
@@ -109,10 +117,18 @@ export function DecisionsSection() {
               type="password"
               autoComplete="off"
               value={key}
-              placeholder={d.keyEnd ? `Saved, ends with ${d.keyEnd}. Paste a new one to replace it` : 'Paste your key'}
+              placeholder={
+                d.keyEnd
+                  ? `Saved, ends with ${d.keyEnd}. Paste a new one to replace it`
+                  : 'Paste your key'
+              }
               onChange={(e) => setKey(e.target.value)}
             />
-            <button className="btn" disabled={!key.trim() || !!busy} onClick={() => save({ apiKey: key }, 'Key saved (encrypted)')}>
+            <button
+              className="btn"
+              disabled={!key.trim() || !!busy}
+              onClick={() => save({ apiKey: key }, 'Key saved (encrypted)')}
+            >
               Save key
             </button>
           </div>
@@ -122,7 +138,9 @@ export function DecisionsSection() {
           label="Use Jev for decisions"
           disabled={!d.configured || !!busy}
           checked={d.enabled}
-          onChange={(e: Any) => save({ enabled: e.target.checked }, e.target.checked ? 'Jev is on' : 'Jev is off')}
+          onChange={(e: Any) =>
+            save({ enabled: e.target.checked }, e.target.checked ? 'Jev is on' : 'Jev is off')
+          }
         />
         <label className="field" style={{ maxWidth: 360 }}>
           <span>Ask the AI when Jev is less sure than</span>
@@ -137,13 +155,17 @@ export function DecisionsSection() {
               </MenuItem>
             ))}
           </SF>
-          <small className="muted">Lower uses Jev for more answers; higher sends more to the AI.</small>
+          <small className="muted">
+            Lower uses Jev for more answers; higher sends more to the AI.
+          </small>
         </label>
         <div className="row" style={{ gap: 8, alignItems: 'center' }}>
           <button
             className="btn"
             disabled={!d.configured || !!busy}
-            onClick={() => run('test', async () => setTest(await api('/api/admin/jev', { method: 'POST' })))}
+            onClick={() =>
+              run('test', async () => setTest(await api('/api/admin/jev', { method: 'POST' })))
+            }
           >
             {busy === 'test' ? (
               <>
@@ -157,7 +179,8 @@ export function DecisionsSection() {
           {test &&
             (test.ok ? (
               <span className="small">
-                <span className="dot ok" /> Works: {test.ms} ms{test.sample ? ` · example answer ${test.sample}` : ''}
+                <span className="dot ok" /> Works: {test.ms} ms
+                {test.sample ? ` · example answer ${test.sample}` : ''}
               </span>
             ) : (
               <span className="small">
@@ -166,8 +189,9 @@ export function DecisionsSection() {
             ))}
         </div>
         <p className="muted small" style={{ marginBottom: 0 }}>
-          The state of the issues or tests being decided (titles, descriptions, acceptance criteria, test names and results) is sent to
-          TypeSafe. Check their terms and your data rules before turning it on.
+          The state of the issues or tests being decided (titles, descriptions, acceptance criteria,
+          test names and results) is sent to TypeSafe. Check their terms and your data rules before
+          turning it on.
         </p>
       </div>
     </div>

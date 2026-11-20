@@ -11,7 +11,9 @@ export const PAYMENT_METHODS = [
   { id: 'gcash', label: 'GCash', hint: 'Pay in the GCash app' },
   { id: 'paymaya', label: 'Maya', hint: 'Pay in the Maya app' },
 ];
-/** Prices in PHP per paid plan (placeholder numbers, like the plans in plans.js: change them here). */
+/**
+ * Prices in PHP per paid plan (placeholder numbers, like the plans in plans.js: change them here).
+ */
 const PHP_PRICES = {
   pro: { month: 999, year: 9990 },
   team: { month: 2499, year: 24990 },
@@ -33,9 +35,15 @@ export function supportedMethods() {
 /** What the customer is about to pay: the plan, billing period and the PHP total. */
 export function checkoutQuote(plan, interval) {
   const id = String(plan || '');
-  if (!PLANS[id] || id === 'free' || !PHP_PRICES[id] || !purchasable(id)) throw err('Choose a paid plan.');
+  if (!PLANS[id] || id === 'free' || !PHP_PRICES[id] || !purchasable(id))
+    throw err('Choose a paid plan.');
   const per = interval === 'year' ? 'year' : 'month';
-  return { plan: { id, name: PLANS[id].name }, interval: per, currency: CHECKOUT_CURRENCY, amount: PHP_PRICES[id][per] };
+  return {
+    plan: { id, name: PLANS[id].name },
+    interval: per,
+    currency: CHECKOUT_CURRENCY,
+    amount: PHP_PRICES[id][per],
+  };
 }
 
 /** Checks the chosen method and returns the page of its payment step. */

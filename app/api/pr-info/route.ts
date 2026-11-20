@@ -3,7 +3,8 @@ import * as store from '@/lib/store';
 import { prInfo } from '@/lib/github';
 import { getProjectSecret } from '@/lib/secrets';
 
-// Looks up a pull/merge request for the Development panel. With ?projectId, the project's GitLab token reads private merge requests.
+// Looks up a pull/merge request for the Development panel. With ?projectId, the project's GitLab
+// token reads private merge requests.
 export const GET = api(async (req) => {
   const user = await perm('issue.edit');
   const sp = new URL(req.url).searchParams;

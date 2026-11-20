@@ -1,8 +1,10 @@
-// Connect GitHub (Project settings → Code & GitHub): sign in with your GitHub account through GitHub's device flow
-// (a short code you approve at github.com/login/device), so TicketForge can list your repositories, clone them, push
-// branches and open pull requests. The access token is saved encrypted as the project's GitHub token.
-// It needs a GitHub OAuth App's client ID (Device Flow enabled): TICKETFORGE_GITHUB_CLIENT_ID, or saved by an
-// administrator from the Connect GitHub dialog. The client ID is public; no client secret is used.
+// Connect GitHub (Project settings → Code & GitHub): sign in with your GitHub account through
+// GitHub's device flow (a short code you approve at github.com/login/device), so TicketForge can
+// list your repositories, clone them, push branches and open pull requests. The access token is
+// saved encrypted as the project's GitHub token.
+// It needs a GitHub OAuth App's client ID (Device Flow enabled): TICKETFORGE_GITHUB_CLIENT_ID, or
+// saved by an administrator from the Connect GitHub dialog. The client ID is public; no client
+// secret is used.
 import crypto from 'node:crypto';
 import { getMeta, setMeta } from './appmeta';
 import { githubToken } from './devagent';
@@ -15,7 +17,8 @@ G.__tfGhDevice ??= new Map(); // id → { deviceCode, interval, expiresAt, proje
 const PENDING = G.__tfGhDevice;
 
 export async function getClientId() {
-  if (process.env.TICKETFORGE_GITHUB_CLIENT_ID) return { clientId: process.env.TICKETFORGE_GITHUB_CLIENT_ID, source: 'env' };
+  if (process.env.TICKETFORGE_GITHUB_CLIENT_ID)
+    return { clientId: process.env.TICKETFORGE_GITHUB_CLIENT_ID, source: 'env' };
   try {
     let v = await getMeta(KEY);
     if (typeof v === 'string') v = JSON.parse(v);
@@ -27,7 +30,9 @@ export async function getClientId() {
 export async function saveClientId(clientId) {
   const id = String(clientId || '').trim();
   if (id && !/^(Iv1\.|Ov2|Iv23)?[A-Za-z0-9._-]{10,40}$/.test(id))
-    throw err('That doesn’t look like a GitHub OAuth App client ID (for example Ov23li… or Iv1.…).');
+    throw err(
+      'That doesn’t look like a GitHub OAuth App client ID (for example Ov23li… or Iv1.…).',
+    );
   await setMeta(KEY, { clientId: id });
   return getClientId();
 }
@@ -35,7 +40,11 @@ export async function saveClientId(clientId) {
 async function form(url, params) {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'TicketForge' },
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'TicketForge',
+    },
     body: new URLSearchParams(params).toString(),
   });
   const text = await res.text();
@@ -52,7 +61,10 @@ async function form(url, params) {
 export async function startDeviceLogin(projectId) {
   const { clientId } = await getClientId();
   if (!clientId) throw err('Connect GitHub needs a GitHub OAuth App client ID first.');
-  const { data } = await form('https://github.com/login/device/code', { client_id: clientId, scope: SCOPES });
+  const { data } = await form('https://github.com/login/device/code', {
+    client_id: clientId,
+    scope: SCOPES,
+  });
   if (!data.device_code)
     throw err(
       data.error === 'device_flow_disabled'
@@ -75,7 +87,10 @@ export async function startDeviceLogin(projectId) {
     expiresIn: Number(data.expires_in) || 900,
   };
 }
-/** One check of a device sign-in: { state: 'pending' | 'slow_down' | 'done' | 'expired' | 'denied', token?, account? }. */
+/**
+ * One check of a device sign-in: { state: 'pending' | 'slow_down' | 'done' | 'expired' | 'denied',
+ * token?, account? }.
+ */
 export async function pollDeviceLogin(id, projectId) {
   const p = PENDING.get(id);
   if (!p || p.projectId !== projectId) return { state: 'expired' };
@@ -99,7 +114,10 @@ export async function pollDeviceLogin(id, projectId) {
     return { state: 'slow_down', interval: p.interval };
   }
   PENDING.delete(id);
-  return { state: data.error === 'access_denied' ? 'denied' : 'expired', message: data.error_description || data.error };
+  return {
+    state: data.error === 'access_denied' ? 'denied' : 'expired',
+    message: data.error_description || data.error,
+  };
 }
 
 async function gh(path, token) {
@@ -111,20 +129,31 @@ async function gh(path, token) {
       'X-GitHub-Api-Version': '2022-11-28',
     },
   });
-  if (!res.ok) throw err(res.status === 401 ? 'GitHub rejected the sign-in. Connect GitHub again.' : `GitHub said ${res.status}.`);
+  if (!res.ok)
+    throw err(
+      res.status === 401
+        ? 'GitHub rejected the sign-in. Connect GitHub again.'
+        : `GitHub said ${res.status}.`,
+    );
   return res.json();
 }
 export async function whoAmI(token) {
   const u = await gh('user', token);
   return { login: u.login, name: u.name || '', avatar: u.avatar_url || '', url: u.html_url || '' };
 }
-/** The repositories the token can see (owned, collaborator, organisation), most recently updated first. */
+/**
+ * The repositories the token can see (owned, collaborator, organisation), most recently updated
+ * first.
+ */
 export async function listRepos(token, { q = '' }: any = {}) {
   const tok = token || (await githubToken('').catch(() => '')) || '';
   if (!tok) throw err('Connect GitHub (or save a GitHub token) to list your repositories.');
   const out: any[] = [];
   for (let page = 1; page <= 5; page++) {
-    const batch = await gh(`user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`, tok);
+    const batch = await gh(
+      `user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`,
+      tok,
+    );
     out.push(...batch);
     if (batch.length < 100) break;
   }
@@ -132,7 +161,9 @@ export async function listRepos(token, { q = '' }: any = {}) {
     .trim()
     .toLowerCase();
   return out
-    .filter((r) => !needle || `${r.full_name} ${r.description || ''}`.toLowerCase().includes(needle))
+    .filter(
+      (r) => !needle || `${r.full_name} ${r.description || ''}`.toLowerCase().includes(needle),
+    )
     .map((r) => ({
       fullName: r.full_name,
       private: r.private,

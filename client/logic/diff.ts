@@ -1,8 +1,13 @@
-// Diff view logic (TF-121): turns a unified diff (git's output) into files of side-by-side rows. No UI, no requests.
+// Diff view logic (TF-121): turns a unified diff (git's output) into files of side-by-side rows. No
+// UI, no requests.
 
 export type Cell = { no: number; text: string };
-/** One row of a side-by-side diff: the old line on the left, the new one on the right (either can be empty). `ctx` rows are unchanged lines. */
-export type Row = { kind: 'hunk'; text: string } | { kind: 'line'; l: Cell | null; r: Cell | null; ctx: boolean };
+/**
+ * One row of a side-by-side diff: the old line on the left, the new one on the right (either can be
+ * empty). `ctx` rows are unchanged lines.
+ */
+export type Row =
+  { kind: 'hunk'; text: string } | { kind: 'line'; l: Cell | null; r: Cell | null; ctx: boolean };
 export type DiffFile = {
   path: string;
   status: 'added' | 'deleted' | 'modified';
@@ -12,7 +17,10 @@ export type DiffFile = {
   rows: Row[];
 };
 
-/** Parses a unified diff into files. Lines such as `--- x` inside a hunk are code; the hunk header's counts tell where a hunk ends. */
+/**
+ * Parses a unified diff into files. Lines such as `--- x` inside a hunk are code; the hunk header's
+ * counts tell where a hunk ends.
+ */
 export function parseDiff(text: string): DiffFile[] {
   const files: DiffFile[] = [];
   let f: DiffFile | null = null;
@@ -46,14 +54,26 @@ export function parseDiff(text: string): DiffFile[] {
         continue;
       }
       flush();
-      f.rows.push({ kind: 'line', l: { no: oldNo++, text: body }, r: { no: newNo++, text: body }, ctx: true });
+      f.rows.push({
+        kind: 'line',
+        l: { no: oldNo++, text: body },
+        r: { no: newNo++, text: body },
+        ctx: true,
+      });
       oldLeft--;
       newLeft--;
       continue;
     }
     if (line.startsWith('diff --git ')) {
       flush();
-      f = { path: (line.match(/ b\/(.+)$/) || [])[1] || '', status: 'modified', added: 0, removed: 0, binary: false, rows: [] };
+      f = {
+        path: (line.match(/ b\/(.+)$/) || [])[1] || '',
+        status: 'modified',
+        added: 0,
+        removed: 0,
+        binary: false,
+        rows: [],
+      };
       files.push(f);
       continue;
     }
@@ -66,10 +86,13 @@ export function parseDiff(text: string): DiffFile[] {
       oldLeft = h[2] === undefined ? 1 : Number(h[2]);
       newLeft = h[4] === undefined ? 1 : Number(h[4]);
       f.rows.push({ kind: 'hunk', text: line });
-    } else if (line.startsWith('--- /dev/null') || line.startsWith('new file mode')) f.status = 'added';
-    else if (line.startsWith('+++ /dev/null') || line.startsWith('deleted file mode')) f.status = 'deleted';
+    } else if (line.startsWith('--- /dev/null') || line.startsWith('new file mode'))
+      f.status = 'added';
+    else if (line.startsWith('+++ /dev/null') || line.startsWith('deleted file mode'))
+      f.status = 'deleted';
     else if (line.startsWith('+++ b/')) f.path = line.slice(6);
-    else if (line.startsWith('Binary files') || line.startsWith('GIT binary patch')) f.binary = true;
+    else if (line.startsWith('Binary files') || line.startsWith('GIT binary patch'))
+      f.binary = true;
   }
   flush();
   return files;

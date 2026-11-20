@@ -1,20 +1,25 @@
-// AI answer cache: an identical request (same task, model choice, system prompt and prompt) within N days reuses the
-// stored answer instead of calling the AI again. Only for tasks where a repeat answer is what you want (Administration →
-// AI → Model routing → Save usage); "again" / "regenerate" actions send fresh: true and skip it. Server-only table.
+// AI answer cache: an identical request (same task, model choice, system prompt and prompt) within
+// N days reuses the stored answer instead of calling the AI again. Only for tasks where a repeat
+// answer is what you want (Administration → AI → Model routing → Save usage); "again" /
+// "regenerate" actions send fresh: true and skip it. Server-only table.
 import crypto from 'node:crypto';
 import { asSystem, currentWs, DEFAULT_WS } from './db';
 import { orm, aiCache, eq, and, desc, sql } from './orm';
 
-// Each workspace has its own answers: other workspaces' keys start with "<workspace>:" (the default one's don't).
+// Each workspace has its own answers: other workspaces' keys start with "<workspace>:" (the default
+// one's don't).
 const wsPrefix = () => {
   const w = currentWs() || DEFAULT_WS;
   return w === DEFAULT_WS ? '' : `${w}:`;
 };
 const wsFilter = () =>
-  wsPrefix() ? sql`${aiCache.key} like ${`${wsPrefix().replace(/[%_\\]/g, '\\$&')}%`}` : sql`${aiCache.key} not like '%:%'`;
+  wsPrefix()
+    ? sql`${aiCache.key} like ${`${wsPrefix().replace(/[%_\\]/g, '\\$&')}%`}`
+    : sql`${aiCache.key} not like '%:%'`;
 const days = (n) => sql`(${String(n)}::text || ' days')::interval`;
 
-export const cacheKey = (parts) => wsPrefix() + crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+export const cacheKey = (parts) =>
+  wsPrefix() + crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 
 export async function cacheGet(key, ttlDays) {
   try {
@@ -38,7 +43,10 @@ export async function cachePut(key, task, value, ttlDays) {
       await orm
         .insert(aiCache)
         .values({ key, task: task || '', value: String(value), chars: String(value).length })
-        .onConflictDoUpdate({ target: aiCache.key, set: { value: String(value), createdAt: sql`now()`, usedAt: sql`now()` } });
+        .onConflictDoUpdate({
+          target: aiCache.key,
+          set: { value: String(value), createdAt: sql`now()`, usedAt: sql`now()` },
+        });
     });
     if (Date.now() - lastSweep > 36e5) {
       lastSweep = Date.now();

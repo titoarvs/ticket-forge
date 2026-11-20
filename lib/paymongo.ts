@@ -7,7 +7,10 @@ import { qs } from './db';
 import { GRACE_DAYS } from './plans';
 import { err } from './errors';
 
-/** Checks the Paymongo-Signature header: "t=<timestamp>,te=<test signature>,li=<live signature>", an HMAC-SHA256 of "<timestamp>.<body>". */
+/**
+ * Checks the Paymongo-Signature header: "t=<timestamp>,te=<test signature>,li=<live signature>", an
+ * HMAC-SHA256 of "<timestamp>.<body>".
+ */
 export function verifySignature(rawBody, header, secret = process.env.PAYMONGO_WEBHOOK_SECRET) {
   if (!secret) throw err('The PayMongo webhook isn’t set up (PAYMONGO_WEBHOOK_SECRET).', 503);
   const parts = Object.fromEntries(
@@ -30,14 +33,18 @@ export function verifySignature(rawBody, header, secret = process.env.PAYMONGO_W
 const FAILED = ['payment.failed', 'subscription.past_due'];
 const PAID = ['payment.paid'];
 
-/** The workspace an event is about: named in the payment's metadata, or found by its PayMongo subscription or customer. */
+/**
+ * The workspace an event is about: named in the payment's metadata, or found by its PayMongo
+ * subscription or customer.
+ */
 async function workspaceOf(res) {
   const a = res?.attributes || {};
   if (a.metadata?.workspace_id) return String(a.metadata.workspace_id);
   const subs = [a.subscription_id, res?.type === 'subscription' ? res.id : null].filter(Boolean);
   const customers = [a.customer_id, a.customer?.id].filter(Boolean);
   for (const s of subs) {
-    const r = (await qs('select id from workspaces where paymongo_subscription_id = $1', [s])).rows[0];
+    const r = (await qs('select id from workspaces where paymongo_subscription_id = $1', [s]))
+      .rows[0];
     if (r) return r.id;
   }
   for (const c of customers) {
@@ -48,8 +55,10 @@ async function workspaceOf(res) {
 }
 
 /**
- * Handles one verified event, once (PayMongo may send it again, so its id is recorded first). Returns what happened.
- * - payment failed: an active (or trialing) subscription becomes past due, with the grace period ending GRACE_DAYS from now.
+ * Handles one verified event, once (PayMongo may send it again, so its id is recorded first).
+ * Returns what happened.
+ * - payment failed: an active (or trialing) subscription becomes past due, with the grace period
+ *   ending GRACE_DAYS from now.
  *   One that is already past due keeps its first grace end date (a failed retry doesn't extend it).
  * - payment paid: a past due subscription becomes active again and its grace period is cleared.
  */
@@ -57,8 +66,12 @@ export async function handleEvent(ev) {
   const id = ev?.data?.id,
     type = ev?.data?.attributes?.type;
   if (!id || !type) throw err('Bad event', 400);
-  const fresh = (await qs('insert into billing_events (id, type) values ($1, $2) on conflict (id) do nothing returning id', [id, type]))
-    .rows[0];
+  const fresh = (
+    await qs(
+      'insert into billing_events (id, type) values ($1, $2) on conflict (id) do nothing returning id',
+      [id, type],
+    )
+  ).rows[0];
   if (!fresh) return { duplicate: true };
   const failed = FAILED.includes(type),
     paid = PAID.includes(type);
@@ -92,13 +105,17 @@ export async function handleEvent(ev) {
 export const paymongoConfigured = () => Boolean(process.env.PAYMONGO_SECRET_KEY);
 const base = () => (process.env.PAYMONGO_API_BASE || 'https://api.paymongo.com').replace(/\/$/, '');
 
-/** Cancels a PayMongo subscription, so it is never charged again. Returns PayMongo's subscription. */
+/**
+ * Cancels a PayMongo subscription, so it is never charged again. Returns PayMongo's subscription.
+ */
 export async function cancelPayMongoSubscription(id, reason = 'unspecified') {
-  if (!paymongoConfigured()) throw err('Payments aren’t set up on this server yet (PAYMONGO_SECRET_KEY).', 503);
+  if (!paymongoConfigured())
+    throw err('Payments aren’t set up on this server yet (PAYMONGO_SECRET_KEY).', 503);
   const res = await fetch(base() + '/v1/subscriptions/' + encodeURIComponent(id) + '/cancel', {
     method: 'POST',
     headers: {
-      Authorization: 'Basic ' + Buffer.from(process.env.PAYMONGO_SECRET_KEY + ':').toString('base64'),
+      Authorization:
+        'Basic ' + Buffer.from(process.env.PAYMONGO_SECRET_KEY + ':').toString('base64'),
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
@@ -106,6 +123,10 @@ export async function cancelPayMongoSubscription(id, reason = 'unspecified') {
     signal: AbortSignal.timeout(20000),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw err('PayMongo: ' + (body?.errors?.[0]?.detail || res.statusText), res.status >= 500 || res.status === 401 ? 502 : 400);
+  if (!res.ok)
+    throw err(
+      'PayMongo: ' + (body?.errors?.[0]?.detail || res.statusText),
+      res.status >= 500 || res.status === 401 ? 502 : 400,
+    );
   return body?.data || {};
 }

@@ -4,7 +4,8 @@ import { currentContext } from '@/lib/db';
 import { selectTests } from '@/lib/testselect';
 import { ensureAgent } from '@/lib/agents';
 
-// Test automation → Smart selection (Test Selection Agent): which tests to run for the current change. Nothing runs here.
+// Test automation → Smart selection (Test Selection Agent): which tests to run for the current
+// change. Nothing runs here.
 export const POST = api(async (req, p) => {
   const user = await authed();
   store.requireAccess(user, p.id);

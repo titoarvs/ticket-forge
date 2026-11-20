@@ -1,22 +1,41 @@
 'use client';
-// The project's AI chatbot: a chat panel on every project page (and so on the refine board) that replaced the AI helper.
-// The person describes an issue in plain words; the assistant answers with a draft preview (title, description, type,
-// story points, priority, acceptance criteria) that they can edit. Nothing becomes an issue until they click Create;
-// Create is off while the title is empty. The conversation is saved on the server per person and per project and is
-// restored when the panel opens. The server decides everything (access, the plan's AI limit); the panel shows its answers.
-// The layout (message list, bubbles, one input at the bottom, a typing indicator) follows common LLM chat apps.
+// The project's AI chatbot: a chat panel on every project page (and so on the refine board) that
+// replaced the AI helper.
+// The person describes an issue in plain words; the assistant answers with a draft preview (title,
+// description, type, story points, priority, acceptance criteria) that they can edit. Nothing
+// becomes an issue until they click Create;
+// Create is off while the title is empty. The conversation is saved on the server per person and
+// per project and is restored when the panel opens. The server decides everything (access, the
+// plan's AI limit); the panel shows its answers.
+// The layout (message list, bubbles, one input at the bottom, a typing indicator) follows common
+// LLM chat apps.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { P, can, toast, pullRemote, TYPES, PRIORITIES, type Any } from './core';
 import { chatHistory, chatSend, chatCreate, chatDiscard } from './api/chat';
 import { Ico, I, Spinner } from './ui';
 
 const POINTS = [1, 2, 3, 5, 8, 13, 21];
-const WELCOME = 'Hi! Tell me what you need, for example “Users should reset their password by email”. I’ll draft the issue for you to check and create.';
+const WELCOME =
+  'Hi! Tell me what you need, for example “Users should reset their password by email”. I’ll draft the issue for you to check and create.';
 const EXAMPLES = ['Add a password reset by email', 'Bug: the export button does nothing on Safari'];
 
-/** The draft of one assistant message: every field can be edited here; Create sends the edited fields. */
-function DraftPreview({ msg, onCreate, onDiscard }: { msg: Any; onCreate: (d: Any) => Promise<void>; onDiscard: () => Promise<void> }) {
-  const [d, setD] = useState<Any>(() => ({ ...msg.draft, criteria: (msg.draft.acceptanceCriteria || []).join('\n') }));
+/**
+ * The draft of one assistant message: every field can be edited here; Create sends the edited
+ * fields.
+ */
+function DraftPreview({
+  msg,
+  onCreate,
+  onDiscard,
+}: {
+  msg: Any;
+  onCreate: (d: Any) => Promise<void>;
+  onDiscard: () => Promise<void>;
+}) {
+  const [d, setD] = useState<Any>(() => ({
+    ...msg.draft,
+    criteria: (msg.draft.acceptanceCriteria || []).join('\n'),
+  }));
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: Any) => setD((x: Any) => ({ ...x, [k]: v }));
   const title = String(d.title || '').trim();
@@ -38,13 +57,24 @@ function DraftPreview({ msg, onCreate, onDiscard }: { msg: Any; onCreate: (d: An
       </span>
       <label className="pchat-f">
         <span>Title</span>
-        <input value={d.title || ''} onChange={(e) => set('title', e.target.value)} maxLength={200} aria-label="Title" aria-invalid={!title} />
+        <input
+          value={d.title || ''}
+          onChange={(e) => set('title', e.target.value)}
+          maxLength={200}
+          aria-label="Title"
+          aria-invalid={!title}
+        />
       </label>
       {!title && <div className="pchat-hint">A title is needed to create the issue.</div>}
       <div className="pchat-row">
         <label className="pchat-f">
           <span>Type</span>
-          <select className="select compact" value={d.type} onChange={(e) => set('type', e.target.value)} aria-label="Type">
+          <select
+            className="select compact"
+            value={d.type}
+            onChange={(e) => set('type', e.target.value)}
+            aria-label="Type"
+          >
             {TYPES.map((t: string) => (
               <option key={t}>{t}</option>
             ))}
@@ -52,7 +82,12 @@ function DraftPreview({ msg, onCreate, onDiscard }: { msg: Any; onCreate: (d: An
         </label>
         <label className="pchat-f">
           <span>Priority</span>
-          <select className="select compact" value={d.priority} onChange={(e) => set('priority', e.target.value)} aria-label="Priority">
+          <select
+            className="select compact"
+            value={d.priority}
+            onChange={(e) => set('priority', e.target.value)}
+            aria-label="Priority"
+          >
             {PRIORITIES.map((t: string) => (
               <option key={t}>{t}</option>
             ))}
@@ -77,18 +112,34 @@ function DraftPreview({ msg, onCreate, onDiscard }: { msg: Any; onCreate: (d: An
       </div>
       <label className="pchat-f">
         <span>Description</span>
-        <textarea value={d.description || ''} onChange={(e) => set('description', e.target.value)} rows={4} aria-label="Description" />
+        <textarea
+          value={d.description || ''}
+          onChange={(e) => set('description', e.target.value)}
+          rows={4}
+          aria-label="Description"
+        />
       </label>
       <label className="pchat-f">
         <span>Acceptance criteria (one per line)</span>
-        <textarea value={d.criteria} onChange={(e) => set('criteria', e.target.value)} rows={4} aria-label="Acceptance criteria" />
+        <textarea
+          value={d.criteria}
+          onChange={(e) => set('criteria', e.target.value)}
+          rows={4}
+          aria-label="Acceptance criteria"
+        />
       </label>
       <div className="pchat-actions">
         <button
           className="btn sm primary"
           onClick={create}
           disabled={!title || busy || !mayCreate}
-          title={!mayCreate ? 'You don’t have permission to create issues' : !title ? 'Add a title first' : 'Create this issue in the backlog'}
+          title={
+            !mayCreate
+              ? 'You don’t have permission to create issues'
+              : !title
+                ? 'Add a title first'
+                : 'Create this issue in the backlog'
+          }
         >
           Create
         </button>
@@ -110,7 +161,8 @@ export function ProjectChat() {
   const [notice, setNotice] = useState<{ text: string; limit: boolean } | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
-  // The saved conversation of this person in this project, each time the panel opens or the project changes.
+  // The saved conversation of this person in this project, each time the panel opens or the project
+  // changes.
   const load = useCallback(async () => {
     setErr('');
     try {
@@ -139,16 +191,21 @@ export function ProjectChat() {
       const r = await chatSend(pid, value);
       setMsgs((m) => [...(m || []).filter((x) => x.id !== 'pending'), ...r.messages]);
     } catch (e: Any) {
-      // Not sent to the assistant (or it failed): nothing was saved, so the request goes back into the input.
+      // Not sent to the assistant (or it failed): nothing was saved, so the request goes back into
+      // the input.
       setMsgs((m) => (m || []).filter((x) => x.id !== 'pending'));
       setText(value);
-      setNotice({ text: e?.message || 'Something went wrong. Please try again.', limit: e?.status === 402 && e?.body?.code === 'limit' });
+      setNotice({
+        text: e?.message || 'Something went wrong. Please try again.',
+        limit: e?.status === 402 && e?.body?.code === 'limit',
+      });
     } finally {
       setBusy(false);
     }
   };
 
-  const patchDraft = (id: string, draft: Any) => setMsgs((m) => (m || []).map((x) => (x.id === id ? { ...x, draft } : x)));
+  const patchDraft = (id: string, draft: Any) =>
+    setMsgs((m) => (m || []).map((x) => (x.id === id ? { ...x, draft } : x)));
   const create = async (msg: Any, draft: Any) => {
     try {
       const r = await chatCreate(pid, msg.id, draft);
@@ -175,7 +232,12 @@ export function ProjectChat() {
         <Ico svg={I.sparkle} />
         <b>AI helper</b>
         <span className="spacer" />
-        <button className="btn sm subtle" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={open ? 'Collapse the AI chat' : 'Open the AI chat'}>
+        <button
+          className="btn sm subtle"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={open ? 'Collapse the AI chat' : 'Open the AI chat'}
+        >
           <Ico svg={open ? I.close : I.comment} />
         </button>
       </header>
@@ -200,7 +262,12 @@ export function ProjectChat() {
               <div key={m.id} className={`pchat-turn ${m.role === 'user' ? 'me' : 'bot'}`}>
                 <div className={`chat-msg ${m.role === 'user' ? 'me' : 'bot'}`}>{m.content}</div>
                 {m.draft && !m.draft.created && !m.draft.discarded && (
-                  <DraftPreview key={m.id} msg={m} onCreate={(d) => create(m, d)} onDiscard={() => discard(m)} />
+                  <DraftPreview
+                    key={m.id}
+                    msg={m}
+                    onCreate={(d) => create(m, d)}
+                    onDiscard={() => discard(m)}
+                  />
                 )}
                 {m.draft?.created && (
                   <div className="pchat-hint">
@@ -215,7 +282,11 @@ export function ProjectChat() {
               </div>
             )}
             {notice && (
-              <div className="chat-msg bot denied" role="alert" data-limit={notice.limit ? 'true' : undefined}>
+              <div
+                className="chat-msg bot denied"
+                role="alert"
+                data-limit={notice.limit ? 'true' : undefined}
+              >
                 {notice.limit ? `AI limit reached. ${notice.text}` : notice.text}
               </div>
             )}
@@ -242,7 +313,11 @@ export function ProjectChat() {
               aria-label="Message"
               maxLength={2000}
             />
-            <button className="btn primary sm" type="submit" disabled={busy || !text.trim() || msgs === null}>
+            <button
+              className="btn primary sm"
+              type="submit"
+              disabled={busy || !text.trim() || msgs === null}
+            >
               Send
             </button>
           </form>

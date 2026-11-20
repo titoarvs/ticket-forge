@@ -1,6 +1,7 @@
-// Test plans built with AI (Test management → Test plans → Build plan with AI): from the project's test repository the AI
-// picks the tests that fit a goal (smoke, regression, an epic, a sprint, retesting failures…), ordered by risk, with a
-// reason each, and lists the issues in scope that no test covers. Nothing is saved here.
+// Test plans built with AI (Test management → Test plans → Build plan with AI): from the project's
+// test repository the AI picks the tests that fit a goal (smoke, regression, an epic, a sprint,
+// retesting failures…), ordered by risk, with a reason each, and lists the issues in scope that no
+// test covers. Nothing is saved here.
 import { askJson } from './claude';
 import { getRules, rulesText } from './genrules';
 import { contextBlock } from './appcontext';
@@ -18,26 +19,43 @@ const KINDS = {
     'a REGRESSION plan: broad coverage of the scope, favouring high-priority tests, tests of areas that changed or failed before, security and integration tests; skip near-duplicates.',
   feature:
     'a FEATURE plan for the chosen epic(s): every acceptance-relevant test of their issues, happy paths first, then negative and edge cases.',
-  sprint: 'a SPRINT plan: the tests covering the issues in the chosen sprint, especially those done or in review.',
-  retest: 'a RETEST plan: tests that failed or were blocked last time, plus closely related tests of the same issues.',
+  sprint:
+    'a SPRINT plan: the tests covering the issues in the chosen sprint, especially those done or in review.',
+  retest:
+    'a RETEST plan: tests that failed or were blocked last time, plus closely related tests of the same issues.',
   custom: 'a plan for the goal described below.',
 };
 
 /** Latest result of each test across executions. */
 function latest(repo) {
   const out: any = {};
-  for (const e of [...(repo.executions || [])].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))) {
-    for (const [id, r] of Object.entries<any>(e.runs || {})) if (r && r.status && r.status !== 'TODO') out[id] = r.status;
+  for (const e of [...(repo.executions || [])].sort((a, b) =>
+    String(a.createdAt).localeCompare(String(b.createdAt)),
+  )) {
+    for (const [id, r] of Object.entries<any>(e.runs || {}))
+      if (r && r.status && r.status !== 'TODO') out[id] = r.status;
   }
   return out;
 }
 
-export async function buildTestPlan({ project, kind = 'regression', goal = '', epicIds = [], sprintId = '', maxTests = 40, ai = {} }: any) {
+export async function buildTestPlan({
+  project,
+  kind = 'regression',
+  goal = '',
+  epicIds = [],
+  sprintId = '',
+  maxTests = 40,
+  ai = {},
+}: any) {
   const repo = project.testRepo || { tests: [], executions: [] };
-  if (!repo.tests?.length) throw Object.assign(new Error('The test repository is empty: add or import tests first.'), { status: 400 });
+  if (!repo.tests?.length)
+    throw Object.assign(new Error('The test repository is empty: add or import tests first.'), {
+      status: 400,
+    });
   const byId = new Map(project.tickets.map((t) => [t.id, t]));
   const epicOf = (t) => project.epics.find((e) => e.id === t?.epicId);
-  const inScopeIssue = (t) => t && (!epicIds.length || epicIds.includes(t.epicId)) && (!sprintId || t.sprintId === sprintId);
+  const inScopeIssue = (t) =>
+    t && (!epicIds.length || epicIds.includes(t.epicId)) && (!sprintId || t.sprintId === sprintId);
   const last = latest(repo);
   const scoped = repo.tests
     .filter((t) => {
@@ -49,14 +67,24 @@ export async function buildTestPlan({ project, kind = 'regression', goal = '', e
       (t) =>
         kind !== 'retest' ||
         ['FAILED', 'BLOCKED'].includes(last[t.id]) ||
-        (t.issueIds || []).some((id) => repo.tests.some((o) => o.issueIds?.includes(id) && ['FAILED', 'BLOCKED'].includes(last[o.id]))),
+        (t.issueIds || []).some((id) =>
+          repo.tests.some(
+            (o) => o.issueIds?.includes(id) && ['FAILED', 'BLOCKED'].includes(last[o.id]),
+          ),
+        ),
     );
   if (!scoped.length)
     throw Object.assign(
-      new Error(kind === 'retest' ? 'Nothing failed or was blocked in the scope yet.' : 'No tests cover the chosen scope.'),
+      new Error(
+        kind === 'retest'
+          ? 'Nothing failed or was blocked in the scope yet.'
+          : 'No tests cover the chosen scope.',
+      ),
       { status: 400 },
     );
-  const scopeIssues = project.tickets.filter((t) => !t.parentId && (epicIds.length || sprintId ? inScopeIssue(t) : true));
+  const scopeIssues = project.tickets.filter(
+    (t) => !t.parentId && (epicIds.length || sprintId ? inScopeIssue(t) : true),
+  );
   const catalog = scoped
     .slice(0, 600)
     .map((t) => {

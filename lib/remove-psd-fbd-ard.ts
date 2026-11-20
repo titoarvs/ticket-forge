@@ -18,16 +18,22 @@
 
 export const MIGRATION_ID = 'tf-125-remove-psd-fbd-ard';
 export const KINDS = ['psd', 'fbd', 'ard'];
-// doc_templates keys: "psd" (default workspace), "ws:<id>:psd" (another workspace), "psd:<projectId>" (one project).
+// doc_templates keys: "psd" (default workspace), "ws:<id>:psd" (another workspace),
+// "psd:<projectId>" (one project).
 export const TEMPLATE_KEY = '^(ws:[^:]+:)?(psd|fbd|ard)(:.+)?$';
 
 type Query = (sql: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }>;
 export type Counts = Record<string, number>;
 
-const exists = async (q: Query, table: string) => Boolean((await q('select to_regclass($1) as t', [`public.${table}`])).rows[0]?.t);
-const n = (r: { rows: any[]; rowCount?: number | null }) => Number(r.rowCount ?? r.rows.length ?? 0);
+const exists = async (q: Query, table: string) =>
+  Boolean((await q('select to_regclass($1) as t', [`public.${table}`])).rows[0]?.t);
+const n = (r: { rows: any[]; rowCount?: number | null }) =>
+  Number(r.rowCount ?? r.rows.length ?? 0);
 
-/** What a run would delete, and which `kind` values each table actually holds (to check before deleting). */
+/**
+ * What a run would delete, and which `kind` values each table actually holds (to check before
+ * deleting).
+ */
 export async function survey(q: Query) {
   const counts: Counts = {};
   const kinds: Record<string, string[]> = {};
@@ -38,7 +44,9 @@ export async function survey(q: Query) {
       continue;
     }
     kinds[t] = (await q(`select distinct kind from ${t} order by kind`)).rows.map((r) => r.kind);
-    counts[t] = Number((await q(`select count(*)::int as n from ${t} where kind = any($1)`, [KINDS])).rows[0].n);
+    counts[t] = Number(
+      (await q(`select count(*)::int as n from ${t} where kind = any($1)`, [KINDS])).rows[0].n,
+    );
   }
   counts.files = (await exists(q, 'epic_doc_versions'))
     ? Number(
@@ -52,7 +60,10 @@ export async function survey(q: Query) {
       )
     : 0;
   counts.doc_templates = (await exists(q, 'doc_templates'))
-    ? Number((await q('select count(*)::int as n from doc_templates where key ~ $1', [TEMPLATE_KEY])).rows[0].n)
+    ? Number(
+        (await q('select count(*)::int as n from doc_templates where key ~ $1', [TEMPLATE_KEY]))
+          .rows[0].n,
+      )
     : 0;
   counts.epics = Number(
     (
@@ -75,24 +86,33 @@ export async function survey(q: Query) {
     ? Number((await q("select count(*)::int as n from ai_cache where task = 'docs'")).rows[0].n)
     : 0;
   const done =
-    (await exists(q, 'schema_migrations')) && (await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length > 0;
+    (await exists(q, 'schema_migrations')) &&
+    (await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length > 0;
   return { counts, kinds, done };
 }
 
 /**
- * Deletes everything listed above. `q` must run inside one transaction (the script and the tests both do), so a
- * failure part-way changes nothing. Returns how many rows went from each place, or { skipped: true } when the
- * migration is already recorded.
+ * Deletes everything listed above. `q` must run inside one transaction (the script and the tests
+ * both do), so a failure part-way changes nothing. Returns how many rows went from each place, or {
+ * skipped: true } when the migration is already recorded.
  */
 export async function removePsdFbdArd(q: Query): Promise<{ skipped: boolean; counts: Counts }> {
-  await q('create table if not exists schema_migrations (id text primary key, at timestamptz not null default now())');
-  if ((await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length) return { skipped: true, counts: {} };
+  await q(
+    'create table if not exists schema_migrations (id text primary key, at timestamptz not null default now())',
+  );
+  if ((await q('select 1 from schema_migrations where id = $1', [MIGRATION_ID])).rows.length)
+    return { skipped: true, counts: {} };
   const counts: Counts = {};
-  if (await exists(q, 'drive_docs')) counts.drive_docs = n(await q('delete from drive_docs where kind = any($1)', [KINDS]));
+  if (await exists(q, 'drive_docs'))
+    counts.drive_docs = n(await q('delete from drive_docs where kind = any($1)', [KINDS]));
   if (await exists(q, 'epic_doc_comments'))
-    counts.epic_doc_comments = n(await q('delete from epic_doc_comments where kind = any($1)', [KINDS]));
+    counts.epic_doc_comments = n(
+      await q('delete from epic_doc_comments where kind = any($1)', [KINDS]),
+    );
   if (await exists(q, 'epic_doc_reviews'))
-    counts.epic_doc_reviews = n(await q('delete from epic_doc_reviews where kind = any($1)', [KINDS]));
+    counts.epic_doc_reviews = n(
+      await q('delete from epic_doc_reviews where kind = any($1)', [KINDS]),
+    );
   if (await exists(q, 'epic_doc_versions')) {
     // The uploaded files first, while the versions still say which ones they are.
     counts.files = n(
@@ -102,11 +122,14 @@ export async function removePsdFbdArd(q: Query): Promise<{ skipped: boolean; cou
         [KINDS],
       ),
     );
-    counts.epic_doc_versions = n(await q('delete from epic_doc_versions where kind = any($1)', [KINDS]));
+    counts.epic_doc_versions = n(
+      await q('delete from epic_doc_versions where kind = any($1)', [KINDS]),
+    );
   }
-  if (await exists(q, 'doc_templates')) counts.doc_templates = n(await q('delete from doc_templates where key ~ $1', [TEMPLATE_KEY]));
-  // Each epic without its psd, fbd and ard, in the same order. The project gets a new version (and the epics section
-  // its revision), so open browsers and running servers read the project again.
+  if (await exists(q, 'doc_templates'))
+    counts.doc_templates = n(await q('delete from doc_templates where key ~ $1', [TEMPLATE_KEY]));
+  // Each epic without its psd, fbd and ard, in the same order. The project gets a new version (and
+  // the epics section its revision), so open browsers and running servers read the project again.
   const projects = await q(
     `update projects p set
       data = jsonb_set(p.data, '{epics}', (select coalesce(jsonb_agg(e - 'psd' - 'fbd' - 'ard' order by i), '[]'::jsonb)
@@ -126,7 +149,8 @@ export async function removePsdFbdArd(q: Query): Promise<{ skipped: boolean; cou
       and (type in ('doc', 'decision') or (type = 'question' and tags ? 'open-decision'))`),
     );
   }
-  if (await exists(q, 'ai_cache')) counts.ai_cache = n(await q("delete from ai_cache where task = 'docs'"));
+  if (await exists(q, 'ai_cache'))
+    counts.ai_cache = n(await q("delete from ai_cache where task = 'docs'"));
   await q('insert into schema_migrations (id) values ($1)', [MIGRATION_ID]);
   return { skipped: false, counts };
 }

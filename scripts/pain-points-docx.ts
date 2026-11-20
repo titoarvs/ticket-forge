@@ -1,5 +1,6 @@
 // Builds the scrum pain points Word document from its Markdown source.
-// Usage: `npm run docs:pain-points`. Reads docs/scrum-pain-points.md, writes docs/scrum-pain-points.docx.
+// Usage: `npm run docs:pain-points`. Reads docs/scrum-pain-points.md, writes
+// docs/scrum-pain-points.docx.
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdownToDocx } from '../lib/md-docx';

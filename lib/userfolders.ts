@@ -1,7 +1,8 @@
-// Local config folders (TF-102): one folder per person and per GitHub repository on this machine, holding the
-// repository clone (clone/) and that person's settings (settings/ai.json, browser.json, email.json, templates.json).
-// Folders are never removed when a person is removed, GitHub is disconnected or a repository is deleted: only an
-// administrator's purge deletes one.
+// Local config folders (TF-102): one folder per person and per GitHub repository on this machine,
+// holding the repository clone (clone/) and that person's settings (settings/ai.json, browser.json,
+// email.json, templates.json).
+// Folders are never removed when a person is removed, GitHub is disconnected or a repository is
+// deleted: only an administrator's purge deletes one.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR, currentWs, DEFAULT_WS } from './db';
@@ -17,12 +18,15 @@ const slugOf = (repo) => {
   const r = String(repo || '')
     .trim()
     .replace(/\.git$/, '');
-  if (!REPO.test(r) || r.includes('..')) throw new HttpError(400, 'Name the repository as owner/name.');
+  if (!REPO.test(r) || r.includes('..'))
+    throw new HttpError(400, 'Name the repository as owner/name.');
   return r.replace('/', '__');
 };
 /** Keeps every path inside the folders root. */
 function inside(...parts) {
-  for (const p of parts) if (!SAFE.test(p) && !/^[\w.-]{1,100}__[\w.-]{1,100}$/.test(p)) throw new HttpError(400, 'Bad folder.');
+  for (const p of parts)
+    if (!SAFE.test(p) && !/^[\w.-]{1,100}__[\w.-]{1,100}$/.test(p))
+      throw new HttpError(400, 'Bad folder.');
   const full = path.resolve(ROOT, ...parts);
   if (!full.startsWith(path.resolve(ROOT) + path.sep)) throw new HttpError(400, 'Bad folder.');
   return full;
@@ -57,7 +61,9 @@ export async function ensureFolder(user, repo) {
 
 async function readDirs(dir) {
   try {
-    return (await fs.readdir(dir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name);
+    return (await fs.readdir(dir, { withFileTypes: true }))
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
   } catch {
     return [];
   }
@@ -114,14 +120,22 @@ export async function purgeFolder(user, id) {
 }
 
 const kindOf = (kind) => {
-  if (!SETTING_KINDS.includes(kind)) throw new HttpError(400, `Settings must be one of: ${SETTING_KINDS.join(', ')}.`);
+  if (!SETTING_KINDS.includes(kind))
+    throw new HttpError(400, `Settings must be one of: ${SETTING_KINDS.join(', ')}.`);
   return kind;
 };
 /** Writes settings into the signed-in person's own folder only. */
 export async function saveFolderSettings(user, repo, kind, data) {
   const f = await ensureFolder(user, repo);
-  const v = { ...(data && typeof data === 'object' ? data : {}), updatedAt: new Date().toISOString() };
-  await fs.writeFile(path.join(f.path, 'settings', `${kindOf(kind)}.json`), JSON.stringify(v, null, 2), { mode: 0o600 });
+  const v = {
+    ...(data && typeof data === 'object' ? data : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  await fs.writeFile(
+    path.join(f.path, 'settings', `${kindOf(kind)}.json`),
+    JSON.stringify(v, null, 2),
+    { mode: 0o600 },
+  );
   return v;
 }
 /** The signed-in person's settings of that kind, or null. */
@@ -129,7 +143,9 @@ export async function readFolderSettings(user, repo, kind) {
   if (!user?.id) throw new HttpError(401, 'Sign in to continue.');
   const dir = folderDir(wsOf(user), user.id, slugOf(repo));
   try {
-    return JSON.parse(await fs.readFile(path.join(dir, 'settings', `${kindOf(kind)}.json`), 'utf8'));
+    return JSON.parse(
+      await fs.readFile(path.join(dir, 'settings', `${kindOf(kind)}.json`), 'utf8'),
+    );
   } catch {
     return null;
   }

@@ -1,14 +1,16 @@
 'use client';
-// Administration → Plans & gateways (the owner who runs this TicketForge, hosted service): turn payment gateways
-// (PayMongo, Xendit, Stripe) on and off, several at once, and create and edit the subscription plans (name, price,
-// currency PHP or USD, recurring cycle, free-plan option, trial days). Editing a plan that has subscribers adds a new
-// version: they stay on theirs and new subscriptions use the new one.
+// Administration → Plans & gateways (the owner who runs this TicketForge, hosted service): turn
+// payment gateways (PayMongo, Xendit, Stripe) on and off, several at once, and create and edit the
+// subscription plans (name, price, currency PHP or USD, recurring cycle, free-plan option, trial
+// days). Editing a plan that has subscribers adds a new version: they stay on theirs and new
+// subscriptions use the new one.
 import { useEffect, useState } from 'react';
 import { api, toast, openModal, closeModal, type Any } from './core';
 import { Ico, I, Modal, Spinner, ErrorState } from './ui';
 import { TF, SF, CB, MenuItem } from './fields';
 
-export const planPrice = (p: Any) => (p.isFree ? 'Free' : `${p.currency} ${p.price.toLocaleString('en', { maximumFractionDigits: 2 })}`);
+export const planPrice = (p: Any) =>
+  p.isFree ? 'Free' : `${p.currency} ${p.price.toLocaleString('en', { maximumFractionDigits: 2 })}`;
 export const cycleLabel = (i: string) => (i === 'year' ? 'yearly' : 'monthly');
 
 function GatewayCard({ g, reload }: { g: Any; reload: () => void }) {
@@ -19,7 +21,10 @@ function GatewayCard({ g, reload }: { g: Any; reload: () => void }) {
     setBusy(true);
     setError('');
     try {
-      await api('/api/billing/gateways', { method: 'PUT', body: { provider: g.provider, active, secretKey: key } });
+      await api('/api/billing/gateways', {
+        method: 'PUT',
+        body: { provider: g.provider, active, secretKey: key },
+      });
       setKey('');
       toast(active ? `${g.name} is active.` : `${g.name} is turned off.`);
       reload();
@@ -68,7 +73,11 @@ function GatewayCard({ g, reload }: { g: Any; reload: () => void }) {
         </p>
       )}
       <div className="row" style={{ gap: 8, marginTop: 8 }}>
-        <button className="btn primary" disabled={busy || (!key && !g.configured)} onClick={() => save(true)}>
+        <button
+          className="btn primary"
+          disabled={busy || (!key && !g.configured)}
+          onClick={() => save(true)}
+        >
           {busy ? 'Checking…' : g.active ? 'Save key' : 'Enable'}
         </button>
         {g.active && (
@@ -106,7 +115,11 @@ function PlanModal({
   const submit = async () => {
     setBusy(true);
     setError('');
-    const body = { ...f, price: f.isFree ? 0 : Number(f.price), trialDays: f.isFree ? 0 : Number(f.trialDays || 0) };
+    const body = {
+      ...f,
+      price: f.isFree ? 0 : Number(f.price),
+      trialDays: f.isFree ? 0 : Number(f.trialDays || 0),
+    };
     try {
       const r = plan
         ? await api(`/api/billing/plans/${encodeURIComponent(plan.id)}`, { method: 'PUT', body })
@@ -128,26 +141,41 @@ function PlanModal({
   return (
     <Modal
       title={plan ? `Edit ${plan.name}` : 'New plan'}
-      actions={[{ label: 'Cancel' }, { label: plan ? 'Save plan' : 'Create plan', kind: 'primary', busy, onClick: submit }]}
+      actions={[
+        { label: 'Cancel' },
+        { label: plan ? 'Save plan' : 'Create plan', kind: 'primary', busy, onClick: submit },
+      ]}
     >
       {plan?.subscribers > 0 && (
         <p className="muted small" style={{ marginTop: 0 }}>
-          <Ico svg={I.warn} /> {plan.subscribers} workspace{plan.subscribers === 1 ? ' is' : 's are'} on this plan. Changing the price,
-          currency, cycle or trial days adds a new version: they keep the current one and new subscriptions use the new one.
+          <Ico svg={I.warn} /> {plan.subscribers} workspace
+          {plan.subscribers === 1 ? ' is' : 's are'} on this plan. Changing the price, currency,
+          cycle or trial days adds a new version: they keep the current one and new subscriptions
+          use the new one.
         </p>
       )}
       <label className="field">
         <span>
           Name <span className="req">*</span>
         </span>
-        <TF autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Business" />
+        <TF
+          autoFocus
+          value={f.name}
+          onChange={(e) => setF({ ...f, name: e.target.value })}
+          placeholder="e.g. Business"
+        />
       </label>
       <label className="field">
         <span>Description</span>
-        <TF value={f.blurb} onChange={(e) => setF({ ...f, blurb: e.target.value })} placeholder="One line shown under the name" />
+        <TF
+          value={f.blurb}
+          onChange={(e) => setF({ ...f, blurb: e.target.value })}
+          placeholder="One line shown under the name"
+        />
       </label>
       <label className="check">
-        <CB checked={f.isFree} onChange={(e) => setF({ ...f, isFree: e.target.checked })} /> Free plan (no price, no trial)
+        <CB checked={f.isFree} onChange={(e) => setF({ ...f, isFree: e.target.checked })} /> Free
+        plan (no price, no trial)
       </label>
       {!f.isFree && (
         <>
@@ -156,7 +184,13 @@ function PlanModal({
               <span>
                 Price <span className="req">*</span>
               </span>
-              <TF type="number" min={0} aria-label="Price" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
+              <TF
+                type="number"
+                min={0}
+                aria-label="Price"
+                value={f.price}
+                onChange={(e) => setF({ ...f, price: e.target.value })}
+              />
             </label>
             <label className="field">
               <span>Currency</span>
@@ -189,7 +223,9 @@ function PlanModal({
               value={f.trialDays}
               onChange={(e) => setF({ ...f, trialDays: e.target.value })}
             />
-            <span className="muted small">The trial needs no card. After it ends the workspace is locked until the owner pays.</span>
+            <span className="muted small">
+              The trial needs no card. After it ends the workspace is locked until the owner pays.
+            </span>
           </label>
         </>
       )}
@@ -229,15 +265,18 @@ export function PaymentsTab() {
         <Spinner /> Loading…
       </div>
     );
-  const edit = (plan?: Any) => openModal(<PlanModal plan={plan} currencies={pl.currencies} intervals={pl.intervals} onSaved={load} />);
+  const edit = (plan?: Any) =>
+    openModal(
+      <PlanModal plan={plan} currencies={pl.currencies} intervals={pl.intervals} onSaved={load} />,
+    );
   return (
     <div className="bill">
       <div className="row" style={{ alignItems: 'center', margin: '0 0 12px' }}>
         <h2 style={{ margin: 0 }}>Payment gateways</h2>
       </div>
       <p className="muted small">
-        Turn on as many as you like. People pick one of the active gateways when they pay. A gateway is only saved as active when it accepts
-        the secret key.
+        Turn on as many as you like. People pick one of the active gateways when they pay. A gateway
+        is only saved as active when it accepts the secret key.
       </p>
       <div className="bill-plans">
         {gw.map((g: Any) => (

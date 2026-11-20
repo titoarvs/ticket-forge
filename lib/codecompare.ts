@@ -1,7 +1,8 @@
-// Compare the output of an AI code job with another state of the code (TF-121): the previous job run for the same issue,
-// the repository's default branch, or the last run made under the prior spec. Everything comes from data that already
-// exists (code jobs, the repository, coding specs); nothing is stored. The result is a plain unified diff that the
-// browser draws side by side (client/DiffReview.tsx).
+// Compare the output of an AI code job with another state of the code (TF-121): the previous job
+// run for the same issue, the repository's default branch, or the last run made under the prior
+// spec. Everything comes from data that already exists (code jobs, the repository, coding specs);
+// nothing is stored. The result is a plain unified diff that the browser draws side by side
+// (client/DiffReview.tsx).
 import { gh as ghApi } from './gh-actions';
 
 export const COMPARE_TARGETS = ['job', 'default', 'spec'] as const;
@@ -17,25 +18,41 @@ export function compareTarget(v: unknown): CompareTarget {
   const t = String(v || '') as CompareTarget;
   if (!COMPARE_TARGETS.includes(t))
     throw Object.assign(
-      new Error('Choose what to compare with: the previous job run, the repository default branch or the prior spec version.'),
+      new Error(
+        'Choose what to compare with: the previous job run, the repository default branch or the prior spec version.',
+      ),
       { status: 400 },
     );
   return t;
 }
 
-/** What the API returns: `diff` is a unified diff ('' = no changes); `available` is false when there is nothing to compare with. */
+/**
+ * What the API returns: `diff` is a unified diff ('' = no changes); `available` is false when there
+ * is nothing to compare with.
+ */
 export function compareResult(
   target: CompareTarget,
   { against = '', diff = '', reason = '' }: { against?: string; diff?: string; reason?: string },
 ) {
-  const cut = diff.length > MAX_DIFF ? `${diff.slice(0, MAX_DIFF)}\n… (diff cut at ${MAX_DIFF.toLocaleString()} characters)` : diff;
-  return { target, label: COMPARE_LABEL[target], available: !reason, reason, against, diff: reason ? '' : cut };
+  const cut =
+    diff.length > MAX_DIFF
+      ? `${diff.slice(0, MAX_DIFF)}\n… (diff cut at ${MAX_DIFF.toLocaleString()} characters)`
+      : diff;
+  return {
+    target,
+    label: COMPARE_LABEL[target],
+    available: !reason,
+    reason,
+    against,
+    diff: reason ? '' : cut,
+  };
 }
 
 /**
- * The earlier job to compare with. "Previous job run": the newest earlier job for the same issue and repository side that
- * changed files. "Prior spec version": the newest of those that started before the issue's current spec was generated,
- * as specs keep no history of their own (`specAt` is when the current spec was generated).
+ * The earlier job to compare with. "Previous job run": the newest earlier job for the same issue
+ * and repository side that changed files. "Prior spec version": the newest of those that started
+ * before the issue's current spec was generated, as specs keep no history of their own (`specAt` is
+ * when the current spec was generated).
  */
 export function baseJobFor(j: any, jobs: any[], target: CompareTarget, specAt = '') {
   const side = (x: any) => x.side || 'frontend';
@@ -68,7 +85,10 @@ const lines = (t: string) => {
   return x;
 };
 
-/** A unified diff (3 lines of context) for one file; `null` stands for a file that doesn't exist on that side. Empty when equal. */
+/**
+ * A unified diff (3 lines of context) for one file; `null` stands for a file that doesn't exist on
+ * that side. Empty when equal.
+ */
 export function unifiedDiff(file: string, from: string | null, to: string | null, ctx = 3) {
   const a = from === null ? [] : lines(from),
     b = to === null ? [] : lines(to);
@@ -85,13 +105,19 @@ export function unifiedDiff(file: string, from: string | null, to: string | null
   const ops: [string, string][] = a.slice(0, s).map((l): [string, string] => [' ', l]);
   if (A.length * B.length > 4_000_000) {
     // too big for a line-by-line match: show the middle as replaced
-    ops.push(...A.map((l): [string, string] => ['-', l]), ...B.map((l): [string, string] => ['+', l]));
+    ops.push(
+      ...A.map((l): [string, string] => ['-', l]),
+      ...B.map((l): [string, string] => ['+', l]),
+    );
   } else {
     const w = B.length + 1,
       t = new Uint32Array((A.length + 1) * w);
     for (let i = A.length - 1; i >= 0; i--)
       for (let k = B.length - 1; k >= 0; k--)
-        t[i * w + k] = A[i] === B[k] ? t[(i + 1) * w + k + 1] + 1 : Math.max(t[(i + 1) * w + k], t[i * w + k + 1]);
+        t[i * w + k] =
+          A[i] === B[k]
+            ? t[(i + 1) * w + k + 1] + 1
+            : Math.max(t[(i + 1) * w + k], t[i * w + k + 1]);
     let i = 0,
       k = 0;
     while (i < A.length || k < B.length) {
@@ -99,7 +125,8 @@ export function unifiedDiff(file: string, from: string | null, to: string | null
         ops.push([' ', A[i]]);
         i++;
         k++;
-      } else if (i < A.length && (k === B.length || t[(i + 1) * w + k] >= t[i * w + k + 1])) ops.push(['-', A[i++]]);
+      } else if (i < A.length && (k === B.length || t[(i + 1) * w + k] >= t[i * w + k + 1]))
+        ops.push(['-', A[i++]]);
       else ops.push(['+', B[k++]]);
     }
   }
@@ -131,17 +158,25 @@ export function unifiedDiff(file: string, from: string | null, to: string | null
     const part = ops.slice(lo, hi + 1);
     const ca = part.filter((o) => o[0] !== '+').length,
       cb = part.filter((o) => o[0] !== '-').length;
-    out.push(`@@ -${ca ? at[lo].a : at[lo].a - 1},${ca} +${cb ? at[lo].b : at[lo].b - 1},${cb} @@`, ...part.map(([t, l]) => t + l));
+    out.push(
+      `@@ -${ca ? at[lo].a : at[lo].a - 1},${ca} +${cb ? at[lo].b : at[lo].b - 1},${cb} @@`,
+      ...part.map(([t, l]) => t + l),
+    );
   }
   return `${out.join('\n')}\n`;
 }
 
-// ---------------------------------------------------------------- code jobs through GitHub (no local checkout)
+// ---------------------------------------------------------------- code jobs through GitHub (no
+// local checkout)
 const enc = (branch: string) => encodeURI(branch);
 async function treeOf(repo: string, branch: string, token: string) {
   const ref: any = await ghApi('GET', `repos/${repo}/git/ref/heads/${enc(branch)}`, { token });
-  const tree: any = await ghApi('GET', `repos/${repo}/git/trees/${ref.object.sha}?recursive=1`, { token });
-  return new Map<string, string>((tree.tree || []).filter((x: any) => x.type === 'blob').map((x: any) => [x.path, x.sha]));
+  const tree: any = await ghApi('GET', `repos/${repo}/git/trees/${ref.object.sha}?recursive=1`, {
+    token,
+  });
+  return new Map<string, string>(
+    (tree.tree || []).filter((x: any) => x.type === 'blob').map((x: any) => [x.path, x.sha]),
+  );
 }
 async function blobText(repo: string, sha: string | undefined, token: string) {
   if (!sha) return null;
@@ -150,8 +185,9 @@ async function blobText(repo: string, sha: string | undefined, token: string) {
 }
 
 /**
- * Compares a code job that ran through the AI API and GitHub. The default branch comes from GitHub's compare (the stored
- * diff when GitHub can't answer); another job's output is compared file by file, from the two branches' contents.
+ * Compares a code job that ran through the AI API and GitHub. The default branch comes from
+ * GitHub's compare (the stored diff when GitHub can't answer); another job's output is compared
+ * file by file, from the two branches' contents.
  */
 export async function remoteCompare(
   j: any,
@@ -165,10 +201,19 @@ export async function remoteCompare(
   }: { token: string; defaultBranch: string; jobs: any[]; specAt?: string; stored?: string },
 ) {
   if (target === 'default') {
-    // Once merged, the default branch already has the change (a live comparison would be empty): show what was merged.
-    if (j.status === 'merged') return compareResult(target, { against: `${defaultBranch} (before the merge)`, diff: stored });
+    // Once merged, the default branch already has the change (a live comparison would be empty):
+    // show what was merged.
+    if (j.status === 'merged')
+      return compareResult(target, {
+        against: `${defaultBranch} (before the merge)`,
+        diff: stored,
+      });
     try {
-      const c: any = await ghApi('GET', `repos/${j.repo}/compare/${enc(defaultBranch)}...${enc(j.branch)}`, { token });
+      const c: any = await ghApi(
+        'GET',
+        `repos/${j.repo}/compare/${enc(defaultBranch)}...${enc(j.branch)}`,
+        { token },
+      );
       const diff = (c.files || [])
         .map((f: any) =>
           f.patch
@@ -185,13 +230,23 @@ export async function remoteCompare(
   if (!prev) return compareResult(target, { reason: noBaseReason(target, specAt) });
   const against = `${prev.ticketKey} run of ${String(prev.startedAt).slice(0, 16).replace('T', ' ')} (${prev.branch})`;
   try {
-    const [from, to] = await Promise.all([treeOf(j.repo, prev.branch, token), treeOf(j.repo, j.branch, token)]);
+    const [from, to] = await Promise.all([
+      treeOf(j.repo, prev.branch, token),
+      treeOf(j.repo, j.branch, token),
+    ]);
     const paths = [...new Set([...(prev.files || []), ...(j.files || [])].map((f: any) => f.path))]
       .filter((p) => from.get(p) !== to.get(p))
       .sort()
       .slice(0, 60);
     const parts: string[] = [];
-    for (const p of paths) parts.push(unifiedDiff(p, await blobText(j.repo, from.get(p), token), await blobText(j.repo, to.get(p), token)));
+    for (const p of paths)
+      parts.push(
+        unifiedDiff(
+          p,
+          await blobText(j.repo, from.get(p), token),
+          await blobText(j.repo, to.get(p), token),
+        ),
+      );
     return compareResult(target, { against, diff: parts.join('') });
   } catch (e: any) {
     return compareResult(target, {

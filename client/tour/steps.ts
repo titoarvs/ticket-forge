@@ -1,6 +1,7 @@
-// The guided tours shown to new people the first time they reach a page. Each step points at an element marked with
-// data-tour="…"; steps whose element isn't on the page (a feature that's off, a button your role can't use) are
-// skipped, so the tour only ever shows what this person can actually do.
+// The guided tours shown to new people the first time they reach a page. Each step points at an
+// element marked with data-tour="…"; steps whose element isn't on the page (a feature that's off, a
+// button your role can't use) are skipped, so the tour only ever shows what this person can
+// actually do.
 export type TourId = 'home' | 'new' | 'project' | 'drawer';
 export type TourStep = {
   target: string;
@@ -30,7 +31,11 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
         title: 'Your AI connection',
         text: 'Shows which AI answers your requests and whether it is ready. Click it to pick a faster or more thorough option for the next task.',
       },
-      { target: 'bell', title: 'Notifications', text: 'Mentions, assignments and finished AI jobs land here.' },
+      {
+        target: 'bell',
+        title: 'Notifications',
+        text: 'Mentions, assignments and finished AI jobs land here.',
+      },
       {
         target: 'account',
         title: 'You, your AI and this tour',
@@ -70,7 +75,12 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
         text: 'Describe a feature and AI plans the epics and issues, or have it write a single issue for you.',
         perm: 'ai.use',
       },
-      { target: 'tn-create', title: 'Create an issue', text: 'Add an issue by hand at any time. Shortcut: press C.', perm: 'issue.create' },
+      {
+        target: 'tn-create',
+        title: 'Create an issue',
+        text: 'Add an issue by hand at any time. Shortcut: press C.',
+        perm: 'issue.create',
+      },
       {
         target: 'tn-edit',
         title: 'Saved as you go',
@@ -93,7 +103,12 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
         text: 'Runs this issue’s test cases in a real browser and records the results with screenshots.',
         perm: 'test.run',
       },
-      { target: 'composer', position: 'top', title: 'Talk it through', text: 'Comment and @mention teammates. They get a notification.' },
+      {
+        target: 'composer',
+        position: 'top',
+        title: 'Talk it through',
+        text: 'Comment and @mention teammates. They get a notification.',
+      },
     ],
   },
 };

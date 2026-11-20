@@ -1,7 +1,9 @@
 'use client';
-// Questions before the AI writes (lib/clarify.ts). The AI reads what it was given and asks the few questions whose
-// answers would most change the result; the person answers (picks a suggested answer or types one) or skips.
-// - askFirst(): a dialog. Resolves with the answers as instructions, '' when skipped (or nothing to ask), null when cancelled.
+// Questions before the AI writes (lib/clarify.ts). The AI reads what it was given and asks the few
+// questions whose answers would most change the result; the person answers (picks a suggested
+// answer or types one) or skips.
+// - askFirst(): a dialog. Resolves with the answers as instructions, '' when skipped (or nothing to
+//   ask), null when cancelled.
 // - useQuestions() + <QuestionsView>: the same inside a dialog that is already open (Add feature).
 import { useEffect, useRef, useState } from 'react';
 import { S, P, api, aiBody, closeModal, openModal, type Any } from './core';
@@ -19,7 +21,8 @@ export type AskOpts = {
   projectless?: boolean;
 };
 
-// The same questions request already on its way is shared (a dialog opened twice in a row costs one AI call).
+// The same questions request already on its way is shared (a dialog opened twice in a row costs one
+// AI call).
 const inflight = new Map<string, Promise<Any>>();
 function questions(body: Any) {
   const key = JSON.stringify(body);
@@ -62,18 +65,31 @@ export function useQuestions(o: AskOpts, onNone?: () => void) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const answered = qs ? qs.filter((q) => ans[q.id]?.trim()).length : 0;
   const text = () => {
-    const lines = (qs || []).filter((q) => ans[q.id]?.trim()).map((q) => `- ${q.question} → ${ans[q.id].trim()}`);
-    return lines.length ? `Answers to the questions asked before writing:\n${lines.join('\n')}` : '';
+    const lines = (qs || [])
+      .filter((q) => ans[q.id]?.trim())
+      .map((q) => `- ${q.question} → ${ans[q.id].trim()}`);
+    return lines.length
+      ? `Answers to the questions asked before writing:\n${lines.join('\n')}`
+      : '';
   };
-  const continueLabel = answered ? `Continue with ${answered} answer${answered > 1 ? 's' : ''}` : 'Continue';
+  const continueLabel = answered
+    ? `Continue with ${answered} answer${answered > 1 ? 's' : ''}`
+    : 'Continue';
   return { qs, err, ans, setAns, answered, text, continueLabel };
 }
 
-export function QuestionsView({ q: { qs, err, ans, setAns }, subject }: { q: ReturnType<typeof useQuestions>; subject: string }) {
+export function QuestionsView({
+  q: { qs, err, ans, setAns },
+  subject,
+}: {
+  q: ReturnType<typeof useQuestions>;
+  subject: string;
+}) {
   return (
     <>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Before it writes {subject}, the AI asks what would most change the result. Pick an answer, type your own, or leave it blank.
+        Before it writes {subject}, the AI asks what would most change the result. Pick an answer,
+        type your own, or leave it blank.
       </p>
       {err ? (
         <div className="warn-banner">
@@ -120,7 +136,15 @@ export function QuestionsView({ q: { qs, err, ans, setAns }, subject }: { q: Ret
   );
 }
 
-function AskModal({ o, resolve, box }: { o: AskOpts; resolve: (v: string | null) => void; box: { node?: unknown } }) {
+function AskModal({
+  o,
+  resolve,
+  box,
+}: {
+  o: AskOpts;
+  resolve: (v: string | null) => void;
+  box: { node?: unknown };
+}) {
   const done = useRef(false);
   const finish = (v: string | null, close = true) => {
     if (done.current) return;
@@ -129,8 +153,8 @@ function AskModal({ o, resolve, box }: { o: AskOpts; resolve: (v: string | null)
     if (close && S.modal === box.node) closeModal();
   };
   const q = useQuestions(o, () => finish(''));
-  // Closed with ✕, Escape or the backdrop (or replaced by another dialog): cancel. Checked after the unmount settles,
-  // so React's development double-mount doesn't count as closing.
+  // Closed with ✕, Escape or the backdrop (or replaced by another dialog): cancel. Checked after
+  // the unmount settles, so React's development double-mount doesn't count as closing.
   useEffect(
     () => () => {
       setTimeout(() => {

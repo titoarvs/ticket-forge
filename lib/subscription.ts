@@ -1,6 +1,7 @@
-// Cancelling a paid subscription or a trial (workspace owner). The gateway stops charging at once; the workspace keeps its paid
-// plan until the period it already paid for ends (`cancel_at_period_end` + `current_period_end`: lib/limits.ts turns
-// that into the Free plan afterwards). Refunds are not part of this.
+// Cancelling a paid subscription or a trial (workspace owner). The gateway stops charging at once;
+// the workspace keeps its paid plan until the period it already paid for ends
+// (`cancel_at_period_end` + `current_period_end`: lib/limits.ts turns that into the Free plan
+// afterwards). Refunds are not part of this.
 import { asSystem } from './db';
 import { orm, workspaces, eq, sql } from './orm';
 import { cancelPayMongoSubscription } from './paymongo';
@@ -15,13 +16,17 @@ const endAtPeriodEnd = (ws) =>
   asSystem(async () => {
     await orm
       .update(workspaces)
-      .set({ cancelAtPeriodEnd: true, currentPeriodEnd: sql`coalesce(${workspaces.currentPeriodEnd}, ${workspaces.trialEndsAt}, now())` })
+      .set({
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: sql`coalesce(${workspaces.currentPeriodEnd}, ${workspaces.trialEndsAt}, now())`,
+      })
       .where(eq(workspaces.id, ws));
   });
 
 /**
  * Cancels the workspace's subscription. Returns { status, cancelAtPeriodEnd, accessEndsAt }.
- * Throws 409 with a clear message when there is no active subscription (or it is already cancelled).
+ * Throws 409 with a clear message when there is no active subscription (or it is already
+ * cancelled).
  */
 export async function cancelSubscription(ws) {
   const [w] = await asSystem(
@@ -40,7 +45,8 @@ export async function cancelSubscription(ws) {
         .where(eq(workspaces.id, ws)),
   );
   if (!w) throw err('Workspace not found', 404);
-  if (!w.plan || w.plan === 'free' || !CANCELLABLE.includes(w.status)) throw err('There is no active subscription to cancel.', 409);
+  if (!w.plan || w.plan === 'free' || !CANCELLABLE.includes(w.status))
+    throw err('There is no active subscription to cancel.', 409);
   const ends = w.periodEnd || w.trialEnd;
   if (w.cancelAtPeriodEnd)
     throw err(
@@ -54,7 +60,8 @@ export async function cancelSubscription(ws) {
   } else if (w.stripeId) {
     await cancelAtPeriodEnd(w.stripeId, ws);
   } else {
-    // A trial, or a plan paid once through PayMongo or Xendit: there is nothing to stop at the gateway; the plan ends with the period.
+    // A trial, or a plan paid once through PayMongo or Xendit: there is nothing to stop at the
+    // gateway; the plan ends with the period.
     await endAtPeriodEnd(ws);
   }
   const [n] = await asSystem(
@@ -68,5 +75,9 @@ export async function cancelSubscription(ws) {
         .from(workspaces)
         .where(eq(workspaces.id, ws)),
   );
-  return { status: n.status, cancelAtPeriodEnd: Boolean(n.cancelAtPeriodEnd), accessEndsAt: n.periodEnd || null };
+  return {
+    status: n.status,
+    cancelAtPeriodEnd: Boolean(n.cancelAtPeriodEnd),
+    accessEndsAt: n.periodEnd || null,
+  };
 }

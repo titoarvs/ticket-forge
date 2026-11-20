@@ -1,7 +1,7 @@
 'use client';
-// Test automation → Smart selection: the Test Selection Agent picks the tests worth running for the current change
-// (code changes since the last run, recently changed issues, recent failures), with a reason for each. You review the
-// list, untick any, then run it.
+// Test automation → Smart selection: the Test Selection Agent picks the tests worth running for the
+// current change (code changes since the last run, recently changed issues, recent failures), with
+// a reason for each. You review the list, untick any, then run it.
 import { useState } from 'react';
 import { P, api, aiBody, toast, closeModal, mutate, type Any } from './core';
 import { Ico, I, Modal, Spinner } from './ui';
@@ -18,7 +18,8 @@ export function SmartSelectModal() {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<Any>(null);
   const [pick, setPick] = useState<Record<string, boolean>>({});
-  const local = typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const local =
+    typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
   const choose = async () => {
     setBusy(true);
     try {
@@ -65,15 +66,24 @@ export function SmartSelectModal() {
                 onClick: run,
               },
             ]
-          : [{ label: 'Cancel' }, { label: busy ? 'Choosing…' : 'Choose tests', kind: 'ai', disabled: busy, onClick: choose }]
+          : [
+              { label: 'Cancel' },
+              {
+                label: busy ? 'Choosing…' : 'Choose tests',
+                kind: 'ai',
+                disabled: busy,
+                onClick: choose,
+              },
+            ]
       }
     >
       {!res ? (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            The Test Selection Agent ranks the automated tests by risk: the pages and files that changed in the code since the last run,
-            issues changed this week, and tests that failed, were flaky or haven’t run for a while. It picks the ones worth running within
-            your budget, so a run takes minutes instead of the whole suite.
+            The Test Selection Agent ranks the automated tests by risk: the pages and files that
+            changed in the code since the last run, issues changed this week, and tests that failed,
+            were flaky or haven’t run for a while. It picks the ones worth running within your
+            budget, so a run takes minutes instead of the whole suite.
           </p>
           <div className="grid2">
             <label className="field">
@@ -88,7 +98,11 @@ export function SmartSelectModal() {
             <div className="field">
               <span>Signals</span>
               <CB
-                label={local ? 'Read code changes from the local repository' : 'Code changes (only on your own computer)'}
+                label={
+                  local
+                    ? 'Read code changes from the local repository'
+                    : 'Code changes (only on your own computer)'
+                }
                 checked={useCode && local}
                 disabled={!local}
                 onChange={(e: Any) => setUseCode(e.target.checked)}

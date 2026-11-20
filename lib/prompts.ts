@@ -11,8 +11,11 @@ Rules:
 - Acceptance criteria must be specific, observable and testable.
 - Always reply with a single valid JSON value and nothing else: no prose, no markdown fences.`;
 
-/** The system prompt plus the team's generation standards and guide (Administration → Generation). */
-export const systemWith = (rules, parts, guide) => `${SYSTEM_BA}\n\n${standardsBlock(rules, parts)}${guideBlock(guide, parts)}`;
+/**
+ * The system prompt plus the team's generation standards and guide (Administration → Generation).
+ */
+export const systemWith = (rules, parts, guide) =>
+  `${SYSTEM_BA}\n\n${standardsBlock(rules, parts)}${guideBlock(guide, parts)}`;
 
 export const TICKET_SHAPE = `{
   "title": "short imperative summary",
@@ -69,17 +72,26 @@ ${text}
 </document>`;
 }
 
-/** New work for an existing project: knows its epics and issues so it reuses epics and doesn't repeat issues. */
+/**
+ * New work for an existing project: knows its epics and issues so it reuses epics and doesn't
+ * repeat issues.
+ */
 export function featurePrompt({ text, sourceName, project, options = {} }: any) {
   const epics =
-    (project.epics || []).map((e) => `- "${e.title}"${e.description ? `: ${String(e.description).slice(0, 160)}` : ''}`).join('\n') ||
-    '- (none yet)';
+    (project.epics || [])
+      .map(
+        (e) => `- "${e.title}"${e.description ? `: ${String(e.description).slice(0, 160)}` : ''}`,
+      )
+      .join('\n') || '- (none yet)';
   const byEpic = new Map((project.epics || []).map((e) => [e.id, e.title]));
   const issues =
     (project.tickets || [])
       .filter((t) => t.type !== 'Sub-task')
       .slice(0, 200)
-      .map((t) => `- ${t.key || ''} ${t.title}${byEpic.get(t.epicId) ? ` [${byEpic.get(t.epicId)}]` : ''}`)
+      .map(
+        (t) =>
+          `- ${t.key || ''} ${t.title}${byEpic.get(t.epicId) ? ` [${byEpic.get(t.epicId)}]` : ''}`,
+      )
       .join('\n') || '- (none yet)';
   const granularity = {
     coarse: 'Prefer fewer, larger tickets (still sprint-sized).',
@@ -140,7 +152,14 @@ ${JSON.stringify(list)}
 Return JSON: { "tickets": [ { "index": 0, "testCases": [ ${TEST_CASE_SHAPE} ] } ] }`;
 }
 
-export function ticketActionPrompt({ action, ticket, epic, project, instruction, answers = '' }: any) {
+export function ticketActionPrompt({
+  action,
+  ticket,
+  epic,
+  project,
+  instruction,
+  answers = '',
+}: any) {
   const ctx = `Project: ${project?.name || ''}
 Project summary: ${project?.summary || ''}
 Epic: ${epic?.title || 'none'} - ${epic?.description || ''}
@@ -210,8 +229,9 @@ ${JSON.stringify(tickets)}
 Return JSON: { "epics": [ { "title": "...", "description": "...", "ticketIds": ["..."] } ] }`;
 }
 
-// The issue fields the AI reads; everything else (history, comments, links, pull requests, people, scripts, run
-// results…) never changes the answer, so it isn't sent (fewer tokens on every ticket action).
+// The issue fields the AI reads; everything else (history, comments, links, pull requests, people,
+// scripts, run results…) never changes the answer, so it isn't sent (fewer tokens on every ticket
+// action).
 import { referencesBlock } from './references';
 const ISSUE_FIELDS = [
   'title',
@@ -229,13 +249,21 @@ const ISSUE_FIELDS = [
 const TEST_FIELDS = ['title', 'type', 'priority', 'preconditions', 'steps', 'expected', 'acRef'];
 const pick = (o, keys) =>
   Object.fromEntries(
-    keys.filter((k) => o?.[k] !== undefined && o[k] !== '' && !(Array.isArray(o[k]) && !o[k].length)).map((k) => [k, o[k]]),
+    keys
+      .filter((k) => o?.[k] !== undefined && o[k] !== '' && !(Array.isArray(o[k]) && !o[k].length))
+      .map((k) => [k, o[k]]),
   );
-/** An issue as the AI needs it for one action: tests and split see only test titles, ac none, enhance the tests without scripts. */
+/**
+ * An issue as the AI needs it for one action: tests and split see only test titles, ac none,
+ * enhance the tests without scripts.
+ */
 export function ticketFor(action, t) {
   const out = pick(t, ISSUE_FIELDS);
   const tcs = t.testCases || [];
   if (action === 'ac' || !tcs.length) return out;
-  out.testCases = action === 'enhance' ? tcs.map((tc) => pick(tc, TEST_FIELDS)) : tcs.map((tc) => ({ title: tc.title }));
+  out.testCases =
+    action === 'enhance'
+      ? tcs.map((tc) => pick(tc, TEST_FIELDS))
+      : tcs.map((tc) => ({ title: tc.title }));
   return out;
 }

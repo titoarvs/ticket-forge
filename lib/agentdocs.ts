@@ -1,8 +1,8 @@
-// Document agents (lib/agents.ts, runner "document"): Epic, Kick Off, Demo, Sign-Off and Manual, Deploy, Release
-// Certification and Review a Submission. Each writes one Markdown document for an epic from everything TicketForge
-// knows about it: the epic, its issues with their status, points, assignees,
-// test results and pull requests, and the documents the other agents already wrote. The app saves the result on the
-// epic (epic.agentDocs[agentId]).
+// Document agents (lib/agents.ts, runner "document"): Epic, Kick Off, Demo, Sign-Off and Manual,
+// Deploy, Release Certification and Review a Submission. Each writes one Markdown document for an
+// epic from everything TicketForge knows about it: the epic, its issues with their status, points,
+// assignees, test results and pull requests, and the documents the other agents already wrote. The
+// app saves the result on the epic (epic.agentDocs[agentId]).
 import { askClaude } from './claude';
 import { getRules, getGuide, guideBlock } from './genrules';
 import { ensureAgent } from './agents';
@@ -41,7 +41,8 @@ export function epicContext(project, epic) {
             .slice(0, 8)
             .map((tc) => `${clip(tc.title, 90)} (${tc.status || 'Not run'})`)
             .join(' | ')}`,
-        t.prs?.length && `  Pull requests: ${t.prs.map((pr) => `${pr.repo || ''}#${pr.number} ${pr.status || ''}`).join(', ')}`,
+        t.prs?.length &&
+          `  Pull requests: ${t.prs.map((pr) => `${pr.repo || ''}#${pr.number} ${pr.status || ''}`).join(', ')}`,
       ]
         .filter(Boolean)
         .join('\n'),

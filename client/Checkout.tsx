@@ -1,8 +1,9 @@
 'use client';
-// Subscription checkout (owner): choose the plan and one of the active payment gateways, then continue to that gateway's
-// hosted payment page. The return page (/checkout/return) shows the way back (paid, cancelled or failed). A trial ended
-// without a payment lands here too: paying lifts the lock. (The PayMongo-only payment step further down is the older
-// card / GCash / Maya flow of /checkout/[method].)
+// Subscription checkout (owner): choose the plan and one of the active payment gateways, then
+// continue to that gateway's hosted payment page. The return page (/checkout/return) shows the way
+// back (paid, cancelled or failed). A trial ended without a payment lands here too: paying lifts
+// the lock. (The PayMongo-only payment step further down is the older card / GCash / Maya flow of
+// /checkout/[method].)
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { S, api, toast, closeProject, useStore, type Any } from './core';
@@ -10,7 +11,12 @@ import { Spinner, ErrorState, EmptyState, Ico, I } from './ui';
 import { planPrice, cycleLabel } from './Payments';
 import { refreshLock } from './Billing';
 
-const php = (n: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(n);
+const php = (n: number) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    maximumFractionDigits: 0,
+  }).format(n);
 const per = (i: string) => (i === 'year' ? 'year' : 'month');
 const search = () => new URLSearchParams(location.search);
 
@@ -37,8 +43,11 @@ export function CheckoutPage() {
   }, []);
 
   const plan = d?.plans.find((p: Any) => p.id === planId);
-  // Each gateway takes certain currencies (PayMongo and Xendit: PHP), so only the ones that can take this plan are offered.
-  const gateways = (d?.gateways || []).filter((g: Any) => !plan || g.currencies.includes(plan.currency));
+  // Each gateway takes certain currencies (PayMongo and Xendit: PHP), so only the ones that can
+  // take this plan are offered.
+  const gateways = (d?.gateways || []).filter(
+    (g: Any) => !plan || g.currencies.includes(plan.currency),
+  );
   const pay = async () => {
     if (!plan || !gateway || !gateways.some((g: Any) => g.provider === gateway)) {
       setMissing(true);
@@ -46,7 +55,10 @@ export function CheckoutPage() {
     }
     setBusy(true);
     try {
-      const r = await api('/api/billing/checkout', { method: 'POST', body: { plan: plan.id, gateway } });
+      const r = await api('/api/billing/checkout', {
+        method: 'POST',
+        body: { plan: plan.id, gateway },
+      });
       location.href = r.url;
     } catch (e: Any) {
       toast(e.message, 'err');
@@ -135,13 +147,21 @@ export function CheckoutPage() {
                 <span className="muted small">Total in {plan.currency}</span>
               </div>
             )}
-            <fieldset className="pay-methods" aria-describedby={missing ? 'pay-missing' : undefined}>
+            <fieldset
+              className="pay-methods"
+              aria-describedby={missing ? 'pay-missing' : undefined}
+            >
               <legend>Pay with</legend>
               {gateways.length === 0 && (
-                <p className="muted">No active payment gateway takes {plan?.currency} payments. Choose another plan.</p>
+                <p className="muted">
+                  No active payment gateway takes {plan?.currency} payments. Choose another plan.
+                </p>
               )}
               {gateways.map((g: Any) => (
-                <label key={g.provider} className={`pay-method ${gateway === g.provider ? 'on' : ''}`}>
+                <label
+                  key={g.provider}
+                  className={`pay-method ${gateway === g.provider ? 'on' : ''}`}
+                >
                   <input
                     type="radio"
                     name="gateway"
@@ -170,7 +190,11 @@ export function CheckoutPage() {
                   Back
                 </Link>
               )}
-              <button className="btn primary" onClick={pay} disabled={busy || !plan || gateways.length === 0}>
+              <button
+                className="btn primary"
+                onClick={pay}
+                disabled={busy || !plan || gateways.length === 0}
+              >
                 {busy ? 'One moment…' : plan ? `Pay ${planPrice(plan)}` : 'Pay'}
               </button>
             </div>
@@ -206,7 +230,10 @@ export function PaymentStepPage({ method }: { method: string }) {
   const toPayMongo = async () => {
     setBusy(true);
     try {
-      const r = await api('/api/billing/paymongo', { method: 'POST', body: { plan: d.plan.id, interval: d.interval, method } });
+      const r = await api('/api/billing/paymongo', {
+        method: 'POST',
+        body: { plan: d.plan.id, interval: d.interval, method },
+      });
       S.nav(r.url);
     } catch (e: Any) {
       toast(e.message, 'err');
@@ -268,13 +295,18 @@ export function PaymentStepPage({ method }: { method: string }) {
   );
 }
 
-/** Where the gateway sends the owner back to: paid (new plan shown, lock lifted), cancelled (nothing changed) or failed (retry). */
+/**
+ * Where the gateway sends the owner back to: paid (new plan shown, lock lifted), cancelled (nothing
+ * changed) or failed (retry).
+ */
 export function CheckoutReturnPage() {
   useStore();
   const [r, setR] = useState<Any>(null);
   const [error, setError] = useState<Any>(null);
   const load = () => {
-    return api(`/api/billing/checkout/return?result=${encodeURIComponent(search().get('result') || '')}`)
+    return api(
+      `/api/billing/checkout/return?result=${encodeURIComponent(search().get('result') || '')}`,
+    )
       .then(async (x) => {
         setR(x);
         setError(null);
@@ -296,7 +328,12 @@ export function CheckoutReturnPage() {
       <div className="page-inner pay">
         <h1>Payment</h1>
         {error ? (
-          <ErrorState title="Couldn’t check your payment" error={error} onRetry={load} actions={billing}>
+          <ErrorState
+            title="Couldn’t check your payment"
+            error={error}
+            onRetry={load}
+            actions={billing}
+          >
             <p>We couldn’t confirm how the payment went.</p>
           </ErrorState>
         ) : !r ? (

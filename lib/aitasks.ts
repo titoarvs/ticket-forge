@@ -1,6 +1,7 @@
-// Model routing (Administration → AI → Model routing): every AI call names its task, each task has a tier, and each
-// tier maps to a model per AI (your Claude account, GitHub Copilot, each AI API). Heavy reasoning gets the top model;
-// routine, high-volume work (epics outlines, questions, failure notes) gets a cheaper, faster one, saving usage.
+// Model routing (Administration → AI → Model routing): every AI call names its task, each task has
+// a tier, and each tier maps to a model per AI (your Claude account, GitHub Copilot, each AI API).
+// Heavy reasoning gets the top model; routine, high-volume work (epics outlines, questions, failure
+// notes) gets a cheaper, faster one, saving usage.
 
 /** The three tiers, best first. */
 export const TIERS = ['high', 'standard', 'light'];
@@ -125,7 +126,14 @@ export const AI_TASKS = [
     tier: 'high',
     agent: true,
   },
-  { id: 'pr', group: 'Code', label: 'Pull request text', desc: 'PR / MR titles and descriptions', tier: 'light', maxOut: 1500 },
+  {
+    id: 'pr',
+    group: 'Code',
+    label: 'Pull request text',
+    desc: 'PR / MR titles and descriptions',
+    tier: 'light',
+    maxOut: 1500,
+  },
   {
     id: 'quick',
     group: 'Helpers',
@@ -153,7 +161,9 @@ export const AGENT_TASK = {
 
 /** Claude Code aliases: always the newest model of each family your Claude Code knows. */
 export const CLAUDE_TIER_DEFAULTS = { high: 'opus', standard: 'sonnet', light: 'haiku' };
-/** Suggested models per tier for each AI API (shown as hints; blank uses the provider's own model). */
+/**
+ * Suggested models per tier for each AI API (shown as hints; blank uses the provider's own model).
+ */
 export const API_TIER_HINTS = {
   anthropic: { high: 'claude-opus-5-5', standard: 'claude-sonnet-5-5', light: 'claude-haiku-5-5' },
   openai: { high: 'gpt-4.1', standard: 'gpt-4.1', light: 'gpt-4.1-mini' },
@@ -164,15 +174,20 @@ const str = (v, n = 120) =>
   String(v ?? '')
     .trim()
     .slice(0, n);
-const tierMap = (v, dflt: any = {}) => Object.fromEntries(TIERS.map((k) => [k, str(v?.[k] ?? dflt[k] ?? '')]));
+const tierMap = (v, dflt: any = {}) =>
+  Object.fromEntries(TIERS.map((k) => [k, str(v?.[k] ?? dflt[k] ?? '')]));
 
 /** Saved routing → a complete, safe object. */
 export function normalizeRouting(v: any = {}) {
   const tiers: any = {};
   for (const t of AI_TASKS)
-    tiers[t.id] = TIERS.includes(v?.tiers?.[t.id]) || /^cfg:[\w-]{1,40}$/.test(v?.tiers?.[t.id] || '') ? v.tiers[t.id] : t.tier;
+    tiers[t.id] =
+      TIERS.includes(v?.tiers?.[t.id]) || /^cfg:[\w-]{1,40}$/.test(v?.tiers?.[t.id] || '')
+        ? v.tiers[t.id]
+        : t.tier;
   const api: any = {};
-  for (const [id, m] of Object.entries<any>(v?.api || {})) if (/^[\w-]{1,40}$/.test(id)) api[id] = tierMap(m);
+  for (const [id, m] of Object.entries<any>(v?.api || {}))
+    if (/^[\w-]{1,40}$/.test(id)) api[id] = tierMap(m);
   return {
     enabled: v?.enabled !== false,
     lightFast: v?.lightFast !== false, // light tasks never use extended thinking
@@ -183,14 +198,19 @@ export function normalizeRouting(v: any = {}) {
       ? v.cacheTasks.filter((t) => TASK_IDS.has(t))
       : ['quick', 'repo', 'failure', 'pr', 'selection', 'healing', 'plan'],
     tiers,
-    // Cheap first: tasks marked escalate run on Standard and are re-asked once on High if the answer doesn't parse.
+    // Cheap first: tasks marked escalate run on Standard and are re-asked once on High if the
+    // answer doesn't parse.
     escalate: v?.escalate === true,
-    // Your own prices (USD per million tokens) for models the built-in list doesn't have, or to override it.
+    // Your own prices (USD per million tokens) for models the built-in list doesn't have, or to
+    // override it.
     prices: normalizePrices(v?.prices),
-    // Monthly AI budget in USD (0 = none). warn: banner only · downgrade: High work runs on Standard · pause: AI stops.
+    // Monthly AI budget in USD (0 = none). warn: banner only · downgrade: High work runs on
+    // Standard · pause: AI stops.
     budget: {
       monthlyUsd: Math.max(0, Number(v?.budget?.monthlyUsd) || 0),
-      action: ['warn', 'downgrade', 'pause'].includes(v?.budget?.action) ? v.budget.action : 'downgrade',
+      action: ['warn', 'downgrade', 'pause'].includes(v?.budget?.action)
+        ? v.budget.action
+        : 'downgrade',
     },
     claude: tierMap(v?.claude, CLAUDE_TIER_DEFAULTS),
     copilot: tierMap(v?.copilot),
@@ -199,18 +219,27 @@ export function normalizeRouting(v: any = {}) {
 }
 export const DEFAULT_ROUTING = normalizeRouting({});
 
-/** The tier for a task ('' = no task named: the caller's own choice). A task routed to a custom configuration has no tier. */
+/**
+ * The tier for a task ('' = no task named: the caller's own choice). A task routed to a custom
+ * configuration has no tier.
+ */
 export function tierFor(routing, task) {
   const p: any = pickFor(routing, task);
   return TIERS.includes(p) ? p : '';
 }
-/** What a task runs on: a tier, 'cfg:<id>' (a custom AI configuration) or '' (the caller's own choice). */
+/**
+ * What a task runs on: a tier, 'cfg:<id>' (a custom AI configuration) or '' (the caller's own
+ * choice).
+ */
 export function pickFor(routing, task) {
   if (!routing?.enabled || !TASK_IDS.has(task)) return '';
   return routing.tiers[task] || 'standard';
 }
 
-/** Custom AI configurations (Administration → AI → Configurations): a named engine + model + reasoning + instructions. */
+/**
+ * Custom AI configurations (Administration → AI → Configurations): a named engine + model +
+ * reasoning + instructions.
+ */
 const ENGINES = ['claude', 'copilot', 'api'];
 export function normalizeConfigs(list) {
   return (Array.isArray(list) ? list : [])
@@ -229,8 +258,8 @@ export function normalizeConfigs(list) {
 }
 
 // ---------------------------------------------------------------- prices (USD per million tokens)
-// Anthropic list prices; cache writes are 1.25x input (5-minute cache). Other providers: add yours in Administration
-// → AI → Model routing → Prices. A model without a price shows tokens only.
+// Anthropic list prices; cache writes are 1.25x input (5-minute cache). Other providers: add yours
+// in Administration → AI → Model routing → Prices. A model without a price shows tokens only.
 const PRICES_DEFAULT = {
   'claude-fable-5-2': { in: 8, out: 40, cacheRead: 0.2 },
   'claude-opus-5-5': { in: 4, out: 20, cacheRead: 0.2 },
@@ -238,8 +267,16 @@ const PRICES_DEFAULT = {
   'claude-sonnet-5-5': { in: 2, out: 10, cacheRead: 0.1 },
   'claude-haiku-5-5': { in: 0.1, out: 0.5, cacheRead: 0.01 },
 };
-/** Claude Code aliases → the model they mean today (for API-equivalent estimates of Claude account runs). */
-const ALIAS = { opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5', fable: 'claude-fable-5-2' };
+/**
+ * Claude Code aliases → the model they mean today (for API-equivalent estimates of Claude account
+ * runs).
+ */
+const ALIAS = {
+  opus: 'claude-opus-5-5',
+  sonnet: 'claude-sonnet-5-5',
+  haiku: 'claude-haiku-5-5',
+  fable: 'claude-fable-5-2',
+};
 function normalizePrices(v) {
   const out: any = {};
   for (const [m, p] of Object.entries<any>(v && typeof v === 'object' ? v : {})) {
@@ -250,7 +287,10 @@ function normalizePrices(v) {
   }
   return out;
 }
-/** The price of a model: your price, else the built-in one (longest matching name, so dated ids match too). */
+/**
+ * The price of a model: your price, else the built-in one (longest matching name, so dated ids
+ * match too).
+ */
 function priceFor(model, prices: any = {}) {
   const m = ALIAS[String(model || '').toLowerCase()] || String(model || '');
   if (!m) return null;

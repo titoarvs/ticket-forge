@@ -1,12 +1,13 @@
-// Markdown (as written for agent documents) to a Word document: headings, paragraphs with bold, italic, code and
-// links, bulleted and numbered lists, and tables with a navy header row.
+// Markdown (as written for agent documents) to a Word document: headings, paragraphs with bold,
+// italic, code and links, bulleted and numbered lists, and tables with a navy header row.
 const NAVY = '0C2A50';
 
 /** Inline Markdown → runs. */
 function inline(d, text, base: any = {}) {
   const { TextRun, ExternalHyperlink } = d;
   const out: any[] = [];
-  const re = /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\s][^*]*)\*|_([^_\s][^_]*)_|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\))/g;
+  const re =
+    /(\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\s][^*]*)\*|_([^_\s][^_]*)_|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\))/g;
   let last = 0,
     m;
   const plain = (s) => s && out.push(new TextRun({ text: s, ...base }));
@@ -19,7 +20,10 @@ function inline(d, text, base: any = {}) {
       const url = m[8];
       out.push(
         /^(https?:|mailto:)/i.test(url)
-          ? new ExternalHyperlink({ link: url, children: [new TextRun({ text: m[7], style: 'Hyperlink', ...base })] })
+          ? new ExternalHyperlink({
+              link: url,
+              children: [new TextRun({ text: m[7], style: 'Hyperlink', ...base })],
+            })
           : new TextRun({ text: m[7], ...base }),
       );
     }
@@ -36,7 +40,10 @@ const cellsOf = (line) =>
     .split(/(?<!\\)\|/)
     .map((c) => c.trim().replace(/\\\|/g, '|'));
 
-export async function markdownToDocx(md, { title = 'Document', creator = 'TicketForge' }: any = {}) {
+export async function markdownToDocx(
+  md,
+  { title = 'Document', creator = 'TicketForge' }: any = {},
+) {
   const d = await import('docx');
   const {
     Document,
@@ -68,7 +75,11 @@ export async function markdownToDocx(md, { title = 'Document', creator = 'Ticket
     let m;
     if ((m = l.match(/^#\s+(.*)/))) {
       kids.push(
-        new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 240 }, children: inline(d, m[1], { size: 44, color: NAVY }) }),
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 240 },
+          children: inline(d, m[1], { size: 44, color: NAVY }),
+        }),
       );
       i++;
       continue;
@@ -86,7 +97,11 @@ export async function markdownToDocx(md, { title = 'Document', creator = 'Ticket
     }
     if ((m = l.match(/^#{3,6}\s+(.*)/))) {
       kids.push(
-        new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 180, after: 80 }, children: inline(d, m[1], { color: NAVY }) }),
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 180, after: 80 },
+          children: inline(d, m[1], { color: NAVY }),
+        }),
       );
       i++;
       continue;
@@ -109,11 +124,17 @@ export async function markdownToDocx(md, { title = 'Document', creator = 'Ticket
                   { length: cols },
                   (_, ci) =>
                     new TableCell({
-                      ...(ri === 0 ? { shading: { type: ShadingType.CLEAR, fill: NAVY, color: 'auto' } } : {}),
+                      ...(ri === 0
+                        ? { shading: { type: ShadingType.CLEAR, fill: NAVY, color: 'auto' } }
+                        : {}),
                       margins: { top: 60, bottom: 60, left: 100, right: 100 },
                       children: [
                         new Paragraph({
-                          children: inline(d, r[ci] ?? '', ri === 0 ? { bold: true, color: 'FFFFFF', size: 19 } : { size: 19 }),
+                          children: inline(
+                            d,
+                            r[ci] ?? '',
+                            ri === 0 ? { bold: true, color: 'FFFFFF', size: 19 } : { size: 19 },
+                          ),
                         }),
                       ],
                     }),
@@ -155,7 +176,8 @@ export async function markdownToDocx(md, { title = 'Document', creator = 'Ticket
     }
     if (/^\s*>\s?/.test(l)) {
       const q: any[] = [];
-      while (i < lines.length && /^\s*>\s?/.test(lines[i])) q.push(lines[i++].replace(/^\s*>\s?/, ''));
+      while (i < lines.length && /^\s*>\s?/.test(lines[i]))
+        q.push(lines[i++].replace(/^\s*>\s?/, ''));
       kids.push(
         new Paragraph({
           indent: { left: 360 },
@@ -167,7 +189,12 @@ export async function markdownToDocx(md, { title = 'Document', creator = 'Ticket
     }
     const para = [l.trim()];
     i++;
-    while (i < lines.length && lines[i].trim() && !/^(#|\s*\||\s*[-*+]\s|\s*\d+[.)]\s|\s*>)/.test(lines[i])) para.push(lines[i++].trim());
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^(#|\s*\||\s*[-*+]\s|\s*\d+[.)]\s|\s*>)/.test(lines[i])
+    )
+      para.push(lines[i++].trim());
     kids.push(new Paragraph({ spacing: { after: 120 }, children: inline(d, para.join(' ')) }));
   }
   const doc = new Document({

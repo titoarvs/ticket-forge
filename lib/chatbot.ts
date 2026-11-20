@@ -1,19 +1,38 @@
-// The help chatbot: rule-based, no AI. It answers from the FAQ below and from live ticket data. Ticket data is limited
-// by the person's role: only projects they have access to, and people counts only with "Manage users and access".
+// The help chatbot: rule-based, no AI. It answers from the FAQ below and from live ticket data.
+// Ticket data is limited by the person's role: only projects they have access to, and people counts
+// only with "Manage users and access".
 import { asSystem } from './db';
 import { orm, projects, issues, workspaceMembers, eq, and, sql } from './orm';
 import { canAccess, has } from './store';
 
-/** Help content. `k`: words or phrases that point to the entry (matched anywhere in the question). */
+/**
+ * Help content. `k`: words or phrases that point to the entry (matched anywhere in the question).
+ */
 export const FAQ = [
   {
     id: 'projects',
-    k: ['create a project', 'new project', 'import a project', 'start a project', 'upload a document', 'requirement document'],
+    k: [
+      'create a project',
+      'new project',
+      'import a project',
+      'start a project',
+      'upload a document',
+      'requirement document',
+    ],
     a: 'To start a project, choose “New” in the top bar, upload a requirements document (or start blank) and TicketForge turns it into epics, tickets, acceptance criteria and test cases. You need the “Create and import projects” permission.',
   },
   {
     id: 'tickets',
-    k: ['create a ticket', 'create an issue', 'new ticket', 'new issue', 'add a ticket', 'add an issue', 'edit a ticket', 'edit an issue'],
+    k: [
+      'create a ticket',
+      'create an issue',
+      'new ticket',
+      'new issue',
+      'add a ticket',
+      'add an issue',
+      'edit a ticket',
+      'edit an issue',
+    ],
     a: 'Open a project and use “Create” to add an issue, or click any issue to open it and edit its fields, acceptance criteria and test cases. Creating and editing need the “Create issues” and “Edit issues” permissions.',
   },
   {
@@ -23,7 +42,13 @@ export const FAQ = [
   },
   {
     id: 'versions',
-    k: ['version history', 'restore a version', 'issue version', 'previous version', 'undo a status'],
+    k: [
+      'version history',
+      'restore a version',
+      'issue version',
+      'previous version',
+      'undo a status',
+    ],
     a: 'Every status change saves the full ticket as a version. Open the ticket, go to Activity → Versions to view, compare or restore one. Restoring is for administrators and project leads.',
   },
   {
@@ -53,7 +78,15 @@ export const FAQ = [
   },
   {
     id: 'release',
-    k: ['release note', 'release notes', 'what is new', "what's new", 'new feature', 'app version', 'which version'],
+    k: [
+      'release note',
+      'release notes',
+      'what is new',
+      "what's new",
+      'new feature',
+      'app version',
+      'which version',
+    ],
     a: 'The app version is shown at the top of the sidebar, and every release with its features is listed on the Release notes page (link in the footer).',
   },
 ];
@@ -92,11 +125,17 @@ const PEOPLE =
 
 const tell = (reply, kind) => ({ reply, kind });
 
-const doneNames = (workflow) => new Set(workflow?.length ? workflow.filter((w) => w.category === 'done').map((w) => w.name) : ['Done']);
+const doneNames = (workflow) =>
+  new Set(
+    workflow?.length ? workflow.filter((w) => w.category === 'done').map((w) => w.name) : ['Done'],
+  );
 
 /** Counts for one project the person can read (the database also filters by their access). */
 async function projectStats(project, user) {
-  const [projectRow] = await orm.select({ data: projects.data }).from(projects).where(eq(projects.id, project.id));
+  const [projectRow] = await orm
+    .select({ data: projects.data })
+    .from(projects)
+    .where(eq(projects.id, project.id));
   const meta: any = projectRow?.data || {};
   const rows: any[] = await orm
     .select({ data: issues.data })
@@ -123,8 +162,8 @@ const describe = (s, askedMine) => {
 /** Ticket data, only for the projects this person can access. */
 async function ticketAnswer(user, text) {
   const m = norm(text);
-  // Every project name in the workspace is compared with the question (names only, never data) so a project the person
-  // can't open is refused instead of being treated as "not found".
+  // Every project name in the workspace is compared with the question (names only, never data) so a
+  // project the person can't open is refused instead of being treated as "not found".
   const all = await asSystem(
     async () =>
       await orm
@@ -136,11 +175,17 @@ async function ticketAnswer(user, text) {
     String(p.key || '')
       .toLowerCase()
       .replace(/[^\w]/g, '');
-  const named = all.filter((p) => (p.name && m.includes(norm(p.name))) || (keyOf(p) && new RegExp(`\\b${keyOf(p)}\\b`).test(m)));
+  const named = all.filter(
+    (p) =>
+      (p.name && m.includes(norm(p.name))) || (keyOf(p) && new RegExp(`\\b${keyOf(p)}\\b`).test(m)),
+  );
   const denied = named.filter((p) => !canAccess(user, p.id));
   const allowed = named.filter((p) => canAccess(user, p.id));
   if (denied.length && !allowed.length)
-    return tell('You don’t have access to that project, so I can’t share its tickets. Ask an administrator to add you to it.', 'denied');
+    return tell(
+      'You don’t have access to that project, so I can’t share its tickets. Ask an administrator to add you to it.',
+      'denied',
+    );
   const mine = /\b(my|mine|assigned to me)\b/.test(m);
   const pool = allowed.length ? allowed : all.filter((p) => canAccess(user, p.id));
   if (!pool.length)
@@ -149,7 +194,10 @@ async function ticketAnswer(user, text) {
       'denied',
     );
   if (pool.length > 8)
-    return tell(`You have access to ${pool.length} projects. Name one (for example “How many tickets are in ${pool[0].name}?”).`, 'data');
+    return tell(
+      `You have access to ${pool.length} projects. Name one (for example “How many tickets are in ${pool[0].name}?”).`,
+      'data',
+    );
   const lines: any[] = [];
   for (const p of pool) lines.push(describe(await projectStats(p, user), mine));
   return tell(lines.join('\n'), 'data');
@@ -158,7 +206,10 @@ async function ticketAnswer(user, text) {
 /** People counts need the "Manage users and access" permission. */
 async function peopleAnswer(user) {
   if (!has(user, 'users.manage'))
-    return tell('You don’t have permission to see user information, so I can’t answer that. Ask an administrator.', 'denied');
+    return tell(
+      'You don’t have permission to see user information, so I can’t answer that. Ask an administrator.',
+      'denied',
+    );
   const [counted] = await asSystem(
     async () =>
       await orm
@@ -167,11 +218,15 @@ async function peopleAnswer(user) {
         .where(eq(workspaceMembers.workspaceId, user.workspace_id || '')),
   );
   const n = counted?.n || 0;
-  return tell(`There ${n === 1 ? 'is' : 'are'} ${n} ${n === 1 ? 'person' : 'people'} in this workspace.`, 'data');
+  return tell(
+    `There ${n === 1 ? 'is' : 'are'} ${n} ${n === 1 ? 'person' : 'people'} in this workspace.`,
+    'data',
+  );
 }
 
 /**
- * Answers one question for a signed-in user. Returns { reply, kind } where kind is 'faq', 'data', 'denied' or 'unknown'.
+ * Answers one question for a signed-in user. Returns { reply, kind } where kind is 'faq', 'data',
+ * 'denied' or 'unknown'.
  * Order: people data (permission checked) → ticket data (access checked) → FAQ → fallback.
  */
 export async function answer(user, message) {
@@ -181,7 +236,8 @@ export async function answer(user, message) {
   if (!text) return tell('Type a question and I’ll do my best to help.', 'unknown');
   const m = norm(text);
   if (PEOPLE.test(m) && !HOW_TO.test(text)) return peopleAnswer(user);
-  if (TICKET_WORD.test(m) && DATA_WORD.test(m) && !HOW_TO.test(text)) return ticketAnswer(user, text);
+  if (TICKET_WORD.test(m) && DATA_WORD.test(m) && !HOW_TO.test(text))
+    return ticketAnswer(user, text);
   const faq = matchFaq(text);
   if (faq) return tell(faq.a, 'faq');
   return tell(FALLBACK, 'unknown');

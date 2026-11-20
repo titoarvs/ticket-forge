@@ -1,6 +1,7 @@
-// UI references attached to a ticket (screenshot, HTML, PDF, Word, text...). The file is kept in `files`; what is read
-// from it (text, form fields, components) is returned as a small object that lives in the ticket as `references[]`
-// and is passed to AI generation. Limits are configurable: TICKETFORGE_REF_MAX_MB and TICKETFORGE_REF_TYPES.
+// UI references attached to a ticket (screenshot, HTML, PDF, Word, text...). The file is kept in
+// `files`; what is read from it (text, form fields, components) is returned as a small object that
+// lives in the ticket as `references[]` and is passed to AI generation. Limits are configurable:
+// TICKETFORGE_REF_MAX_MB and TICKETFORGE_REF_TYPES.
 import path from 'node:path';
 import { extractText } from './parse';
 
@@ -19,7 +20,10 @@ const TYPES = {
   '.json': 'application/json',
   '.csv': 'text/csv',
 };
-/** Allowed extensions: all of TYPES, or the comma-separated list in TICKETFORGE_REF_TYPES (e.g. ".png,.pdf"). */
+/**
+ * Allowed extensions: all of TYPES, or the comma-separated list in TICKETFORGE_REF_TYPES (e.g.
+ * ".png,.pdf").
+ */
 export function allowedExtensions() {
   const set = String(process.env.TICKETFORGE_REF_TYPES || '')
     .split(',')
@@ -38,7 +42,8 @@ export function referenceType(name) {
   const ext = path.extname(String(name || '')).toLowerCase();
   return allowedExtensions().includes(ext) ? TYPES[ext] : null;
 }
-export const typeMessage = () => `This type of file can’t be attached as a reference. Allowed types: ${allowedExtensions().join(', ')}.`;
+export const typeMessage = () =>
+  `This type of file can’t be attached as a reference. Allowed types: ${allowedExtensions().join(', ')}.`;
 export const sizeMessage = () => `The file is larger than the maximum size of ${maxLabel()}.`;
 
 const decode = (s) =>
@@ -54,12 +59,19 @@ const strip = (h) =>
     .replace(/\s+/g, ' ')
     .trim();
 const attr = (tag, n) =>
-  decode((new RegExp(`\\b${n}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(tag) || []).slice(2).find((x) => x !== undefined) || '');
+  decode(
+    (new RegExp(`\\b${n}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(tag) || [])
+      .slice(2)
+      .find((x) => x !== undefined) || '',
+  );
 const uniq = (a) => [...new Set(a.filter(Boolean))];
 
 /** Form fields and components from page markup. */
 export function fromHtml(html) {
-  const h = String(html).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<!--[\s\S]*?-->/gi, '');
+  const h = String(html).replace(
+    /<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<!--[\s\S]*?-->/gi,
+    '',
+  );
   const labels: any = {};
   for (const m of h.matchAll(/<label\b([^>]*)>([\s\S]*?)<\/label>/gi)) {
     const f = attr(m[1], 'for');
@@ -67,17 +79,29 @@ export function fromHtml(html) {
   }
   const fields: any[] = [];
   for (const m of h.matchAll(/<(input|select|textarea)\b([^>]*)>/gi)) {
-    const type = m[1].toLowerCase() === 'input' ? (attr(m[2], 'type') || 'text').toLowerCase() : m[1].toLowerCase();
+    const type =
+      m[1].toLowerCase() === 'input'
+        ? (attr(m[2], 'type') || 'text').toLowerCase()
+        : m[1].toLowerCase();
     if (['hidden', 'submit', 'button', 'reset', 'image'].includes(type)) continue;
     const id = attr(m[2], 'id');
-    const label = labels[id] || attr(m[2], 'aria-label') || attr(m[2], 'placeholder') || attr(m[2], 'name') || id;
-    fields.push(`${label || 'Unnamed field'} (${type}${/\brequired\b/i.test(m[2]) ? ', required' : ''})`);
+    const label =
+      labels[id] ||
+      attr(m[2], 'aria-label') ||
+      attr(m[2], 'placeholder') ||
+      attr(m[2], 'name') ||
+      id;
+    fields.push(
+      `${label || 'Unnamed field'} (${type}${/\brequired\b/i.test(m[2]) ? ', required' : ''})`,
+    );
   }
   const components: any[] = [];
-  for (const m of h.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/gi)) components.push(`Button: ${strip(m[1]) || 'unlabelled'}`);
+  for (const m of h.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/gi))
+    components.push(`Button: ${strip(m[1]) || 'unlabelled'}`);
   for (const m of h.matchAll(/<input\b[^>]*type\s*=\s*["']?(?:submit|button)["']?[^>]*>/gi))
     components.push(`Button: ${attr(m[0], 'value') || 'unlabelled'}`);
-  for (const m of h.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)) components.push(`Heading: ${strip(m[2])}`);
+  for (const m of h.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi))
+    components.push(`Heading: ${strip(m[2])}`);
   for (const [tag, name] of [
     ['table', 'Table'],
     ['form', 'Form'],
@@ -124,7 +148,8 @@ const clip = (s, n) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 /**
  * Reads an uploaded reference. Returns { text, fields, components, preview, status, note }.
- * Images are kept and shown, but no text is read from them (no OCR), so their `status` is 'no-text'.
+ * Images are kept and shown, but no text is read from them (no OCR), so their `status` is
+ * 'no-text'.
  */
 export async function extractReference(buffer, name) {
   const ext = path.extname(String(name || '')).toLowerCase();
@@ -139,7 +164,8 @@ export async function extractReference(buffer, name) {
     };
   try {
     const text = await extractText(buffer, name);
-    const found = ext === '.html' || ext === '.htm' ? fromHtml(buffer.toString('utf8')) : fromText(text);
+    const found =
+      ext === '.html' || ext === '.htm' ? fromHtml(buffer.toString('utf8')) : fromText(text);
     return {
       text: clip(text, 20000),
       ...found,
@@ -167,7 +193,9 @@ export function referencesBlock(refs) {
     .map((r, i) =>
       [
         `Reference ${i + 1}: ${String(r.name || '').slice(0, 200)}`,
-        r.text ? `Extracted text:\n${String(r.text).slice(0, 6000)}` : '(no text could be extracted)',
+        r.text
+          ? `Extracted text:\n${String(r.text).slice(0, 6000)}`
+          : '(no text could be extracted)',
         r.fields?.length ? `Form fields: ${r.fields.slice(0, 80).join('; ')}` : '',
         r.components?.length ? `UI components: ${r.components.slice(0, 80).join('; ')}` : '',
       ]

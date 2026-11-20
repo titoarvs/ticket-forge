@@ -1,5 +1,6 @@
 'use client';
-// The workspace you are in (top bar): switch to another of your workspaces, create one, or rename this one (owner).
+// The workspace you are in (top bar): switch to another of your workspaces, create one, or rename
+// this one (owner).
 // Switching reloads the app, so nothing from the previous workspace stays on screen or in memory.
 import { useState } from 'react';
 import { S, api, openModal, closeModal, setMenu, toast, type Any } from './core';
@@ -10,7 +11,10 @@ const go = (to = '/projects') => {
   location.href = to;
 };
 
-/** Switch to another of your workspaces and reload there (`to`: a page to open afterwards, such as a project). */
+/**
+ * Switch to another of your workspaces and reload there (`to`: a page to open afterwards, such as a
+ * project).
+ */
 export async function switchWorkspace(id: string, to = '/projects') {
   try {
     await api('/api/workspaces/current', { method: 'PUT', body: { id } });
@@ -45,12 +49,18 @@ function NameModal({ mode }: { mode: 'create' | 'rename' }) {
       title={mode === 'create' ? 'Create a workspace' : 'Rename this workspace'}
       actions={[
         { label: 'Cancel' },
-        { label: mode === 'create' ? 'Create workspace' : 'Save', kind: 'primary', disabled: !name.trim() || busy, onClick: save },
+        {
+          label: mode === 'create' ? 'Create workspace' : 'Save',
+          kind: 'primary',
+          disabled: !name.trim() || busy,
+          onClick: save,
+        },
       ]}
     >
       {mode === 'create' && (
         <p className="muted" style={{ marginTop: 0 }}>
-          A workspace is a separate space for a company or team: its own projects, people, roles and AI settings. You’ll be its owner.
+          A workspace is a separate space for a company or team: its own projects, people, roles and
+          AI settings. You’ll be its owner.
         </p>
       )}
       <label className="field">
@@ -103,7 +113,11 @@ export function WorkspaceSwitcher() {
     >
       <div className="mh">Your workspaces</div>
       {list.map((w) => (
-        <button key={w.id} onClick={() => (w.id === cur ? null : switchTo(w.id))} aria-current={w.id === cur ? 'true' : undefined}>
+        <button
+          key={w.id}
+          onClick={() => (w.id === cur ? null : switchTo(w.id))}
+          aria-current={w.id === cur ? 'true' : undefined}
+        >
           <span className="ws-avatar sm" aria-hidden>
             {String(w.name).slice(0, 1).toUpperCase()}
           </span>
@@ -111,7 +125,9 @@ export function WorkspaceSwitcher() {
             <b>{w.name}</b>
             <small className="muted">
               {w.isOwner ? 'Owner' : w.role || 'Member'}
-              {typeof w.projects === 'number' ? ` · ${w.projects} project${w.projects === 1 ? '' : 's'}` : ''}
+              {typeof w.projects === 'number'
+                ? ` · ${w.projects} project${w.projects === 1 ? '' : 's'}`
+                : ''}
             </small>
           </span>
           {w.id === cur && <Ico svg={I.check} />}

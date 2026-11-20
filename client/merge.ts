@@ -1,14 +1,16 @@
-// Three-way merge for teammates' changes: base = what this browser last got from the server, mine = it now (with
-// unsaved edits), theirs = the server's copy now. Whatever only one side changed is kept; lists of things with an id
-// (comments, history, test cases, epics, sprints…) are merged item by item, so two people commenting on the same
-// issue, or editing different epics, both keep their work. When both changed the same value, this person's wins
-// (it's what they are saving now).
+// Three-way merge for teammates' changes: base = what this browser last got from the server, mine =
+// it now (with unsaved edits), theirs = the server's copy now. Whatever only one side changed is
+// kept; lists of things with an id (comments, history, test cases, epics, sprints…) are merged item
+// by item, so two people commenting on the same issue, or editing different epics, both keep their
+// work. When both changed the same value, this person's wins (it's what they are saving now).
 
 type Any = any;
 const J = (x: Any) => JSON.stringify(x === undefined ? null : x);
 const isObj = (x: Any) => x !== null && typeof x === 'object' && !Array.isArray(x);
-const isIdList = (x: Any) => Array.isArray(x) && x.every((v) => isObj(v) && typeof v.id === 'string');
-const isPrimList = (x: Any) => Array.isArray(x) && x.every((v) => v === null || typeof v !== 'object');
+const isIdList = (x: Any) =>
+  Array.isArray(x) && x.every((v) => isObj(v) && typeof v.id === 'string');
+const isPrimList = (x: Any) =>
+  Array.isArray(x) && x.every((v) => v === null || typeof v !== 'object');
 
 function mergeById(base: Any[], mine: Any[], theirs: Any[]) {
   const B = new Map(base.map((x) => [x.id, x])),

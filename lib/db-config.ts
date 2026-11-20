@@ -5,16 +5,23 @@
 //                                      "disable" = no SSL. Empty falls back to ?sslmode= in the URL.
 //   PG_POOL_MAX                        connections each server keeps open (default 5)
 //   PG_CONNECT_TIMEOUT_MS              how long start-up waits for the first connection (default 10000)
+//   PG_ACQUIRE_TIMEOUT_MS              how long a request waits for a free pooled connection before a retryable 503
+//                                      (default 15000), so a traffic spike can't queue requests without end
 
 export type DbEnv = Record<string, string | undefined>;
 
 export const DEFAULT_POOL_MAX = 5;
 export const DEFAULT_CONNECT_TIMEOUT_MS = 10000;
+export const DEFAULT_ACQUIRE_TIMEOUT_MS = 15000;
 
 /** The configured connection string, or '' when the built-in local database is used. */
-export const databaseUrl = (env: DbEnv = process.env) => (env.DATABASE_URL || env.SUPABASE_DB_URL || '').trim();
+export const databaseUrl = (env: DbEnv = process.env) =>
+  (env.DATABASE_URL || env.SUPABASE_DB_URL || '').trim();
 
-/** The connection string must be a postgres:// or postgresql:// address; anything else stops the app with a clear message. */
+/**
+ * The connection string must be a postgres:// or postgresql:// address; anything else stops the app
+ * with a clear message.
+ */
 export function checkConnectionString(url: string, name = 'DATABASE_URL') {
   let u: URL | null;
   try {
@@ -26,7 +33,9 @@ export function checkConnectionString(url: string, name = 'DATABASE_URL') {
     throw new Error(
       `${name} is not a valid PostgreSQL connection string. Use the form postgresql://user:password@host:5432/database ` +
         '(URL-encode special characters in the password, such as @ # / as %40 %23 %2F)' +
-        (name === 'DATABASE_URL' ? ', or remove DATABASE_URL to use the built-in local database.' : '.'),
+        (name === 'DATABASE_URL'
+          ? ', or remove DATABASE_URL to use the built-in local database.'
+          : '.'),
     );
   }
 }
@@ -58,7 +67,10 @@ export const isLocalHost = (host: string) => /^(localhost|127\.0\.0\.1|::1|\[::1
 
 export type PgSsl = false | { rejectUnauthorized: boolean };
 
-/** PGSSL wins; without it the ?sslmode= of the URL decides; without either the connection is encrypted but not verified. */
+/**
+ * PGSSL wins; without it the ?sslmode= of the URL decides; without either the connection is
+ * encrypted but not verified.
+ */
 export function sslFor(url: string, env: DbEnv = process.env): PgSsl {
   const mode = (env.PGSSL || '').trim().toLowerCase();
   if (mode === 'disable') return false;
@@ -76,11 +88,15 @@ export function sslFor(url: string, env: DbEnv = process.env): PgSsl {
   return { rejectUnauthorized: false };
 }
 
-/** The URL handed to node-postgres without SSL parameters: node-postgres would let them override `ssl` (see sslFor). */
+/**
+ * The URL handed to node-postgres without SSL parameters: node-postgres would let them override
+ * `ssl` (see sslFor).
+ */
 export function withoutSslParams(url: string) {
   try {
     const u = new URL(url);
-    for (const k of ['sslmode', 'ssl', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat']) u.searchParams.delete(k);
+    for (const k of ['sslmode', 'ssl', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat'])
+      u.searchParams.delete(k);
     return u.toString();
   } catch {
     return url;
@@ -98,6 +114,8 @@ export function pgConfig(url: string, env: DbEnv = process.env) {
     connectionString: withoutSslParams(url),
     ssl: sslFor(url, env),
     max: positive(env.PG_POOL_MAX, DEFAULT_POOL_MAX),
+    connectionTimeoutMillis: positive(env.PG_ACQUIRE_TIMEOUT_MS, DEFAULT_ACQUIRE_TIMEOUT_MS),
   };
 }
-export const connectTimeoutMs = (env: DbEnv = process.env) => positive(env.PG_CONNECT_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS);
+export const connectTimeoutMs = (env: DbEnv = process.env) =>
+  positive(env.PG_CONNECT_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS);

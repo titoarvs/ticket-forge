@@ -2,9 +2,9 @@ import { ready } from '@/lib/server/http';
 import { asSystem } from '@/lib/db';
 import { verifySignature, handleEvent } from '@/lib/paymongo';
 
-// PayMongo → TicketForge: failed and successful payments. Not a normal API route: PayMongo signs the raw body, which
-// must be read as-is (not parsed) to check the signature, and there's no signed-in user. A bad signature is rejected
-// with 400 before anything is read or changed.
+// PayMongo → TicketForge: failed and successful payments. Not a normal API route: PayMongo signs
+// the raw body, which must be read as-is (not parsed) to check the signature, and there's no
+// signed-in user. A bad signature is rejected with 400 before anything is read or changed.
 export async function POST(req: Request) {
   const raw = await req.text();
   try {

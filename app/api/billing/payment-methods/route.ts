@@ -7,7 +7,8 @@ function ownerCheckout(u: any) {
   if (!billingOn()) throw new HttpError(400, 'Plans are only used on the hosted service.');
 }
 
-// Checkout page data: the payment methods the gateway supports and the PHP total for the chosen plan.
+// Checkout page data: the payment methods the gateway supports and the PHP total for the chosen
+// plan.
 export const GET = api(async (req) => {
   const u: any = await authed();
   ownerCheckout(u);

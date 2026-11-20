@@ -1,7 +1,11 @@
-// Playwright reads data files (browsers.json and others) at runtime, which import tracing can't see. Ship its
-// whole packages with every route that drives a browser, or serverless hosting (Vercel) fails with
-// "Cannot find module …/playwright-core/browsers.json".
-const PLAYWRIGHT_FILES = ['./node_modules/playwright-core/**/*', './node_modules/playwright/**/*', './node_modules/@playwright/test/**/*'];
+// Playwright reads data files (browsers.json and others) at runtime, which import tracing can't
+// see. Ship its whole packages with every route that drives a browser, or serverless hosting
+// (Vercel) fails with "Cannot find module …/playwright-core/browsers.json".
+const PLAYWRIGHT_FILES = [
+  './node_modules/playwright-core/**/*',
+  './node_modules/playwright/**/*',
+  './node_modules/@playwright/test/**/*',
+];
 const BROWSER_ROUTES = [
   '/api/automation/*',
   '/api/admin/browser',
@@ -13,7 +17,8 @@ const BROWSER_ROUTES = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // NEXT_DIST_DIR lets a test build go to its own folder, so it never replaces the build a running `next start` uses.
+  // NEXT_DIST_DIR lets a test build go to its own folder, so it never replaces the build a running
+  // `next start` uses.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   outputFileTracingIncludes: {
     ...Object.fromEntries(BROWSER_ROUTES.map((r) => [r, PLAYWRIGHT_FILES])),
@@ -27,8 +32,8 @@ const nextConfig = {
       './node_modules/@playwright/test/package.json',
     ],
   },
-  // Server-only packages with native parts, WASM or data files: load them from node_modules at runtime
-  // instead of bundling them.
+  // Server-only packages with native parts, WASM or data files: load them from node_modules at
+  // runtime instead of bundling them.
   serverExternalPackages: [
     'pg',
     'mysql2',

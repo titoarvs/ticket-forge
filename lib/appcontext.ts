@@ -1,7 +1,8 @@
-// App context: one compact Markdown "app knowledge" document per project (what the product is, its users and roles,
-// its modules and pages with their real actions and fields, domain rules, data and integrations), built once from the
-// code and documents and stored on the project. Every AI prompt for the project includes it, so the AI knows the app
-// without re-reading the code each time, and because it's the same text on every call, prompt caching makes it cheap.
+// App context: one compact Markdown "app knowledge" document per project (what the product is, its
+// users and roles, its modules and pages with their real actions and fields, domain rules, data and
+// integrations), built once from the code and documents and stored on the project. Every AI prompt
+// for the project includes it, so the AI knows the app without re-reading the code each time, and
+// because it's the same text on every call, prompt caching makes it cheap.
 // Rebuild it when the code changes (the project remembers the commit it was built from).
 import { askAI } from './claude';
 import { codeInventory } from './codeinventory';
@@ -16,16 +17,16 @@ const clip = (s, n) => {
 const CONTEXT_MAX = 12000;
 
 /**
- * The block added to system prompts: the app context, then the database schema (Project settings → Database), each
- * left out when the project has none. Stable text: good for prompt caching.
+ * The block added to system prompts: the app context, then the database schema (Project settings →
+ * Database), each left out when the project has none. Stable text: good for prompt caching.
  */
 export function contextBlock(project, { short = false }: any = {}) {
   return appContextBlock(project, { short }) + schemaBlock(project, { short });
 }
 function appContextBlock(project, { short = false }: any = {}) {
   let md = String(project?.appContext?.md || '').trim();
-  // Light jobs (questions, failure notes, test selection) get the start of the brief only: what the app is, and its
-  // users and roles. The rest is ~10k characters they rarely need.
+  // Light jobs (questions, failure notes, test selection) get the start of the brief only: what the
+  // app is, and its users and roles. The rest is ~10k characters they rarely need.
   if (short && md) {
     const cut = md.search(/\n##\s+Modules/i);
     md = cut > 0 ? md.slice(0, cut).trim() : clip(md, 2500);
@@ -35,8 +36,17 @@ function appContextBlock(project, { short = false }: any = {}) {
     : '';
 }
 
-/** Builds the app context from the code (when a local repository is set) and the project. Returns { md, sha, sources }. */
-export async function buildAppContext({ project, dir = '', backendDir = '', ai = {}, emit = (_m) => {} }: any) {
+/**
+ * Builds the app context from the code (when a local repository is set) and the project. Returns {
+ * md, sha, sources }.
+ */
+export async function buildAppContext({
+  project,
+  dir = '',
+  backendDir = '',
+  ai = {},
+  emit = (_m) => {},
+}: any) {
   let code = '',
     sha = null,
     sources = { pages: 0, endpoints: 0, models: 0, docs: 0, issues: project.tickets?.length || 0 };
@@ -47,10 +57,18 @@ export async function buildAppContext({ project, dir = '', backendDir = '', ai =
     const inv = await codeInventory({ root: repo.root, pages: repo.pages, backendDir });
     const files = await localReader(dir).list();
     const docs = await featureDocs(repo.root, files, 15000);
-    sources = { ...sources, pages: inv.counts.pages, endpoints: inv.counts.endpoints, models: inv.counts.models, docs: docs.length };
+    sources = {
+      ...sources,
+      pages: inv.counts.pages,
+      endpoints: inv.counts.endpoints,
+      models: inv.counts.models,
+      docs: docs.length,
+    };
     code = `PAGES (route, files, what each page shows: headings, actions, fields, calls):\n${clip(inv.pagesText, 40000)}\n\n${clip(inv.endpointsText, 15000)}\n\n${clip(inv.modelsText, 4000)}\n\nDOCUMENTS (hints):\n${docs.map((d) => `### ${d.file}\n${clip(d.text, 1200)}`).join('\n\n')}`;
   }
-  const epics = (project.epics || []).map((e) => `- ${e.key} ${e.title}${e.description ? `: ${clip(e.description, 200)}` : ''}`).join('\n');
+  const epics = (project.epics || [])
+    .map((e) => `- ${e.key} ${e.title}${e.description ? `: ${clip(e.description, 200)}` : ''}`)
+    .join('\n');
   const issues = (project.tickets || [])
     .filter((t) => !t.parentId)
     .slice(0, 150)
@@ -90,5 +108,11 @@ ${code ? `\n=== FROM THE CODE ===\n${code}` : '\n(No local repository: write fro
   });
   const fence = md.match(/```(?:markdown|md)?\s*([\s\S]*?)```\s*$/);
   const out = (fence ? fence[1] : md).trim();
-  return { md: clip(out, CONTEXT_MAX), sha, sources, chars: out.length, at: new Date().toISOString() };
+  return {
+    md: clip(out, CONTEXT_MAX),
+    sha,
+    sources,
+    chars: out.length,
+    at: new Date().toISOString(),
+  };
 }
