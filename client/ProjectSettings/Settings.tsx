@@ -8,6 +8,7 @@ import { WorkflowSettings } from '../WorkflowEditor';
 import { DevSettings } from '../DevCode';
 import { AppContextSettings } from '../AppContext';
 import { RepoSetupCard } from '../RepoSetup';
+import { GithubSyncCard } from '../GithubSync';
 import { DatabaseSettings } from '../Database';
 import { SECTIONS, Details } from './Details';
 
@@ -292,6 +293,7 @@ export function Settings() {
           {cur === 'code' && (
             <>
               <RepoSetupCard key={P().id} />
+              <GithubSyncCard key={`gh-${P().id}`} />
               <DevSettings ed={ed} />
             </>
           )}
