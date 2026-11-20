@@ -132,7 +132,7 @@ async function openAIOnce(
     take(j.usage);
     text = j.choices?.[0]?.message?.content || '';
     finish = j.choices?.[0]?.finish_reason || null;
-    if (text) onText?.(text.length, text.length);
+    if (text) onText?.(text.length, text.length, text);
   } else {
     const decoder = new TextDecoder();
     let buf = '';
@@ -161,7 +161,7 @@ async function openAIOnce(
         const delta = choice?.delta?.content;
         if (typeof delta === 'string' && delta) {
           text += delta;
-          onText?.(delta.length, text.length);
+          onText?.(delta.length, text.length, delta);
         }
         if (choice?.finish_reason) finish = choice.finish_reason;
       }

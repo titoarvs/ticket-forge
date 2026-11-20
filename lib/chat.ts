@@ -1,12 +1,12 @@
-// The project's AI chatbot (the chat panel on the project page and the refine board; it replaced
-// the AI helper panel).
-// A person asks for an issue in plain words and the assistant answers with a draft preview (title,
-// description, type, story points, priority, acceptance criteria). The draft is not an issue:
-// nothing is written to issues until the person clicks Create, and they may edit the draft first.
-// The conversation is saved per person and per project (chat_messages) and restored when the panel
-// opens; nobody else's messages are ever returned. Every request is an AI call, so it is recorded
-// in ai_usage (who, project, workspace) and stopped by the plan's AI limit like any other AI
-// action.
+// Saved conversations and issue drafts of Ticket Forge AI (the one chat in the corner of every
+// page; the conversation itself is lib/assistant/). Inside a project the conversation is saved per person
+// and per project (chat_messages) and restored when the chat opens; nobody else's messages are ever
+// returned.
+// When the person asks for an issue, the reply carries a draft preview (title, description, type,
+// story points, priority, acceptance criteria). The draft is not an issue: nothing is written to
+// issues until the person clicks Create, and they may edit the draft first. Every AI call is
+// recorded in ai_usage (who, project, workspace) and stopped by the plan's AI limit like any other
+// AI action.
 // Any workspace user who can open the project can chat; Create needs the issue.create permission,
 // as everywhere else.
 import { q, tx } from './db';
@@ -36,11 +36,7 @@ const messageOut = (r) => ({
  */
 export async function chatHistory(projectId: string, user) {
   await requireProject(user, projectId);
-  const { rows } = await q(
-    `select * from (select * from chat_messages where project_id = $1 and user_id = $2 order by id desc limit ${HISTORY_MAX}) m order by id`,
-    [projectId, user.id],
-  );
-  return { messages: rows.map(messageOut) };
+  return { messages: await recentMessages(projectId, user, HISTORY_MAX) };
 }
 
 /**
@@ -83,11 +79,69 @@ export function cleanDraft(input: any) {
 const openDraft = (rows) =>
   rows.find((r) => r.draft && !r.draft.created && !r.draft.discarded)?.draft || null;
 
+/** The person's message, checked: not empty, not too long. */
+export function checkMessage(message: any) {
+  const text = String(message || '').trim();
+  if (!text) throw new HttpError(400, 'Type a message first.');
+  if (text.length > MESSAGE_MAX)
+    throw new HttpError(400, `Keep the message under ${MESSAGE_MAX} characters.`);
+  return text;
+}
+
+/** The newest messages of this person's conversation in this project, oldest first. */
+export async function recentMessages(projectId: string, user, limit = 16) {
+  const { rows } = await q(
+    `select * from (select * from chat_messages where project_id = $1 and user_id = $2 order by id desc limit ${Number(limit) | 0}) m order by id`,
+    [projectId, user.id],
+  );
+  return rows.map(messageOut);
+}
+
 /**
- * One turn of the chat. The assistant (the same AI call as New issue, task "tickets") turns the
- * request into a draft; the request and the answer are saved together afterwards, so a request the
- * plan limit stopped (402 from the AI call, before anything is sent) leaves no trace. `write` is
- * the AI call; tests stand it in.
+ * A draft issue for `idea`, written by the same AI call as New issue (task "tickets"). When the
+ * conversation has an open draft, the request refines it. `write` is the AI call (tests stand it
+ * in).
+ */
+export async function writeDraft(
+  project,
+  user,
+  idea: string,
+  ai: any,
+  write?: (a: any) => Promise<any>,
+) {
+  const earlier = (
+    await q(
+      'select draft from chat_messages where project_id = $1 and user_id = $2 and draft is not null order by id desc limit 5',
+      [project.id, user.id],
+    )
+  ).rows;
+  const current = openDraft(earlier);
+  const answers = current
+    ? `The person is refining this draft ticket (JSON): ${JSON.stringify({ ...current, testCases: undefined }).slice(0, 3000)}\nApply their new request to it and return the whole updated ticket.`
+    : '';
+  const run = write || (await import('./generate')).newTicket;
+  const { ticket } = await run({ epicId: null, project, idea, answers, ai: ai || {} });
+  const { id: _i, key: _k, status: _s, assignee: _a, ...draft } = normTicket(ticket || {}, null);
+  return draft;
+}
+
+/** Saves one turn (the person's message and the reply, with its draft if any) together. */
+export async function saveTurn(projectId: string, user, text: string, reply: string, draft: any) {
+  const saved = await tx(async (t) => {
+    const ins =
+      'insert into chat_messages (project_id, user_id, role, content, draft) values ($1,$2,$3,$4,$5) returning *';
+    const mine = (await t.query(ins, [projectId, user.id, 'user', text, null])).rows[0];
+    const json = draft ? JSON.stringify(draft) : null;
+    const bot = (await t.query(ins, [projectId, user.id, 'assistant', reply, json])).rows[0];
+    return [mine, bot];
+  });
+  return saved.map(messageOut);
+}
+
+/**
+ * One drafting turn: the request becomes a draft (see writeDraft). The request and the answer are
+ * saved together afterwards, so a request the plan limit stopped (402 from the AI call, before
+ * anything is sent) leaves no trace.
  */
 export async function sendChatMessage(
   projectId: string,
@@ -96,35 +150,21 @@ export async function sendChatMessage(
   write?: (a: any) => Promise<any>,
 ) {
   await requireProject(user, projectId);
-  const text = String(input?.message || '').trim();
-  if (!text) throw new HttpError(400, 'Type what you want the issue to be about.');
-  if (text.length > MESSAGE_MAX)
-    throw new HttpError(400, `Keep the message under ${MESSAGE_MAX} characters.`);
+  const text = checkMessage(input?.message);
   const project = await getProject(projectId);
-  const earlier = (
-    await q(
-      'select draft from chat_messages where project_id = $1 and user_id = $2 and draft is not null order by id desc limit 5',
-      [projectId, user.id],
-    )
-  ).rows;
-  const current = openDraft(earlier);
-  const answers = current
-    ? `The person is refining this draft ticket (JSON): ${JSON.stringify({ ...current, testCases: undefined }).slice(0, 3000)}\nApply their new request to it and return the whole updated ticket.`
-    : '';
-  const run = write || (await import('./generate')).newTicket;
-  const { ticket } = await run({ epicId: null, project, idea: text, answers, ai: input?.ai || {} });
-  const { id: _i, key: _k, status: _s, assignee: _a, ...draft } = normTicket(ticket || {}, null);
-  const reply = `I drafted “${draft.title}”. Check it below, change anything you like, then click Create.`;
-  const saved = await tx(async (t) => {
-    const ins =
-      'insert into chat_messages (project_id, user_id, role, content, draft) values ($1,$2,$3,$4,$5) returning *';
-    const mine = (await t.query(ins, [projectId, user.id, 'user', text, null])).rows[0];
-    const bot = (
-      await t.query(ins, [projectId, user.id, 'assistant', reply, JSON.stringify(draft)])
-    ).rows[0];
-    return [mine, bot];
-  });
-  return { messages: saved.map(messageOut) };
+  const draft = await writeDraft(project, user, text, input?.ai, write);
+  const reply = draftReply(draft);
+  return { messages: await saveTurn(projectId, user, text, reply, draft) };
+}
+
+export const draftReply = (draft: any) =>
+  `I drafted “${draft.title}”. Check it below, change anything you like, then click Create.`;
+
+/** Starts the conversation in this project over: this person's messages are deleted. */
+export async function clearChat(projectId: string, user) {
+  await requireProject(user, projectId);
+  await q('delete from chat_messages where project_id = $1 and user_id = $2', [projectId, user.id]);
+  return { ok: true };
 }
 
 /**

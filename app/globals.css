@@ -17851,7 +17851,8 @@ hr.sep {
   }
 }
 
-/* ---------------------------------------------------------------- help chatbot and release announcement robot */
+/* ---------------------------------------------------------------- Ticket Forge AI (client/Assistant/): the one chat in
+   the corner of every page, and the release announcement robot beside its button. */
 .chatbot {
   position: fixed;
   right: 24px;
@@ -17878,8 +17879,8 @@ hr.sep {
   background: var(--brand-hover);
 }
 .chat-panel {
-  width: min(360px, calc(100vw - 32px));
-  height: min(480px, calc(100vh - 120px));
+  width: min(420px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 48px));
   display: flex;
   flex-direction: column;
   background: var(--overlay);
@@ -17933,25 +17934,61 @@ hr.sep {
   white-space: normal;
   text-align: left;
 }
-.chat-in {
+.chat-where {
+  max-width: 140px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--bg-neutral);
+  color: var(--text-subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-msg.md {
+  white-space: normal;
+}
+.chat-msg.md > :first-child {
+  margin-top: 0;
+}
+.chat-msg.md > :last-child {
+  margin-bottom: 0;
+}
+.chat-msg.md p,
+.chat-msg.md ul,
+.chat-msg.md ol {
+  margin: 6px 0;
+}
+.chat-msg.md ul,
+.chat-msg.md ol {
+  padding-left: 18px;
+}
+.chat-msg.md pre {
+  white-space: pre-wrap;
+}
+.chat-typing {
   display: flex;
-  gap: 8px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
+  gap: 4px;
+  padding: 12px;
 }
-.chat-in input {
-  flex: 1;
-  min-width: 0;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
+.chat-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-subtlest);
+  animation: chat-dot 1s ease-in-out infinite;
 }
-.chat-in input:focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: 1px;
+.chat-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.chat-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes chat-dot {
+  50% {
+    opacity: 0.3;
+    transform: translateY(-3px);
+  }
 }
 .bot-announce {
   position: relative;
@@ -18015,7 +18052,8 @@ hr.sep {
 @media (prefers-reduced-motion: reduce) {
   .bot-announce,
   .bot-robot,
-  .bot-arm {
+  .bot-arm,
+  .chat-typing span {
     animation: none;
   }
 }
@@ -18026,43 +18064,7 @@ hr.sep {
   }
 }
 
-/* Project AI chatbot (TF-128, client/ProjectChat.tsx): a chat panel docked bottom right on every project page, beside the
-   help chatbot's button (it replaced the AI helper panel of TF-125). It reuses the chat message styles above; the draft
-   preview is a small form under the assistant's message. */
-.pchat {
-  position: fixed;
-  right: 84px;
-  bottom: 24px;
-  z-index: 170;
-  width: min(400px, calc(100vw - 108px));
-  display: flex;
-  flex-direction: column;
-  background: var(--overlay);
-  color: var(--text);
-  border-radius: 12px;
-  box-shadow: var(--shadow-overlay);
-  overflow: hidden;
-}
-.pchat.open {
-  height: min(600px, calc(100vh - 120px));
-}
-.pchat-h {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-}
-.pchat.open .pchat-h {
-  border-bottom: 1px solid var(--border);
-}
-.pchat-log {
-  flex: 1;
-  overflow: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* Inside the chat: a turn (a message and its issue draft), the input, and the editable draft. */
 .pchat-turn {
   display: flex;
   flex-direction: column;
@@ -18138,13 +18140,6 @@ hr.sep {
 .pchat-hint {
   color: var(--text-subtlest);
   font-size: 12px;
-}
-@media (max-width: 640px) {
-  .pchat {
-    right: 16px;
-    bottom: 76px;
-    width: calc(100vw - 32px);
-  }
 }
 
 /* Diff review (TF-121, client/DiffReview.tsx): one file at a time. Changed files on the left, the chosen file's diff on

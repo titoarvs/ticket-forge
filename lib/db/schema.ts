@@ -470,7 +470,7 @@ create table if not exists ticket_drafts (
   primary key (project_id, id)
 );
 create index if not exists ticket_drafts_status on ticket_drafts(project_id, status, created_at desc);
--- AI chatbot (client/ProjectChat.tsx, lib/chat.ts). chat_messages: one person's conversation with the assistant in one
+-- Ticket Forge AI (client/Assistant/, lib/assistant/, lib/chat.ts). chat_messages: one person's conversation with the assistant in one
 -- project, restored when the panel opens. role is user or assistant, and content is the text. An assistant message
 -- that proposed an issue also keeps the draft preview in draft (it is not an issue until the person clicks Create).
 create table if not exists chat_messages (
