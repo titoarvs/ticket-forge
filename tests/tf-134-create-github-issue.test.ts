@@ -163,3 +163,31 @@ test('a linked repository without a token asks for one and saves nothing', async
   assert.equal(posted.length, 0);
   assert.equal((await tickets()).length, 0);
 });
+
+// ---------------------------------------------------------------- Write issue with AI
+const file = (input: any, who: any = person) => as(() => I.fileGithubIssue(who, 'p1', input));
+
+test('an AI-written ticket gets its GitHub issue filed when a repository is linked', async () => {
+  await setProject({ githubSync: { repo: REPO } });
+  const { github } = await file({ title: 'Export to CSV', description: 'From the table' });
+  assert.deepEqual(posted, [{ title: 'Export to CSV', body: 'From the table' }]);
+  assert.equal(github.number, 41);
+  // The browser saves the ticket itself: nothing is written to issues here.
+  assert.equal((await tickets()).length, 0);
+});
+
+test('without a linked repository nothing is filed', async () => {
+  const { github } = await file({ title: 'Export to CSV' });
+  assert.equal(github, null);
+  assert.equal(posted.length, 0);
+});
+
+test('filing needs a title and the permission to create issues', async () => {
+  await setProject({ githubSync: { repo: REPO } });
+  await assert.rejects(file({ title: '  ' }), (e: any) => e.status === 400);
+  await assert.rejects(
+    file({ title: 'Export' }, { ...person, permissions: [] }),
+    (e: any) => e.status === 403,
+  );
+  assert.equal(posted.length, 0);
+});
