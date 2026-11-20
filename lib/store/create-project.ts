@@ -84,8 +84,19 @@ const splitProject = (p) => {
   const { tickets = [], id, version, _revs, ...meta } = p;
   return { meta, tickets };
 };
-/** Keys a browser can't save as project sections. */
-export const NOT_META = new Set([TICKETS, 'id', 'version', 'updatedAt', 'createdBy', '_revs']);
+/**
+ * Keys a browser can't save as project sections (githubSync: the linked GitHub repository changes
+ * only through the owner's link and import routes, TF-130).
+ */
+export const NOT_META = new Set([
+  TICKETS,
+  'id',
+  'version',
+  'updatedAt',
+  'createdBy',
+  '_revs',
+  'githubSync',
+]);
 export const statsOf = (data) => ({ epics: Array.isArray(data?.epics) ? data.epics.length : 0 });
 // ---------------------------------------------------------------- caches (per server process) The
 // project version every open browser polls for (every 10 s): answered from memory for up to 2 s,
