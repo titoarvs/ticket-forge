@@ -348,7 +348,7 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
     const all = (
       await t.query('select id, position, data from issues where project_id = $1', [projectId])
     ).rows;
-    const linked = new Map(
+    const linked = new Map<number, any>(
       all
         .filter((r) => r.data?.github?.repo === link.repo)
         .map((r) => [Number(r.data.github.number), r]),
