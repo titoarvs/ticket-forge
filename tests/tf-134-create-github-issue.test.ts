@@ -136,7 +136,14 @@ test('the planning fields are kept and checked against the project', async () =>
 test('with a linked repository the GitHub issue is filed and linked to the ticket', async () => {
   await setProject({ githubSync: { repo: REPO } });
   const { issue } = await create({ title: 'Pay by card', type: 'Story', description: 'Visa' });
-  assert.deepEqual(posted, [{ title: 'Pay by card', body: 'Visa' }]);
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].title, 'Pay by card');
+  assert.match(
+    posted[0].body,
+    /### Description\n<!-- tf:description -->\nVisa\n<!-- \/tf:description -->/,
+  );
+  // The first sync sees the plain description, not the layout, so nothing looks changed.
+  assert.equal(issue.github.base.description, 'Visa');
   assert.equal(issue.github.repo, REPO);
   assert.equal(issue.github.number, 41);
   assert.equal(issue.github.url, `https://github.com/${REPO}/issues/41`);
@@ -170,7 +177,8 @@ const file = (input: any, who: any = person) => as(() => I.fileGithubIssue(who, 
 test('an AI-written ticket gets its GitHub issue filed when a repository is linked', async () => {
   await setProject({ githubSync: { repo: REPO } });
   const { github } = await file({ title: 'Export to CSV', description: 'From the table' });
-  assert.deepEqual(posted, [{ title: 'Export to CSV', body: 'From the table' }]);
+  assert.equal(posted[0].title, 'Export to CSV');
+  assert.match(posted[0].body, /From the table/);
   assert.equal(github.number, 41);
   // The browser saves the ticket itself: nothing is written to issues here.
   assert.equal((await tickets()).length, 0);
@@ -190,4 +198,59 @@ test('filing needs a title and the permission to create issues', async () => {
     (e: any) => e.status === 403,
   );
   assert.equal(posted.length, 0);
+});
+
+test('the GitHub issue is laid out like the ticket, with Given / When / Then criteria', async () => {
+  await setProject({ githubSync: { repo: REPO } });
+  await file({
+    key: 'SH-7',
+    title: 'Reset password',
+    type: 'Story',
+    priority: 'High',
+    storyPoints: 3,
+    epicId: 'e1',
+    userStory: 'As a user, I want to reset my password, so that I can sign in again.',
+    description: 'Send a reset link by email.',
+    acceptanceCriteria: [
+      'Given a registered email, when I ask for a reset, then a link is emailed',
+      'The link expires after 1 hour',
+    ],
+    testCases: [
+      {
+        title: 'Link arrives',
+        type: 'Functional',
+        steps: ['Ask', 'Open mail'],
+        expected: 'Mail has a link',
+      },
+    ],
+  });
+  const body = posted[0].body;
+  assert.match(
+    body,
+    /^> \*\*Story\*\* · Priority: \*\*High\*\* · Story points: \*\*3\*\* · Epic: \*\*Checkout\*\* · Ticket Forge: \*\*SH-7\*\*/,
+  );
+  assert.match(body, /### User story\nAs a user, I want to reset my password/);
+  assert.match(
+    body,
+    /\*\*AC1\*\*\n- \*\*Given\*\* a registered email\n- \*\*When\*\* I ask for a reset\n- \*\*Then\*\* a link is emailed/,
+  );
+  assert.match(body, /\*\*AC2\*\*\n- The link expires after 1 hour/);
+  assert.match(
+    body,
+    /### Test cases\n1\. \*\*Link arrives\*\* _\(Functional\)_\n   1\. Ask\n   2\. Open mail\n   - Expected: Mail has a link/,
+  );
+});
+
+test('only the marked description is read back from the layout', async () => {
+  const B = await import('../lib/github-body');
+  const body = B.ticketBody({
+    title: 'T',
+    description: 'Line 1\n\n## Not a section',
+    acceptanceCriteria: ['Given a, then b'],
+  });
+  assert.equal(B.descriptionOf(body), 'Line 1\n\n## Not a section');
+  assert.equal(B.isTicketBody(body), true);
+  // An issue written on GitHub keeps its whole body as the description.
+  assert.equal(B.descriptionOf('Plain body\r\nline 2'), 'Plain body\nline 2');
+  assert.equal(B.isTicketBody('Plain body'), false);
 });

@@ -54,17 +54,28 @@ async function createWithGithub(fields: Any) {
 
 /**
  * For tickets made in the browser: files their GitHub issue first when the project has a
- * repository linked (TF-134). Returns the link for `ticket.github`, null when no repository is
+ * repository linked (TF-134), laid out like the ticket (user story, description, Given / When /
+ * Then criteria, test cases). Returns the link for `ticket.github`, null when no repository is
  * linked; throws (with GitHub's reason) when it couldn't be filed.
  */
-export async function githubIssueFor(title: string, description: string) {
+export async function githubIssueFor(t: Any) {
   if (!P().githubSync?.repo) return null;
+  const body = {
+    action: 'create-issue',
+    ...pickFields(t, ['key', 'title', 'description', 'userStory', 'acceptanceCriteria']),
+    ...pickFields(t, ['type', 'priority', 'storyPoints', 'epicId']),
+    testCases: (t.testCases || []).map((tc: Any) =>
+      pickFields(tc, ['title', 'type', 'steps', 'expected']),
+    ),
+  };
   const r = await api(`/api/projects/${encodeURIComponent(P().id)}/github-sync`, {
     method: 'POST',
-    body: { action: 'create-issue', title, description },
+    body,
   });
   return r.github || null;
 }
+const pickFields = (o: Any, keys: string[]) =>
+  Object.fromEntries(keys.filter((k) => o?.[k] != null).map((k) => [k, o[k]]));
 
 export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
   const p = P();
@@ -319,7 +330,7 @@ export async function writeWithClaude({
   if (type) nt.type = type;
   // With a repository linked the GitHub issue comes first: if it can't be filed, no ticket is made.
   try {
-    const github = await githubIssueFor(nt.title, nt.description || '');
+    const github = await githubIssueFor(nt);
     if (github) nt.github = github;
   } catch (e: Any) {
     toast(`Not created: ${e.message}`, 'err');
