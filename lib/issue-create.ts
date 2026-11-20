@@ -8,10 +8,40 @@ import { uid } from './model';
 import { createGithubIssue } from './github-sync';
 
 export const ISSUE_TYPES = ['Story', 'Task', 'Bug', 'Spike'];
+const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
+const RICH_MAX = 100000;
+
+const idIn = (list: any, id: any) =>
+  Array.isArray(list) && list.some((x: any) => x?.id === id) ? String(id) : null;
+
+/**
+ * The planning fields the Create issue form may set, checked against the project: an epic or
+ * sprint that isn't in it is left empty, an unknown priority becomes Medium.
+ */
+function planning(input: any, data: any) {
+  const points = Number(input?.storyPoints);
+  const rich = input?.descriptionRich;
+  const richOk = rich && typeof rich === 'object' && JSON.stringify(rich).length <= RICH_MAX;
+  return {
+    epicId: idIn(data?.epics, input?.epicId),
+    sprintId: idIn(data?.sprints, input?.sprintId),
+    priority: PRIORITIES.includes(input?.priority) ? input.priority : 'Medium',
+    storyPoints:
+      input?.storyPoints !== null && input?.storyPoints !== '' && points >= 0 && points <= 1000
+        ? points
+        : null,
+    assignee: String(input?.assignee ?? '')
+      .trim()
+      .slice(0, 120),
+    ...(richOk ? { descriptionRich: rich } : {}),
+  };
+}
 
 /**
  * Creates one issue at the end of a project's backlog as `user`. input: { title, description, type,
- * status, attachments: [file id] }.
+ * status, attachments: [file id], epicId, sprintId, priority, storyPoints, assignee,
+ * descriptionRich }. When the project has a GitHub repository linked, the GitHub issue is filed
+ * too and linked to the ticket.
  */
 export async function createProjectIssue(user: any, projectId: string, input: any) {
   requireAccess(user, projectId);
@@ -20,17 +50,24 @@ export async function createProjectIssue(user: any, projectId: string, input: an
   if (!title) throw new HttpError(400, 'Title is required.');
   if (title.length > 200) throw new HttpError(400, 'Title must be at most 200 characters.');
   const type = ISSUE_TYPES.find(
-    (x) => x.toLowerCase() === String(input?.type ?? '').trim().toLowerCase(),
+    (x) =>
+      x.toLowerCase() ===
+      String(input?.type ?? '')
+        .trim()
+        .toLowerCase(),
   );
   if (!type) throw new HttpError(400, `Type must be one of ${ISSUE_TYPES.join(', ')}.`);
-  const description = String(input?.description ?? '').trim().slice(0, 20000);
+  const description = String(input?.description ?? '')
+    .trim()
+    .slice(0, 20000);
   const attachments = (Array.isArray(input?.attachments) ? input.attachments : [])
     .map((x: any) => String(x))
     .filter((x: string) => /^\w{1,40}$/.test(x))
     .slice(0, 20);
   const wanted = String(input?.status ?? '').trim();
 
-  // TF-134: file the GitHub issue first, so a GitHub failure leaves no ticket behind.
+  // TF-134: with a repository linked, file the GitHub issue first, so a GitHub failure leaves no
+  // ticket behind. Without one the ticket is only in Ticket Forge.
   const github = await createGithubIssue(projectId, title, description);
 
   const out = await tx(async (t) => {
@@ -61,13 +98,10 @@ export async function createProjectIssue(user: any, projectId: string, input: an
     const issue = {
       id: uid(),
       key: `${key}-${max + 1}`,
-      epicId: null,
-      sprintId: null,
       parentId: null,
       title,
       type,
-      priority: 'Medium',
-      storyPoints: null,
+      ...planning(input, pr.data),
       labels: [],
       userStory: '',
       description,
@@ -76,16 +110,23 @@ export async function createProjectIssue(user: any, projectId: string, input: an
       testCases: [],
       attachments,
       status,
-      assignee: '',
       reporter: user.name || '',
       createdBy: user.id,
       links: [],
       prs: [],
       comments: [],
-      history: [{ id: uid(), at: now, author: user.name || '', field: 'created', text: 'created the issue' }],
+      history: [
+        {
+          id: uid(),
+          at: now,
+          author: user.name || '',
+          field: 'created',
+          text: 'created the issue',
+        },
+      ],
       createdAt: now,
       updatedAt: now,
-      github,
+      ...(github ? { github } : {}),
     };
     await t.query(
       'insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)',

@@ -208,23 +208,21 @@ async function tokenFor(projectId: string) {
 }
 /**
  * TF-134: files a GitHub issue for a new ticket in the project's linked repository. Returns the
- * `ticket.github` link. Throws HttpError with a readable message when GitHub can't be used.
+ * `ticket.github` link, or null when the project has no repository linked (the ticket then lives
+ * only in Ticket Forge). Throws HttpError with a readable message when a linked repository can't
+ * be used.
  */
 export async function createGithubIssue(projectId: string, title: string, description: string) {
+  const pr = (
+    await q('select data from projects where id = $1 and archived_at is null', [projectId])
+  ).rows[0];
+  const repo = pr?.data?.githubSync?.repo;
+  if (!repo) return null;
   const token = (await getProjectSecret(projectId, 'githubToken')) || process.env.GITHUB_TOKEN || '';
   if (!token)
     throw new HttpError(
       400,
       'GitHub connection missing: add a personal access token in settings (Project settings → Code & GitHub) to create tickets.',
-    );
-  const pr = (
-    await q('select data from projects where id = $1 and archived_at is null', [projectId])
-  ).rows[0];
-  const repo = pr?.data?.githubSync?.repo;
-  if (!repo)
-    throw new HttpError(
-      400,
-      'GitHub connection missing: link a GitHub repository in Project settings → Code & GitHub.',
     );
   let data: any;
   try {
