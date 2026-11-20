@@ -142,6 +142,14 @@ export const AI_TASKS = [
     tier: 'light',
     maxOut: 2000,
   },
+  {
+    id: 'chat',
+    group: 'Helpers',
+    label: 'Ticket Forge AI chat',
+    desc: 'Answers in the chat: how the app works, the project’s issues, and when to draft an issue',
+    tier: 'light',
+    maxOut: 2000,
+  },
 ];
 const TASK_IDS = new Set(AI_TASKS.map((t) => t.id));
 

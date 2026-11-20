@@ -1,4 +1,5 @@
-// The help chatbot: rule-based, no AI. It answers from the FAQ below and from live ticket data.
+// The free, rule-based answers of Ticket Forge AI (no AI): used when no AI is set up, and for the
+// live ticket counts the AI is given. It answers from the FAQ below and from live ticket data.
 // Ticket data is limited by the person's role: only projects they have access to, and people counts
 // only with "Manage users and access".
 import { asSystem } from './db';

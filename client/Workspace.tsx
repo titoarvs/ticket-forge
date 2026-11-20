@@ -9,7 +9,6 @@ import { useStore, openProject, P, S, emit, type Any, ticket, statusColorCss, fe
 import { WorkspaceSkeleton } from './skeletons';
 import { RowPop } from './RowActions';
 import { Drawer } from './Drawer';
-import { ProjectChat } from './ProjectChat';
 import { openCode } from './DevCode';
 import { watchCodeStatus, stopWatching } from './codeStatus';
 import { VIEWS, COMPONENTS, Sidebar, VIEW_FEATURE } from './Workspace/view-list';
@@ -91,7 +90,6 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
           {feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}
         </section>
         <Drawer />
-        <ProjectChat />
       </div>
       <RowPop />
     </div>

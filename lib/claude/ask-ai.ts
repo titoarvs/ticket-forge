@@ -520,7 +520,7 @@ async function runChain(chain, opts, from?) {
 }
 /**
  * Ask the AI once and return the full text reply. Uses your Claude account locally, the AI API
- * elsewhere. opts: { system, prompt, model, onText(chunkLength, totalLength), signal }. `model`
+ * elsewhere. opts: { system, prompt, model, onText(chunkLength, totalLength, chunkText), signal }. `model`
  * only applies to the Claude account.
  */
 /** AI isn't set up: a 503 the app shows as a message, not a crash. */
@@ -1096,7 +1096,7 @@ function cliOnce(
           evt.event.delta?.type === 'text_delta'
         ) {
           streamed += evt.event.delta.text;
-          onText?.(evt.event.delta.text.length, streamed.length);
+          onText?.(evt.event.delta.text.length, streamed.length, evt.event.delta.text);
         } else if (evt.type === 'result') {
           if (evt.is_error || evt.subtype !== 'success')
             errorText = evt.result || evt.subtype || 'Claude CLI returned an error';
@@ -1198,7 +1198,7 @@ async function anthropicOnce(
   let total = 0;
   stream.on('text', (t) => {
     total += t.length;
-    onText?.(t.length, total);
+    onText?.(t.length, total, t);
   });
   let msg;
   try {

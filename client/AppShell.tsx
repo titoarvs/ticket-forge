@@ -24,7 +24,7 @@ import { AppSkeleton } from './skeletons';
 import { openCreateIssue } from './actions';
 import { TourHost } from './tour';
 import { showUpgrade, LockedScreen } from './Billing';
-import { Chatbot } from './Chatbot';
+import { Assistant } from './Assistant/Assistant';
 import { planLimitHandler } from './core';
 import { bootSession, setLocalEngine, refreshStatus } from './AppShell/set-local-engine';
 import { ServerDown, LegalPrompt, RunPill } from './AppShell/ServerDown';
@@ -201,7 +201,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <Toasts />
       <TaskTray />
       <RunPill />
-      <Chatbot />
+      <Assistant />
     </TourHost>
   );
 }
