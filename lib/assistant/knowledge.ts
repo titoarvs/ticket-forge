@@ -17,7 +17,12 @@ export function personBlock(user) {
     has(user, 'users.manage') && 'manage users',
   ].filter(Boolean);
   const name = user?.name || 'a team member';
-  return `The person asking is ${name}. ${can.length ? `They can ${can.join(', ')}.` : 'They can view issues but not change them.'}`;
+  const role = user?.role_name ? ` Their role is ${user.role_name}.` : '';
+  const owner = user?.is_owner ? ' They own this workspace.' : '';
+  const rights = can.length
+    ? `They can ${can.join(', ')}.`
+    : 'They can view issues but not change them.';
+  return `The person asking is ${name}.${role}${owner} ${rights}`;
 }
 
 /** One issue as a short line: key | type | status | priority | points | assignee | epic | title. */

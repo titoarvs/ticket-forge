@@ -21,6 +21,7 @@ const WS = 'default';
 const person = {
   id: 'u-ai',
   name: 'Ana Reyes',
+  role_name: 'Developer',
   is_owner: false,
   project_access: ['p1'],
   permissions: ['issue.create'],
@@ -101,6 +102,7 @@ test('in a project the reply streams, knows the project and the turn is saved', 
     assert.equal(deltas.join(''), '**CL-1** Clock in is open.');
     assert.equal(seen[0].task, 'chat');
     assert.match(seen[0].system, /CL-1 \| .*Clock in/);
+    assert.match(seen[0].system, /Their role is Developer\./);
     assert.deepEqual(
       r.messages.map((m) => m.role),
       ['user', 'assistant'],
