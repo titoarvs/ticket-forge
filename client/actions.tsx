@@ -28,6 +28,7 @@ export {
   writeWithClaude,
   NewWithClaudeModal,
 } from './actions/CreateIssueModal';
+export { CreateIssueForm, openCreateIssueForm } from './actions/CreateIssueForm';
 export { runTicketAi, AskModal, RegroupModal } from './actions/RegroupModal';
 export {
   bulkTests,

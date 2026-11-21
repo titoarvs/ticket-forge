@@ -5,6 +5,7 @@ import { Modal, Avatar } from '../ui';
 import { sendTestEmail, changePassword } from '../api/admin';
 import { TF } from '../fields';
 import { A } from './UsersTab';
+import { DatabaseUsage } from './DatabaseUsage';
 
 // ---------------------------------------------------------------- email & database
 export function EmailTab() {
@@ -87,6 +88,7 @@ export function EmailTab() {
               )}
           </tbody>
         </table>
+        <DatabaseUsage />
         <p className="muted small" style={{ marginBottom: 0 }}>
           {/Supabase|PostgreSQL/.test(e.database || '') ? (
             'Data is stored in your Postgres database.'

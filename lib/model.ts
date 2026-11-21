@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 const TYPES = ['Story', 'Task', 'Spike', 'Bug'];
 const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
-const EPIC_COLORS = [
+export const EPIC_COLORS = [
   '#6366f1',
   '#0ea5e9',
   '#10b981',

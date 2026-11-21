@@ -10,6 +10,7 @@
     "start": "next start -p 5173",
     "db:push": "node --env-file-if-exists=.env --import tsx scripts/db-push.ts",
     "db:migrate-host": "node --env-file-if-exists=.env --import tsx scripts/db-migrate-host.ts",
+    "db:switch": "node --env-file-if-exists=.env --import tsx scripts/db-switch.ts",
     "db:cutover-load": "node scripts/db-cutover-load.mjs",
     "db:schema": "node scripts/drizzle-schema.mjs",
     "db:check": "node scripts/drizzle-schema.mjs --check",

@@ -164,7 +164,11 @@ All settings live in `.env` (see `.env.example`):
      (delete the project). **Workflow**: add, rename, reorder or delete statuses, set each
      one's category (to do, in progress or done) and column limit, and choose the **transitions**, like Jira:
      *any status to any status* (the default), or *custom transitions* with a From → To grid, "any status can
-     move here" per status, and quick starts (step by step, allow every move, clear). A diagram shows the flow.
+     move here" per status, and quick starts (step by step, allow every move, clear). A **Status flow** node
+     graph at the top shows every status as a node and every saved transition as an arrow (everyone who can open
+     the project sees it). With *Edit project settings* you can add statuses, drag them, connect two statuses,
+     and remove a status or transition (after a confirmation), then **Save flow**; a duplicate status name is
+     refused. Without that permission the controls are hidden.
      With custom transitions the issue panel only offers allowed statuses, the board greys out columns an issue
      can't move to while you drag it, and bulk "Set status" skips (and reports) issues that can't move.
    - **Issue panel** (click any issue; expand for a full view): summary, status, details (assignee with
@@ -671,6 +675,30 @@ Project settings → Code & GitHub is organised top to bottom:
    branch, branch prefix, Claude model, draft pull requests) and **Advanced** (the GitHub owner/name, found
    automatically).
 3. **Coding agent**, the **Backend repository** (same three sources) and **CodeRabbit**.
+
+### Import and sync GitHub issues (TF-130)
+
+Project settings → Code & GitHub → **GitHub issues** links a GitHub repository to the project and brings its issues in
+as tickets. It signs in to GitHub with the project's existing GitHub connection (Connect GitHub, a saved token or
+`GITHUB_TOKEN`: connect GitHub under Repository setup first). Only the **project owner** (its creator) and the **Super
+Admin** (the workspace owner) can link a repository, import or sync; everyone else sees the link, and the buttons are
+disabled with a permission message (the server refuses as well).
+
+- **Link repository** takes `owner/name` (or a github.com address), checks that the connected account can open it and
+  saves it on the project (`githubSync`).
+- **Import issues** reads every issue (pull requests are skipped; at most 2000 per run) and creates a ticket for each. A
+  ticket keeps its GitHub issue as an external key (`ticket.github`: repository and issue number), so importing again
+  updates the same ticket instead of creating a duplicate. Mapping: title → title, body → description, labels →
+  labels, assignee → assignee (a project member with the same name, otherwise the GitHub login), milestone → epic (an
+  epic with that name is created when the project has none), open → the first workflow status, closed → the first
+  "done" status.
+- **Sync now** does the same and also writes Ticket Forge's changes (title, description, labels, assignee, status) to
+  GitHub. A field changed on only one side since the last sync is copied across. When both sides changed it, **the newer
+  change wins** (GitHub's *updated* time against the ticket's *updated* time; a tie goes to GitHub) and the ticket's
+  activity gets a *Sync conflict* entry that says which side won and what the other value was. Milestones are read-only:
+  a changed epic isn't written back.
+- Sync runs when someone presses a button (there is no webhook or timer yet). Issues deleted or transferred in GitHub
+  leave their tickets as they are. GitHub's rate limit stops the run with a message that says when to try again.
 
 ### My AI: each person's own Claude subscription
 
