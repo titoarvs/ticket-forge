@@ -5334,20 +5334,38 @@ a.set-stat:hover {
 }
 @media (max-width: 900px) {
   .set-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
+  /* One scrolling row of tabs (TF-143): the row scrolls, never the page; the tab bar stays inside
+     the viewport and the selected tab is scrolled into view by Settings. */
   .set-nav {
     position: static;
     flex-direction: row;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
     gap: 4px;
     padding-bottom: 2px;
     border-bottom: 1px solid var(--border);
   }
+  /* Touch target: at least 44px tall and 44px wide, with a gap so a tap never hits the next tab. */
   .set-nav-item {
     flex: none;
-    padding: 8px 12px;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+  .set-nav-item > .ico {
+    margin-top: 0;
+  }
+  .set-nav-item.on b {
+    font-weight: 600;
   }
   .set-nav-item small {
     display: none;
@@ -5374,6 +5392,26 @@ a.set-stat:hover {
   }
   .set-main .grid2 {
     grid-template-columns: 1fr;
+  }
+  /* Card actions (Refresh, Connect…) drop under the title and stay easy to tap. */
+  .set-card-h {
+    gap: 10px;
+  }
+  .set-card-right {
+    flex-wrap: wrap;
+  }
+  .set-card-right .btn {
+    min-height: 40px;
+  }
+}
+/* GitHub issue and project rows: long titles wrap inside the card instead of widening the page. */
+.set-docs li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .set-docs a {
+    min-height: 32px;
   }
 }
 
