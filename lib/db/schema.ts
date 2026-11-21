@@ -344,6 +344,33 @@ create table if not exists code_jobs (
   updated_at timestamptz not null default now()
 );
 create index if not exists code_jobs_project on code_jobs(project_id, ticket_id);
+-- Code & GitHub connection and repository selection (TF-142, lib/github-link.ts). github_connections: whether a
+-- project's GitHub sign-in works (status connected or error), who it is and when it was last checked. The token itself
+-- stays encrypted in the project's secrets, never here. github_repo_links: the repository chosen for the project. An
+-- empty repo_full_name means the choice was cleared, and a connection error never touches it. (No semicolons in these
+-- comments: PGlite splits on them.)
+create table if not exists github_connections (
+  project_id text primary key references projects(id) on delete cascade,
+  status text not null default 'connected',
+  account_login text not null default '',
+  account_name text not null default '',
+  account_avatar text not null default '',
+  scopes text not null default '',
+  last_error text not null default '',
+  connected_by text,
+  connected_at timestamptz not null default now(),
+  checked_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+create table if not exists github_repo_links (
+  project_id text primary key references projects(id) on delete cascade,
+  repo_full_name text not null default '',
+  default_branch text not null default '',
+  repo_url text not null default '',
+  repo_private boolean not null default false,
+  selected_by text,
+  updated_at timestamptz not null default now()
+);
 create table if not exists doc_templates (
   key text primary key,
   name text not null default '',

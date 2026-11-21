@@ -718,6 +718,24 @@ GitHub issues and Projects from Ticket Forge is a follow-up.
 - Administration → **GitHub** shows whether the workspace has a GitHub connection (`GET /api/admin/github`; never the
   token).
 
+### GitHub connection and repository (TF-142)
+
+Project settings → Code & GitHub starts with a **GitHub connection and repository** card. It is stored in two tables
+(`github_connections`, `github_repo_links`; created by the schema in `lib/db/schema.ts`, with row-level security), so
+it is the same after a reload. The token stays encrypted in the project's secrets and is never stored in these tables
+or sent to the browser.
+
+- **Status**: *Connected* (with the GitHub account), *Not connected* or *Error*. Each time the tab opens (and on
+  **Refresh**) the sign-in is checked with GitHub, so a revoked or failing connection shows as an error with **Try
+  again**, **Reconnect GitHub** and **Disconnect**.
+- **Connect GitHub** (device sign-in or a personal access token) and **Disconnect** work as under *GitHub account*
+  below, but need only the **Set up the repository** permission (`project.repo`).
+- **Linked repository**: choose, change or clear the project's repository from the list of repositories the
+  connection can access (searchable), then **Save repository**. The server refuses a repository that is not in that
+  list. A GitHub error never clears the saved choice. The Issues and Projects sections read this repository first.
+- Only people whose custom role has `project.repo` see the card's controls; everyone else gets a note and no actions
+  (`GET`/`POST /api/projects/:id/github-link` answer 403).
+
 ### My AI: each person's own Claude subscription
 
 Your avatar → **My AI** lets each person add **their own** Claude Pro/Max subscription token (`claude setup-token`,
