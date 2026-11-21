@@ -27,6 +27,7 @@ const CUTOVER_KEY = 'db_cutover'; // lib/db/connection.ts
 const ENV_FILE = process.env.DB_SWITCH_ENV_FILE || path.join(process.cwd(), '.env'); // override: tests
 const MIGRATE_HOST = path.join(path.dirname(fileURLToPath(import.meta.url)), 'db-migrate-host.ts');
 const [cmd = '', ...flags] = process.argv.slice(2);
+const COPY_ATTEMPTS = 3;
 
 const log = (msg: string) => console.log(msg);
 const fail = (msg: string): never => {
@@ -110,18 +111,32 @@ function migrateHost(step: string, source: string, target: string, extra: Record
 }
 
 /**
- * Copies everything and freezes the source. A source that can't be frozen (Supabase turns a full
- * free-plan database read-only) can't take writes anyway: then a clean `verify` is enough. `extra`:
- * environment for the migration tool.
+ * Copies everything and freezes the source. When the cutover can't finish (work on the source
+ * didn't end in time, or Supabase made a full free-plan database read-only), the source is frozen
+ * as it is, the copy checked and caught up; if it still doesn't match, the source is re-opened and
+ * nothing is switched. Returns whether the source is frozen (a read-only one can't be marked).
+ * `extra`: environment for the migration tool.
  */
 function move(source: string, target: string, extra: Record<string, string> = {}) {
   const step = (name: string) => migrateHost(name, source, target, extra);
-  if (!step('copy')) fail('The copy failed (see above). Nothing was switched.');
+  // A dropped connection (a busy or over-quota free plan) stops a copy part-way; the copy is
+  // repeatable (rows already there are skipped), so it is tried again.
+  let copied = step('copy');
+  for (let attempt = 2; !copied && attempt <= COPY_ATTEMPTS; attempt++) {
+    log(`\nThe copy stopped part-way. Trying again (${attempt} of ${COPY_ATTEMPTS})…`);
+    copied = step('copy');
+  }
+  if (!copied) fail('The copy failed (see above). Nothing was switched; run it again later.');
   if (step('cutover')) return true;
-  log('\nThe cutover could not freeze the source. Checking the copy instead…');
-  if (!step('verify'))
-    fail('The copy does not match the source (see above). Nothing was switched; run it again.');
-  return false;
+  log('\nThe cutover could not finish. Freezing the source as it is and checking the copy…');
+  const frozen = step('finish');
+  if (step('verify')) return frozen;
+  log('\nCatching up the last changes…');
+  if (step('copy') && step('verify')) return frozen;
+  if (frozen) step('release');
+  return fail(
+    'The copy does not match the source (see above). Nothing was switched; the source accepts writes again.',
+  );
 }
 
 /** Connections other than ours: TicketForge servers (or anything else) still on the database. */
