@@ -15,6 +15,7 @@ import {
   pollDeviceLogin,
   listRepos,
 } from '@/lib/github-connect';
+import { recordConnection, forgetConnection } from '@/lib/github-link';
 
 // Project settings → Code & GitHub: checks the local repository folder and keeps the project's
 // GitHub token.
@@ -107,6 +108,7 @@ export const POST = api(async (req, p) => {
     const r: any = await pollDeviceLogin(String(b.id || ''), p.id);
     if (r.state !== 'done') return r;
     await setProjectSecret(p.id, 'githubToken', r.token, user);
+    await recordConnection(p.id, user, { account: r.account, scopes: r.scopes });
     return { state: 'done', account: r.account, scopes: r.scopes };
   }
   if (b.action === 'ghRepos')
@@ -183,6 +185,7 @@ export const POST = api(async (req, p) => {
         'That doesn’t look like a GitHub token (they start with ghp_, github_pat_ …).',
       );
     await setProjectSecret(p.id, 'githubToken', token, user);
+    await recordConnection(p.id, user);
     return { hasToken: true };
   }
   if (b.action === 'saveGitlabToken') {
@@ -215,6 +218,7 @@ export const POST = api(async (req, p) => {
   }
   if (b.action === 'clearToken') {
     await setProjectSecret(p.id, 'githubToken', '', user);
+    await forgetConnection(p.id);
     return { hasToken: false };
   }
   throw new HttpError(400, 'Unknown action');

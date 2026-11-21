@@ -5,7 +5,8 @@
 //   opens Project settings → Code & GitHub); the server checks it, the UI only hides the section.
 // - Connection: the GitHub sign-in the project already uses (its saved token, else GITHUB_TOKEN,
 //   which is shared by every project). No sign-in → { connected: false } and no GitHub request.
-// - Repository: the one chosen in Code & GitHub → Repository (dev.repo), else the one linked for
+// - Repository: the one chosen in Code & GitHub → GitHub connection and repository (TF-142, the
+//   github_repo_links table), else the one chosen in Repository (dev.repo), else the one linked for
 //   GitHub issues (githubSync.repo). None → { repo: '' } and no GitHub request.
 // - A failed GitHub request throws HttpError, so the client shows an error state, never old data.
 // Read-only: creating or editing issues and Projects from Ticket Forge is a follow-up.
@@ -34,7 +35,13 @@ async function target(user: any, projectId: string) {
   if (!pr) throw new HttpError(404, 'Project not found');
   const token = await tokenOf(projectId);
   if (!token) return { connected: false as const };
-  const repo = String(pr.data?.dev?.repo || pr.data?.githubSync?.repo || '').trim();
+  // The repository chosen in the GitHub connection card (TF-142, github_repo_links) wins, even
+  // when it was cleared; projects that never used the card keep the older settings.
+  const link = (await q('select repo_full_name from github_repo_links where project_id = $1', [projectId]))
+    .rows[0];
+  const repo = String(
+    link ? link.repo_full_name : pr.data?.dev?.repo || pr.data?.githubSync?.repo || '',
+  ).trim();
   return { connected: true as const, token, repo: REPO_RE.test(repo) ? repo : '' };
 }
 

@@ -10,6 +10,7 @@ import { AppContextSettings } from '../AppContext';
 import { RepoSetupCard } from '../RepoSetup';
 import { GithubSyncCard } from '../GithubSync';
 import { GithubLive } from '../GithubLive';
+import { GithubConnectionCard } from '../GithubConnection';
 import { DatabaseSettings } from '../Database';
 import { SECTIONS, Details } from './Details';
 
@@ -293,6 +294,7 @@ export function Settings() {
           {cur === 'context' && <AppContextSettings ed={ed} />}
           {cur === 'code' && (
             <>
+              <GithubConnectionCard key={`conn-${P().id}`} />
               <RepoSetupCard key={P().id} />
               <GithubSyncCard key={`gh-${P().id}`} />
               <GithubLive />

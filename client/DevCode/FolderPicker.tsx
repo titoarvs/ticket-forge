@@ -173,7 +173,16 @@ export function FolderPicker({
  * Connect GitHub: device sign-in (a code you approve on github.com). Admins can set the OAuth App
  * client ID here.
  */
-export function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account: Any) => void }) {
+export function GitHubConnectModal({
+  env,
+  onDone,
+  route = 'dev',
+}: {
+  env: Any;
+  onDone: (account: Any) => void;
+  /** The API route under /api/projects/:id that handles ghClientId, ghConnectStart and ghConnectPoll. */
+  route?: string;
+}) {
   const [configured, setConfigured] = useState(Boolean(env?.githubConnect?.configured));
   const [clientId, setClientId] = useState('');
   const [flow, setFlow] = useState<Any>(null);
@@ -186,7 +195,7 @@ export function GitHubConnectModal({ env, onDone }: { env: Any; onDone: (account
     },
     [],
   );
-  const base = `/api/projects/${P().id}/dev`;
+  const base = `/api/projects/${P().id}/${route}`;
   const start = async () => {
     setErr('');
     setState('starting');
