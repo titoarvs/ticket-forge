@@ -1,6 +1,6 @@
 // The body of a GitHub issue filed from Ticket Forge, laid out like a Jira ticket: a summary line
 // (type, priority, points, epic, key), the user story, the description, the acceptance criteria as
-// Given / When / Then, and the test cases.
+// Given / When / Then, the ticket's pull requests (links) and the test cases.
 // Two-way sync (lib/github-sync.ts) maps the body to the ticket's description, so the description
 // sits between hidden markers: descriptionOf() reads just that part back, and the rest of the
 // layout never leaks into the ticket. A body without the markers (an issue written on GitHub) is
@@ -21,6 +21,7 @@ export type TicketForBody = {
   priority?: string;
   storyPoints?: number | null;
   key?: string;
+  prs?: { number?: number; title?: string; url?: string; status?: string; repo?: string }[];
 };
 
 const text = (v: any) =>
@@ -69,6 +70,18 @@ function testCases(list: TicketForBody['testCases'] = []) {
     .join('\n');
 }
 
+/** The ticket's pull requests: "#19 TF-71: Version tickets… (Merged)", each a link. */
+function pullRequests(list: TicketForBody['prs'] = []) {
+  return list
+    .filter((p) => p?.url)
+    .slice(0, LIST_MAX)
+    .map((p) => {
+      const label = `${p.number ? `#${p.number} ` : ''}${text(p.title) || 'Pull request'}`;
+      return `- [${label.replace(/[[\]]/g, '')}](${p.url})${p.status ? ` · ${text(p.status)}` : ''}`;
+    })
+    .join('\n');
+}
+
 /** The GitHub issue body for a ticket. `epic`: the title of the ticket's epic ('' for none). */
 export function ticketBody(t: TicketForBody, epic = '') {
   const ac = (t.acceptanceCriteria || []).map(text).filter(Boolean);
@@ -77,6 +90,7 @@ export function ticketBody(t: TicketForBody, epic = '') {
     text(t.userStory) && `### User story\n${text(t.userStory)}`,
     `### Description\n${OPEN}\n${text(t.description)}\n${CLOSE}`,
     ac.length && `### Acceptance criteria\n${criteria(ac)}`,
+    t.prs?.some((p) => p?.url) && `### Pull requests\n${pullRequests(t.prs)}`,
     t.testCases?.length && `### Test cases\n${testCases(t.testCases)}`,
   ];
   return sections.filter(Boolean).join('\n\n').slice(0, BODY_MAX);

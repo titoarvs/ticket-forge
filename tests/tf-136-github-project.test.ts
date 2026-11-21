@@ -12,6 +12,7 @@ process.env.TICKETFORGE_DATA = dir;
 process.env.DATABASE_URL = '';
 process.env.SUPABASE_DB_URL = '';
 process.env.GITHUB_TOKEN = 'test-token';
+process.env.GITHUB_PUSH_PAUSE_MS = '0';
 
 let G: typeof import('../lib/github-sync');
 let L: typeof import('../lib/github-project/link');
@@ -204,9 +205,17 @@ globalThis.fetch = (async (url: any, init: any = {}) => {
     return json({ full_name: REPO, private: true, html_url: `https://github.com/${REPO}` });
   if (route === `repos/${REPO}/issues` && (init.method || 'GET') === 'GET') return json(issues);
   if (route === `repos/${REPO}/issues` && init.method === 'POST') {
-    const i = { ...issue(issues.length + 100), title: JSON.parse(init.body).title };
+    const b = JSON.parse(init.body);
+    const labels = (b.labels || []).map((name: string) => ({ name }));
+    const i = { ...issue(issues.length + 100), title: b.title, body: b.body, labels };
     issues.push(i);
     return json(i, 201);
+  }
+  const one = route.match(new RegExp(`^repos/${REPO}/issues/(\\d+)$`));
+  if (one && init.method === 'PATCH') {
+    const i = issues.find((x) => x.number === Number(one[1]));
+    Object.assign(i, JSON.parse(init.body), { updated_at: T(70) });
+    return json(i);
   }
   return json({ message: 'Not Found' }, 404);
 }) as any;
@@ -418,4 +427,86 @@ test('a token without Projects access is reported and the issues still sync', as
   const r: any = await sync('import');
   assert.equal(r.created, 1);
   assert.ok(r.errors.some((e: string) => /project/.test(e)));
+});
+
+// ---------------------------------------------------------------- push tickets to GitHub
+const addTicket = (id: string, key: string, extra: any = {}) =>
+  D.q("insert into issues (project_id, id, position, data) values ('p1', $1, $2, $3)", [
+    id,
+    Number(key.split('-')[1]),
+    JSON.stringify({
+      id,
+      key,
+      title: `Ticket ${key}`,
+      type: 'Story',
+      status: 'To Do',
+      priority: 'Medium',
+      labels: [],
+      prs: [],
+      history: [],
+      ...extra,
+    }),
+  ]);
+
+test('pushing files an issue for every ticket without one, with PR links, and puts it on the board', async () => {
+  const P = await import('../lib/github-push');
+  await linkAll();
+  await addTicket('t2', 'SH-2', {
+    status: 'Done',
+    labels: ['FE'],
+    prs: [
+      {
+        number: 19,
+        title: 'SH-2: Pay by card',
+        url: `https://github.com/${REPO}/pull/19`,
+        status: 'Merged',
+      },
+    ],
+  });
+  await addTicket('t1', 'SH-1');
+  await addTicket('t3', 'SH-3', { github: { repo: REPO, number: 5 } }); // already on GitHub
+  const r: any = await as(() => P.pushTickets(owner, 'p1'));
+  assert.deepEqual([r.pushed, r.remaining, r.errors], [2, 0, []]);
+  assert.deepEqual(
+    r.issues.map((x: any) => x.key),
+    ['SH-1', 'SH-2'],
+    'key order',
+  );
+  const done = issues.find((i) => i.title === 'Ticket SH-2');
+  assert.match(
+    done.body,
+    /### Pull requests\n- \[#19 SH-2: Pay by card\]\(https:\/\/github\.com\/acme\/shop\/pull\/19\) · Merged/,
+  );
+  assert.deepEqual(done.labels, [{ name: 'FE' }]);
+  assert.equal(done.state, 'closed');
+  assert.deepEqual(items.map((i) => i.values.status).sort(), ['Done', 'Todo']);
+  const t2 = (await tickets()).find((t) => t.key === 'SH-2');
+  assert.equal(t2.github.number, done.number);
+  assert.equal(t2.github.base.state, 'closed');
+  assert.ok(t2.history.some((h: any) => h.text === `filed as GitHub issue #${done.number}`));
+  // The next issues sync finds them linked: no duplicate tickets.
+  await sync('sync');
+  assert.equal((await tickets()).length, 3);
+});
+
+test('a big backlog goes in batches; the next push carries on where it stopped', async () => {
+  const P = await import('../lib/github-push');
+  await linkAll();
+  for (let n = 1; n <= P.PUSH_BATCH + 2; n++) await addTicket(`t${n}`, `SH-${n}`);
+  const first: any = await as(() => P.pushTickets(owner, 'p1'));
+  assert.deepEqual([first.pushed, first.remaining], [P.PUSH_BATCH, 2]);
+  const second: any = await as(() => P.pushTickets(owner, 'p1'));
+  assert.deepEqual([second.pushed, second.remaining], [2, 0]);
+  assert.equal(issues.length, P.PUSH_BATCH + 2);
+});
+
+test('only the project owner or a Super Admin can push', async () => {
+  const P = await import('../lib/github-push');
+  await linkAll();
+  await addTicket('t1', 'SH-1');
+  await assert.rejects(
+    as(() => P.pushTickets(member, 'p1')),
+    /Only the project owner/,
+  );
+  assert.equal(issues.length, 0);
 });
