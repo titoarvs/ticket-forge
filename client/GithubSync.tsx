@@ -8,6 +8,7 @@ import { SetCard, Spinner } from './ui';
 import { TF } from './fields';
 import { canDeleteProject } from './DeleteProject';
 import { GithubBoardPicker } from './GithubBoardPicker';
+import { GithubPushButton } from './GithubPushButton';
 
 export const ONLY_OWNERS =
   'Only the project owner or a Super Admin can link a GitHub repository or import from GitHub.';
@@ -144,6 +145,7 @@ export function GithubSyncCard() {
             )}
           </button>
         </span>
+        <GithubPushButton allowed={allowed} />
       </div>
       <GithubBoardPicker allowed={allowed} />
       {last && <LastRun last={last} />}

@@ -228,7 +228,7 @@ export async function tokenFor(projectId: string) {
  */
 export async function createGithubIssue(
   projectId: string,
-  ticket: TicketForBody & { epicId?: any; sprintId?: any; status?: string },
+  ticket: TicketForBody & { epicId?: any; sprintId?: any; status?: string; labels?: string[] },
 ) {
   const pr = (
     await q('select data from projects where id = $1 and archived_at is null', [projectId])
@@ -243,11 +243,14 @@ export async function createGithubIssue(
       400,
       'GitHub connection missing: add a personal access token in settings (Project settings → Code & GitHub) to create tickets.',
     );
+  // Labels go with the issue so both sides start equal; a Done ticket's issue is closed right away.
+  const labels = (ticket.labels || []).map(clean).filter(Boolean).slice(0, 20);
+  const done = workflowOf(pr.data).find((w: any) => w.name === ticket.status)?.category === 'done';
   let data: any;
   try {
     ({ data } = await gh(`repos/${repo}/issues`, token, {
       method: 'POST',
-      body: { title, body: ticketBody(ticket, epic) },
+      body: { title, body: ticketBody(ticket, epic), ...(labels.length ? { labels } : {}) },
     }));
   } catch (e: any) {
     if (e instanceof HttpError) {
@@ -256,6 +259,14 @@ export async function createGithubIssue(
     }
     throw new HttpError(504, 'GitHub connection problem: GitHub didn’t respond. Try again.');
   }
+  // The issue exists now: a failed close mustn't lose it (the next sync closes it).
+  if (done)
+    data = await gh(`repos/${repo}/issues/${data.number}`, token, {
+      method: 'PATCH',
+      body: { state: 'closed', state_reason: 'completed' },
+    })
+      .then((r) => r.data)
+      .catch(() => data);
   const g: any = fromGithub(data);
   const now = new Date().toISOString();
   // The linked GitHub Project board gets the issue with the ticket's status, priority, points and

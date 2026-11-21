@@ -3,6 +3,7 @@ import * as store from '@/lib/store';
 import { linkRepo, syncIssues } from '@/lib/github-sync';
 import { fileGithubIssue } from '@/lib/issue-create';
 import { boardsFor, linkBoard, unlinkBoard } from '@/lib/github-project/link';
+import { pushTickets } from '@/lib/github-push';
 
 export const maxDuration = 300;
 
@@ -13,6 +14,7 @@ export const maxDuration = 300;
 // create (needs the issue.create permission; { github: null } when no repository is linked).
 // actions "boards", "link-board" { boardId }, "unlink-board": the GitHub Project board whose
 // Status, Priority, story points and Sprint ↔ Iteration sync with the tickets (lib/github-project/).
+// action "push-tickets": files the next batch of tickets without a GitHub issue (lib/github-push.ts).
 
 export const POST = api(async (req, p) => {
   const user = await authed();
@@ -25,8 +27,9 @@ export const POST = api(async (req, p) => {
   if (b.action === 'boards') return boardsFor(user, p.id);
   if (b.action === 'link-board') return linkBoard(user, p.id, b.boardId);
   if (b.action === 'unlink-board') return unlinkBoard(user, p.id);
+  if (b.action === 'push-tickets') return pushTickets(user, p.id);
   throw new HttpError(
     400,
-    'Send an action: link, import, sync, create-issue, boards, link-board or unlink-board.',
+    'Send an action: link, import, sync, create-issue, boards, link-board, unlink-board or push-tickets.',
   );
 });
