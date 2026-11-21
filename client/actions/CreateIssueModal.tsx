@@ -63,7 +63,7 @@ export async function githubIssueFor(t: Any) {
   const body = {
     action: 'create-issue',
     ...pickFields(t, ['key', 'title', 'description', 'userStory', 'acceptanceCriteria']),
-    ...pickFields(t, ['type', 'priority', 'storyPoints', 'epicId']),
+    ...pickFields(t, ['type', 'priority', 'storyPoints', 'epicId', 'sprintId', 'status']),
     testCases: (t.testCases || []).map((tc: Any) =>
       pickFields(tc, ['title', 'type', 'steps', 'expected']),
     ),
