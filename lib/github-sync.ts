@@ -51,7 +51,7 @@ const DEFAULT_WORKFLOW = [
 ];
 
 // ---------------------------------------------------------------- GitHub
-async function gh(path: string, token: string, { method = 'GET', body }: any = {}) {
+export async function gh(path: string, token: string,{ method = 'GET', body }: any = {}) {
   const res = await fetch(`https://api.github.com/${path}`, {
     method,
     headers: {

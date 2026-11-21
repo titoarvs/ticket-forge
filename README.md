@@ -700,6 +700,24 @@ disabled with a permission message (the server refuses as well).
 - Sync runs when someone presses a button (there is no webhook or timer yet). Issues deleted or transferred in GitHub
   leave their tickets as they are. GitHub's rate limit stops the run with a message that says when to try again.
 
+### Live GitHub Issues and Projects (TF-140)
+
+Project settings → Code & GitHub also has an **Issues** and a **Projects** section. Each reads from the GitHub API
+every time it opens (and on **Refresh**); nothing is copied into the project. They are read-only: creating or editing
+GitHub issues and Projects from Ticket Forge is a follow-up.
+
+- **Issues** lists the repository's most recent issues (up to 100, pull requests left out). **Projects** lists the open
+  GitHub Projects of the repository and its owner (GraphQL API; the token needs Projects access).
+- The repository is the one chosen under **Repository** (else the one linked under GitHub issues). The sign-in is the
+  project's existing GitHub connection (a saved token, else `GITHUB_TOKEN`, which every project shares).
+- Only people whose custom role has **Set up the repository** (`project.repo`, the permission that opens Code & GitHub)
+  see the sections; `GET /api/projects/:id/github-live?section=issues|projects` refuses everyone else (403).
+- Without a GitHub connection both sections say to connect GitHub in admin settings and show no data. If GitHub fails
+  the section shows an error with **Try again**; the earlier list is cleared before each load, never shown as current.
+  A repository with no GitHub Projects shows an empty state.
+- Administration → **GitHub** shows whether the workspace has a GitHub connection (`GET /api/admin/github`; never the
+  token).
+
 ### My AI: each person's own Claude subscription
 
 Your avatar → **My AI** lets each person add **their own** Claude Pro/Max subscription token (`claude setup-token`,

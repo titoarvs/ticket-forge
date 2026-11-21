@@ -9,6 +9,7 @@ import { DevSettings } from '../DevCode';
 import { AppContextSettings } from '../AppContext';
 import { RepoSetupCard } from '../RepoSetup';
 import { GithubSyncCard } from '../GithubSync';
+import { GithubLive } from '../GithubLive';
 import { DatabaseSettings } from '../Database';
 import { SECTIONS, Details } from './Details';
 
@@ -294,6 +295,7 @@ export function Settings() {
             <>
               <RepoSetupCard key={P().id} />
               <GithubSyncCard key={`gh-${P().id}`} />
+              <GithubLive />
               <DevSettings ed={ed} />
             </>
           )}
