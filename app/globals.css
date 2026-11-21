@@ -5414,6 +5414,37 @@ a.set-stat:hover {
     min-height: 32px;
   }
 }
+/* Previous / Next under the GitHub issue and project lists (TF-144). The page text and buttons wrap
+   onto their own lines instead of overlapping; on phones the buttons share a full-width row. */
+.set-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.set-pager-btns {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 900px) {
+  .set-pager .btn {
+    min-height: 40px;
+    min-width: 88px;
+    justify-content: center;
+  }
+}
+@media (max-width: 640px) {
+  .set-pager {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  .set-pager-btns .btn {
+    flex: 1;
+  }
+}
 
 /* ---------- readable assumption / question lists ---------- */
 .set-lists {
