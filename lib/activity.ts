@@ -30,6 +30,8 @@ const FIELD = {
   status: 'status',
   category: 'category',
   next: 'transitions',
+  x: 'position',
+  y: 'position',
   wip: 'column limit',
   steps: 'steps',
   expected: 'expected result',
@@ -116,7 +118,7 @@ function diffList(kind, noun, label, before, after) {
       (k) => J(o[k]) !== J(x[k]) && !/At$|^id$/.test(k),
     );
     if (!keys.length) continue; // only timestamps changed
-    const names = keys.map((k) => FIELD[k] || k).slice(0, 3);
+    const names = [...new Set(keys.map((k) => FIELD[k] || k))].slice(0, 3);
     out.push({
       kind,
       text: `updated ${noun} ${q(label(x))}${names.length ? ` (${names.join(', ')}${keys.length > 3 ? '…' : ''})` : ''}`,

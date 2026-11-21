@@ -4831,6 +4831,38 @@ a.navlink:hover {
   font-size: 12px;
   fill: var(--text-subtle);
 }
+.flow-bar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.flow-node {
+  cursor: pointer;
+  outline: none;
+}
+.flow-node .wf-node {
+  transition: stroke-width 0.1s;
+}
+.flow-node.on .wf-node,
+.flow-node:focus-visible .wf-node {
+  stroke: var(--brand, #0c66e4);
+  stroke-width: 3;
+}
+.flow-node.from .wf-node {
+  stroke-dasharray: 4 3;
+}
+.flow-edge {
+  cursor: pointer;
+  outline: none;
+}
+.flow-edge .flow-hit {
+  stroke: transparent;
+  stroke-width: 12;
+}
+.flow-edge.on .wf-edge,
+.flow-edge:focus-visible .wf-edge {
+  stroke: var(--brand, #0c66e4);
+  stroke-width: 3;
+}
 .wf-matrix-wrap {
   overflow-x: auto;
 }

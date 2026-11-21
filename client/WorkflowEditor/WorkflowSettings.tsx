@@ -15,6 +15,7 @@ import {
 import { Confirm, SetCard, Ico, I } from '../ui';
 import { SF, MenuItem, TF, CB } from '../fields';
 import { stepByStep, FlowDiagram } from './FlowDiagram';
+import { FlowGraph } from './FlowGraph';
 import { CommitName, StatusColorPicker } from './StatusColorPicker';
 
 export function WorkflowSettings() {
@@ -100,6 +101,7 @@ export function WorkflowSettings() {
 
   return (
     <>
+      <FlowGraph />
       <SetCard
         id="statuses"
         title="Statuses"

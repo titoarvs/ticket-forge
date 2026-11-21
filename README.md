@@ -164,7 +164,11 @@ All settings live in `.env` (see `.env.example`):
      (delete the project). **Workflow**: add, rename, reorder or delete statuses, set each
      one's category (to do, in progress or done) and column limit, and choose the **transitions**, like Jira:
      *any status to any status* (the default), or *custom transitions* with a From → To grid, "any status can
-     move here" per status, and quick starts (step by step, allow every move, clear). A diagram shows the flow.
+     move here" per status, and quick starts (step by step, allow every move, clear). A **Status flow** node
+     graph at the top shows every status as a node and every saved transition as an arrow (everyone who can open
+     the project sees it). With *Edit project settings* you can add statuses, drag them, connect two statuses,
+     and remove a status or transition (after a confirmation), then **Save flow**; a duplicate status name is
+     refused. Without that permission the controls are hidden.
      With custom transitions the issue panel only offers allowed statuses, the board greys out columns an issue
      can't move to while you drag it, and bulk "Set status" skips (and reports) issues that can't move.
    - **Issue panel** (click any issue; expand for a full view): summary, status, details (assignee with

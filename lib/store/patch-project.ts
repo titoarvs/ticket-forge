@@ -1,6 +1,7 @@
 import { tx, q } from '../db';
 import { HttpError } from '../auth';
 import { describeSection } from '../activity';
+import { duplicateStatus } from '../workflow';
 import {
   NOT_META,
   has,
@@ -80,6 +81,15 @@ export async function patchProject(id, patch, user) {
         (k === 'key' && meta[k] !== pr.key),
     );
     for (const k of changedMeta) need(META_PERM[k] || ['project.settings']);
+    // A saved workflow can't use a status name twice (the flow isn't saved).
+    if (changedMeta.includes('workflow')) {
+      const dup = duplicateStatus(meta.workflow);
+      if (dup)
+        throw new HttpError(
+          400,
+          `The status name “${dup}” is a duplicate. Names must be unique in a project.`,
+        );
+    }
     // Publishing an epic draft (its draft flag removed) needs a title.
     if (changedMeta.includes('epics')) {
       const was = new Map((Array.isArray(old.epics) ? old.epics : []).map((e: any) => [e?.id, e]));
