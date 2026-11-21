@@ -42,6 +42,8 @@ export const TABLES = [
   'ticket_drafts',
   'chat_messages',
   'api_tokens',
+  'github_connections',
+  'github_repo_links',
 ];
 const FUNCS = [
   'tf_uid()',
@@ -183,8 +185,12 @@ create policy tf_system_only on usage_counters for all to ${APP_ROLE} using (tf_
 -- Workspace isolation, added on top of every rule above (restrictive): rows of another workspace never show, even to
 -- someone with access to "all projects". System work stays inside the request's workspace in the app code.
 ${['projects', 'roles', 'invites'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using (tf_system() or workspace_id = tf_ws()) with check (tf_system() or workspace_id = tf_ws())`).join(';\n')};
-${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs', 'helper_perms', 'ticket_drafts', 'chat_messages'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
+${['issues', 'issue_tombstones', 'activity', 'issue_versions', 'screenshots', 'files', 'code_jobs', 'brain_notes', 'brain_state', 'coding_specs', 'spec_changes', 'drive_docs', 'helper_perms', 'ticket_drafts', 'chat_messages', 'github_connections', 'github_repo_links'].map((t) => `create policy tfw_tenant on ${t} as restrictive for all to ${APP_ROLE} using ((select tf_system()) or project_id in (select unnest(tf_ws_projects()))) with check ((select tf_system()) or project_id in (select unnest(tf_ws_projects())))`).join(';\n')};
 create policy tf_all on code_jobs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
+create policy tf_select on github_connections for select to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or tf_can('project.repo')));
+create policy tf_write on github_connections for all to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or tf_can('project.repo'))) with check (${ACCESS('project_id')} and (select tf_system() or tf_can('project.repo')));
+create policy tf_select on github_repo_links for select to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or tf_can('project.repo')));
+create policy tf_write on github_repo_links for all to ${APP_ROLE} using (${ACCESS('project_id')} and (select tf_system() or tf_can('project.repo'))) with check (${ACCESS('project_id')} and (select tf_system() or tf_can('project.repo')));
 create policy tf_all on brain_notes for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on brain_state for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});
 create policy tf_all on coding_specs for all to ${APP_ROLE} using (${ACCESS('project_id')}) with check (${ACCESS('project_id')});

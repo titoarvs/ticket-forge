@@ -700,6 +700,45 @@ disabled with a permission message (the server refuses as well).
 - Sync runs when someone presses a button (there is no webhook or timer yet). Issues deleted or transferred in GitHub
   leave their tickets as they are. GitHub's rate limit stops the run with a message that says when to try again.
 
+### Live GitHub Issues and Projects (TF-140)
+
+Project settings → Code & GitHub also has an **Issues** and a **Projects** section. Each reads from the GitHub API
+every time it opens (and on **Refresh**); nothing is copied into the project. They are read-only: creating or editing
+GitHub issues and Projects from Ticket Forge is a follow-up.
+
+- **Issues** lists the repository's most recent issues (up to 100, pull requests left out). **Projects** lists the open
+  GitHub Projects of the repository and its owner (GraphQL API; the token needs Projects access).
+- Both lists show 10 items per page with **Previous** / **Next** and a "Page n of m" indicator (TF-144). The pages are
+  cut from the one load, so paging makes no extra GitHub request, and a load or **Refresh** starts again at page 1.
+  On phones and tablets the page controls wrap under the list and the buttons stay at least 40px tall.
+- The repository is the one chosen under **Repository** (else the one linked under GitHub issues). The sign-in is the
+  project's existing GitHub connection (a saved token, else `GITHUB_TOKEN`, which every project shares).
+- Only people whose custom role has **Set up the repository** (`project.repo`, the permission that opens Code & GitHub)
+  see the sections; `GET /api/projects/:id/github-live?section=issues|projects` refuses everyone else (403).
+- Without a GitHub connection both sections say to connect GitHub in admin settings and show no data. If GitHub fails
+  the section shows an error with **Try again**; the earlier list is cleared before each load, never shown as current.
+  A repository with no GitHub Projects shows an empty state.
+- Administration → **GitHub** shows whether the workspace has a GitHub connection (`GET /api/admin/github`; never the
+  token).
+
+### GitHub connection and repository (TF-142)
+
+Project settings → Code & GitHub starts with a **GitHub connection and repository** card. It is stored in two tables
+(`github_connections`, `github_repo_links`; created by the schema in `lib/db/schema.ts`, with row-level security), so
+it is the same after a reload. The token stays encrypted in the project's secrets and is never stored in these tables
+or sent to the browser.
+
+- **Status**: *Connected* (with the GitHub account), *Not connected* or *Error*. Each time the tab opens (and on
+  **Refresh**) the sign-in is checked with GitHub, so a revoked or failing connection shows as an error with **Try
+  again**, **Reconnect GitHub** and **Disconnect**.
+- **Connect GitHub** (device sign-in or a personal access token) and **Disconnect** work as under *GitHub account*
+  below, but need only the **Set up the repository** permission (`project.repo`).
+- **Linked repository**: choose, change or clear the project's repository from the list of repositories the
+  connection can access (searchable), then **Save repository**. The server refuses a repository that is not in that
+  list. A GitHub error never clears the saved choice. The Issues and Projects sections read this repository first.
+- Only people whose custom role has `project.repo` see the card's controls; everyone else gets a note and no actions
+  (`GET`/`POST /api/projects/:id/github-link` answer 403).
+
 ### My AI: each person's own Claude subscription
 
 Your avatar → **My AI** lets each person add **their own** Claude Pro/Max subscription token (`claude setup-token`,

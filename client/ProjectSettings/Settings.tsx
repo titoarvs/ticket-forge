@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { P, type Any, mutate, S, uid, can, setField, emit, saveUi } from '../core';
 import { SetCard, Ico, I, Avatar } from '../ui';
 import { canDeleteProject, openDeleteProject, ONLY_OWNERS } from '../DeleteProject';
@@ -9,6 +10,8 @@ import { DevSettings } from '../DevCode';
 import { AppContextSettings } from '../AppContext';
 import { RepoSetupCard } from '../RepoSetup';
 import { GithubSyncCard } from '../GithubSync';
+import { GithubLive } from '../GithubLive';
+import { GithubConnectionCard } from '../GithubConnection';
 import { DatabaseSettings } from '../Database';
 import { SECTIONS, Details } from './Details';
 
@@ -244,6 +247,17 @@ export function Settings() {
     document.querySelector('.view')?.scrollTo({ top: 0 });
   };
   const [, label, , desc] = sections.find(([k]) => k === cur)!;
+  // On phones and tablets the nav is one scrolling row: bring the selected tab into view (also
+  // after a reload, when the last tab is the saved one). Only the nav scrolls, never the page.
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const n = nav.current;
+    const on = n?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!n || !on || n.scrollWidth <= n.clientWidth) return;
+    const nb = n.getBoundingClientRect();
+    const ob = on.getBoundingClientRect();
+    n.scrollLeft += ob.left - nb.left - (nb.width - ob.width) / 2;
+  }, [cur, sections.length]);
   return (
     <>
       <Header
@@ -256,7 +270,7 @@ export function Settings() {
         }
       />
       <div className="set-layout">
-        <nav className="set-nav" aria-label="Settings sections">
+        <nav ref={nav} className="set-nav" aria-label="Settings sections">
           {sections.map(([k, l, icon, d]) => (
             <button
               key={k}
@@ -292,8 +306,10 @@ export function Settings() {
           {cur === 'context' && <AppContextSettings ed={ed} />}
           {cur === 'code' && (
             <>
+              <GithubConnectionCard key={`conn-${P().id}`} />
               <RepoSetupCard key={P().id} />
               <GithubSyncCard key={`gh-${P().id}`} />
+              <GithubLive />
               <DevSettings ed={ed} />
             </>
           )}

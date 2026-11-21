@@ -19,6 +19,7 @@ import { InviteModal, InvitesTab } from './Admin/InvitesTab';
 import { RolesTab } from './Admin/RolesTab';
 import { AiTab } from './Admin/AiTab';
 import { EmailTab } from './Admin/AccountModal';
+import { GithubTab } from './Admin/GithubTab';
 
 export { AccountModal } from './Admin/AccountModal';
 
@@ -104,6 +105,7 @@ export default function AdminPage({ tab }: { tab: string }) {
         {t === 'generation' && <GenerationTab />}
         {t === 'agents' && <AgentsTab />}
         {t === 'features' && <FeaturesTab />}
+        {t === 'github' && <GithubTab />}
         {t === 'gdrive' && <DriveTab />}
         {t === 'billing' && <BillingTab />}
         {t === 'payments' && <PaymentsTab />}
