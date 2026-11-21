@@ -42,6 +42,11 @@ const [cmd = '', ...flags] = process.argv.slice(2);
 const KEEP_HOLD = flags.includes('--keep-hold');
 const SKIP_DRAIN = flags.includes('--skip-drain');
 const DRAIN_MAX_MS = 60000;
+// A copy keeps a transaction open on the source while it writes each batch to the target. If this
+// computer loses the connection, the host may keep that session (and its locks) open: hosts like
+// Supabase never close it, and it then blocks schema changes and waits on the next move. The
+// database ends such a session itself after this long without a statement.
+const IDLE_TX_MS = 10 * 60 * 1000;
 
 const sourceUrl = (process.env.SOURCE_DATABASE_URL || databaseUrl()).trim();
 const targetUrl = (process.env.TARGET_DATABASE_URL || '').trim();
@@ -99,7 +104,8 @@ async function open(side: Side) {
     );
   }
   await c.query(
-    `select set_config('TimeZone', 'UTC', false), set_config('app.writer', '2', false), set_config('app.system', 'on', false)`,
+    `select set_config('TimeZone', 'UTC', false), set_config('app.writer', '2', false), set_config('app.system', 'on', false),
+      set_config('idle_in_transaction_session_timeout', '${IDLE_TX_MS}', false)`,
   );
   side.client = c;
   return c;

@@ -115,6 +115,29 @@ Until you stop the old servers nothing on the source was removed. To go back: se
 host refuse writes), redeploy. Writes made on the new host after the cutover are only there: copy them back first by running
 the tool the other way round (swap `SOURCE_DATABASE_URL` and `TARGET_DATABASE_URL`).
 
+## 8. Supabase free plan full: work on a local database, move back later
+
+When the Supabase free plan (500 MB of database space) fills up, run TicketForge on PostgreSQL on your own computer and
+move the data back to Supabase once there is room (a paid plan, or space freed). Administration → Email & database shows
+how full the database is and, near the limit, these commands. Stop `npm run dev` first and restart it after each switch.
+
+```bash
+npm run db:switch -- status   # which database the app uses, its size, the share of the free plan
+npm run db:switch -- local    # Supabase -> PostgreSQL on this computer
+npm run db:switch -- hosted   # back to Supabase
+```
+
+- `local` creates the database `ticketforge` on `localhost:5432` (or `LOCAL_DATABASE_URL`), copies everything with the tool
+  above (`copy` + `cutover`, every table checked), then points `DATABASE_URL` in `.env` at it and saves the Supabase address
+  as `HOSTED_DATABASE_URL`. Supabase is marked `moved`: the deployed site still shows data but refuses saves, so nothing is
+  written there that the move back would overwrite. (A Supabase database that is already read-only because the plan is
+  full can't be marked; the copy is then verified instead.)
+- `hosted` copies everything back while Supabase is still frozen, checks it, re-opens Supabase, marks the local database
+  `moved` and points `.env` back. Supabase needs room for the data. It refuses to start while anything else is connected to
+  the local database (a running TicketForge would write after the last copy).
+- `.env` is copied to `.env.before-db-switch` before it changes. The deployed site can't reach a database on your computer:
+  while you work locally only the local app saves.
+
 ## Out of scope
 
-Moving to a non-PostgreSQL database, and switching providers from the UI.
+Moving to a non-PostgreSQL database, and switching providers from the UI (use `npm run db:switch`).
