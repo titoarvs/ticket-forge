@@ -3,13 +3,17 @@
 // and GitHub Projects, read live from the GitHub API each time a section opens (nothing is kept
 // from an earlier load). Read-only. Shown only to people whose role has the Code & GitHub
 // permission (project.repo); the server checks it too. States: loading, "connect GitHub" (no
-// connection), "choose a repository", empty, error, list.
+// connection), "choose a repository", empty, error, list. Lists show GITHUB_PAGE items at a time
+// with Previous / Next (TF-144); the page is cut from what one load returned, so there is no extra
+// GitHub request, and it starts again at page 1 after every load.
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { P, api, ago, can, type Any } from './core';
 import { SetCard, Ico, I, Loading, Sk, EmptyState, ErrorState } from './ui';
 
 type Section = 'issues' | 'projects';
+/** Items per page in the Issues and Projects lists. */
+export const GITHUB_PAGE = 10;
 type Live = { status: 'loading' } | { status: 'ok'; data: Any } | { status: 'error'; error: Any };
 
 /**
@@ -109,6 +113,48 @@ function LiveBody({
   return <>{list(d)}</>;
 }
 
+/**
+ * One page of `items` as a list, with Previous / Next and "Page n of m" when there is more than one
+ * page. It is mounted fresh after each load (the loading state replaces it), so it opens on page 1.
+ */
+function Paged<T>({
+  items,
+  label,
+  row,
+}: {
+  items: T[];
+  label: string;
+  row: (item: T) => React.ReactNode;
+}) {
+  const pages = Math.max(1, Math.ceil(items.length / GITHUB_PAGE));
+  const [at, setAt] = useState(1);
+  const page = Math.min(at, pages);
+  const from = (page - 1) * GITHUB_PAGE;
+  const shown = items.slice(from, from + GITHUB_PAGE);
+  return (
+    <>
+      <ul className="set-docs" aria-label={label}>
+        {shown.map(row)}
+      </ul>
+      {pages > 1 && (
+        <nav className="set-pager" aria-label={`${label} pages`}>
+          <span className="muted small" aria-live="polite">
+            {from + 1}–{from + shown.length} of {items.length} · Page {page} of {pages}
+          </span>
+          <span className="set-pager-btns">
+            <button className="btn sm" disabled={page <= 1} onClick={() => setAt(page - 1)}>
+              Previous
+            </button>
+            <button className="btn sm" disabled={page >= pages} onClick={() => setAt(page + 1)}>
+              Next
+            </button>
+          </span>
+        </nav>
+      )}
+    </>
+  );
+}
+
 const refreshButton = (live: Live, reload: () => Promise<void>) => (
   <button className="btn sm" disabled={live.status === 'loading'} onClick={reload}>
     <Ico svg={I.refresh} />
@@ -134,8 +180,10 @@ export function GithubIssuesCard() {
         empty="No GitHub issues"
         list={(d) => (
           <>
-            <ul className="set-docs" aria-label={`Issues of ${d.repo}`}>
-              {d.issues.map((i: Any) => (
+            <Paged
+              items={d.issues}
+              label={`Issues of ${d.repo}`}
+              row={(i: Any) => (
                 <li key={i.number}>
                   <a href={i.url} target="_blank" rel="noreferrer">
                     <b>#{i.number}</b> {i.title}
@@ -149,8 +197,8 @@ export function GithubIssuesCard() {
                     updated {ago(i.updatedAt)}
                   </span>
                 </li>
-              ))}
-            </ul>
+              )}
+            />
             {d.truncated && (
               <p className="muted small set-note">
                 Showing the {d.issues.length} most recently updated issues of {d.repo}.
@@ -180,15 +228,17 @@ export function GithubProjectsCard() {
         reload={reload}
         empty="No GitHub Projects"
         list={(d) => (
-          <ul className="set-docs" aria-label={`GitHub Projects of ${d.repo}`}>
-            {d.projects.map((b: Any) => (
+          <Paged
+            items={d.projects}
+            label={`GitHub Projects of ${d.repo}`}
+            row={(b: Any) => (
               <li key={b.id}>
                 <a href={b.url} target="_blank" rel="noreferrer">
                   <b>#{b.number}</b> {b.title}
                 </a>
               </li>
-            ))}
-          </ul>
+            )}
+          />
         )}
       />
     </SetCard>

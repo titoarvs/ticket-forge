@@ -708,6 +708,9 @@ GitHub issues and Projects from Ticket Forge is a follow-up.
 
 - **Issues** lists the repository's most recent issues (up to 100, pull requests left out). **Projects** lists the open
   GitHub Projects of the repository and its owner (GraphQL API; the token needs Projects access).
+- Both lists show 10 items per page with **Previous** / **Next** and a "Page n of m" indicator (TF-144). The pages are
+  cut from the one load, so paging makes no extra GitHub request, and a load or **Refresh** starts again at page 1.
+  On phones and tablets the page controls wrap under the list and the buttons stay at least 40px tall.
 - The repository is the one chosen under **Repository** (else the one linked under GitHub issues). The sign-in is the
   project's existing GitHub connection (a saved token, else `GITHUB_TOKEN`, which every project shares).
 - Only people whose custom role has **Set up the repository** (`project.repo`, the permission that opens Code & GitHub)
