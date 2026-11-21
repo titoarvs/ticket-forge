@@ -159,7 +159,7 @@ test('with no repository chosen nothing is read from GitHub', async () => {
 test('a user without the Code & GitHub permission is refused and nothing is read', async () => {
   for (const read of [L.liveIssues, L.liveProjects])
     await assert.rejects(
-      as(() => read(without, 'p1')),
+      as<unknown>(() => read(without, 'p1')),
       (e: any) => e.status === 403,
     );
   assert.deepEqual(calls, []);
@@ -191,7 +191,7 @@ test('a failed GitHub request is an error, and the next read does not reuse earl
   down = true;
   for (const read of [L.liveIssues, L.liveProjects])
     await assert.rejects(
-      as(() => read(withRepo, 'p1')),
+      as<unknown>(() => read(withRepo, 'p1')),
       (e: any) => e.status >= 400,
     );
   down = false;
