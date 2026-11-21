@@ -14,6 +14,7 @@ export const TABS: [string, string, string][] = [
   ['generation', 'Generation', I.test],
   ['agents', 'Agents', I.bot],
   ['features', 'Features', I.flag],
+  ['github', 'GitHub', I.pr],
   ['gdrive', 'Google Drive', I.folder],
   ['billing', 'Billing', I.chart],
   ['payments', 'Plans & gateways', I.settings],
