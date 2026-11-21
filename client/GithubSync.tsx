@@ -7,6 +7,7 @@ import { P, api, pullRemote, toast, type Any } from './core';
 import { SetCard, Spinner } from './ui';
 import { TF } from './fields';
 import { canDeleteProject } from './DeleteProject';
+import { GithubBoardPicker } from './GithubBoardPicker';
 
 export const ONLY_OWNERS =
   'Only the project owner or a Super Admin can link a GitHub repository or import from GitHub.';
@@ -14,7 +15,21 @@ export const ONLY_OWNERS =
 const summary = (r: Any) =>
   `${r.created} new, ${r.updated} updated, ${r.unchanged} unchanged` +
   (r.conflicts ? `, ${r.conflicts} conflict${r.conflicts === 1 ? '' : 's'}` : '') +
-  (r.pushed ? `, ${r.pushed} written to GitHub` : '');
+  (r.pushed ? `, ${r.pushed} written to GitHub` : '') +
+  (r.board
+    ? `. Project “${r.board.title}”: ${r.board.updated} updated, ${r.board.pushed} written` +
+      (r.board.added ? `, ${r.board.added} added` : '') +
+      (r.board.conflicts ? `, ${r.board.conflicts} conflicts` : '')
+    : '');
+
+function LastRun({ last }: { last: Any }) {
+  return (
+    <small className="muted">
+      Last {last.mode === 'sync' ? 'sync' : 'import'} {new Date(last.at).toLocaleString()}
+      {last.by ? ` by ${last.by}` : ''}: {summary(last)}.
+    </small>
+  );
+}
 
 export function GithubSyncCard() {
   const p = P();
@@ -52,7 +67,7 @@ export function GithubSyncCard() {
     <SetCard
       id="github-issues"
       title="GitHub issues"
-      desc="Link a GitHub repository, import its issues as tickets and keep them in sync. Titles, descriptions, labels, assignees and milestones (as epics) carry over; when both sides changed an issue, the newer change wins and the ticket’s activity records the conflict."
+      desc="Link a GitHub repository, import its issues as tickets and keep them in sync. Titles, descriptions, labels, assignees and milestones (as epics) carry over, and with a GitHub Project linked so do Status, Priority, story points and sprints (as Iterations); when both sides changed, the newer change wins and the ticket’s activity records the conflict."
     >
       {!allowed && (
         <div className="warn-banner" role="status">
@@ -70,7 +85,10 @@ export function GithubSyncCard() {
         <small className="muted">
           {link?.repo ? (
             <>
-              Linked: <a href={link.url} target="_blank" rel="noreferrer">{link.repo}</a>
+              Linked:{' '}
+              <a href={link.url} target="_blank" rel="noreferrer">
+                {link.repo}
+              </a>
             </>
           ) : (
             'No repository linked yet. Connect GitHub under Repository setup first.'
@@ -127,12 +145,8 @@ export function GithubSyncCard() {
           </button>
         </span>
       </div>
-      {last && (
-        <small className="muted">
-          Last {last.mode === 'sync' ? 'sync' : 'import'} {new Date(last.at).toLocaleString()}
-          {last.by ? ` by ${last.by}` : ''}: {summary(last)}.
-        </small>
-      )}
+      <GithubBoardPicker allowed={allowed} />
+      {last && <LastRun last={last} />}
     </SetCard>
   );
 }

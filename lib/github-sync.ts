@@ -11,6 +11,8 @@
 // - Conflicts: a field changed on both sides since the last sync takes the newer side's value
 //   (GitHub's updated_at against the ticket's updatedAt; a tie goes to GitHub) and the ticket's
 //   activity gets a "Sync conflict" entry. Fields changed on one side only are copied across.
+// - GitHub Project board (when one is linked): Status, Priority, story points and Sprint ↔
+//   Iteration sync the same way, after the issues (lib/github-project/).
 // Out of scope: pull requests, comments, other hosts, and issues deleted or transferred in GitHub
 // (their tickets are left as they are).
 import { q, tx } from './db';
@@ -21,6 +23,7 @@ import { insertVersions } from './store/patch-project';
 import { EPIC_COLORS, uid } from './model';
 import { getProjectSecret } from './secrets';
 import { ticketBody, descriptionOf, isTicketBody, type TicketForBody } from './github-body';
+import { syncBoard, addToBoard } from './github-project/sync';
 
 export const ONLY_OWNERS =
   'Only the project owner or a Super Admin can link a GitHub repository or import from GitHub.';
@@ -97,6 +100,7 @@ const clean = (s: any) => String(s ?? '').replace(/\r\n/g, '\n').trim();
 /** A GitHub issue as the ticket-side values (before the assignee is matched to a person). */
 const fromGithub = (i: any) => ({
   number: Number(i.number),
+  nodeId: i.node_id || '',
   url: i.html_url || '',
   author: i.user?.login || '',
   createdAt: i.created_at || '',
@@ -135,11 +139,14 @@ function ticketValues(d: any, epics: any[], wf: any[]) {
  * GitHub (`push`) and the fields both sides changed (`conflicts`, each decided by the newer side).
  * `base` is what both sides had at the last sync.
  */
-export function planSync(tf: any, base: any, gh: any, tfTime: number, ghTime: number) {
+type PlanInput = { tf: any; base: any; gh: any; tfTime: number; ghTime: number };
+/** planSync's rule for any set of fields (the GitHub Project board uses it too). */
+export function planFields(fields: string[], pushable: string[], v: PlanInput) {
+  const { tf, base, gh, tfTime, ghTime } = v;
   const apply: any = {},
     push: any = {},
     conflicts: any[] = [];
-  for (const f of FIELDS) {
+  for (const f of fields) {
     if (same(f, tf[f], gh[f])) continue;
     const ghChanged = !same(f, gh[f], base?.[f]);
     const tfChanged = !same(f, tf[f], base?.[f]);
@@ -147,11 +154,14 @@ export function planSync(tf: any, base: any, gh: any, tfTime: number, ghTime: nu
       const github = ghTime >= tfTime;
       conflicts.push({ field: f, winner: github ? 'GitHub' : 'Ticket Forge', tf: tf[f], gh: gh[f] });
       if (github) apply[f] = gh[f];
-      else if (PUSHABLE.includes(f)) push[f] = tf[f];
+      else if (pushable.includes(f)) push[f] = tf[f];
     } else if (ghChanged) apply[f] = gh[f];
-    else if (tfChanged && PUSHABLE.includes(f)) push[f] = tf[f];
+    else if (tfChanged && pushable.includes(f)) push[f] = tf[f];
   }
   return { apply, push, conflicts };
+}
+export function planSync(tf: any, base: any, gh: any, tfTime: number, ghTime: number) {
+  return planFields(FIELDS, PUSHABLE, { tf, base, gh, tfTime, ghTime });
 }
 const clip = (v: any) => {
   const s = Array.isArray(v) ? v.join(', ') : String(v ?? '');
@@ -189,7 +199,7 @@ const pushBody = (fields: any) => {
  * The project with its repository link ({ repo, url, private, linkedAt, linkedBy, lastSyncAt, last }
  * or null) and whether this person may link and import.
  */
-async function openProject(user: any, projectId: string) {
+export async function openProject(user: any, projectId: string) {
   const pr = (
     await q('select created_by, key, data from projects where id = $1 and archived_at is null', [
       projectId,
@@ -198,10 +208,10 @@ async function openProject(user: any, projectId: string) {
   if (!pr) throw new HttpError(404, 'Project not found');
   return { ...pr, link: pr.data?.githubSync || null, canManage: canDeleteProject(user, pr.created_by) };
 }
-function requireOwner(project: any) {
+export function requireOwner(project: any) {
   if (!project.canManage) throw new HttpError(403, ONLY_OWNERS);
 }
-async function tokenFor(projectId: string) {
+export async function tokenFor(projectId: string) {
   const token = (await getProjectSecret(projectId, 'githubToken')) || process.env.GITHUB_TOKEN || '';
   if (!token)
     throw new HttpError(
@@ -216,7 +226,10 @@ async function tokenFor(projectId: string) {
  * only in Ticket Forge). Throws HttpError with a readable message when a linked repository can't
  * be used.
  */
-export async function createGithubIssue(projectId: string, ticket: TicketForBody & { epicId?: any }) {
+export async function createGithubIssue(
+  projectId: string,
+  ticket: TicketForBody & { epicId?: any; sprintId?: any; status?: string },
+) {
   const pr = (
     await q('select data from projects where id = $1 and archived_at is null', [projectId])
   ).rows[0];
@@ -245,9 +258,18 @@ export async function createGithubIssue(projectId: string, ticket: TicketForBody
   }
   const g: any = fromGithub(data);
   const now = new Date().toISOString();
+  // The linked GitHub Project board gets the issue with the ticket's status, priority, points and
+  // sprint. The issue already exists, so a board problem doesn't stop the ticket: the next sync
+  // adds it.
+  let board: any = null;
+  if (pr.data.githubSync?.project?.id && g.nodeId)
+    board = await addToBoard(token, pr.data.githubSync.project.id, g.nodeId, ticket, pr.data).catch(
+      () => null,
+    );
   return {
     repo,
     number: g.number,
+    nodeId: g.nodeId,
     url: g.url,
     updatedAt: g.updatedAt,
     syncedAt: now,
@@ -259,6 +281,7 @@ export async function createGithubIssue(projectId: string, ticket: TicketForBody
       milestone: '',
       state: g.state,
     },
+    ...(board ? { board } : {}),
   };
 }
 
@@ -393,6 +416,7 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
       const meta = (base = mapped) => ({
         repo: link.repo,
         number: g.number,
+        nodeId: g.nodeId,
         url: g.url,
         updatedAt: g.updatedAt,
         syncedAt: now,
@@ -458,7 +482,10 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
       }
       // What GitHub looks like now becomes the new common ground; whatever Ticket Forge still
       // differs in is written to GitHub next (sync) or at the next sync (import).
-      const stale = JSON.stringify(d.github.base) !== JSON.stringify(mapped) || d.github.updatedAt !== g.updatedAt;
+      const stale =
+        JSON.stringify(d.github.base) !== JSON.stringify(mapped) ||
+        d.github.updatedAt !== g.updatedAt ||
+        d.github.nodeId !== g.nodeId;
       d.github = { ...d.github, ...meta() };
       // A Jira-style body is rewritten whole, so the layout stays around the new description.
       if ('description' in plan.push && g.formatted)
@@ -510,6 +537,14 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
   });
   noteVersion(projectId, version);
   if (pushes.length) await pushToGithub(user, projectId, link, token, pushes, result);
+  if (link.project?.id) {
+    const plan = (v: PlanInput, fields: string[]) => planFields(fields, fields, v);
+    try {
+      await syncBoard({ user, projectId, link, token, mode, plan }, result);
+    } catch (e: any) {
+      result.errors.push(`GitHub Project: ${e.message}`);
+    }
+  }
   return result;
 }
 

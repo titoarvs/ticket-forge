@@ -199,6 +199,8 @@ function bodyFields(input: any, title: string) {
     priority: PRIORITIES.includes(input?.priority) ? input.priority : '',
     storyPoints: points > 0 && points <= 1000 ? points : null,
     epicId: input?.epicId ?? null,
+    sprintId: input?.sprintId ?? null,
+    status: s(input?.status, 60),
     key: s(input?.key, 30),
   };
 }
