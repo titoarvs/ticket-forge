@@ -20,7 +20,7 @@ export const DATA_DIR = process.env.TICKETFORGE_DATA
   ? path.resolve(process.env.TICKETFORGE_DATA)
   : SERVERLESS
     ? path.join(os.tmpdir(), 'ticketforge')
-    : path.join(ROOT, 'data');
+    : path.join(/*turbopackIgnore: true*/ ROOT, 'data');
 export const G = (globalThis.__ticketforgeDb ??= {
   impl: null,
   info: { kind: null, label: '', rls: null },
