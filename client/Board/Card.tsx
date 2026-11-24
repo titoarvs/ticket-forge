@@ -6,8 +6,7 @@ import {
   ticket,
   catOf,
   epic,
-  statusColor,
-  statusOf,
+  fmtDate,
   isBlocked,
   can,
   S,
@@ -16,10 +15,10 @@ import {
   mutate,
   toast,
 } from '../core';
-import { Ico, I, ELoz, TypeIcon } from '../ui';
+import { Ico, I, TypeIcon } from '../ui';
 import { openDrawer } from '../actions';
 import { rowDnd } from '../views';
-import { rowContextMenu, AssigneeCell, PointsCell, PriorityCell } from '../RowActions';
+import { rowContextMenu, AssigneeCell, MoreCell, PointsCell, PriorityCell } from '../RowActions';
 import { CodeChip } from '../codeStatus';
 
 export const COLLAPSED_W = 44;
@@ -35,17 +34,16 @@ export function useNarrow() {
   }, []);
   return n;
 }
-const PRIORITY_TAG: Record<string, [string, string]> = {
-  Highest: ['Urgent', 'pt-urgent'],
-  High: ['High priority', 'pt-high'],
-  Medium: ['Medium', 'pt-medium'],
-  Low: ['Low priority', 'pt-low'],
-};
-const CAT_COLOR: Record<string, string> = {
-  todo: 'var(--text-subtlest)',
-  inprogress: 'var(--brand)',
-  done: '#22c55e',
-};
+/** The due date, as a chip: red once it has passed on an issue that isn't done. */
+function DueChip({ date, done }: { date: string; done: boolean }) {
+  const late = !done && new Date(`${date.slice(0, 10)}T23:59:59`).getTime() < Date.now();
+  return (
+    <span className={`bcard-chip ${late ? 'late' : ''}`} title={late ? 'Overdue' : 'Due date'}>
+      <Ico svg={I.clock} />
+      Due: {fmtDate(date)}
+    </span>
+  );
+}
 /**
  * One issue card. Memoised: only re-renders when the issue (or its selection, sub-tasks or
  * comments) changes.
@@ -70,18 +68,14 @@ export const Card = memo(function Card({
   void v; // changes whenever the issue does, so the memo re-renders on edits
   const zone = JSON.parse(zoneKey);
   const parent = isSub(t) ? ticket(t.parentId) : null;
-  const cat = catOf(t.status);
-  const done = cat === 'done';
+  const done = catOf(t.status) === 'done';
   const e = showEpic && !isSub(t) ? epic(t.epicId) : null;
-  const pt = PRIORITY_TAG[t.priority];
   const pct = kids ? Math.round((kidsDone / kids) * 100) : 0;
   const tests = t.testCases?.length || 0;
   const passing = tests ? t.testCases.filter((x: Any) => x.status === 'Pass').length : 0;
-  const color = statusColor(statusOf(t.status)) || CAT_COLOR[cat];
   return (
     <div
       className={`bcard ${active ? 'active' : ''} ${done ? 'is-done' : ''} ${t.flagged ? 'flagged' : ''}`}
-      style={{ ['--pc' as string]: color }}
       role="button"
       tabIndex={0}
       aria-label={`${t.key} ${t.title}`}
@@ -95,38 +89,58 @@ export const Card = memo(function Card({
       }}
       {...rowDnd(t, zone)}
     >
-      <div className="bcard-tags">
-        {t.flagged && (
-          <span className="ptag pt-blocked" title="Flagged">
-            <Ico svg={I.flag} />
-            Flagged
-          </span>
+      <div className="bcard-top">
+        <span className="bcard-chip" title={t.type}>
+          <TypeIcon type={t.type} size={14} />
+          <span className={`key ${done ? 'done' : ''}`}>{t.key}</span>
+        </span>
+        {t.dueDate && <DueChip date={t.dueDate} done={done} />}
+        <MoreCell t={t} />
+      </div>
+      <div className="bcard-main">
+        <div className="t">
+          {t.flagged && (
+            <span className="bcard-flag" title="Flagged">
+              <Ico svg={I.flagSolid} />
+            </span>
+          )}
+          {t.title}
+        </div>
+        {parent && (
+          <div className="bcard-sub">
+            <TypeIcon type={parent.type} size={14} />
+            <span>
+              {parent.key} {parent.title}
+            </span>
+          </div>
         )}
-        {pt && <span className={`ptag ${pt[1]}`}>{pt[0]}</span>}
-        {e && <ELoz e={e} />}
-        {t.labels?.slice(0, 2).map((l: string) => (
-          <span key={l} className="label-chip">
-            {l}
-          </span>
-        ))}
-        {isBlocked(t) && (
-          <span className="ptag pt-blocked" title="Blocked by an open issue">
-            <Ico svg={I.flag} />
-            Blocked
-          </span>
+        {e && (
+          <div className="bcard-sub" title={`Epic: ${e.title}`}>
+            <i style={{ background: e.color }} />
+            <span>{e.title}</span>
+          </div>
         )}
       </div>
-      {parent && (
-        <div className="muted small bcard-parent">
-          <TypeIcon type={parent.type} /> {parent.key} {parent.title}
+      {(t.labels?.length > 0 || isBlocked(t)) && (
+        <div className="bcard-tags">
+          {isBlocked(t) && (
+            <span className="ptag pt-blocked" title="Blocked by an open issue">
+              <Ico svg={I.flag} />
+              Blocked
+            </span>
+          )}
+          {t.labels?.slice(0, 2).map((l: string) => (
+            <span key={l} className="label-chip">
+              {l}
+            </span>
+          ))}
         </div>
       )}
-      <div className="t">{t.title}</div>
       {kids > 0 && (
         <div className="bcard-prog" title={`${kidsDone} of ${kids} sub-tasks done`}>
           <div className="bcard-prog-h">
             <span>Progress</span>
-            <b>{pct === 100 ? 'Done' : `${pct}%`}</b>
+            <b>{pct}%</b>
           </div>
           <div className="bcard-bar">
             <i style={{ width: `${Math.max(pct, 2)}%` }} />
@@ -135,8 +149,8 @@ export const Card = memo(function Card({
       )}
       <div className="foot">
         <AssigneeCell t={t} />
-        <TypeIcon type={t.type} />
-        <span className={`key ${done ? 'done' : ''}`}>{t.key}</span>
+        <PriorityCell t={t} />
+        {(t.storyPoints != null || can('issue.edit')) && <PointsCell t={t} />}
         <span className="right">
           <CodeChip t={t} />
           {t.prs.length > 0 && (
@@ -163,8 +177,6 @@ export const Card = memo(function Card({
               {passing}/{tests}
             </span>
           )}
-          {(t.storyPoints != null || can('issue.edit')) && <PointsCell t={t} />}
-          <PriorityCell t={t} />
         </span>
       </div>
     </div>

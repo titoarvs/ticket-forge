@@ -1,0 +1,57 @@
+# Runs TicketForge's code agents (written by TicketForge: Project settings → Code & GitHub → Where code jobs run).
+# TicketForge starts it through the API with an encrypted job; the agent's commits are pushed to the job's branch.
+name: TicketForge code
+run-name: TicketForge code ${{ inputs.run_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: TicketForge job id
+        required: true
+      payload:
+        description: Encrypted job (from TicketForge)
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: ticketforge-code-${{ inputs.run_id }}
+jobs:
+  code:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code --no-audit --no-fund --loglevel=error
+      - name: Install the project's dependencies
+        continue-on-error: true
+        run: |
+          if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then corepack enable && yarn install --immutable
+          elif [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+          fi
+      - name: Run the TicketForge agent
+        env:
+          TF_KEY: ${{ secrets.TICKETFORGE_RUN_KEY }}
+          TF_PAYLOAD: ${{ inputs.payload }}
+          TF_OUT: ${{ runner.temp }}/ticketforge
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          # Claude subscription only: never billed API usage.
+          unset ANTHROPIC_API_KEY
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then echo "::error::The CLAUDE_CODE_OAUTH_TOKEN secret is missing. Paste your token from claude setup-token in TicketForge (Where code jobs run → Set up)."; exit 1; fi
+          cp .github/ticketforge/code.mjs "${{ runner.temp }}/ticketforge-code.mjs"
+          node "${{ runner.temp }}/ticketforge-code.mjs"
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ticketforge-${{ inputs.run_id }}
+          path: ${{ runner.temp }}/ticketforge/result.bin
+          retention-days: 1
+          if-no-files-found: ignore

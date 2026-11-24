@@ -1,0 +1,5 @@
+{
+  "name": "ticketforge-runner",
+  "private": true,
+  "type": "module"
+}

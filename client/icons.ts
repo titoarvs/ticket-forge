@@ -43,7 +43,7 @@ export const PRIORITY_ICON = {
 export const priorityIcon = (p) => PRIORITY_ICON[p] || PRIORITY_ICON.Medium;
 
 const s = (d, extra = '') =>
-  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+  `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
 export const I = {
   search: s('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/>'),
   chevron: s('<path d="M4 6l4 4 4-4"/>', 'class="chev"'),
@@ -104,7 +104,7 @@ export const I = {
   user: s(
     '<circle cx="8" cy="5.5" r="2.8"/><path d="M2.8 14c.6-2.6 2.7-4.2 5.2-4.2s4.6 1.6 5.2 4.2"/>',
   ),
-  logo: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 3.5h10v2.6H9.4V13H6.6V6.1H3z" fill="#fff"/></svg>',
+  logo: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 3.5h10v2.6H9.4V13H6.6V6.1H3z" fill="currentColor"/></svg>',
   subtask: s(
     '<rect x="2" y="2" width="6" height="6" rx="1"/><rect x="8" y="8" width="6" height="6" rx="1"/><path d="M5 8v3h3"/>',
   ),
@@ -151,6 +151,32 @@ export const I = {
     '<path d="M4 11.5V7.2a4 4 0 018 0v4.3l1.3 1.3H2.7z"/><path d="M6.6 13.8a1.5 1.5 0 002.8 0"/>',
   ),
   flag: s('<path d="M3.5 14V2.5M3.5 3h8.5l-1.8 3 1.8 3H3.5"/>'),
+  flagSolid:
+    '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.8c.4 0 .7.3.7.7h8.6c.6 0 1 .7.6 1.2L11.3 6l1.6 2.3c.4.5 0 1.2-.6 1.2H3.7V14a.7.7 0 01-1.4 0V2.5c0-.4.3-.7.7-.7z"/></svg>',
+  updown: s('<path d="M5 6l3-3 3 3M5 10l3 3 3-3"/>'),
+  collapseSide: s('<path d="M7.5 4L3.5 8l4 4M12.5 4l-4 4 4 4"/>'),
+  left: s('<path d="M13 8H3M7 4L3 8l4 4"/>'),
+  right: s('<path d="M3 8h10M9 4l4 4-4 4"/>'),
+  help: s(
+    '<circle cx="8" cy="8" r="6"/><path d="M6.3 6.3a1.8 1.8 0 113 1.4c-.7.5-1.3.9-1.3 1.7M8 11.4v.1"/>',
+  ),
+  filter: s('<path d="M2.2 3h11.6L9.4 8.4v4.2l-2.8 1V8.4z"/>'),
+  sort: s('<path d="M2.5 4h6M2.5 8h4.5M2.5 12h3M11.5 13V3.5M9 6l2.5-2.5L14 6"/>'),
+  tag: s(
+    '<path d="M2.5 3.3v4.1c0 .3.1.6.3.8l5.3 5.3c.4.4 1.1.4 1.6 0l3.8-3.8c.4-.4.4-1.1 0-1.6L8.2 2.8a1 1 0 00-.8-.3H3.3c-.5 0-.8.3-.8.8z"/><circle cx="5.4" cy="5.4" r=".7"/>',
+  ),
+  info: s(
+    '<rect x="2.2" y="2.2" width="11.6" height="11.6" rx="3"/><path d="M8 7.4v3.4M8 5.2v.1"/>',
+  ),
+  box: s('<path d="M8 1.8l5.5 2.9v6.6L8 14.2l-5.5-2.9V4.7zM2.6 4.8L8 7.7l5.4-2.9M8 7.7v6.4"/>'),
+  checklist: s('<path d="M2.2 4.2l1.1 1.1 2-2.2M2.2 11l1.1 1.1 2-2.2M8 4.3h5.8M8 11.2h5.8"/>'),
+  play2: s('<circle cx="8" cy="8" r="6"/><path d="M6.7 5.6v4.8L10.5 8z"/>'),
+  eye: s(
+    '<path d="M1.6 8S3.9 3.6 8 3.6 14.4 8 14.4 8 12.1 12.4 8 12.4 1.6 8 1.6 8z"/><circle cx="8" cy="8" r="1.9"/>',
+  ),
+  clip: s(
+    '<path d="M13.2 7.4l-5.5 5.5a3.2 3.2 0 01-4.5-4.5l5.7-5.7a2.1 2.1 0 013 3l-5.6 5.6a1 1 0 01-1.5-1.5l5-5"/>',
+  ),
 };
 TYPE_ICON['Sub-task'] = box(
   '#4bade8',

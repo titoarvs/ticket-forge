@@ -1,6 +1,7 @@
 'use client';
 import { type DragEvent, type ReactNode, memo } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   can,
   type Any,
@@ -19,9 +20,10 @@ import {
   epicTickets,
   catOf,
 } from '../core';
-import { Avatar } from '../ui';
+import { Avatar, I, Ico } from '../ui';
 import { moveTicket } from '../actions';
 import { TF, SF, MenuItem, opts } from '../fields';
+import { VIEW_ICON } from '../Workspace/view-icons';
 
 // ---------------------------------------------------------------- drag & drop
 let dragId: string | null = null;
@@ -92,6 +94,24 @@ export function zoneDnd(zone: Any) {
     },
   };
 }
+/** The trail to a page: back to the projects, then where you are. */
+export function Crumbs({ children }: { children?: ReactNode }) {
+  return (
+    <div className="crumbs">
+      <Link
+        className="crumb-back"
+        href="/projects"
+        aria-label="Back to projects"
+        title="All projects"
+      >
+        <Ico svg={I.left} />
+      </Link>
+      <Link href="/projects">Projects</Link>
+      <span aria-hidden>/</span>
+      {children}
+    </div>
+  );
+}
 export function Header({
   title,
   right,
@@ -101,14 +121,14 @@ export function Header({
   right?: ReactNode;
   sub?: ReactNode;
 }) {
+  const icon = VIEW_ICON[usePathname().split('/')[3]] || VIEW_ICON.backlog;
   return (
     <>
-      <div className="crumbs">
-        <Link href="/projects">Projects</Link>
-        <span>/</span>
+      <Crumbs>
         <Link href={`/p/${P().id}/summary`}>{P().name}</Link>
-      </div>
+      </Crumbs>
       <div className="page-h">
+        <Ico svg={icon} size={24} className="page-ic" />
         <h1>{title}</h1>
         {sub}
         <div className="spacer" />

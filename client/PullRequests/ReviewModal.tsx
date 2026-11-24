@@ -75,14 +75,10 @@ export function ReviewModal({ t, pr }: { t: Any; pr: Any }) {
       <div className="upd-modes" role="radiogroup" aria-label="Reviewer">
         {(
           [
-            [
-              'review',
-              '🔍 Code review',
-              'Correctness, security, tests and the acceptance criteria.',
-            ],
+            ['review', 'Code review', 'Correctness, security, tests and the acceptance criteria.'],
             [
               'ui-review',
-              '🧐 UI/UX review',
+              'UI/UX review',
               'Usability, accessibility, states, copy and responsive layout.',
             ],
           ] as [string, string, string][]

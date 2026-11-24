@@ -218,7 +218,7 @@ export function PrFindingChips({ t, r }: { t: Any; r: Any }) {
       onClick={() => openPrFindings(t, r)}
       title={`CodeRabbit on ${rv.prRef}: read ${ago(rv.at)}`}
     >
-      🐇{' '}
+      <Ico svg={I.eye} />
       {open.length ? (
         SEVS.map((s) => {
           const n = open.filter((f: Any) => f.severity === s).length;

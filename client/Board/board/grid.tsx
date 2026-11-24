@@ -39,18 +39,17 @@ function ColumnHead({ b, w }: ColProps) {
 function OpenColumnHead({ b, w, n, over }: ColProps & { n: number; over: boolean }) {
   return (
     <>
-      <span className={`dot-cat ${wCls(w)}`} />
+      <span
+        className={`bcol-badge ${wCls(w)} ${over ? 'over' : ''}`}
+        title={w.wip ? `${n} issues · column limit ${w.wip}` : `${n} issues`}
+      >
+        <i className={`dot-cat ${wCls(w)}`} />
+        {n}
+        {w.wip ? ` / ${w.wip}` : ''}
+      </span>
       <span className="bcol-name" title={w.name}>
         {w.name}
       </span>
-      <span
-        className={`bcol-count ${over ? 'over' : ''}`}
-        title={w.wip ? `${n} issues · column limit ${w.wip}` : `${n} issues`}
-      >
-        ({n}
-        {w.wip ? <span className="muted"> / {w.wip}</span> : null})
-      </span>
-      {w.category === 'done' && <Ico svg={I.check} className="bcol-done" />}
       {!b.narrow && (
         <button
           className="icon-btn bcol-collapse"

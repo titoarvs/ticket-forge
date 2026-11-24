@@ -1,15 +1,14 @@
 import Link from 'next/link';
 import { Footer } from '@/client/Footer';
+import { I } from '@/client/icons';
 
 // Public pages (landing, pricing, legal): no app shell, no sign-in needed, rendered on the server.
-const LOGO =
-  "<svg viewBox='0 0 32 32' width='22' height='22'><rect width='32' height='32' rx='7' fill='#0c66e4'/><path d='M8 9h16v4h-6v11h-4V13H8z' fill='white'/></svg>";
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mk">
       <header className="mk-head">
         <Link href="/" className="mk-brand">
-          <span dangerouslySetInnerHTML={{ __html: LOGO }} />
+          <span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} />
           TicketForge
         </Link>
         <nav className="mk-nav" aria-label="Main">
