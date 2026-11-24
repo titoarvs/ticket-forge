@@ -4,7 +4,7 @@
 import { useStore, can } from '../core';
 import { Ico, I } from '../ui';
 import { openCreateIssue } from '../actions';
-import { BulkBar } from '../views';
+import { BulkBar, Header } from '../views';
 import { useIssues } from './navigator/use-issues';
 import { exportIssuesCsv } from './navigator/filter';
 import { ViewsSide } from './navigator/views-side';
@@ -17,24 +17,27 @@ export function Issues() {
   return (
     <div className="page">
       <div className="page-inner iss-page">
-        <div className="page-h">
-          <h1>Issues</h1>
-          <span className="spacer" />
-          <button
-            className="btn"
-            onClick={() => exportIssuesCsv(g.p.key, g.rows, g.cols)}
-            disabled={!g.rows.length}
-          >
-            <Ico svg={I.download} />
-            Export CSV
-          </button>
-          {can('issue.create') && (
-            <button className="btn primary" onClick={() => openCreateIssue()}>
-              <Ico svg={I.plus} />
-              Create issue
-            </button>
-          )}
-        </div>
+        <Header
+          title="Issues"
+          right={
+            <>
+              <button
+                className="btn"
+                onClick={() => exportIssuesCsv(g.p.key, g.rows, g.cols)}
+                disabled={!g.rows.length}
+              >
+                <Ico svg={I.download} />
+                Export CSV
+              </button>
+              {can('issue.create') && (
+                <button className="btn primary" onClick={() => openCreateIssue()}>
+                  <Ico svg={I.plus} />
+                  Create issue
+                </button>
+              )}
+            </>
+          }
+        />
         <div className="iss-layout">
           <ViewsSide g={g} />
           <div className="iss-main">

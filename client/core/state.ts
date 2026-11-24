@@ -667,10 +667,15 @@ const scId = (w: Any) => String(w.id).replace(/[^\w-]/g, '');
 /** Class for a status: its category colours, plus its own colour when set (see statusColorCss). */
 export const sCls = (status: string) => {
   const w = statusOf(status);
-  return `s-${catOf(status)}${w && statusColor(w) ? ` sc sc-${scId(w)}` : ''}`;
+  return w ? wCls(w) : `s-${catOf(status)}`;
 };
+/** How a workflow entry is drawn: its category, with review statuses set apart from the work. */
+export const toneOf = (w: Any): string =>
+  w?.category === 'inprogress' && /\breview/i.test(w.name || '')
+    ? 'inreview'
+    : w?.category || 'todo';
 /** Class for a workflow entry (by object, for settings and board columns). */
-export const wCls = (w: Any) => `s-${w.category}${statusColor(w) ? ` sc sc-${scId(w)}` : ''}`;
+export const wCls = (w: Any) => `s-${toneOf(w)}${statusColor(w) ? ` sc sc-${scId(w)}` : ''}`;
 /** CSS giving each coloured status its colour variable. */
 export const statusColorCss = () =>
   (P()?.workflow || [])

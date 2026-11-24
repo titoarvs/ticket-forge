@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useStore, closeProject, S, feat, emit, type Any, openModal } from './core';
 import { ErrorState, Ico, I } from './ui';
+import { Crumbs } from './views';
 import { AdminSkeleton } from './skeletons';
 import { GenerationTab } from './GenerationTab';
 import { AgentsTab } from './AgentsTab';
@@ -70,12 +71,11 @@ export default function AdminPage({ tab }: { tab: string }) {
   return (
     <div className="page">
       <div className="page-inner">
-        <div className="crumbs">
-          <Link href="/projects">Projects</Link>
-          <span>/</span>
+        <Crumbs>
           <span>Administration</span>
-        </div>
+        </Crumbs>
         <div className="page-h">
+          <Ico svg={I.people} size={24} className="page-ic" />
           <h1>Administration</h1>
           <div className="spacer" />
           {S.user?.isOwner && (

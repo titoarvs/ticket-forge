@@ -5,9 +5,9 @@ import {
   can,
   isSub,
   S,
-  catOf,
   statusColor,
   statusOf,
+  toneOf,
   allowedStatuses,
   setMenu,
   openModal,
@@ -58,7 +58,7 @@ export function IssueToolbar({ t, edit }: IssueProps) {
   return (
     <div className="dr-actions">
       <SF
-        tone={catOf(t.status)}
+        tone={toneOf(statusOf(t.status))}
         toneColor={statusColor(statusOf(t.status))}
         aria-label="Status"
         disabled={!edit}

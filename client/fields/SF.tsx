@@ -8,7 +8,7 @@ import Radio from '@mui/material/Radio';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import InputAdornment from '@mui/material/InputAdornment';
 import { I } from '../icons';
-import { readableOn, type Any } from '../core';
+import { type Any } from '../core';
 
 export const ico = (svg: string) => (
   <span className="ico" dangerouslySetInnerHTML={{ __html: svg }} />
@@ -36,7 +36,13 @@ export const ghost = {
 };
 const titleLook = {
   ...ghost,
-  '& .MuiInputBase-root': { fontSize: 24, lineHeight: '28px', fontWeight: 500, ml: '-6px' },
+  '& .MuiInputBase-root': {
+    fontSize: 22,
+    lineHeight: '30px',
+    fontWeight: 600,
+    letterSpacing: '-0.015em',
+    ml: '-10px',
+  },
 };
 const bare = {
   '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused':
@@ -59,13 +65,12 @@ const filterLook = {
   maxWidth: 200,
   minWidth: 0,
   '& .MuiOutlinedInput-root': {
-    backgroundColor: 'var(--bg-neutral)',
+    backgroundColor: 'var(--bg)',
     fontWeight: 500,
-    color: 'var(--text-subtle)',
+    color: 'var(--text)',
+    boxShadow: 'var(--shadow-btn)',
   },
-  '& .MuiOutlinedInput-root:hover': { backgroundColor: 'var(--bg-neutral-2)' },
-  '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline':
-    { borderColor: 'transparent' },
+  '& .MuiOutlinedInput-root:hover': { backgroundColor: 'var(--bg-sunken)' },
 };
 const lozLook = {
   width: 'auto',
@@ -74,12 +79,11 @@ const lozLook = {
     {
       backgroundColor: 'transparent',
       color: 'inherit',
-      fontSize: 11,
-      fontWeight: 700,
-      textTransform: 'uppercase',
+      fontSize: 12,
+      fontWeight: 500,
     },
   '& .MuiSelect-select': {
-    padding: '0 22px 0 6px !important',
+    padding: '0 22px 0 8px !important',
     minHeight: '20px !important',
     lineHeight: '20px',
   },
@@ -87,25 +91,36 @@ const lozLook = {
   '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline':
     { border: 'none' },
 };
-const STATUS_TONE: Record<string, { bg: string; fg: string }> = {
-  todo: { bg: 'var(--bg-neutral)', fg: 'var(--text)' },
-  inprogress: { bg: 'var(--brand)', fg: 'var(--brand-text)' },
-  done: { bg: '#1f845a', fg: '#ffffff' },
+const STATUS_TONE: Record<string, { bg: string; fg: string; edge: string }> = {
+  todo: { bg: 'var(--loz-todo-bg)', fg: 'var(--loz-todo)', edge: 'var(--loz-todo-edge)' },
+  inprogress: { bg: 'var(--loz-prog-bg)', fg: 'var(--loz-prog)', edge: 'var(--loz-prog-edge)' },
+  inreview: {
+    bg: 'var(--loz-review-bg)',
+    fg: 'var(--loz-review)',
+    edge: 'var(--loz-review-edge)',
+  },
+  done: { bg: 'var(--loz-done-bg)', fg: 'var(--loz-done)', edge: 'var(--loz-done-edge)' },
 };
+/** A workflow's own colour as a chip: the same tint as .sc in globals.css, readable in both themes. */
+const customTone = (color: string) => ({
+  bg: `color-mix(in srgb, ${color} 13%, var(--bg))`,
+  fg: `color-mix(in srgb, ${color} 55%, var(--text))`,
+  edge: `color-mix(in srgb, ${color} 34%, var(--bg))`,
+});
 const statusLook = (tone: string, color?: string) => {
-  const c = color ? { bg: color, fg: readableOn(color) } : STATUS_TONE[tone] || STATUS_TONE.todo;
+  const c = color ? customTone(color) : STATUS_TONE[tone] || STATUS_TONE.todo;
   return {
     width: 'auto',
     '& .MuiOutlinedInput-root, & .MuiOutlinedInput-root:hover, & .MuiOutlinedInput-root.Mui-focused':
       {
         backgroundColor: c.bg,
         color: c.fg,
-        fontWeight: 600,
-        height: 32,
+        fontWeight: 500,
+        height: 36,
       },
     '& .MuiSelect-icon': { color: c.fg },
     '& .MuiOutlinedInput-notchedOutline, & .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline':
-      { border: 'none' },
+      { borderColor: c.edge },
   };
 };
 // "&&" doubles the class so these looks win over the theme's default input styles.

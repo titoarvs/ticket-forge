@@ -1,7 +1,7 @@
 'use client';
 // Create a project from a document. This page only puts the parts in client/Home/create/ together.
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { Crumbs } from '../views';
 import { useStore, S, closeProject, can, openModal } from '../core';
 import { Ico, I } from '../ui';
 import { BlankProjectModal } from '../actions';
@@ -55,11 +55,9 @@ export function CreateProjectPage() {
   return (
     <div className="page">
       <div className="page-inner">
-        <div className="crumbs">
-          <Link href="/projects">Projects</Link>
-          <span>/</span>
+        <Crumbs>
           <span>Create project</span>
-        </div>
+        </Crumbs>
         <div className="page-h">
           <h1>Create a project from a document</h1>
         </div>

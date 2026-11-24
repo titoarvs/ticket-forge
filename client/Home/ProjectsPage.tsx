@@ -84,6 +84,7 @@ export function ProjectsPage() {
     <div className="page">
       <div className="page-inner">
         <div className="page-h">
+          <Ico svg={I.folder} size={24} className="page-ic" />
           <div>
             <h1>Projects</h1>
             {(S.auth?.workspaces || []).length > 1 && (

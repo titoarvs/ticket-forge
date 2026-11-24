@@ -37,7 +37,7 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
       actions={[
         { label: 'Cancel' },
         {
-          label: '✨ Rewrite and run',
+          label: 'Rewrite and run',
           kind: 'ai',
           hidden: !can('ai.use') || !can('test.run'),
           onClick: () => {
@@ -81,7 +81,7 @@ export function ScriptModal({ tid, tcid }: { tid: string; tcid: string }) {
       />
       {tc.healed?.previous && (
         <div className="heal-note small">
-          <b>🩹 Self-healed {ago(tc.healed.at)}</b>: {tc.healed.reason}
+          <b>Self-healed {ago(tc.healed.at)}</b>: {tc.healed.reason}
           {editable && (
             <button
               className="link-btn small"

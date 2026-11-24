@@ -47,7 +47,7 @@ export function useBoard() {
     // Column widths: collapsed columns are a narrow strip.
     cols: shown
       .map((w) =>
-        narrow ? 'minmax(0, 1fr)' : isCollapsed(w.id) ? `${COLLAPSED_W}px` : 'minmax(264px, 1fr)',
+        narrow ? 'minmax(0, 1fr)' : isCollapsed(w.id) ? `${COLLAPSED_W}px` : 'minmax(244px, 1fr)',
       )
       .join(' '),
     all: byStatus(wf, list),

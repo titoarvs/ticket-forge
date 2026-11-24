@@ -251,7 +251,7 @@ export function AutoBody({ c, t }: { c: Any; t: Any }) {
                     {r.durationMs > 0 && <span className="run-ms">{fmtMs(r.durationMs)}</span>}
                     {r.healed && (
                       <span className="heal-chip" title={`Was failing: ${r.healed.error || ''}`}>
-                        🩹 Self-healed: {r.healed.reason}
+                        Self-healed: {r.healed.reason}
                       </span>
                     )}
                   </span>

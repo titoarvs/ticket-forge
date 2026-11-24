@@ -48,7 +48,8 @@ export function ReviewButtons({ cj, ui }: { cj: CodeJobs; ui: TabState }) {
           onClick={() => review()}
           title={`Reviewed by ${reviewerName}`}
         >
-          🔍 {job.reviews?.length ? 'Review again' : 'Review changes'}
+          <Ico svg={I.eye} />
+          {job.reviews?.length ? 'Review again' : 'Review changes'}
         </button>
       )}
       {roles.review && enabled(agents, 'review-panel') && (
@@ -61,7 +62,8 @@ export function ReviewButtons({ cj, ui }: { cj: CodeJobs; ui: TabState }) {
           }}
           title="Three Review agents in parallel: correctness, security, tests & acceptance"
         >
-          🤝 Review panel
+          <Ico svg={I.people} />
+          Review panel
         </button>
       )}
       {enabled(agents, 'ui-review') && (
@@ -71,7 +73,8 @@ export function ReviewButtons({ cj, ui }: { cj: CodeJobs; ui: TabState }) {
           onClick={() => review({ agent: 'ui-review' })}
           title="Usability, accessibility, states, copy and responsive layout"
         >
-          🧐 UI/UX review
+          <Ico svg={I.eye} />
+          UI/UX review
         </button>
       )}
       {custom.map((a: Any) => (
@@ -94,7 +97,8 @@ export function ReviewButtons({ cj, ui }: { cj: CodeJobs; ui: TabState }) {
         }}
         title="An independent review by the CodeRabbit CLI: findings by severity, with fix instructions"
       >
-        🐇 {crRunning ? 'CodeRabbit is reviewing…' : 'CodeRabbit review'}
+        <Ico svg={I.eye} />
+        {crRunning ? 'CodeRabbit is reviewing…' : 'CodeRabbit review'}
       </button>
       <span className="muted small">Read-only reviewers. They never edit files.</span>
     </div>

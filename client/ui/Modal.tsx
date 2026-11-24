@@ -102,12 +102,15 @@ export function Menu({
   button,
   children,
   left = false,
+  up = false,
   style,
 }: {
   id: string;
   button: ReactNode;
   children: ReactNode;
   left?: boolean;
+  /** Opens above the button. */
+  up?: boolean;
   style?: Any;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -128,7 +131,7 @@ export function Menu({
       {button}
       {open && (
         <div
-          className={`menu ${left ? 'left' : ''}`}
+          className={`menu ${left ? 'left' : ''} ${up ? 'up' : ''}`}
           onClick={() => {
             S.menu = null;
             emit();
@@ -209,7 +212,7 @@ export function Modal({
                 aria-busy={a.busy || undefined}
                 onClick={a.onClick || closeModal}
               >
-                {a.busy && <span className="spinner" />}
+                {a.busy ? <span className="spinner" /> : a.kind === 'ai' && <Ico svg={I.sparkle} />}
                 {a.label}
               </button>
             ))}

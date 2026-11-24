@@ -52,7 +52,7 @@ export function SmartSelectModal() {
   };
   return (
     <Modal
-      title="🎯 Smart selection"
+      title="Smart selection"
       wide
       persistent
       actions={

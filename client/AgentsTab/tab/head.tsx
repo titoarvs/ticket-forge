@@ -78,7 +78,8 @@ export function NoAgents({ g }: { g: AgentsPage }) {
   const actions = can('ai.use') ? (
     <>
       <button className="btn primary" onClick={() => openCreate(g, '__repo')}>
-        🧬 Start with the Repo-native Builder
+        <Ico svg={I.sparkle} />
+        Start with the Repo-native Builder
       </button>
       <button className="btn" onClick={() => openCreate(g)}>
         <Ico svg={I.plus} />

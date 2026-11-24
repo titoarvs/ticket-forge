@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useStore, type Any, api, closeProject, toast, P, S, ago } from '../core';
 import { ErrorState, Ico, I, Spinner, EmptyState } from '../ui';
 import { SF, MenuItem, TF } from '../fields';
+import { Crumbs } from '../views';
 import { openCodingBoard, toCodeCount } from '../CodingBoard';
 import { type Filter, REVIEW, TROUBLE, LIVE, TicketContext, LABEL } from './TicketContext';
 import { JobActions } from './JobActions';
@@ -169,15 +170,16 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   return (
     <div className="page">
       <div className="page-inner cjp">
+        <Crumbs>
+          {scoped ? (
+            <Link href={`/p/${projectId}/summary`}>{P()?.name || 'Project'}</Link>
+          ) : (
+            <span>Code jobs</span>
+          )}
+        </Crumbs>
         <div className="page-h">
-          <div>
-            <h1>Code jobs</h1>
-            <p className="muted small" style={{ margin: '2px 0 0' }}>
-              {scoped
-                ? `What AI agents are writing for ${P()?.name || 'this project'}, live. Open a job to review its changes, then open the pull request.`
-                : `What AI agents are writing across your projects${S.user?.workspaceName ? ` in ${S.user.workspaceName}` : ''}, live.`}
-            </p>
-          </div>
+          <Ico svg={I.bot} size={24} className="page-ic" />
+          <h1>Code jobs</h1>
           <div className="spacer" />
           {scoped && (
             <Link className="btn" href={`/p/${projectId}/prs`}>
@@ -200,6 +202,11 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
             </button>
           )}
         </div>
+        <p className="page-intro">
+          {scoped
+            ? `What AI agents are writing for ${P()?.name || 'this project'}, live. Open a job to review its changes, then open the pull request.`
+            : `What AI agents are writing across your projects${S.user?.workspaceName ? ` in ${S.user.workspaceName}` : ''}, live.`}
+        </p>
         {asked && <TicketContext projectId={asked.project} ticketId={asked.ticket} />}
         {!d ? (
           <div className="muted" style={{ padding: 20 }}>

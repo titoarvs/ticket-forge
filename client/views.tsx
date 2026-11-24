@@ -3,7 +3,7 @@
 // Project views: Summary, Backlog, Board, Epics, Reports, Test cases, Test automation, Source,
 // Settings.
 
-export { rowDnd, zoneDnd, Header, FilterBar, epicProgress, ProgBar } from './views/row-dnd';
+export { rowDnd, zoneDnd, Crumbs, Header, FilterBar, epicProgress, ProgBar } from './views/row-dnd';
 export { daysLeft, Summary } from './views/Summary';
 export { IssueRow, Backlog } from './views/Backlog';
 export { BulkBar } from './views/BulkBar';

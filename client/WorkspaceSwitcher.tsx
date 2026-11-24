@@ -1,5 +1,5 @@
 'use client';
-// The workspace you are in (top bar): switch to another of your workspaces, create one, or rename
+// The workspace you are in (sidebar and workspace rail): switch to another of your workspaces, create one, or rename
 // this one (owner).
 // Switching reloads the app, so nothing from the previous workspace stays on screen or in memory.
 import { useState } from 'react';
@@ -25,7 +25,7 @@ export async function switchWorkspace(id: string, to = '/projects') {
 }
 const switchTo = (id: string) => switchWorkspace(id);
 
-function NameModal({ mode }: { mode: 'create' | 'rename' }) {
+export function NameModal({ mode }: { mode: 'create' | 'rename' }) {
   const [name, setName] = useState(mode === 'rename' ? S.user?.workspaceName || '' : '');
   const [busy, setBusy] = useState(false);
   const save = async () => {
@@ -82,32 +82,45 @@ function NameModal({ mode }: { mode: 'create' | 'rename' }) {
   );
 }
 
-export function WorkspaceSwitcher() {
-  const list: Any[] = S.auth?.workspaces || [];
+/** The workspaces you belong to. */
+export const workspaceList = (): Any[] => S.auth?.workspaces || [];
+export const canCreateWorkspace = () => Boolean(S.auth?.saas || S.user?.isOwner);
+
+/** `compact`: only the ⋯ button, for the workspace rail. */
+export function WorkspaceSwitcher({ compact = false }: { compact?: boolean }) {
+  const list = workspaceList();
   const cur = S.user?.workspaceId;
   const name = S.user?.workspaceName || 'Workspace';
-  const canCreate = Boolean(S.auth?.saas || S.user?.isOwner);
+  const canCreate = canCreateWorkspace();
+  const id = compact ? 'workspaces' : 'workspace';
   // One workspace and nothing to do with it: no switcher, just room for the rest of the bar.
   if (list.length <= 1 && !canCreate && !S.user?.isOwner) return null;
   return (
     <Menu
-      id="workspace"
+      id={id}
       left
       style={{ flex: 'none', minWidth: 0 }}
       button={
         <button
-          className="ws-chip"
-          data-tour="workspace"
+          className={compact ? 'icon-btn ws-more' : 'ws-chip'}
+          data-tour={compact ? undefined : 'workspace'}
           aria-haspopup="menu"
-          aria-expanded={S.menu === 'workspace'}
-          title={`Workspace: ${name}`}
-          onClick={() => setMenu('workspace')}
+          aria-expanded={S.menu === id}
+          aria-label={compact ? 'Workspaces' : undefined}
+          title={compact ? 'Workspaces' : `Workspace: ${name}`}
+          onClick={() => setMenu(id)}
         >
-          <span className="ws-avatar" aria-hidden>
-            {name.slice(0, 1).toUpperCase()}
-          </span>
-          <span className="ws-name hide-sm">{name}</span>
-          <Ico svg={I.chevron} />
+          {compact ? (
+            <Ico svg={I.more} />
+          ) : (
+            <>
+              <span className="ws-avatar" aria-hidden>
+                {name.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="ws-name side-text">{name}</span>
+              <Ico svg={I.updown} className="sw-chev" />
+            </>
+          )}
         </button>
       }
     >

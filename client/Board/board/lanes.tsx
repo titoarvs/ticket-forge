@@ -104,6 +104,8 @@ export const cardSig = (t: Any) =>
     t.storyPoints,
     t.priority,
     t.epicId,
+    t.dueDate,
+    t.type,
     t.prs.length,
     (t.links || []).length,
     (t.labels || []).join(),
