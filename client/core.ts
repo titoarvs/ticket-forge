@@ -77,6 +77,7 @@ export {
   wCls,
   statusColorCss,
   readableOn,
+  toneOf,
   tCls,
   openIssue,
   openEpic,

@@ -1,6 +1,6 @@
 'use client';
 
-// Project workspace: sidebar, current view and the issue/epic panel.
+// Project workspace: the current view and the issue/epic panel.
 
 import { useEffect } from 'react';
 import { loadAgents, hireAgent } from './Agents';
@@ -11,7 +11,7 @@ import { RowPop } from './RowActions';
 import { Drawer } from './Drawer';
 import { openCode } from './DevCode';
 import { watchCodeStatus, stopWatching } from './codeStatus';
-import { VIEWS, COMPONENTS, Sidebar, VIEW_FEATURE } from './Workspace/view-list';
+import { VIEWS, COMPONENTS, VIEW_FEATURE } from './Workspace/view-list';
 import { ProjectError, LockedView } from './Workspace/ProjectError';
 
 export { VIEWS } from './Workspace/view-list';
@@ -84,7 +84,6 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
   return (
     <div className="shell">
       <style>{statusColorCss()}</style>
-      <Sidebar view={v} />
       <div className="main">
         <section className="view">
           {feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}

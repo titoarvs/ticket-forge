@@ -23,6 +23,7 @@ export function ProjectSwitcher({ p }: { p: Any }) {
     <Menu
       id="projects"
       left
+      style={{ minWidth: 0 }}
       button={
         <button
           className={`proj-switch ${open ? 'on' : ''}`}
@@ -30,19 +31,22 @@ export function ProjectSwitcher({ p }: { p: Any }) {
             setMenu('projects');
             load();
           }}
-          title="Switch project"
+          title={`${p.name}: switch project`}
           aria-haspopup="menu"
           aria-expanded={open}
         >
           <span
-            className="proj-avatar xs"
+            className="proj-avatar"
             style={{ background: hashColor(p.key, COLORS) }}
             aria-hidden
           >
             {String(p.key).slice(0, 2)}
           </span>
-          <span className="proj-name">{p.name}</span>
-          <Ico svg={I.chevron} className="proj-chev" />
+          <span className="proj-txt side-text">
+            <b title={p.name}>{p.name}</b>
+            <small>Software project</small>
+          </span>
+          <Ico svg={I.updown} className="sw-chev" />
         </button>
       }
     >

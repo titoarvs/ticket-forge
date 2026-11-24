@@ -184,7 +184,8 @@ function PrActions({ t, r, ai, open, onToggle, refreshing, id }: RowProps & { id
           onClick={() => openPrFindings(t, r)}
           title="CodeRabbit's review comments: fix with an agent, file as bugs, or dismiss"
         >
-          🐇 CodeRabbit
+          <Ico svg={I.eye} />
+          CodeRabbit
         </button>
       )}
       {ai && edit && aiCan(r) && (

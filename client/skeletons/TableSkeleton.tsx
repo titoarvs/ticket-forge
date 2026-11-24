@@ -9,16 +9,14 @@ export const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 export function TopNavSkeleton() {
   return (
     <header className="topnav" aria-hidden="true">
-      <span className="brand">
-        <span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} />
-        TicketForge
-      </span>
-      <Sk w={64} h={14} style={{ margin: '0 12px' }} />
-      <Sk w={96} h={14} />
-      <div className="spacer" />
-      <Sk w={24} h={24} r="50%" style={{ marginRight: 12 }} />
-      <Sk w={150} h={28} r={14} style={{ marginRight: 12 }} />
-      <Sk w={28} h={28} r="50%" />
+      <div className="tn-search">
+        <Sk w="100%" h={40} />
+      </div>
+      <div className="tn-right">
+        <Sk w={120} h={36} />
+        <Sk w={36} h={36} />
+        <Sk w={92} h={36} />
+      </div>
     </header>
   );
 }
@@ -140,10 +138,10 @@ function BoardSk() {
       <HeaderSk buttons={1} />
       <ToolbarSk filters={2} />
       <div style={{ overflowX: 'auto' }}>
-        <div className="board">
+        <div className="board" style={{ ['--cols' as string]: 'repeat(4, minmax(220px, 1fr))' }}>
           {[3, 2, 2, 1].map((n, c) => (
-            <div key={c} className="col">
-              <Sk w={80} h={10} style={{ margin: '4px 4px 6px' }} />
+            <div key={c} className="bcol">
+              <Sk w="100%" h={44} r={10} />
               {range(n).map((i) => (
                 <div key={i} className="sk-bcard">
                   <Sk w={w(c * 2 + i)} h={12} />
@@ -271,36 +269,45 @@ export function ViewSkeleton({ view }: { view: string }) {
   const V = VIEW_SKELETONS[view] || BacklogSk;
   return <V />;
 }
-function SidebarSk() {
+/** The sidebar before we know who is signed in (hidden on phones, where it is a drawer). */
+export function SidebarSk() {
   return (
-    <div className={`side-wrap ${S.sideCollapsed ? 'is-collapsed' : ''}`}>
-      <nav className="sidebar" aria-hidden="true">
-        <div className="proj-head">
-          <Sk w={32} h={32} r={4} />
-          <div className="sk-stack" style={{ gap: 6 }}>
-            <Sk w="75%" h={12} />
-            <Sk w="50%" h={10} />
+    <div className={`side-wrap sk-side ${S.sideCollapsed ? 'is-collapsed' : ''}`}>
+      <div className="sidebar" aria-hidden="true">
+        <div className="side-top">
+          <div className="side-brand">
+            <span className="brand">
+              <span className="brand-mark" dangerouslySetInnerHTML={{ __html: I.logo }} />
+              <span className="side-text brand-name">TicketForge</span>
+            </span>
           </div>
+          <Sk w="100%" h={46} r={10} />
         </div>
-        {[6, 2, 1].map((n, g) => (
-          <div key={g}>
-            <Sk w={64} h={8} style={{ margin: '18px 10px 10px' }} />
-            {range(n).map((i) => (
-              <div key={i} className="side-item" style={{ pointerEvents: 'none' }}>
-                <Sk w={16} h={16} r={4} />
-                <Sk className="side-text" w={w(i + g * 2, 45)} h={12} style={{ maxWidth: 120 }} />
+        <div className="side-scroll">
+          {[8, 3, 2].map((n, g) => (
+            <div key={g} className="side-group">
+              <div className="side-label">
+                <Sk w={64} h={9} />
               </div>
-            ))}
-          </div>
-        ))}
-      </nav>
+              {range(n).map((i) => (
+                <div key={i} className="side-item" style={{ pointerEvents: 'none' }}>
+                  <Sk w={16} h={16} r={4} />
+                  <Sk className="side-text" w={w(i + g * 2, 45)} h={12} style={{ maxWidth: 130 }} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="side-me">
+          <Sk w="100%" h={48} r={10} />
+        </div>
+      </div>
     </div>
   );
 }
 export function WorkspaceSkeleton({ view }: { view: string }) {
   return (
     <Loading label="Loading project…" className="shell">
-      <SidebarSk />
       <div className="main">
         <section className="view">
           <ViewSkeleton view={view} />

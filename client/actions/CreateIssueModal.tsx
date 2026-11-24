@@ -170,7 +170,7 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
       actions={[
         { label: 'Cancel' },
         {
-          label: '✨ Write with Claude',
+          label: 'Write with Claude',
           kind: 'ai',
           onClick: withClaude,
           hidden: isEpic || !can('ai.use'),
@@ -354,7 +354,7 @@ export function NewWithClaudeModal({ epicId = '' }: { epicId?: string }) {
       actions={[
         { label: 'Cancel' },
         {
-          label: '✨ Write issue',
+          label: 'Write issue',
           kind: 'primary',
           disabled: !idea.trim(),
           onClick: () => {

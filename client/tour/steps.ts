@@ -17,7 +17,7 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
     steps: [
       {
         target: 'home-create',
-        title: 'Welcome to TicketForge 👋',
+        title: 'Welcome to TicketForge',
         text: 'Start with a project. Upload a requirements document and AI drafts the epics, issues, acceptance criteria and test cases, or start blank and write issues yourself.',
         perm: 'project.create',
       },
@@ -38,8 +38,9 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       },
       {
         target: 'account',
+        position: 'top',
         title: 'You, your AI and this tour',
-        text: 'Change your password, connect your own Claude subscription (My AI), switch to dark mode, read the Terms and Privacy Policy, or start this tour again.',
+        text: 'Change your password, connect your own Claude subscription (My AI), and read the Terms and Privacy Policy. Dark mode and “Show me around” are just above.',
       },
     ],
   },

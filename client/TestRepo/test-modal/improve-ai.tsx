@@ -43,7 +43,7 @@ export function ImproveWithAi({ test, draft }: { test: Any | null; draft: Draft 
     <div className="xr-improve">
       <TF
         value={ask}
-        placeholder="✨ Improve with AI: e.g. convert to Gherkin, add the negative case, split the data out (optional)"
+        placeholder="Improve with AI: e.g. convert to Gherkin, add the negative case, split the data out (optional)"
         onChange={(e) => setAsk(e.target.value)}
         onKeyDown={(e: Any) => {
           if (e.key === 'Enter') improve();

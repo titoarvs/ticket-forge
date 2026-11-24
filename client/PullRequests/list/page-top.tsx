@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { type Any, P, can, openModal, S, emit } from '../../core';
 import { Ico, I, Spinner } from '../../ui';
 import { TF, SF, MenuItem } from '../../fields';
+import { Header } from '../../views';
 import { ACTIVE, flagsOf, FOCUS, SORTS } from '../PrDetails';
 import { LinkModal } from '../ReviewModal';
 import type { PrFilters, PrRow } from './filters';
@@ -15,40 +16,43 @@ type HeadProps = { rows: PrRow[]; ai: boolean; progress: Progress; refreshOpen: 
 export function PageHead({ rows, ai, progress, refreshOpen }: HeadProps) {
   const edit = can('issue.edit');
   return (
-    <div className="page-h">
-      <h1>Pull requests</h1>
-      <span className="spacer" />
-      {progress ? (
-        <span className="muted small pr-progress">
-          <Spinner />
-          Updating from GitHub/GitLab… {progress.done} of {progress.total}
-        </span>
-      ) : (
-        edit &&
-        rows.some((x) => ACTIVE.includes(x.r.status)) && (
-          <button className="btn" onClick={refreshOpen}>
-            <Ico svg={I.refresh} />
-            Refresh open
-          </button>
-        )
-      )}
-      {ai && (
-        <Link
-          className="btn"
-          href={`/p/${P().id}/codejobs`}
-          title="Every code generation for this project: running, ready for review, shipped"
-        >
-          <Ico svg={I.bot} />
-          Code jobs
-        </Link>
-      )}
-      {edit && (
-        <button className="btn primary" onClick={() => openModal(<LinkModal />)}>
-          <Ico svg={I.plus} />
-          Link pull request
-        </button>
-      )}
-    </div>
+    <Header
+      title="Pull requests"
+      right={
+        <>
+          {progress ? (
+            <span className="muted small pr-progress">
+              <Spinner />
+              Updating from GitHub/GitLab… {progress.done} of {progress.total}
+            </span>
+          ) : (
+            edit &&
+            rows.some((x) => ACTIVE.includes(x.r.status)) && (
+              <button className="btn" onClick={refreshOpen}>
+                <Ico svg={I.refresh} />
+                Refresh open
+              </button>
+            )
+          )}
+          {ai && (
+            <Link
+              className="btn"
+              href={`/p/${P().id}/codejobs`}
+              title="Every code generation for this project: running, ready for review, shipped"
+            >
+              <Ico svg={I.bot} />
+              Code jobs
+            </Link>
+          )}
+          {edit && (
+            <button className="btn primary" onClick={() => openModal(<LinkModal />)}>
+              <Ico svg={I.plus} />
+              Link pull request
+            </button>
+          )}
+        </>
+      }
+    />
   );
 }
 
@@ -56,7 +60,7 @@ export function PageHead({ rows, ai, progress, refreshOpen }: HeadProps) {
 export function Intro({ ai }: { ai: boolean }) {
   const setUp = !ai && can('ai.use') && can('project.settings');
   return (
-    <p className="muted small" style={{ marginTop: -6 }}>
+    <p className="page-intro">
       Every pull and merge request linked to this project’s issues, with their checks, reviews and
       conflicts from GitHub / GitLab.
       {ai && ' Review them with AI, or update them with AI on their own branch.'}

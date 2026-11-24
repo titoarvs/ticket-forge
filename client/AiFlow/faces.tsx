@@ -58,12 +58,7 @@ function TierFace({ n, f }: { n: FNode; f: Flow }) {
   return (
     <>
       <span className="fn-port in" data-port="in" />
-      <div
-        className="fn-tier-h"
-        style={{
-          background: `linear-gradient(135deg, ${m.color}, color-mix(in srgb, ${m.color} 55%, #000))`,
-        }}
-      >
+      <div className="fn-tier-h" style={{ ['--tc' as string]: m.color }}>
         <b>{m.label}</b>
         <span>{m.hint}</span>
       </div>

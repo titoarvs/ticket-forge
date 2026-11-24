@@ -144,7 +144,7 @@ export function InputStep({ f }: { f: Feature }) {
       actions={[
         { label: 'Cancel' },
         {
-          label: '✨ Plan the work',
+          label: 'Plan the work',
           kind: 'primary',
           disabled: !f.source || f.reading,
           onClick: f.next,

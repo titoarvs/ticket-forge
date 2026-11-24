@@ -9,6 +9,7 @@ import {
   WorkspaceSkeleton,
   ProjectsPageSk,
   TopNavSkeleton,
+  SidebarSk,
   range,
   w,
 } from './TableSkeleton';
@@ -53,10 +54,13 @@ export function AppSkeleton() {
   else if (path.startsWith('/new')) body = <NewProjectSk />;
   else body = <ProjectsPageSk />;
   return (
-    <>
-      <TopNavSkeleton />
-      <main id="app">{body}</main>
-    </>
+    <div className="app-frame">
+      <SidebarSk />
+      <div className="app-col">
+        <TopNavSkeleton />
+        <main id="app">{body}</main>
+      </div>
+    </div>
   );
 }
 export function AuthSkeleton() {

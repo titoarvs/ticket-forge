@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { I } from '@/client/icons';
 
 export const metadata: Metadata = {
   title: 'TicketForge · From requirements to a tested backlog and working code',
@@ -9,32 +10,32 @@ export const metadata: Metadata = {
 
 const FEATURES: [string, string, string][] = [
   [
-    '📄',
+    I.doc,
     'Backlog from your documents',
     'Upload a PDF, Word file or notes. TicketForge drafts epics, user stories, acceptance criteria and story points, and asks you what is unclear.',
   ],
   [
-    '🧭',
+    I.board,
     'Plan like you do in Jira',
     'Backlog with sprints, a board with your own workflow, a timeline of epics, releases and reports, all in one place.',
   ],
   [
-    '✅',
+    I.test,
     'Test cases and automation',
     'Every issue gets test cases. Run them as Playwright tests in a real browser, here or on GitHub Actions, with self-healing scripts.',
   ],
   [
-    '🤖',
+    I.bot,
     'AI agents that write code',
     'Agents build an issue in its own branch, follow your repository’s patterns, run your checks, then open a pull request for review.',
   ],
   [
-    '📝',
+    I.pencil,
     'Documents on demand',
     'Kick Off, Demo, Sign-Off and other epic documents written by agents from your epics and their issues.',
   ],
   [
-    '🔍',
+    I.eye,
     'Reviews you can trust',
     'AI code review panels, CodeRabbit findings turned into bugs, and acceptance criteria checked against every change.',
   ],
@@ -95,8 +96,8 @@ export default function Landing() {
               </div>
             ))}
             <div className="mk-agent">
-              <b>🛠️ Build agent</b> wrote 4 files on <code>tf/pay-12-payslip-pdf</code> · tests pass
-              · ready for review
+              <b>Build agent</b> wrote 4 files on <code>tf/pay-12-payslip-pdf</code> · tests pass ·
+              ready for review
             </div>
           </div>
         </div>
@@ -107,9 +108,7 @@ export default function Landing() {
         <div className="mk-grid">
           {FEATURES.map(([icon, title, text]) => (
             <article key={title} className="mk-card">
-              <span className="mk-ic" aria-hidden>
-                {icon}
-              </span>
+              <span className="mk-ic" aria-hidden dangerouslySetInnerHTML={{ __html: icon }} />
               <h3>{title}</h3>
               <p>{text}</p>
             </article>

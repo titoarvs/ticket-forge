@@ -100,12 +100,26 @@ export function CreateIssueForm() {
       title="Create issue"
       actions={[
         { label: 'Cancel' },
-        { label: ai ? 'Generating…' : '✨ Generate with AI', kind: 'ai', onClick: generate, disabled: ai || !pid || !can('ai.use'), keepOpen: true } as Any,
-        { label: busy ? 'Creating…' : 'Create', kind: 'primary', onClick: create, disabled: busy || ai, keepOpen: true } as Any,
+        {
+          label: ai ? 'Generating…' : 'Generate with AI',
+          kind: 'ai',
+          onClick: generate,
+          disabled: ai || !pid || !can('ai.use'),
+          keepOpen: true,
+        } as Any,
+        {
+          label: busy ? 'Creating…' : 'Create',
+          kind: 'primary',
+          onClick: create,
+          disabled: busy || ai,
+          keepOpen: true,
+        } as Any,
       ]}
     >
       <label className="field">
-        <span>Project <span className="req">*</span></span>
+        <span>
+          Project <span className="req">*</span>
+        </span>
         <SF value={pid} onChange={(e: Any) => setPid(e.target.value)}>
           <MenuItem value="">Select a project</MenuItem>
           {projects.map((p: Any) => (
@@ -128,7 +142,9 @@ export function CreateIssueForm() {
             {ai && <span className="muted small">AI is writing the issue…</span>}
           </label>
           <label className="field">
-            <span>Title <span className="req">*</span></span>
+            <span>
+              Title <span className="req">*</span>
+            </span>
             <TF value={f.title} onChange={set('title')} />
             {tried && !f.title.trim() && <span style={err}>Title is required.</span>}
           </label>
@@ -138,7 +154,9 @@ export function CreateIssueForm() {
           </label>
           <div className="grid2">
             <label className="field">
-              <span>Type <span className="req">*</span></span>
+              <span>
+                Type <span className="req">*</span>
+              </span>
               <SF value={f.type} onChange={set('type')}>
                 <MenuItem value="">Select a type</MenuItem>
                 {opts(TYPE_LIST)}

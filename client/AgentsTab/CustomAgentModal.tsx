@@ -76,7 +76,7 @@ tests added and their result, and anything where you had to depart from the repo
 const TEMPLATES: { id: string; label: string; md: string }[] = [
   {
     id: '__repo',
-    label: '🧬 Repo-native Builder (builds from the repository and project)',
+    label: 'Repo-native Builder (builds from the repository and project)',
     md: REPO_BUILDER,
   },
 ];

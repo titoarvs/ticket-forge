@@ -19,6 +19,7 @@ import { Ico, I, EmptyState, PriorityIcon, Avatar, ELoz } from '../ui';
 import { openCreateIssue, openDrawer } from '../actions';
 import { ItemText } from '../ListEditor';
 import { Header, epicProgress, ProgBar } from './row-dnd';
+import { Overview } from './Overview';
 
 export const daysLeft = (s: Any) => {
   if (!s?.endDate) return null;
@@ -116,7 +117,8 @@ export function Summary() {
     .slice(0, 8);
   return (
     <>
-      <Header title="Summary" />
+      <Header title={p.name} sub={<span className="label-chip">{p.key}</span>} />
+      <Overview />
       <div className="tiles">
         <Tile icon={I.backlog} value={ts.length} label={`issues in ${p.epics.length} epics`} />
         <Tile

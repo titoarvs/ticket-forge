@@ -1,6 +1,6 @@
 'use client';
 
-// Signed-in shell: loads the session, renders the top navigation, dialogs and notifications.
+// Signed-in shell: loads the session, renders the sidebar and top bar, dialogs and notifications.
 
 import { type ReactNode, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -29,6 +29,7 @@ import { planLimitHandler } from './core';
 import { bootSession, setLocalEngine, refreshStatus } from './AppShell/set-local-engine';
 import { ServerDown, LegalPrompt, RunPill } from './AppShell/ServerDown';
 import { TopNav } from './AppShell/TopNav';
+import { AppSidebar } from './AppShell/AppSidebar';
 
 export {
   bootSession,
@@ -124,14 +125,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         }
         return;
       }
-      if (
-        !inField &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.altKey &&
-        P() &&
-        location.pathname.startsWith('/p/')
-      ) {
+      const plain = !inField && !e.metaKey && !e.ctrlKey && !e.altKey;
+      if (plain && e.key === '[') {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
+      if (plain && P() && location.pathname.startsWith('/p/')) {
         if (e.key === 'c') {
           e.preventDefault();
           openCreateIssue();
@@ -142,10 +142,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
             e.preventDefault();
             f.focus();
           }
-        }
-        if (e.key === '[') {
-          e.preventDefault();
-          toggleSidebar();
         }
       }
     };
@@ -191,11 +187,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (!S.ready || !S.user) return <AppSkeleton />;
   return (
     <TourHost>
-      <TopNav />
-      {/* A trial that ended without a payment: the pay prompt replaces the app (checkout stays reachable so it can be paid). */}
-      <main id="app">
-        {S.auth?.billing?.locked && !pathname.startsWith('/checkout') ? <LockedScreen /> : children}
-      </main>
+      <div className="app-frame">
+        <AppSidebar />
+        <div className="app-col">
+          <TopNav />
+          {/* A trial that ended without a payment: the pay prompt replaces the app (checkout stays reachable so it can be paid). */}
+          <main id="app">
+            {S.auth?.billing?.locked && !pathname.startsWith('/checkout') ? (
+              <LockedScreen />
+            ) : (
+              children
+            )}
+          </main>
+        </div>
+      </div>
       {S.modal as Any}
       <LegalPrompt />
       <Toasts />

@@ -60,7 +60,8 @@ function PrRow({ t, edit, r }: IssueProps & { r: Any }) {
           title="Read CodeRabbit's review comments on it: fix them with an agent, file them as bugs, or dismiss them"
           onClick={() => openPrFindings(t, r)}
         >
-          🐇 CodeRabbit
+          <Ico svg={I.eye} />
+          CodeRabbit
         </button>
       )}
       {edit && (

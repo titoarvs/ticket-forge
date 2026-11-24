@@ -205,7 +205,7 @@ export function AskModal({ t }: { t: Any }) {
       actions={[
         { label: 'Cancel' },
         {
-          label: '✨ Apply',
+          label: 'Apply',
           kind: 'primary',
           disabled: !v.trim(),
           onClick: () => {
@@ -243,7 +243,7 @@ export function RegroupModal() {
       actions={[
         { label: 'Cancel' },
         {
-          label: '✨ Propose epics',
+          label: 'Propose epics',
           kind: 'primary',
           onClick: async () => {
             closeModal();

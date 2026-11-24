@@ -70,7 +70,8 @@ export function Automation() {
                   onClick={() => openModal(<SmartSelectModal />)}
                   title="The Test Selection Agent picks the tests worth running for the latest changes"
                 >
-                  🎯 Smart selection
+                  <Ico svg={I.sparkle} />
+                  Smart selection
                 </button>
               )}
               <button
