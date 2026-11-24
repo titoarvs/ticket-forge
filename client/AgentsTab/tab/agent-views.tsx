@@ -1,11 +1,13 @@
 'use client';
-// The agents that match: as cards grouped by phase, or as a list (or "No agents match").
+// The agents that match: as cards grouped by phase, as a list, or on the 2D office floor (or
+// "No agents match").
 import type { Any } from '../../core';
 import { I, EmptyState } from '../../ui';
 import { phaseClass } from '../../Agents';
 import { modelOf, Toggle, Card } from '../BuiltInsModal';
 import { hireFor, openDetails } from './open';
 import type { AgentsPage } from './use-agents-tab';
+import { OfficeView } from './OfficeView';
 
 const stop = (e: Any) => e.stopPropagation();
 
@@ -137,5 +139,6 @@ export function AgentViews({ g }: { g: AgentsPage }) {
         }
       />
     );
+  if (g.view === 'office') return <OfficeView g={g} />;
   return g.view === 'list' ? <AgentTable g={g} /> : <AgentGroups g={g} />;
 }

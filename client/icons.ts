@@ -91,6 +91,9 @@ export const I = {
   down: s('<path d="M4 6l4 4 4-4"/>'),
   warn: s('<path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5v.2"/>'),
   check: s('<path d="M3 8.5l3 3 7-7"/>'),
+  office: s(
+    '<rect x="1.8" y="2.5" width="12.4" height="11" rx="1.5"/><path d="M1.8 7.5h5v6M9.5 2.5v4h4.7M9.5 10h4.7"/>',
+  ),
   grid: s('<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M2 6h12M6 6v8"/>'),
   database: s(
     '<ellipse cx="8" cy="3.6" rx="5.2" ry="1.9"/><path d="M2.8 3.6v8.8c0 1 2.3 1.9 5.2 1.9s5.2-.9 5.2-1.9V3.6"/><path d="M2.8 8c0 1 2.3 1.9 5.2 1.9s5.2-.9 5.2-1.9"/>',

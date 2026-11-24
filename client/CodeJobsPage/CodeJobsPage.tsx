@@ -1,12 +1,56 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useStore, type Any, api, closeProject, toast, P, S, ago, openModal } from '../core';
-import { ErrorState, Ico, I, Spinner, EmptyState, Modal } from '../ui';
+import { useStore, type Any, api, closeProject, toast, P, S, ago } from '../core';
+import { ErrorState, Ico, I, Spinner, EmptyState } from '../ui';
 import { SF, MenuItem, TF } from '../fields';
-import { DiffReview } from '../DiffReview';
 import { openCodingBoard, toCodeCount } from '../CodingBoard';
 import { type Filter, REVIEW, TROUBLE, LIVE, TicketContext, LABEL } from './TicketContext';
+import { JobActions } from './JobActions';
+import { JobsOffice } from './JobsOffice';
+
+const VIEW_KEY = 'tf.codejobs.view';
+/** List or office, remembered on this device. */
+function useJobsView() {
+  const [view, setView] = useState('list');
+  useEffect(() => {
+    try {
+      setView(localStorage.getItem(VIEW_KEY) || 'list');
+    } catch {
+      /* storage off */
+    }
+  }, []);
+  const set = (v: string) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* storage off */
+    }
+  };
+  return [view, set] as const;
+}
+
+function ViewSwitch({ view, setView }: { view: string; setView: (v: string) => void }) {
+  const tab = (v: string, title: string, icon: string) => (
+    <button
+      role="tab"
+      aria-selected={view === v}
+      className={view === v ? 'on' : ''}
+      onClick={() => setView(v)}
+      title={title}
+      aria-label={title}
+    >
+      <Ico svg={icon} />
+    </button>
+  );
+  return (
+    <div className="seg cjp-view" role="tablist" aria-label="View">
+      {tab('list', 'List', I.backlog)}
+      {tab('office', 'Office', I.office)}
+    </div>
+  );
+}
 
 /**
  * The Code jobs page. With `projectId` it is that project's page (Development → Code jobs): its
@@ -20,6 +64,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   const [q, setQ] = useState('');
   const [project, setProject] = useState('');
   const [busy, setBusy] = useState('');
+  const [view, setView] = useJobsView();
   const timer = useRef<Any>(null);
   // Opened by "Write code" on an issue (TF-124): /code-jobs?project=…&ticket=…
   const [asked, setAsked] = useState<{ project: string; ticket: string } | null>(null);
@@ -113,8 +158,6 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
       setBusy('');
     }
   };
-  const openHref = (j: Any) =>
-    `/p/${j.projectId}/backlog?issue=${encodeURIComponent(j.ticketId)}&code=${j.side || 'frontend'}`;
   const scoped = Boolean(projectId);
   const tabs: [Filter, string, number][] = [
     ['live', 'Running now', n(LIVE)],
@@ -203,6 +246,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
+              <ViewSwitch view={view} setView={setView} />
             </div>
             {!shown.length ? (
               <div className="cjp-empty">
@@ -246,6 +290,8 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                   </p>
                 </EmptyState>
               </div>
+            ) : view === 'office' ? (
+              <JobsOffice jobs={shown} busy={busy} stop={stop} />
             ) : (
               <div className="jobs-list cjp-list">
                 {shown.map((j) => {
@@ -328,61 +374,7 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                           </div>
                         </div>
                         <div className="cjp-actions">
-                          {j.files?.length > 0 && !j.live && (
-                            <button
-                              className="btn sm subtle"
-                              onClick={() =>
-                                openModal(
-                                  <Modal
-                                    title={`Changes · ${j.ticketKey} ${j.title || ''}`}
-                                    wide="xl"
-                                  >
-                                    <DiffReview job={j} />
-                                  </Modal>,
-                                )
-                              }
-                              title="Review the changes, file by file"
-                            >
-                              Changes
-                            </button>
-                          )}
-                          {j.url && (
-                            <a
-                              className="btn sm subtle"
-                              href={j.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Open the GitHub Actions run"
-                            >
-                              <Ico svg={I.external} />
-                            </a>
-                          )}
-                          {j.pr?.url && (
-                            <a
-                              className="btn sm subtle"
-                              href={j.pr.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              PR #{j.pr.number}
-                            </a>
-                          )}
-                          {j.live && (
-                            <button
-                              className="btn sm subtle"
-                              disabled={busy === j.id}
-                              onClick={() => stop(j)}
-                            >
-                              {busy === j.id ? <Spinner /> : <Ico svg={I.stop} />}
-                              {j.status === 'queued' ? 'Remove' : 'Stop'}
-                            </button>
-                          )}
-                          <Link
-                            className={`btn sm ${REVIEW.includes(j.status) ? 'primary' : ''}`}
-                            href={openHref(j)}
-                          >
-                            {REVIEW.includes(j.status) ? 'Review' : 'Open'}
-                          </Link>
+                          <JobActions j={j} busy={busy} stop={stop} />
                         </div>
                       </div>
                     </div>
