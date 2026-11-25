@@ -1,14 +1,15 @@
 'use client';
 // The canvas itself: the wires, the nodes, and the wire being drawn.
 import type { FNode } from './model';
-import { type Edge, canWire, nodeState, nodeLabel } from './graph';
+import { type Edge, type WireStart, canWire, nodeState, nodeLabel } from './graph';
 import { type Ports, edgePath, hpath, vpath } from './geometry';
 import type { Flow } from './flow';
 import type { Viewport } from './use-viewport';
-import type { Wiring, usePointer } from './use-pointer';
+import type { Wiring as Wire, usePointer } from './use-pointer';
 import { NodeFace } from './faces';
 
-type Pointer = ReturnType<typeof usePointer>;
+type Wiring = Wire<WireStart>;
+type Pointer = ReturnType<typeof usePointer<WireStart>>;
 type CanvasProps = {
   f: Flow;
   v: Viewport;

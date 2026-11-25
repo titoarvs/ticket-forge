@@ -4,15 +4,23 @@
 import { useState, useRef } from 'react';
 import type { Any } from '../core';
 import type { Pt } from './model';
-import { type Graph, type WireStart, canWire } from './graph';
 import type { Viewport, Sel } from './use-viewport';
 
-type Handlers = {
+type Handlers<W> = {
+  /** The start of a wire drawn from this port. */
+  wireFrom: (port: HTMLElement) => W;
+  canWire: (from: W, target: string) => boolean;
   /** A wire was dropped on a node it may connect to. */
-  onWire: (from: WireStart, target: string) => void;
+  onWire: (from: W, target: string) => void;
   setSel: (sel: Sel) => void;
+  /** Nodes can't be moved. */
+  fixed?: boolean;
+  /** Where a dragged node is now, for canvases that keep their own layout; `done` on release. */
+  onMove?: (id: string, p: Pt, done: boolean) => void;
+  /** A port was clicked, or its wire was dropped on empty canvas at `p`. */
+  onMiss?: (from: W, p: Pt, moved: boolean) => void;
 };
-export type Wiring = { from: WireStart; cur: Pt; over: string } | null;
+export type Wiring<W> = { from: W; cur: Pt; over: string } | null;
 type ClientPt = { clientX: number; clientY: number };
 
 /** The node under the pointer, or ''. */
@@ -21,8 +29,9 @@ const nodeAt = (e: ClientPt) =>
     '[data-node]',
   )?.dataset.node || '';
 
-export function usePointer(v: Viewport, g: Graph, { onWire, setSel }: Handlers) {
-  const [conn, setConn] = useState<Wiring>(null);
+export function usePointer<W extends { node: string }>(v: Viewport, h: Handlers<W>) {
+  const { canWire, onWire, setSel, onMove, onMiss } = h;
+  const [conn, setConn] = useState<Wiring<W>>(null);
   const drag = useRef<Any>(null);
   const pts = useRef(new Map<number, Pt>());
 
@@ -39,9 +48,7 @@ export function usePointer(v: Viewport, g: Graph, { onWire, setSel }: Handlers) 
     const nodeEl = t.closest<HTMLElement>('[data-node]');
     const start = { sx: e.clientX, sy: e.clientY, moved: false };
     if (port) {
-      const from: WireStart = port.dataset.row
-        ? { kind: 'task', node: port.dataset.node!, row: port.dataset.row }
-        : { kind: 'prov', node: port.dataset.node! };
+      const from = h.wireFrom(port);
       capture(e);
       drag.current = { type: 'conn', from, ...start };
       setConn({ from, cur: v.toWorld(e), over: '' });
@@ -52,12 +59,13 @@ export function usePointer(v: Viewport, g: Graph, { onWire, setSel }: Handlers) 
       const p = v.at(nodeEl.dataset.node!);
       drag.current = {
         type: 'node',
+        fixed: h.fixed,
         id: nodeEl.dataset.node!,
         ox: w.x - p.x,
         oy: w.y - p.y,
         ...start,
       };
-    } else if (!nodeEl && !t.closest('[data-edge], .flow-edge-x')) {
+    } else if (!nodeEl && !t.closest('[data-edge], [data-nodrag], .flow-edge-x')) {
       capture(e);
       const { x: vx, y: vy } = v.viewRef.current;
       drag.current = { type: 'pan', vx, vy, ...start };
@@ -83,6 +91,10 @@ export function usePointer(v: Viewport, g: Graph, { onWire, setSel }: Handlers) 
     const k = d.k0 * (Math.hypot(a.x - b.x, a.y - b.y) / d.d0);
     v.zoomAt((a.x + b.x) / 2 - box.left, (a.y + b.y) / 2 - box.top, k);
   };
+  const draggedTo = (d: Any, e: ClientPt): Pt => {
+    const w = v.toWorld(e);
+    return { x: Math.round(w.x - d.ox), y: Math.round(w.y - d.oy) };
+  };
   const move = (e: React.PointerEvent) => {
     if (pts.current.has(e.pointerId)) pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const d = drag.current;
@@ -92,9 +104,11 @@ export function usePointer(v: Viewport, g: Graph, { onWire, setSel }: Handlers) 
     if (d.type === 'pan') {
       if (d.moved) v.touched.current = true;
       v.setView((x) => ({ ...x, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy }));
-    } else if (d.type === 'node' && d.moved) {
-      const w = v.toWorld(e);
-      v.setPos((p) => ({ ...p, [d.id]: { x: Math.round(w.x - d.ox), y: Math.round(w.y - d.oy) } }));
+    } else if (d.type === 'node' && d.moved && !d.fixed) {
+      v.touched.current = true;
+      const p = draggedTo(d, e);
+      if (onMove) onMove(d.id, p, false);
+      else v.setPos((all) => ({ ...all, [d.id]: p }));
     } else if (d.type === 'conn')
       setConn((cn) => cn && { ...cn, cur: v.toWorld(e), over: nodeAt(e) });
   };
@@ -103,10 +117,14 @@ export function usePointer(v: Viewport, g: Graph, { onWire, setSel }: Handlers) 
     if (d.type === 'conn') {
       const target = nodeAt(e);
       setConn(null);
-      if (d.moved && target && canWire(g, d.from, target)) onWire(d.from, target);
+      if (d.moved && target && canWire(d.from, target)) onWire(d.from, target);
+      else if (onMiss && (!d.moved || !target)) onMiss(d.from, v.toWorld(e), d.moved);
       else if (!d.moved) setSel({ type: 'node', id: d.from.node });
     } else if (!d.moved) setSel(d.type === 'node' ? { type: 'node', id: d.id } : null);
-    else v.persist();
+    else {
+      if (d.type === 'node' && !d.fixed) onMove?.(d.id, draggedTo(d, e), true);
+      v.persist();
+    }
   };
   const up = (e: React.PointerEvent) => {
     pts.current.delete(e.pointerId);

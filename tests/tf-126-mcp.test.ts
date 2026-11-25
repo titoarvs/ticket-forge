@@ -39,8 +39,9 @@ before(async () => {
     "insert into workspaces (id, name) values ($1, 'Test workspace') on conflict (id) do nothing",
     [WS],
   );
+  // 'viewer' is one of the roles seedRoles() just made (it may comment, not create).
   await D.q(
-    `insert into roles (workspace_id, id, name, permissions) values ($1,'maker','Maker','["issue.create"]'), ($1,'viewer','Viewer','["issue.comment"]')`,
+    `insert into roles (workspace_id, id, name, permissions) values ($1,'maker','Maker','["issue.create"]')`,
     [WS],
   );
   const people = [

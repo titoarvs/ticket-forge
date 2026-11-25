@@ -48,7 +48,8 @@ export function FlowToolbar({ f }: { f: Flow }) {
   );
 }
 
-export function ZoomControls({ v }: { v: Viewport }) {
+/** `reset` off: for canvases without a starting layout to go back to. */
+export function ZoomControls({ v, reset = true }: { v: Viewport; reset?: boolean }) {
   const { full, setFull } = v;
   return (
     <div className="flow-ui flow-zoom">
@@ -62,14 +63,16 @@ export function ZoomControls({ v }: { v: Viewport }) {
       <button type="button" onClick={v.refit} aria-label="Fit everything" title="Fit everything">
         ⤢
       </button>
-      <button
-        type="button"
-        className="flow-reset"
-        onClick={v.resetLayout}
-        title="Put the nodes back where they started"
-      >
-        Reset layout
-      </button>
+      {reset && (
+        <button
+          type="button"
+          className="flow-reset"
+          onClick={v.resetLayout}
+          title="Put the nodes back where they started"
+        >
+          Reset layout
+        </button>
+      )}
       <button
         type="button"
         onClick={() => setFull(!full)}

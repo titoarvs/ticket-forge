@@ -14,8 +14,9 @@ import {
 } from '../core';
 import { Confirm, SetCard, Ico, I } from '../ui';
 import { SF, MenuItem, TF, CB } from '../fields';
-import { stepByStep, FlowDiagram } from './FlowDiagram';
+import { stepByStep } from './flow-graph';
 import { FlowGraph } from './FlowGraph';
+import { CAT_HINT } from './flow-panel';
 import { CommitName, StatusColorPicker } from './StatusColorPicker';
 
 export function WorkflowSettings() {
@@ -112,12 +113,7 @@ export function WorkflowSettings() {
           {CATEGORIES.map(([v, l]) => (
             <span key={v}>
               <span className={`dot-cat s-${v}`} />
-              <b>{l}</b>{' '}
-              {v === 'todo'
-                ? 'not started'
-                : v === 'inprogress'
-                  ? 'being worked on'
-                  : 'counts as finished in progress, sprints and reports'}
+              <b>{l}</b> {CAT_HINT[v]}
             </span>
           ))}
         </div>
@@ -282,7 +278,6 @@ export function WorkflowSettings() {
           </div>
         }
       >
-        <FlowDiagram wf={wf} free={free} />
         {!free && (
           <>
             {ed && (
