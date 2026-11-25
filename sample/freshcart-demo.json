@@ -1,0 +1,1144 @@
+{
+  "id": "freshcart",
+  "name": "FreshCart Grocery Delivery",
+  "key": "FC",
+  "summary": "A mobile-first web app for ordering groceries from partner supermarkets in Metro Manila, delivered within 2 hours. The MVP covers accounts, the catalogue, checkout, order tracking and store administration.",
+  "assumptions": [
+    "Partner supermarkets keep their own stock counts up to date.",
+    "One store admin account manages one store."
+  ],
+  "openQuestions": [
+    "Which SMS provider will be used for order updates?",
+    "How are refunds for unavailable items paid back on cash-on-delivery orders?"
+  ],
+  "sourceName": "sample-requirements.md",
+  "sourceText": "# Product Requirements: FreshCart Grocery Delivery (MVP)\n\n## Overview\nFreshCart is a mobile-first web app that lets customers in Metro Manila order groceries from partner\nsupermarkets and get them delivered within 2 hours. The MVP targets launch in Q1.\n\n## Users\n- Customer: browses products, places orders, pays, tracks delivery.\n- Store admin: manages product catalogue, stock and order fulfilment for one store.\n\n## Requirements\n\n### 1. Account\n- Customers sign up with email + password or Google. Email must be verified before first checkout.\n- Customers can reset a forgotten password via an emailed link that expires after 30 minutes.\n- Customers can save up to 5 delivery addresses and mark one as default.\n\n### 2. Catalogue & search\n- Products are shown by category with image, name, price (PHP) and stock status.\n- Search by product name with results in under 1 second for 95% of queries.\n- Out-of-stock items are visible but cannot be added to the cart.\n\n### 3. Cart & checkout\n- Cart keeps items for 7 days for logged-in users.\n- Minimum order is PHP 500. Delivery fee is PHP 79, free above PHP 2,000.\n- Payment by GCash, credit/debit card, or cash on delivery (COD only for orders under PHP 5,000).\n- Customers choose a 1-hour delivery slot from the next 48 hours.\n\n### 4. Order tracking\n- Customers see order status: Placed, Picking, Out for delivery, Delivered, Cancelled.\n- Customers get an SMS and email at each status change.\n- Customers can cancel an order until it moves to Picking.\n\n### 5. Store admin\n- Admins can add/edit products, set price and stock, and upload images (max 5 MB, JPG/PNG).\n- Admins see incoming orders in real time and move them through the statuses.\n- Admins can mark an item as unavailable during picking; the customer is refunded for that item.\n\n## Non-functional\n- Works on the latest two versions of Chrome, Safari and Firefox, and on screens from 360px wide.\n- WCAG 2.1 AA accessibility.\n- Personal data handled in line with the Philippine Data Privacy Act.\n",
+  "members": [
+    {
+      "id": "m-1",
+      "name": "Ana Santos",
+      "email": "",
+      "role": ""
+    },
+    {
+      "id": "m-2",
+      "name": "Ben Cruz",
+      "email": "",
+      "role": ""
+    },
+    {
+      "id": "m-3",
+      "name": "Carla Reyes",
+      "email": "",
+      "role": ""
+    }
+  ],
+  "epics": [
+    {
+      "id": "epic-1",
+      "key": "FC-E1",
+      "title": "Account",
+      "description": "Sign-up, password reset and saved addresses.",
+      "color": "#6366f1",
+      "startDate": "2026-11-02",
+      "dueDate": "2026-11-27"
+    },
+    {
+      "id": "epic-2",
+      "key": "FC-E2",
+      "title": "Catalogue & search",
+      "description": "Browse by category and find products fast.",
+      "color": "#0ea5e9",
+      "startDate": "2026-11-09",
+      "dueDate": "2026-12-04"
+    },
+    {
+      "id": "epic-3",
+      "key": "FC-E3",
+      "title": "Cart & checkout",
+      "description": "Cart, delivery slots and payment.",
+      "color": "#10b981",
+      "startDate": "2026-11-16",
+      "dueDate": "2026-12-18"
+    },
+    {
+      "id": "epic-4",
+      "key": "FC-E4",
+      "title": "Order tracking",
+      "description": "Order statuses, notifications and cancelling.",
+      "color": "#f59e0b",
+      "startDate": "2026-12-07",
+      "dueDate": "2027-01-08"
+    },
+    {
+      "id": "epic-5",
+      "key": "FC-E5",
+      "title": "Store admin",
+      "description": "Catalogue and order fulfilment for a store.",
+      "color": "#8b5cf6",
+      "startDate": "2026-12-14",
+      "dueDate": "2027-01-22"
+    }
+  ],
+  "sprints": [
+    {
+      "id": "sp-1",
+      "name": "FC Sprint 1",
+      "goal": "People can sign up and browse",
+      "state": "closed",
+      "startDate": "2026-11-02",
+      "endDate": "2026-11-13",
+      "committedPoints": 11,
+      "completedPoints": 11
+    },
+    {
+      "id": "sp-2",
+      "name": "FC Sprint 2",
+      "goal": "Search and cart",
+      "state": "active",
+      "startDate": "2026-11-16",
+      "endDate": "2026-11-27",
+      "committedPoints": 21
+    },
+    {
+      "id": "sp-3",
+      "name": "FC Sprint 3",
+      "goal": "Checkout and payment",
+      "state": "future",
+      "startDate": "",
+      "endDate": ""
+    }
+  ],
+  "tickets": [
+    {
+      "id": "issue-1",
+      "key": "FC-1",
+      "epicId": "epic-1",
+      "sprintId": "sp-1",
+      "parentId": null,
+      "title": "Sign up with email and password",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 5,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to sign up with my email and a password, so that I can order groceries.",
+      "description": "Context: FreshCart MVP, section 1 of the requirements.\n\nScope: Sign up with email and password.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a new email, when I submit a valid password, then my account is created and a verification email is sent",
+        "Given an email already in use, when I submit the form, then I am asked to sign in instead",
+        "Given an unverified email, when I go to checkout, then I am asked to verify it first"
+      ],
+      "dependencies": [],
+      "status": "Done",
+      "assignee": "Ana Santos",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-1-1",
+          "key": "TC-FC-1-01",
+          "title": "Verify my account is created and a verification email is sent",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a new email",
+          "steps": [
+            "Open the app as a customer",
+            "I submit a valid password",
+            "Check the result"
+          ],
+          "expected": "my account is created and a verification email is sent",
+          "acRef": [
+            1
+          ],
+          "status": "Pass"
+        },
+        {
+          "id": "tc-1-2",
+          "key": "TC-FC-1-02",
+          "title": "Verify I am asked to sign in instead",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given an email already in use",
+          "steps": [
+            "Open the app as a customer",
+            "I submit the form",
+            "Check the result"
+          ],
+          "expected": "I am asked to sign in instead",
+          "acRef": [
+            2
+          ],
+          "status": "Pass"
+        },
+        {
+          "id": "tc-1-3",
+          "key": "TC-FC-1-03",
+          "title": "Verify I am asked to verify it first",
+          "type": "Edge case",
+          "priority": "Medium",
+          "preconditions": "Given an unverified email",
+          "steps": [
+            "Open the app as a customer",
+            "I go to checkout",
+            "Check the result"
+          ],
+          "expected": "I am asked to verify it first",
+          "acRef": [
+            3
+          ],
+          "status": "Pass"
+        }
+      ]
+    },
+    {
+      "id": "issue-2",
+      "key": "FC-2",
+      "epicId": "epic-1",
+      "sprintId": "sp-1",
+      "parentId": null,
+      "title": "Reset a forgotten password by email",
+      "type": "Story",
+      "priority": "Medium",
+      "storyPoints": 3,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to reset my password from an emailed link, so that I can get back into my account.",
+      "description": "Context: FreshCart MVP, section 1 of the requirements.\n\nScope: Reset a forgotten password by email.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a registered email, when I request a reset, then I get a link that expires after 30 minutes",
+        "Given an expired link, when I open it, then I am offered a new one",
+        "Given a valid link, when I save a new password, then I can sign in with it"
+      ],
+      "dependencies": [],
+      "status": "Done",
+      "assignee": "Ben Cruz",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-2-1",
+          "key": "TC-FC-2-01",
+          "title": "Verify I get a link that expires after 30 minutes",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a registered email",
+          "steps": [
+            "Open the app as a customer",
+            "I request a reset",
+            "Check the result"
+          ],
+          "expected": "I get a link that expires after 30 minutes",
+          "acRef": [
+            1
+          ],
+          "status": "Pass"
+        },
+        {
+          "id": "tc-2-2",
+          "key": "TC-FC-2-02",
+          "title": "Verify I am offered a new one",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given an expired link",
+          "steps": [
+            "Open the app as a customer",
+            "I open it",
+            "Check the result"
+          ],
+          "expected": "I am offered a new one",
+          "acRef": [
+            2
+          ],
+          "status": "Pass"
+        },
+        {
+          "id": "tc-2-3",
+          "key": "TC-FC-2-03",
+          "title": "Verify I can sign in with it",
+          "type": "Edge case",
+          "priority": "Medium",
+          "preconditions": "Given a valid link",
+          "steps": [
+            "Open the app as a customer",
+            "I save a new password",
+            "Check the result"
+          ],
+          "expected": "I can sign in with it",
+          "acRef": [
+            3
+          ],
+          "status": "Pass"
+        }
+      ]
+    },
+    {
+      "id": "issue-3",
+      "key": "FC-3",
+      "epicId": "epic-2",
+      "sprintId": "sp-1",
+      "parentId": null,
+      "title": "Browse products by category",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 3,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to browse products by category, so that I can find what I need.",
+      "description": "Context: FreshCart MVP, section 2 of the requirements.\n\nScope: Browse products by category.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a category, when I open it, then each product shows its image, name, price in PHP and stock status",
+        "Given an out-of-stock product, when I view it, then it is visible and cannot be added to the cart"
+      ],
+      "dependencies": [],
+      "status": "Done",
+      "assignee": "Carla Reyes",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-3-1",
+          "key": "TC-FC-3-01",
+          "title": "Verify each product shows its image, name, price in PHP and stock status",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a category",
+          "steps": [
+            "Open the app as a customer",
+            "I open it",
+            "Check the result"
+          ],
+          "expected": "each product shows its image, name, price in PHP and stock status",
+          "acRef": [
+            1
+          ],
+          "status": "Pass"
+        },
+        {
+          "id": "tc-3-2",
+          "key": "TC-FC-3-02",
+          "title": "Verify it is visible and cannot be added to the cart",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given an out-of-stock product",
+          "steps": [
+            "Open the app as a customer",
+            "I view it",
+            "Check the result"
+          ],
+          "expected": "it is visible and cannot be added to the cart",
+          "acRef": [
+            2
+          ],
+          "status": "Pass"
+        }
+      ]
+    },
+    {
+      "id": "issue-4",
+      "key": "FC-4",
+      "epicId": "epic-1",
+      "sprintId": "sp-2",
+      "parentId": null,
+      "title": "Save up to 5 delivery addresses",
+      "type": "Story",
+      "priority": "Medium",
+      "storyPoints": 3,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to save delivery addresses, so that checkout is faster.",
+      "description": "Context: FreshCart MVP, section 1 of the requirements.\n\nScope: Save up to 5 delivery addresses.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given fewer than 5 addresses, when I add one, then it is saved to my account",
+        "Given 5 saved addresses, when I add another, then I am asked to remove one first",
+        "Given several addresses, when I mark one as default, then checkout selects it"
+      ],
+      "dependencies": [],
+      "status": "In Progress",
+      "assignee": "Ana Santos",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-4-1",
+          "key": "TC-FC-4-01",
+          "title": "Verify it is saved to my account",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given fewer than 5 addresses",
+          "steps": [
+            "Open the app as a customer",
+            "I add one",
+            "Check the result"
+          ],
+          "expected": "it is saved to my account",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-4-2",
+          "key": "TC-FC-4-02",
+          "title": "Verify I am asked to remove one first",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given 5 saved addresses",
+          "steps": [
+            "Open the app as a customer",
+            "I add another",
+            "Check the result"
+          ],
+          "expected": "I am asked to remove one first",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-4-3",
+          "key": "TC-FC-4-03",
+          "title": "Verify checkout selects it",
+          "type": "Edge case",
+          "priority": "Medium",
+          "preconditions": "Given several addresses",
+          "steps": [
+            "Open the app as a customer",
+            "I mark one as default",
+            "Check the result"
+          ],
+          "expected": "checkout selects it",
+          "acRef": [
+            3
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-5",
+      "key": "FC-5",
+      "epicId": "epic-2",
+      "sprintId": "sp-2",
+      "parentId": null,
+      "title": "Search products by name",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 5,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to search products by name, so that I find items quickly.",
+      "description": "Context: FreshCart MVP, section 2 of the requirements.\n\nScope: Search products by name.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a product name, when I search, then matching products are listed",
+        "Given normal load, when I search, then 95% of results appear in under 1 second",
+        "Given no match, when I search, then I see a clear empty state"
+      ],
+      "dependencies": [],
+      "status": "In Review",
+      "assignee": "Ben Cruz",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-5-1",
+          "key": "TC-FC-5-01",
+          "title": "Verify matching products are listed",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a product name",
+          "steps": [
+            "Open the app as a customer",
+            "I search",
+            "Check the result"
+          ],
+          "expected": "matching products are listed",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-5-2",
+          "key": "TC-FC-5-02",
+          "title": "Verify 95% of results appear in under 1 second",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given normal load",
+          "steps": [
+            "Open the app as a customer",
+            "I search",
+            "Check the result"
+          ],
+          "expected": "95% of results appear in under 1 second",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-5-3",
+          "key": "TC-FC-5-03",
+          "title": "Verify I see a clear empty state",
+          "type": "Edge case",
+          "priority": "Medium",
+          "preconditions": "Given no match",
+          "steps": [
+            "Open the app as a customer",
+            "I search",
+            "Check the result"
+          ],
+          "expected": "I see a clear empty state",
+          "acRef": [
+            3
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-6",
+      "key": "FC-6",
+      "epicId": "epic-3",
+      "sprintId": "sp-2",
+      "parentId": null,
+      "title": "Keep cart items for 7 days",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 5,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a signed-in customer, I want my cart to be kept, so that I can finish ordering later.",
+      "description": "Context: FreshCart MVP, section 3 of the requirements.\n\nScope: Keep cart items for 7 days.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given items in my cart, when I return within 7 days, then they are still there",
+        "Given 7 days have passed, when I return, then the cart is empty"
+      ],
+      "dependencies": [],
+      "status": "In Progress",
+      "assignee": "Carla Reyes",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-6-1",
+          "key": "TC-FC-6-01",
+          "title": "Verify they are still there",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given items in my cart",
+          "steps": [
+            "Open the app as a signed-in customer",
+            "I return within 7 days",
+            "Check the result"
+          ],
+          "expected": "they are still there",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-6-2",
+          "key": "TC-FC-6-02",
+          "title": "Verify the cart is empty",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given 7 days have passed",
+          "steps": [
+            "Open the app as a signed-in customer",
+            "I return",
+            "Check the result"
+          ],
+          "expected": "the cart is empty",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-7",
+      "key": "FC-7",
+      "epicId": "epic-3",
+      "sprintId": "sp-2",
+      "parentId": null,
+      "title": "Enforce the PHP 500 minimum order",
+      "type": "Story",
+      "priority": "Highest",
+      "storyPoints": 3,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a store, I want small orders to be refused, so that deliveries stay profitable.",
+      "description": "Context: FreshCart MVP, section 3 of the requirements.\n\nScope: Enforce the PHP 500 minimum order.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a cart under PHP 500, when I go to checkout, then I see how much more to add",
+        "Given a cart of PHP 500 or more, when I go to checkout, then I can continue"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "Ana Santos",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-7-1",
+          "key": "TC-FC-7-01",
+          "title": "Verify I see how much more to add",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a cart under PHP 500",
+          "steps": [
+            "Open the app as a store",
+            "I go to checkout",
+            "Check the result"
+          ],
+          "expected": "I see how much more to add",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-7-2",
+          "key": "TC-FC-7-02",
+          "title": "Verify I can continue",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given a cart of PHP 500 or more",
+          "steps": [
+            "Open the app as a store",
+            "I go to checkout",
+            "Check the result"
+          ],
+          "expected": "I can continue",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-8",
+      "key": "FC-8",
+      "epicId": "epic-3",
+      "sprintId": "sp-2",
+      "parentId": null,
+      "title": "Delivery fee is charged above PHP 2,000",
+      "type": "Bug",
+      "priority": "Medium",
+      "storyPoints": 2,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want free delivery above PHP 2,000, so that I pay the advertised price.",
+      "description": "Context: FreshCart MVP, section 3 of the requirements.\n\nScope: Delivery fee is charged above PHP 2,000.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a cart above PHP 2,000, when I view the total, then the delivery fee is PHP 0",
+        "Given a cart of PHP 2,000 or less, when I view the total, then the delivery fee is PHP 79"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "Ben Cruz",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-8-1",
+          "key": "TC-FC-8-01",
+          "title": "Verify the delivery fee is PHP 0",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a cart above PHP 2,000",
+          "steps": [
+            "Open the app as a customer",
+            "I view the total",
+            "Check the result"
+          ],
+          "expected": "the delivery fee is PHP 0",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-8-2",
+          "key": "TC-FC-8-02",
+          "title": "Verify the delivery fee is PHP 79",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given a cart of PHP 2,000 or less",
+          "steps": [
+            "Open the app as a customer",
+            "I view the total",
+            "Check the result"
+          ],
+          "expected": "the delivery fee is PHP 79",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-9",
+      "key": "FC-9",
+      "epicId": "epic-3",
+      "sprintId": "sp-3",
+      "parentId": null,
+      "title": "Pay with GCash, card or cash on delivery",
+      "type": "Story",
+      "priority": "Highest",
+      "storyPoints": 8,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to choose how I pay, so that I can use the method I have.",
+      "description": "Context: FreshCart MVP, section 3 of the requirements.\n\nScope: Pay with GCash, card or cash on delivery.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given an order under PHP 5,000, when I pick a method, then cash on delivery is offered",
+        "Given an order of PHP 5,000 or more, when I pick a method, then cash on delivery is not offered",
+        "Given a declined card, when payment fails, then my cart is kept and I can retry"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-9-1",
+          "key": "TC-FC-9-01",
+          "title": "Verify cash on delivery is offered",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given an order under PHP 5,000",
+          "steps": [
+            "Open the app as a customer",
+            "I pick a method",
+            "Check the result"
+          ],
+          "expected": "cash on delivery is offered",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-9-2",
+          "key": "TC-FC-9-02",
+          "title": "Verify cash on delivery is not offered",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given an order of PHP 5,000 or more",
+          "steps": [
+            "Open the app as a customer",
+            "I pick a method",
+            "Check the result"
+          ],
+          "expected": "cash on delivery is not offered",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-9-3",
+          "key": "TC-FC-9-03",
+          "title": "Verify my cart is kept and I can retry",
+          "type": "Edge case",
+          "priority": "Medium",
+          "preconditions": "Given a declined card",
+          "steps": [
+            "Open the app as a customer",
+            "payment fails",
+            "Check the result"
+          ],
+          "expected": "my cart is kept and I can retry",
+          "acRef": [
+            3
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-10",
+      "key": "FC-10",
+      "epicId": "epic-3",
+      "sprintId": "sp-3",
+      "parentId": null,
+      "title": "Choose a 1-hour delivery slot",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 5,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to choose a delivery slot, so that I am home when it arrives.",
+      "description": "Context: FreshCart MVP, section 3 of the requirements.\n\nScope: Choose a 1-hour delivery slot.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given the next 48 hours, when I choose a slot, then only available 1-hour slots are listed",
+        "Given a slot that fills up, when I confirm, then I am asked to choose another"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-10-1",
+          "key": "TC-FC-10-01",
+          "title": "Verify only available 1-hour slots are listed",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given the next 48 hours",
+          "steps": [
+            "Open the app as a customer",
+            "I choose a slot",
+            "Check the result"
+          ],
+          "expected": "only available 1-hour slots are listed",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-10-2",
+          "key": "TC-FC-10-02",
+          "title": "Verify I am asked to choose another",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given a slot that fills up",
+          "steps": [
+            "Open the app as a customer",
+            "I confirm",
+            "Check the result"
+          ],
+          "expected": "I am asked to choose another",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-11",
+      "key": "FC-11",
+      "epicId": "epic-4",
+      "sprintId": null,
+      "parentId": null,
+      "title": "See the status of an order",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 5,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to see my order status, so that I know when it arrives.",
+      "description": "Context: FreshCart MVP, section 4 of the requirements.\n\nScope: See the status of an order.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given an order, when I open it, then I see Placed, Picking, Out for delivery, Delivered or Cancelled",
+        "Given a status change, when it is saved, then I get an SMS and an email"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-11-1",
+          "key": "TC-FC-11-01",
+          "title": "Verify I see Placed, Picking, Out for delivery, Delivered or Cancelled",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given an order",
+          "steps": [
+            "Open the app as a customer",
+            "I open it",
+            "Check the result"
+          ],
+          "expected": "I see Placed, Picking, Out for delivery, Delivered or Cancelled",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-11-2",
+          "key": "TC-FC-11-02",
+          "title": "Verify I get an SMS and an email",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given a status change",
+          "steps": [
+            "Open the app as a customer",
+            "it is saved",
+            "Check the result"
+          ],
+          "expected": "I get an SMS and an email",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-12",
+      "key": "FC-12",
+      "epicId": "epic-4",
+      "sprintId": null,
+      "parentId": null,
+      "title": "Cancel an order before picking",
+      "type": "Story",
+      "priority": "Medium",
+      "storyPoints": 3,
+      "labels": [
+        "mvp"
+      ],
+      "userStory": "As a customer, I want to cancel an order, so that I am not charged for a mistake.",
+      "description": "Context: FreshCart MVP, section 4 of the requirements.\n\nScope: Cancel an order before picking.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given an order in Placed, when I cancel it, then it becomes Cancelled",
+        "Given an order in Picking, when I open it, then Cancel is not available"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-12-1",
+          "key": "TC-FC-12-01",
+          "title": "Verify it becomes Cancelled",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given an order in Placed",
+          "steps": [
+            "Open the app as a customer",
+            "I cancel it",
+            "Check the result"
+          ],
+          "expected": "it becomes Cancelled",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-12-2",
+          "key": "TC-FC-12-02",
+          "title": "Verify Cancel is not available",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given an order in Picking",
+          "steps": [
+            "Open the app as a customer",
+            "I open it",
+            "Check the result"
+          ],
+          "expected": "Cancel is not available",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-13",
+      "key": "FC-13",
+      "epicId": "epic-5",
+      "sprintId": null,
+      "parentId": null,
+      "title": "Add and edit products",
+      "type": "Story",
+      "priority": "High",
+      "storyPoints": 5,
+      "labels": [
+        "admin"
+      ],
+      "userStory": "As a store admin, I want to manage products, so that the catalogue is correct.",
+      "description": "Context: FreshCart MVP, section 5 of the requirements.\n\nScope: Add and edit products.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given a product, when I save its price and stock, then customers see the new values",
+        "Given an image over 5 MB, when I upload it, then it is refused with the reason"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-13-1",
+          "key": "TC-FC-13-01",
+          "title": "Verify customers see the new values",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given a product",
+          "steps": [
+            "Open the app as a store admin",
+            "I save its price and stock",
+            "Check the result"
+          ],
+          "expected": "customers see the new values",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        },
+        {
+          "id": "tc-13-2",
+          "key": "TC-FC-13-02",
+          "title": "Verify it is refused with the reason",
+          "type": "Negative",
+          "priority": "Medium",
+          "preconditions": "Given an image over 5 MB",
+          "steps": [
+            "Open the app as a store admin",
+            "I upload it",
+            "Check the result"
+          ],
+          "expected": "it is refused with the reason",
+          "acRef": [
+            2
+          ],
+          "status": "Not run"
+        }
+      ]
+    },
+    {
+      "id": "issue-14",
+      "key": "FC-14",
+      "epicId": "epic-5",
+      "sprintId": null,
+      "parentId": null,
+      "title": "Compare SMS providers for order updates",
+      "type": "Spike",
+      "priority": "Medium",
+      "storyPoints": 2,
+      "labels": [
+        "admin"
+      ],
+      "userStory": "As a team, I want to compare SMS providers, so that we choose one for launch.",
+      "description": "Context: FreshCart MVP, section 5 of the requirements.\n\nScope: Compare SMS providers for order updates.\n\nOut of scope: anything not listed in the acceptance criteria.",
+      "acceptanceCriteria": [
+        "Given two or more providers, when the spike ends, then cost and delivery rates are documented"
+      ],
+      "dependencies": [],
+      "status": "To Do",
+      "assignee": "",
+      "reporter": "Ana Santos",
+      "links": [],
+      "prs": [],
+      "comments": [],
+      "history": [],
+      "createdAt": "2026-11-16T02:00:00.000Z",
+      "updatedAt": "2026-11-16T02:00:00.000Z",
+      "testCases": [
+        {
+          "id": "tc-14-1",
+          "key": "TC-FC-14-01",
+          "title": "Verify cost and delivery rates are documented",
+          "type": "Positive",
+          "priority": "Medium",
+          "preconditions": "Given two or more providers",
+          "steps": [
+            "Open the app as a team",
+            "the spike ends",
+            "Check the result"
+          ],
+          "expected": "cost and delivery rates are documented",
+          "acRef": [
+            1
+          ],
+          "status": "Not run"
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-11-16T02:00:00.000Z",
+  "updatedAt": "2026-11-16T02:00:00.000Z"
+}
