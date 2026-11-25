@@ -83,6 +83,11 @@ before(async () => {
   await D.q("insert into workspaces (id, name) values ($1, 'WS') on conflict (id) do nothing", [
     WS,
   ]);
+  // The project's creator (projects.created_by references users).
+  await D.q(
+    "insert into users (id, email, name, password_hash, role_id, status) values ($1,$2,$3,'x','admin','active')",
+    [owner.id, `${owner.id}@x.test`, owner.name],
+  );
 });
 beforeEach(async () => {
   issues = [];
