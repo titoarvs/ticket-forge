@@ -2,10 +2,24 @@
 import { lockedFeatureFor, lockedMessage } from '../features';
 import { cookies, headers } from 'next/headers';
 import * as auth from '@/lib/auth';
-import { migrate, asSystem, asUser, currentContext, SCHEMA_VERSION, DEFAULT_WS } from '@/lib/db';
+import {
+  migrate,
+  asSystem,
+  asUser,
+  currentContext,
+  SCHEMA_VERSION,
+  DEFAULT_WS,
+  SERVERLESS,
+} from '@/lib/db';
 import * as store from '@/lib/store';
 import { isLocalHost } from '@/lib/claude';
-import { scrubSharedTokens, platformAdminEmails, requestIsLocal } from '@/lib/platform';
+import {
+  scrubSharedTokens,
+  platformAdminEmails,
+  requestIsLocal,
+  trustedProxyHops,
+} from '@/lib/platform';
+import { peerAddress, clientAddress } from '@/lib/peer';
 import { lockStatus } from '@/lib/limits';
 import { startWorker as startDriveWorker } from '@/lib/gdrive';
 
@@ -100,9 +114,10 @@ export async function endSession() {
   jar.delete(auth.SESSION_COOKIE);
 }
 
+/** The visitor's address (rate limits, consent records). Serverless hosting is always one proxy. */
 export async function clientIp() {
-  const h = await headers();
-  return h.get('x-forwarded-for')?.split(',')[0].trim() || h.get('x-real-ip') || 'local';
+  const hops = trustedProxyHops() || (SERVERLESS ? 1 : 0);
+  return clientAddress(await headers(), { peer: peerAddress(), hops });
 }
 export const appUrl = (req: Request) =>
   (process.env.APP_URL || new URL(req.url).origin).replace(/\/$/, '');
@@ -161,11 +176,11 @@ export function api(fn: Handler, opts: { bearer?: boolean } = {}) {
       // Every query in this request runs as the signed-in user, so database row-level security
       // applies.
       const user = opts.bearer ? await bearerUser(req) : await currentUser();
-      // Opened on this computer (localhost)? Then AI uses your Claude account, otherwise the
-      // configured AI API.
+      // Opened on this computer (a connection from here, to localhost)? Then AI uses your Claude
+      // account, otherwise the configured AI API.
       // On the hosted service (SaaS) never: the server's own Claude sign-in must not answer for
       // other companies.
-      const local = requestIsLocal(isLocalHost, req.headers);
+      const local = requestIsLocal(isLocalHost, req.headers, peerAddress());
       // The project this request is about (for AI usage per project): from the address, or set by
       // aiOpts from the body.
       const projectId =

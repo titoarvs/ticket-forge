@@ -129,7 +129,8 @@ Reload TicketForge. The pill at the top right shows **Claude account**.
 4. Click **Test**, then **Add provider**.
 
 On `localhost`, TicketForge uses your Claude account by default. To use the API there too, set `AI_MODE=api` in
-`.env` and restart.
+`.env` and restart. Opening TicketForge from another device, through a tunnel or through Docker's port forwarding
+doesn't count as your own computer: use option B for that.
 
 ## Quick start: your first project
 
@@ -185,6 +186,7 @@ A shared server needs these settings:
 | `DATABASE_URL` | Your PostgreSQL connection string (Supabase: **Transaction pooler**, port 6543) |
 | `APP_URL` | The public `https://` address; invite and reset links use it |
 | `TICKETFORGE_SECRET` | A long random value that encrypts saved API keys. Keep it: changing it means entering the keys again |
+| `TRUST_PROXY` | `1` behind a reverse proxy, or the number of proxies. Not needed on Vercel |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | Your AI API, unless you set it in Administration → AI |
 
 **On Vercel:** import the repository, add the settings under **Settings → Environment Variables**, and deploy.
@@ -194,8 +196,8 @@ Claude Code and local folders aren't available there, so code jobs use your AI A
 reverse proxy in front of port 5173.
 
 > [!IMPORTANT]
-> Don't expose port 5173 to the internet directly. TicketForge reads the visitor's address and the host name from
-> the request headers, so have the reverse proxy set `Host`, `X-Forwarded-Host` and `X-Forwarded-For` itself.
+> Set `TRUST_PROXY=1` and have the proxy add the visitor's address to `X-Forwarded-For`. Make sure visitors can't reach
+> port 5173 around the proxy. `TRUST_PROXY` also turns off local folders, git and Claude Code on that server.
 
 Before you open it to the public, replace the placeholders in the [legal pages](lib/legal).
 

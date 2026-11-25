@@ -199,7 +199,7 @@ TicketForge has no git sign-in, so it needs the connection (or a token) to read 
 deployed, even at `localhost`, so the repository source *Folder on this computer*, cloning and Claude Code agents are
 off (a visitor can send any `Host` header to a public server, so hosted mode never trusts it). To use them while
 testing billing on your own computer, add `TICKETFORGE_ALLOW_LOCAL=1` to `.env` and restart: it is honoured only for
-requests whose address is `localhost` and that came through no proxy (no `X-Forwarded-*` header). Never set it on a
+requests that come from this computer to `localhost`, with no other address passed on by a proxy. Never set it on a
 server. Project settings → Code & GitHub says so when this is why folders are unavailable.
 
 **Everyone sets up their own local copy.** The project shares *which* repository it is (name, provider, base branch,
