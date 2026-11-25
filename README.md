@@ -98,7 +98,12 @@ TicketForge picks how it talks to AI from the address you open it on:
   **Load models** in the panel to see the ones your key can use.
 
 `AI_MODE=account` or `AI_MODE=api` overrides the automatic choice: for example, `AI_MODE=api` uses the API on
-your own computer too. Behind a reverse proxy, the original address comes from `X-Forwarded-Host`.
+your own computer too.
+
+"On your own computer" means the connection itself comes from this computer, to a `localhost` address, and no
+proxy passed on another address. It isn't decided by the `Host` or `X-Forwarded-*` headers alone, because any
+visitor can send those. Opening TicketForge from another device, through a tunnel, or through Docker's port
+forwarding is not "on this computer". The same rule decides who may use local folders, git and Claude Code agents.
 
 All settings live in `.env` (see `.env.example`):
 
@@ -111,7 +116,7 @@ All settings live in `.env` (see `.env.example`):
 | `TICKETFORGE_CUTOVER_POLL_MS`, `TICKETFORGE_CUTOVER_HOLD_MS` | Moving to another PostgreSQL host: how often servers check for a cutover (default 1000, `0` = off) and how long writes wait during it (default 30000). See [docs/postgres-host-migration.md](docs/postgres-host-migration.md) |
 | `APP_URL` | Public address used in invite and password-reset links |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Email for invites and password resets |
-| `TRUST_PROXY` | Set when running behind a reverse proxy |
+| `TRUST_PROXY` | `1` behind a reverse proxy, or the number of proxies: sign-in limits then use the address the proxy adds to `X-Forwarded-For` (otherwise that header is ignored). Turns off this computer's folders, git and Claude Code unless `TICKETFORGE_ALLOW_LOCAL=1`. Not needed on Vercel |
 | `PORT` | Server port (default 5173) |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` | The AI API used when TicketForge isn't opened on localhost (see AI connection) |
 | `AI_MODE` | `account` or `api` to override the automatic choice |
@@ -801,7 +806,7 @@ TicketForge has no git sign-in, so it needs the connection (or a token) to read 
 deployed, even at `localhost`, so the repository source *Folder on this computer*, cloning and Claude Code agents are
 off (a visitor can send any `Host` header to a public server, so hosted mode never trusts it). To use them while
 testing billing on your own computer, add `TICKETFORGE_ALLOW_LOCAL=1` to `.env` and restart: it is honoured only for
-requests whose address is `localhost` and that came through no proxy (no `X-Forwarded-*` header). Never set it on a
+requests that come from this computer to `localhost`, with no other address passed on by a proxy. Never set it on a
 server. Project settings → Code & GitHub says so when this is why folders are unavailable.
 
 **Everyone sets up their own local copy.** The project shares *which* repository it is (name, provider, base branch,

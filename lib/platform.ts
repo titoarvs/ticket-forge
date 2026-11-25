@@ -6,38 +6,47 @@
 //   PLATFORM_NAME, LEGAL_CONTACT_EMAIL  shown on the public pages and in emails
 export const isSaas = () => String(process.env.TICKETFORGE_MODE || '').toLowerCase() === 'saas';
 /**
- * Trying the hosted mode on your own computer: TICKETFORGE_ALLOW_LOCAL=1 lets a request opened at
- * localhost use this computer (folders, Claude Code agents, git) even though TICKETFORGE_MODE=saas.
- * Never set it on a server: it is only honoured for a request whose address is localhost and that
- * came through no proxy (no X-Forwarded-* header).
+ * TICKETFORGE_ALLOW_LOCAL=1 lets a request opened at localhost use this computer (folders, Claude
+ * Code agents, git) where that is otherwise off: in the hosted mode (TICKETFORGE_MODE=saas), to try
+ * it on your own computer, and behind a reverse proxy (TRUST_PROXY). Never set it on a server.
  */
-export const allowLocalInSaas = () =>
+export const allowLocal = () =>
   /^(1|true|yes)$/i.test(String(process.env.TICKETFORGE_ALLOW_LOCAL || ''));
 /**
- * Whether a request opened at `host` counts as "on this computer": always off in SaaS unless
- * allowLocalInSaas() and no proxy.
+ * How many reverse proxies stand in front of TicketForge (TRUST_PROXY): 0 when it is empty or off,
+ * 1 for any other value that isn't a number. Only then does X-Forwarded-For say who the visitor is.
  */
-const LOOPBACK = /^(::1|127(\.\d{1,3}){3}|::ffff:127(\.\d{1,3}){3}|localhost)$/i;
+export function trustedProxyHops() {
+  const v = String(process.env.TRUST_PROXY || '')
+    .trim()
+    .toLowerCase();
+  if (/^\d+$/.test(v)) return Number(v);
+  return ['', 'false', 'no', 'off'].includes(v) ? 0 : 1;
+}
+/**
+ * Whether a request counts as "on this computer". Headers can't show that (the sender writes them),
+ * so the connection itself (`peer`, see lib/peer.ts) must come from this computer. Headers can only
+ * take it away: a proxy or tunnel here connects from this computer too, so any address or host it
+ * passed on must be this computer as well. Off in SaaS and behind a declared proxy, unless
+ * allowLocal().
+ */
+const LOOPBACK = /^(::1|(::ffff:)?127(\.\d{1,3}){3})$/i;
 export function requestIsLocal(
   isLocalHost: (h: any) => boolean,
   headers: { get(n: string): string | null },
+  peer: string | null,
 ) {
-  if (!isSaas()) return isLocalHost(headers.get('x-forwarded-host') || headers.get('host'));
-  if (!allowLocalInSaas()) return false;
-  // The caller must be this computer itself: every address on the way is loopback (Next adds the
-  // socket's address to X-Forwarded-For, so a remote visitor who only sends "Host: localhost" or a
-  // forged header still shows up with theirs).
-  const hops = [
-    ...String(headers.get('x-forwarded-for') || '').split(','),
-    headers.get('x-real-ip') || '',
-  ]
-    .map((x) => x.trim())
-    .filter(Boolean);
-  if (hops.some((h) => !LOOPBACK.test(h))) return false;
-  const host = headers.get('host');
-  const fwd = headers.get('x-forwarded-host');
-  if (fwd && fwd !== host) return false;
-  return isLocalHost(host);
+  if ((isSaas() || trustedProxyHops()) && !allowLocal()) return false;
+  if (!peer || !LOOPBACK.test(peer)) return false;
+  if (headers.get('forwarded')) return false;
+  const each = (name: string) =>
+    String(headers.get(name) || '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const hops = [...each('x-forwarded-for'), ...each('x-real-ip')];
+  if (!hops.every((h) => LOOPBACK.test(h))) return false;
+  return isLocalHost(headers.get('host')) && each('x-forwarded-host').every(isLocalHost);
 }
 export function signupMode() {
   const m = String(process.env.SIGNUP_MODE || '').toLowerCase();
