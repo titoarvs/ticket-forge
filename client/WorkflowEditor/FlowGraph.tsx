@@ -1,30 +1,36 @@
 'use client';
-// TF-141: the project's status flow as an interactive node graph (Project settings → Workflow).
-// Everyone who can open the project sees it; only people with "Edit project settings" get the
-// controls. Edits are a draft until "Save flow", which writes the project's workflow (statuses and
-// their transitions) through the same save as the rest of the settings.
-import { useRef, useState, type PointerEvent } from 'react';
-import {
-  P,
-  type Any,
-  can,
-  toast,
-  mutate,
-  openModal,
-  setField,
-  uid,
-  CATEGORIES,
-  wCls,
-} from '../core';
+// TF-141: the project's status flow as a node canvas (Project settings → Workflow): drag tiles, draw
+// wires between them, click one for its details. Everyone who can open the project sees it; only
+// people with "Edit project settings" get the controls. Edits are a draft until "Save flow", which
+// writes the project's workflow (statuses and their transitions) through the same save as the rest
+// of the settings.
+//   flow-graph.ts (the draft) · flow-lines.ts (the wires) · flow-canvas.tsx (drawing) ·
+//   flow-panel.tsx (the details) · ../AiFlow/use-viewport.ts, use-pointer.ts (pan, zoom, drag).
+import { useEffect, useState } from 'react';
+import { P, type Any, can, toast, mutate, openModal, setField, uid } from '../core';
 import { Confirm, SetCard, Ico, I } from '../ui';
-import { SF, MenuItem, TF } from '../fields';
+import {
+  type CanvasGraph,
+  useViewport,
+  useAutoFit,
+  useWheelZoom,
+  useFullScreenKeys,
+  useGlideToSelection,
+} from '../AiFlow/use-viewport';
+import { usePointer } from '../AiFlow/use-pointer';
+import { ZoomControls } from '../AiFlow/toolbar';
 import {
   NODE_W,
   NODE_H,
+  LABEL_H,
   type FlowDraft,
-  type FlowNode,
   toDraft,
   addNode,
+  addAfter,
+  insertOn,
+  settle,
+  tidy,
+  freshName,
   renameNode,
   removeNode,
   connect,
@@ -33,39 +39,12 @@ import {
   sameDraft,
   applyDraft,
 } from './flow-graph';
+import { type Adding, type Editor, type Sel, lookOf } from './flow-model';
+import { type WireStart, StatusCanvas, canMove } from './flow-canvas';
+import { panelFor } from './flow-panel';
 
-type Sel = { kind: 'node'; id: string } | { kind: 'edge'; from: string; to: string } | null;
-
-const short = (s: string, n = 17) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-
-/** The line from one box to another, ending at the box edges; moves both ways are split apart. */
-function edgeLine(a: FlowNode, b: FlowNode, both: boolean) {
-  const ax = a.x + NODE_W / 2,
-    ay = a.y + NODE_H / 2,
-    bx = b.x + NODE_W / 2,
-    by = b.y + NODE_H / 2;
-  const dx = bx - ax,
-    dy = by - ay,
-    len = Math.hypot(dx, dy) || 1;
-  const nx = (-dy / len) * (both ? 6 : 0),
-    ny = (dx / len) * (both ? 6 : 0);
-  // where the centre-to-centre line leaves a box
-  const clip = (sx: number, sy: number) => {
-    const t = Math.min(
-      sx ? NODE_W / 2 / Math.abs(sx) : Infinity,
-      sy ? NODE_H / 2 / Math.abs(sy) : Infinity,
-    );
-    return [sx * t, sy * t];
-  };
-  const [ox, oy] = clip(dx, dy),
-    [ix, iy] = clip(-dx, -dy);
-  return { x1: ax + ox + nx, y1: ay + oy + ny, x2: bx + ix + nx, y2: by + iy + ny };
-}
-
-export function FlowGraph() {
-  const p = P();
-  const wf: Any[] = p.workflow;
-  const ed = can('project.settings');
+/** The draft, and what keeps it in step with the project. */
+function useDraft(wf: Any[]) {
   const saved = toDraft(wf);
   const savedKey = JSON.stringify(saved);
   const [draft, setDraft] = useState<FlowDraft>(saved);
@@ -76,294 +55,312 @@ export function FlowGraph() {
     setBase(savedKey);
     if (JSON.stringify(draft) === base) setDraft(saved);
   }
-  const [sel, setSel] = useState<Sel>(null);
-  // connecting: the status the new move starts at
-  const [from, setFrom] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const drag = useRef<{ id: string; sx: number; sy: number; x: number; y: number } | null>(null);
-  const dirty = !sameDraft(draft, saved);
-  const free = p.flowMode !== 'custom';
-  const node = (id: string) => draft.nodes.find((n) => n.id === id);
-  const selNode = sel?.kind === 'node' ? node(sel.id) : undefined;
-  const edit = (d: FlowDraft) => {
-    setDraft(d);
-    setError('');
-  };
+  return { saved, draft, setDraft, dirty: !sameDraft(draft, saved) };
+}
 
-  const W = Math.max(640, ...draft.nodes.map((n) => n.x + NODE_W + 16));
-  const H = Math.max(120, ...draft.nodes.map((n) => n.y + NODE_H + 16));
+/** Asks before a status or a transition goes. */
+function askRemove(x: Editor, s: Sel, yes: () => void) {
+  if (s?.kind === 'edge') {
+    const a = x.node(s.from)?.name;
+    const b = x.node(s.to)?.name;
+    openModal(
+      <Confirm
+        title="Remove this transition?"
+        label="Remove transition"
+        text={`Issues can no longer move from “${a}” to “${b}”. This is saved when you press Save flow.`}
+        onYes={yes}
+      />,
+    );
+    return;
+  }
+  const n = s && x.node(s.id);
+  if (!n) return;
+  const count = x.issues(n.id);
+  const moves = x.draft.edges.filter((e) => e.from === n.id || e.to === n.id).length;
+  openModal(
+    <Confirm
+      title={`Delete status “${n.name}”?`}
+      label="Delete status"
+      text={`${moves ? `Its ${moves} transition${moves === 1 ? '' : 's'} will be removed too. ` : ''}${count ? `${count} issue${count === 1 ? '' : 's'} will move to another status. ` : ''}This is saved when you press Save flow.`}
+      onYes={yes}
+    />,
+  );
+}
 
-  const add = () => {
-    if (!ed) return;
-    if (!name.trim()) {
-      setError('Type a name for the new status.');
-      return;
-    }
-    const id = uid();
-    edit(addNode(draft, id, name.trim()));
-    setSel({ kind: 'node', id });
-    setName('');
-  };
-  const pick = (id: string) => {
-    if (ed && from && from !== id) {
-      edit(connect(draft, from, id));
-      setSel({ kind: 'edge', from, to: id });
-      setFrom(null);
-      return;
-    }
-    setFrom(null);
-    setSel({ kind: 'node', id });
-  };
-  const remove = () => {
-    if (!ed || !sel) return;
-    if (sel.kind === 'edge') {
-      const a = node(sel.from)?.name,
-        b = node(sel.to)?.name;
-      openModal(
-        <Confirm
-          title="Remove this transition?"
-          label="Remove transition"
-          text={`Issues can no longer move from “${a}” to “${b}”. This is saved when you press Save flow.`}
-          onYes={() => {
-            edit(removeEdge(draft, sel.from, sel.to));
-            setSel(null);
-          }}
-        />,
-      );
-    } else if (selNode) {
-      const n = p.tickets.filter((t: Any) => t.status === selNode.name).length;
-      const moves = draft.edges.filter((e) => e.from === selNode.id || e.to === selNode.id).length;
-      openModal(
-        <Confirm
-          title={`Delete status “${selNode.name}”?`}
-          label="Delete status"
-          text={`${moves ? `Its ${moves} transition${moves === 1 ? '' : 's'} will be removed too. ` : ''}${n ? `${n} issue${n === 1 ? '' : 's'} will move to another status. ` : ''}This is saved when you press Save flow.`}
-          onYes={() => {
-            edit(removeNode(draft, selNode.id));
-            setSel(null);
-            setFrom(null);
-          }}
-        />,
-      );
-    }
-  };
-  const save = () => {
-    if (!ed) return;
-    const msg = checkDraft(draft);
-    if (msg) {
-      setError(msg);
-      toast(msg, 'err');
-      return;
-    }
-    const out = applyDraft(wf, draft);
-    mutate((pp) => {
-      pp.tickets.forEach((t: Any) => {
-        const r = out.renamed.find((x) => x.from === t.status);
-        if (r) t.status = r.to;
-        else {
-          const m = out.removed.find((x) => x.from === t.status);
-          if (m && m.to) setField(t, 'status', m.to);
-        }
-      });
-      pp.workflow = out.workflow;
+/** Saves the draft, moving the issues of renamed and removed statuses. Returns the new workflow. */
+function saveFlow(wf: Any[], draft: FlowDraft) {
+  const out = applyDraft(wf, draft);
+  mutate((pp) => {
+    pp.tickets.forEach((t: Any) => {
+      const r = out.renamed.find((x) => x.from === t.status);
+      if (r) t.status = r.to;
+      else {
+        const m = out.removed.find((x) => x.from === t.status);
+        if (m && m.to) setField(t, 'status', m.to);
+      }
     });
+    pp.workflow = out.workflow;
+  });
+  toast('Status flow saved.');
+  return out.workflow;
+}
+
+/** Everything the canvas and the panel can do to the draft. */
+function useEditor(): Editor & {
+  dirty: boolean;
+  error: string;
+  save(): void;
+  discard(): void;
+  arrange(): void;
+} {
+  const p = P();
+  const wf: Any[] = p.workflow;
+  const ed = can('project.settings');
+  const { saved, draft, setDraft, dirty } = useDraft(wf);
+  const [sel, pick] = useState<Sel>(null);
+  const [adding, openAdd] = useState<Adding>(null);
+  const [justAdded, setJustAdded] = useState('');
+  const [error, setError] = useState('');
+  const edit = (next: FlowDraft | ((d: FlowDraft) => FlowDraft)) => {
+    if (!ed) return;
+    setDraft(next);
     setError('');
-    toast('Status flow saved.');
   };
+  const setSel = (s: Sel) => {
+    pick(s);
+    openAdd(null);
+    setJustAdded('');
+  };
+  const byId = (id: string) => wf.find((w) => w.id === id);
+  const node = (id: string) => draft.nodes.find((n) => n.id === id);
+  const x: Editor = {
+    ed,
+    free: p.flowMode !== 'custom',
+    draft,
+    sel,
+    setSel,
+    adding,
+    setAdding: openAdd,
+    justAdded,
+    node,
+    look: (n) => lookOf(byId(n.id), n),
+    issues: (id) => {
+      const w = byId(id);
+      return w ? p.tickets.filter((t: Any) => t.status === w.name).length : 0;
+    },
+    patch: (id, c) => edit((d) => renameNode(d, id, c)),
+    connect: (from, to) => edit((d) => connect(d, from, to)),
+    disconnect: (from, to) => edit((d) => removeEdge(d, from, to)),
+    add: (category) => {
+      const n = { id: uid(), name: freshName(draft), category };
+      const { edge, after, at } = adding || {};
+      if (edge) edit(insertOn(draft, edge, n));
+      else if (after) edit(addAfter(draft, after, n, at));
+      else edit(addNode(draft, n.id, n.name, category, at));
+      setSel({ kind: 'node', id: n.id });
+      setJustAdded(n.id);
+    },
+    remove: (s) => {
+      if (!ed || !s) return;
+      askRemove(x, s, () => {
+        edit((d) => (s.kind === 'edge' ? removeEdge(d, s.from, s.to) : removeNode(d, s.id)));
+        setSel(null);
+      });
+    },
+  };
+  return {
+    ...x,
+    dirty,
+    error,
+    save: () => {
+      if (!ed) return;
+      const msg = checkDraft(draft);
+      setError(msg);
+      if (msg) toast(msg, 'err');
+      else setDraft(toDraft(saveFlow(wf, draft)));
+    },
+    discard: () => {
+      edit(saved);
+      setSel(null);
+    },
+    arrange: () =>
+      edit(
+        tidy(
+          draft,
+          applyDraft(wf, draft).workflow.map((w) => w.id),
+        ),
+      ),
+  };
+}
 
-  // dragging a status (editors only)
-  const down = (e: PointerEvent, n: FlowNode) => {
-    pick(n.id);
-    if (!ed || from) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { id: n.id, sx: e.clientX, sy: e.clientY, x: n.x, y: n.y };
-  };
-  const move = (e: PointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const x = Math.max(0, Math.round(d.x + e.clientX - d.sx)),
-      y = Math.max(0, Math.round(d.y + e.clientY - d.sy));
-    setDraft((cur) => renameNode(cur, d.id, { x, y }));
-  };
+function Toolbar({ x, onTidy }: { x: ReturnType<typeof useEditor>; onTidy: () => void }) {
+  return (
+    <div className="flow-ui flow-top wfc-top">
+      <button type="button" className="btn sm" onClick={() => x.setAdding({})}>
+        <Ico svg={I.plus} />
+        Add status
+      </button>
+      <button
+        type="button"
+        className="btn sm subtle"
+        title="Put the statuses back in rows, in board order"
+        onClick={onTidy}
+      >
+        <Ico svg={I.grid} />
+        Tidy up
+      </button>
+      <span className="wfc-gap" />
+      <span className="flow-status" role="status">
+        {x.dirty && (
+          <>
+            <i className="wfc-dot" />
+            Unsaved changes
+          </>
+        )}
+      </span>
+      <button type="button" className="btn sm subtle" disabled={!x.dirty} onClick={x.discard}>
+        Discard changes
+      </button>
+      <button type="button" className="btn sm primary" disabled={!x.dirty} onClick={x.save}>
+        Save flow
+      </button>
+    </div>
+  );
+}
 
+function Side({
+  label,
+  onClose,
+  children,
+}: {
+  label: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <aside className="flow-ui flow-insp" aria-label={label}>
+      <button type="button" className="icon-btn flow-insp-x" onClick={onClose} aria-label="Close">
+        <Ico svg={I.close} />
+      </button>
+      {children}
+    </aside>
+  );
+}
+
+export function FlowGraph() {
+  const x = useEditor();
+  const { ed, draft, sel } = x;
+  const nodes = draft.nodes.map((n) => ({
+    id: n.id,
+    w: NODE_W,
+    h: NODE_H + LABEL_H,
+    def: { x: n.x, y: n.y },
+  }));
+  const g: CanvasGraph = { nodes, byId: Object.fromEntries(nodes.map((n) => [n.id, n])) };
+  const v = useViewport(g, null, 0.6);
+  useAutoFit(v, g);
+  useWheelZoom(v);
+  useFullScreenKeys(v);
+  const smooth = useGlideToSelection(
+    v,
+    g,
+    sel?.kind === 'node' ? { type: 'node', id: sel.id } : null,
+  );
+  const ptr = usePointer<WireStart>(v, {
+    wireFrom: (port) => ({ node: port.dataset.node! }),
+    canWire: (from, to) => canMove(x, from.node, to),
+    onWire: (from, to) => {
+      x.connect(from.node, to);
+      x.setSel({ kind: 'edge', from: from.node, to });
+    },
+    setSel: (s) => x.setSel(s?.type === 'node' ? { kind: 'node', id: s.id } : null),
+    fixed: !ed,
+    onMove: (id, p, done) =>
+      x.patch(
+        id,
+        done
+          ? settle(
+              p,
+              draft.nodes.filter((n) => n.id !== id),
+            )
+          : p,
+      ),
+    onMiss: (from, p, moved) =>
+      x.setAdding({
+        after: from.node,
+        at: moved ? { x: Math.round(p.x), y: Math.round(p.y - NODE_H / 2) } : undefined,
+      }),
+  });
+  // Tidying up also brings everything into view, once the statuses are in their new places.
+  const [tidied, setTidied] = useState(0);
+  const onTidy = () => {
+    x.arrange();
+    setTidied((k) => k + 1);
+  };
+  useEffect(() => {
+    if (tidied) v.refit();
+  }, [tidied]); // eslint-disable-line react-hooks/exhaustive-deps
+  const panel = panelFor(x);
+  const close = () => x.setSel(null);
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const t = e.target as HTMLElement;
+    if (e.key === 'Escape' && panel) {
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if ((e.key !== 'Delete' && e.key !== 'Backspace') || !ed) return;
+    if (t.closest('input, textarea, [role="combobox"], .flow-insp')) return;
+    // what has the focus goes, or else what is selected
+    const [from, to] = (t.closest<SVGElement>('[data-edge]')?.dataset.edge || '').split('>');
+    const id = t.closest<HTMLElement>('[data-node]')?.dataset.node;
+    let target: Sel = sel;
+    if (to) target = { kind: 'edge', from, to };
+    else if (id) target = { kind: 'node', id };
+    if (!target || (target.kind === 'node' && draft.nodes.length < 2)) return;
+    e.preventDefault();
+    x.remove(target);
+  };
+  const cls = ['flow', 'wfc', v.full && 'full', ptr.conn && 'wiring', panel && 'has-insp'];
   return (
     <SetCard
       id="status-flow"
       title="Status flow"
       desc={
         ed
-          ? 'Each status is a node and each allowed move an arrow. Add statuses, connect them, then save the flow.'
-          : 'Each status is a node and each allowed move an arrow. You can view the flow; changing it needs the “Edit project settings” permission.'
+          ? 'Each status is a node and each allowed move a wire. Drag from a node’s dot to connect it, click anything to edit it, then save the flow.'
+          : 'Each status is a node and each allowed move a wire. You can view the flow; changing it needs the “Edit project settings” permission.'
       }
       right={<span className="muted small">{draft.nodes.length} statuses</span>}
     >
-      {ed && (
-        <div className="row flow-bar" style={{ gap: 6, marginBottom: 8 }}>
-          <TF
-            size="small"
-            aria-label="New status name"
-            placeholder="New status name"
-            value={name}
-            onChange={(e: Any) => setName(e.target.value)}
-            onKeyDown={(e: Any) => e.key === 'Enter' && add()}
-          />
-          <button className="btn sm" onClick={add}>
-            <Ico svg={I.plus} />
-            Add status
-          </button>
-          <button
-            className={`btn sm ${from ? 'primary' : ''}`}
-            disabled={!selNode}
-            aria-pressed={Boolean(from)}
-            title="Pick a status, press Connect, then click the status it can move to"
-            onClick={() => setFrom(from ? null : selNode!.id)}
-          >
-            <Ico svg={I.link} />
-            {from ? 'Click the target status…' : 'Connect'}
-          </button>
-          <button className="btn sm" disabled={!sel} onClick={remove}>
-            <Ico svg={I.trash} />
-            Remove
-          </button>
-          <span style={{ flex: 1 }} />
-          <button className="btn sm subtle" disabled={!dirty} onClick={() => edit(saved)}>
-            Discard changes
-          </button>
-          <button className="btn sm primary" disabled={!dirty} onClick={save}>
-            Save flow
-          </button>
-        </div>
-      )}
-      {error && (
-        <p className="small wf-warn" role="alert">
-          <Ico svg={I.warn} /> {error}
-        </p>
-      )}
       <div
-        className="wf-diagram flow-canvas"
+        className={cls.filter(Boolean).join(' ')}
         role="group"
         aria-label={`Status flow: ${draft.nodes.length} statuses, ${draft.edges.length} transitions`}
+        onKeyDown={onKeyDown}
       >
-        <svg
-          width={W}
-          height={H}
-          viewBox={`0 0 ${W} ${H}`}
-          onPointerMove={move}
-          onPointerUp={() => (drag.current = null)}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setSel(null);
-              setFrom(null);
-            }
-          }}
-        >
-          <defs>
-            <marker
-              id="flow-arrow"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="7"
-              markerHeight="7"
-              orient="auto-start-reverse"
-            >
-              <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
-            </marker>
-          </defs>
-          {draft.edges.map((e) => {
-            const a = node(e.from),
-              b = node(e.to);
-            if (!a || !b) return null;
-            const l = edgeLine(
-              a,
-              b,
-              draft.edges.some((x) => x.from === e.to && x.to === e.from),
-            );
-            const on = sel?.kind === 'edge' && sel.from === e.from && sel.to === e.to;
-            return (
-              <g
-                key={`${e.from}>${e.to}`}
-                className={`flow-edge ${on ? 'on' : ''}`}
-                role="img"
-                aria-label={`${a.name} can move to ${b.name}`}
-                tabIndex={ed ? 0 : undefined}
-                onKeyDown={(k) => k.key === 'Enter' && setSel({ kind: 'edge', ...e })}
-                onClick={() => setSel({ kind: 'edge', ...e })}
-              >
-                <line {...l} className="flow-hit" />
-                <line {...l} className="wf-edge" markerEnd="url(#flow-arrow)" />
-              </g>
-            );
-          })}
-          {draft.nodes.map((n) => {
-            const on = sel?.kind === 'node' && sel.id === n.id;
-            const w = wf.find((x) => x.id === n.id) || { category: n.category };
-            return (
-              <g
-                key={n.id}
-                className={`flow-node ${on ? 'on' : ''} ${from === n.id ? 'from' : ''}`}
-                data-status={n.name}
-                tabIndex={0}
-                role="button"
-                aria-pressed={on}
-                aria-label={`Status ${n.name}`}
-                onPointerDown={(e) => down(e, n)}
-                onKeyDown={(k) => (k.key === 'Enter' || k.key === ' ') && pick(n.id)}
-              >
-                <rect
-                  x={n.x}
-                  y={n.y}
-                  width={NODE_W}
-                  height={NODE_H}
-                  rx={6}
-                  className={`wf-node c-${n.category} ${wCls({ ...w, category: n.category })}`}
-                />
-                <text
-                  x={n.x + NODE_W / 2}
-                  y={n.y + NODE_H / 2 + 4}
-                  textAnchor="middle"
-                  className={`wf-label c-${n.category} ${wCls({ ...w, category: n.category })}`}
-                >
-                  {short((n.name || '…').toUpperCase())}
-                </text>
-                <title>{n.name}</title>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      {!draft.nodes.some((n) => draft.edges.some((e) => e.from === n.id || e.to === n.id)) &&
-        draft.nodes.length > 0 && (
-          <p className="muted small set-note">No transitions yet: every status stands on its own.</p>
+        {ed && <Toolbar x={x} onTidy={onTidy} />}
+        {x.error && (
+          <p className="flow-ui wfc-error" role="alert">
+            <Ico svg={I.warn} />
+            {x.error}
+          </p>
         )}
-      {ed && selNode && (
-        <div className="row" style={{ gap: 6, marginTop: 8 }}>
-          <TF
-            size="small"
-            aria-label="Selected status name"
-            value={selNode.name}
-            onChange={(e: Any) => edit(renameNode(draft, selNode.id, { name: e.target.value }))}
-          />
-          <SF
-            aria-label="Selected status category"
-            value={selNode.category}
-            onChange={(e: Any) => edit(renameNode(draft, selNode.id, { category: e.target.value }))}
-          >
-            {CATEGORIES.map(([v, l]) => (
-              <MenuItem key={v} value={v}>
-                {l}
-              </MenuItem>
-            ))}
-          </SF>
-        </div>
-      )}
-      {free && draft.edges.length > 0 && (
-        <p className="muted small set-note">
-          Transitions are saved with the flow, but moves are only limited to them when Transitions
-          (below) is set to Custom.
-        </p>
-      )}
+        <StatusCanvas x={x} v={v} ptr={ptr} smooth={smooth} />
+        <ZoomControls v={v} reset={false} />
+        {x.free && (
+          <p className="flow-ui wfc-note">
+            {draft.edges.length
+              ? 'Any status can move to any other. Wires are a guide until Transitions is set to Custom.'
+              : 'No transitions yet: any status can move to any other.'}
+          </p>
+        )}
+        {panel && (
+          <Side label={x.adding ? 'Add a status' : 'Details'} onClose={close}>
+            {panel}
+          </Side>
+        )}
+      </div>
     </SetCard>
   );
 }

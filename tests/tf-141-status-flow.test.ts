@@ -12,6 +12,11 @@ import {
   removeEdge,
   checkDraft,
   applyDraft,
+  addAfter,
+  insertOn,
+  settle,
+  tidy,
+  freshName,
 } from '../client/WorkflowEditor/flow-graph';
 import { duplicateStatus } from '../lib/workflow';
 
@@ -108,4 +113,74 @@ test('removing a transition keeps both statuses', () => {
 test('renaming reports what the issues move to', () => {
   const out = applyDraft(wf(), renameNode(toDraft(wf()), 'c', { name: 'Finished' }));
   assert.deepEqual(out.renamed, [{ from: 'Done', to: 'Finished' }]);
+});
+
+const overlaps = (n: { x: number; y: number }[]) =>
+  n.some((a, i) =>
+    n.some((b, j) => j > i && Math.abs(a.x - b.x) < 160 && Math.abs(a.y - b.y) < 160),
+  );
+
+test('layouts saved when nodes were smaller are spread apart, and stay put once saved', () => {
+  const old = Array.from({ length: 7 }, (_, i) => ({
+    id: `s${i}`,
+    name: `S${i}`,
+    category: 'todo',
+    x: 16 + (i % 4) * 202,
+    y: 16 + Math.floor(i / 4) * 78,
+  }));
+  const d = toDraft(old);
+  assert.equal(overlaps(d.nodes), false);
+  assert.deepEqual(toDraft(applyDraft(old, d).workflow), d);
+  const free = { x: 1000, y: 0 };
+  assert.deepEqual(settle(free, d.nodes), free);
+});
+
+test('a status added after another is connected and comes after it on the board', () => {
+  const d = addAfter(toDraft(wf()), 'a', { id: 'n', name: 'Ready', category: 'todo' });
+  assert.ok(d.edges.some((e) => e.from === 'a' && e.to === 'n'));
+  assert.equal(overlaps(d.nodes), false);
+  const names = (x: typeof d) => applyDraft(wf(), x).workflow.map((w) => w.name);
+  assert.deepEqual(names(d), ['To Do', 'Ready', 'In Progress', 'Done']);
+  // one after another new one; and a finished status stays the last column
+  const two = addAfter(d, 'n', { id: 'm', name: 'Queued', category: 'todo' });
+  assert.deepEqual(names(two), ['To Do', 'Ready', 'Queued', 'In Progress', 'Done']);
+  const end = addAfter(toDraft(wf()), 'c', { id: 'n', name: 'Reopened', category: 'todo' });
+  assert.deepEqual(names(end), ['To Do', 'In Progress', 'Reopened', 'Done']);
+});
+
+test('a status added on a transition goes between its two statuses', () => {
+  const d = insertOn(
+    toDraft(wf()),
+    { from: 'b', to: 'c' },
+    { id: 'n', name: 'Review', category: 'inprogress' },
+  );
+  assert.deepEqual(d.edges, [
+    { from: 'a', to: 'b' },
+    { from: 'b', to: 'n' },
+    { from: 'n', to: 'c' },
+  ]);
+  assert.equal(overlaps(d.nodes), false);
+  assert.deepEqual(
+    applyDraft(wf(), d).workflow.map((w) => w.id),
+    ['a', 'b', 'n', 'c'],
+  );
+});
+
+test('color and limit changed on the canvas are saved; untouched ones are kept', () => {
+  let d = renameNode(toDraft(wf()), 'a', { color: null });
+  d = renameNode(d, 'c', { wip: 5, fromAny: true });
+  const out = applyDraft(wf(), d).workflow;
+  assert.equal('color' in out[0], false);
+  assert.equal(out[1].wip, 3);
+  assert.equal(out[2].wip, 5);
+  assert.equal(out[2].fromAny, true);
+});
+
+test('tidy up follows the board order and new names are unique', () => {
+  const d = tidy(toDraft(wf()), ['c', 'b', 'a']);
+  const x = (id: string) => d.nodes.find((n) => n.id === id)!.x;
+  assert.ok(x('c') < x('b') && x('b') < x('a'));
+  const one = addNode(d, 'n', freshName(d));
+  assert.equal(freshName(d), 'New status');
+  assert.equal(freshName(one), 'New status 2');
 });

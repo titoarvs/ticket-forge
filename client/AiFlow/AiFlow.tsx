@@ -7,7 +7,7 @@ import { useState } from 'react';
 import type { Any } from '../core';
 import { Ico, I } from '../ui';
 import type { FlowActions } from './model';
-import { type WireStart, useFlowGraph, buildEdges } from './graph';
+import { type WireStart, useFlowGraph, buildEdges, canWire } from './graph';
 import { makePorts } from './geometry';
 import type { Flow } from './flow';
 import { useRouting } from './use-routing';
@@ -35,7 +35,13 @@ export function AiFlow({ c, actions }: { c: Any; actions: FlowActions }) {
     if (from.kind === 'prov') return providers.setFallback(from.node, target);
     routing.setTaskTier(from.row!, n.kind === 'tier' ? n.data.tier : `cfg:${n.data.id}`);
   };
-  const ptr = usePointer(v, g, { onWire, setSel });
+  const ptr = usePointer<WireStart>(v, {
+    wireFrom: ({ dataset: d }) =>
+      d.row ? { kind: 'task', node: d.node!, row: d.row } : { kind: 'prov', node: d.node! },
+    canWire: (from, target) => canWire(g, from, target),
+    onWire,
+    setSel,
+  });
 
   if (!routing.r)
     return (

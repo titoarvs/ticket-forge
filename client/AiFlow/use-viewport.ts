@@ -4,21 +4,28 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Pt } from './model';
 import { LS, clamp } from './model';
-import type { Graph } from './graph';
 
+/** What the viewport needs to know about a canvas: each node's size and where it starts out. */
+export type CanvasNode = { id: string; w: number; h: number; def: Pt; kind?: string };
+export type CanvasGraph = { nodes: CanvasNode[]; byId: Record<string, CanvasNode> };
 type View = { x: number; y: number; k: number };
 export type Sel = { type: 'node' | 'edge'; id: string } | null;
 
-function readStored() {
+function readStored(store: string | null) {
+  if (!store) return {};
   try {
-    return JSON.parse(localStorage.getItem(LS) || '{}');
+    return JSON.parse(localStorage.getItem(store) || '{}');
   } catch {
     return {};
   }
 }
 
-export function useViewport(g: Graph) {
-  const stored = useMemo(() => readStored(), []);
+/**
+ * `store`: the browser storage key for the layout and view; null keeps neither. `minFit`: how small
+ * fitting everything may make it; what doesn't fit then starts at the left.
+ */
+export function useViewport(g: CanvasGraph, store: string | null = LS, minFit = 0.2) {
+  const stored = useMemo(() => readStored(store), [store]);
   const [pos, setPos] = useState<Record<string, Pt>>(stored.pos || {});
   const [view, setView] = useState<View>(stored.view || { x: 24, y: 24, k: 0.8 });
   const [fitted, setFitted] = useState(Boolean(stored.view));
@@ -30,8 +37,9 @@ export function useViewport(g: Graph) {
   const touched = useRef(Boolean(stored.view));
 
   const persist = (p = pos, v = view) => {
+    if (!store) return;
     try {
-      localStorage.setItem(LS, JSON.stringify({ pos: p, view: v }));
+      localStorage.setItem(store, JSON.stringify({ pos: p, view: v }));
     } catch {
       /* private mode */
     }
@@ -58,7 +66,7 @@ export function useViewport(g: Graph) {
   };
   const fit = () => {
     if (!vp.current || !g.nodes.length) return;
-    const v = fittedView(rectOf(), g, at);
+    const v = fittedView(rectOf(), g, at, minFit);
     setView(v);
     persist(pos, v);
   };
@@ -98,7 +106,7 @@ export function useViewport(g: Graph) {
 export type Viewport = ReturnType<typeof useViewport>;
 
 /** The view that shows every node, leaving room for the toolbar on top and the zoom controls below. */
-function fittedView(b: DOMRect, g: Graph, at: (id: string) => Pt): View {
+function fittedView(b: DOMRect, g: CanvasGraph, at: (id: string) => Pt, minFit: number): View {
   const xs = g.nodes.flatMap((n) => [at(n.id).x, at(n.id).x + n.w]);
   const ys = g.nodes.flatMap((n) => [at(n.id).y, at(n.id).y + n.h]);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -107,18 +115,18 @@ function fittedView(b: DOMRect, g: Graph, at: (id: string) => Pt): View {
   const bottom = 56;
   const k = clamp(
     Math.min((b.width - 48) / (x1 - x0), (b.height - top - bottom) / (y1 - y0)),
-    0.2,
+    minFit,
     1,
   );
   return {
     k,
-    x: (b.width - (x1 - x0) * k) / 2 - x0 * k,
+    x: Math.max((b.width - (x1 - x0) * k) / 2, 24) - x0 * k,
     y: top + (b.height - top - bottom - (y1 - y0) * k) / 2 - y0 * k,
   };
 }
 
 /** Fits the canvas the first time, when it resizes (until you pan or zoom) and on full screen. */
-export function useAutoFit(v: Viewport, g: Graph) {
+export function useAutoFit(v: Viewport, g: CanvasGraph) {
   const { vp, fitted, setFitted, full, touched, fit } = v;
   useEffect(() => {
     if (!fitted && vp.current && g.nodes.length) {
@@ -189,13 +197,27 @@ export function useFullScreenKeys(v: Viewport) {
 
 /**
  * Opening a node's details glides the canvas so the node isn't hidden under the details panel (wide
- * screens). Returns whether the glide animation is running.
+ * screens); closing them glides back, unless you moved the canvas meanwhile. Returns whether the
+ * glide animation is running.
  */
-export function useGlideToSelection(v: Viewport, g: Graph, sel: Sel) {
+export function useGlideToSelection(v: Viewport, g: CanvasGraph, sel: Sel) {
   const [smooth, setSmooth] = useState(false);
+  const back = useRef<{ from: number; to: number; touched: boolean } | null>(null);
   const selId = sel?.type === 'node' ? sel.id : '';
   useEffect(() => {
     const n = g.byId[selId];
+    const b0 = back.current;
+    if (b0 && Math.abs(v.viewRef.current.x - b0.to) > 1) back.current = null;
+    else if (b0 && !selId) {
+      back.current = null;
+      setSmooth(true);
+      v.setView((x) => ({ ...x, x: b0.from }));
+      const t = setTimeout(() => {
+        setSmooth(false);
+        v.touched.current = b0.touched;
+      }, 360);
+      return () => clearTimeout(t);
+    }
     if (!selId || !v.vp.current || !n || n.kind === 'add') return;
     const b = v.rectOf();
     if (b.width < 720) return;
@@ -208,6 +230,11 @@ export function useGlideToSelection(v: Viewport, g: Graph, sel: Sel) {
     if (right > panel - 8) dx = panel - 8 - right;
     if (left + dx < 12) dx = 12 - left;
     if (Math.abs(dx) < 2) return;
+    back.current = {
+      from: back.current?.from ?? view.x,
+      to: view.x + dx,
+      touched: back.current?.touched ?? v.touched.current,
+    };
     v.touched.current = true;
     setSmooth(true);
     v.setView((x) => ({ ...x, x: x.x + dx }));

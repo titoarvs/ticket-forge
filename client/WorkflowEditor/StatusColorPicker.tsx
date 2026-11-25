@@ -33,7 +33,7 @@ export function CommitName({
     />
   );
 }
-const PRESETS = [
+export const PRESETS = [
   '#626f86',
   '#0c66e4',
   '#1d7afc',
