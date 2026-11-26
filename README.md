@@ -58,14 +58,12 @@ This takes about five minutes.
 ### Step 2: get the code
 
 ```bash
-git clone https://github.com/titoarvs/automated-tickets.git
+git clone https://github.com/titoarvs/ticket-forge.git
 ```
 
 ```bash
-cd automated-tickets
+cd ticket-forge
 ```
-
-While the repository is private, your GitHub account needs access to it before you can clone it.
 
 ### Step 3: install the dependencies
 
@@ -247,8 +245,8 @@ To update an existing copy, run `git pull`, then repeat steps 3 and 5.
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), then open an
-[issue](https://github.com/titoarvs/automated-tickets/issues) or a
-[pull request](https://github.com/titoarvs/automated-tickets/pulls).
+[issue](https://github.com/titoarvs/ticket-forge/issues) or a
+[pull request](https://github.com/titoarvs/ticket-forge/pulls).
 
 ## License
 
