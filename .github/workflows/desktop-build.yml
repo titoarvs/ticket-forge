@@ -1,0 +1,82 @@
+# Builds the TicketForge desktop app: a Windows installer (.exe) and macOS disk images (.dmg) for
+# Apple Silicon and Intel Macs. Each is built on its own platform, so the native parts in
+# node_modules (sharp, canvas, the Next.js compiler) match the computer that runs it.
+#
+# It runs on every push that changes the desktop app, from Actions → Desktop build → Run workflow,
+# and on a tag such as v1.0.2, which also attaches the installers to a GitHub release (path filters
+# don't apply to tags). See docs/guide/desktop-app.md.
+name: Desktop build
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'desktop/**'
+      - 'electron-builder.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop-build.yml'
+permissions:
+  contents: write # attach installers to the release on a tag
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            command: npx electron-builder --win --x64 --publish never
+          - os: macos-latest
+            name: mac-arm64
+            command: npx electron-builder --mac --arm64 --publish never
+          - os: macos-15-intel
+            name: mac-x64
+            command: npx electron-builder --mac --x64 --publish never
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the web app
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Package the desktop app
+        run: ${{ matrix.command }}
+        env:
+          # Optional signing. Without these the app is unsigned (macOS: signed ad hoc).
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CSC_LINK != '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TicketForge-${{ matrix.name }}
+          path: |
+            dist-desktop/*.exe
+            dist-desktop/*.dmg
+            dist-desktop/*.zip
+          if-no-files-found: error
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(dist-desktop/*.exe dist-desktop/*.dmg dist-desktop/*.zip)
+          # The three jobs finish at different times; the first one creates the release.
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes 2>/dev/null || true
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber

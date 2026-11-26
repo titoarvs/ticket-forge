@@ -1,0 +1,64 @@
+# Desktop installers for macOS (.dmg) and Windows (.exe). See docs/guide/desktop-app.md.
+# Build on the platform you are packaging for (npm ci installs that platform's native parts):
+#   macOS:   npm run desktop:dist:mac
+#   Windows: npm run desktop:dist:win
+# Or let GitHub Actions build both: .github/workflows/desktop-build.yml
+appId: com.titosolutions.ticketforge
+productName: TicketForge
+copyright: Copyright © 2026 Tito Solutions
+
+directories:
+  output: dist-desktop
+  buildResources: desktop/build
+
+# Next.js reads its build and node_modules from disk and the server starts child processes
+# (Playwright runner, Claude Code) by path, so the app is shipped as plain files, not an asar archive.
+asar: false
+# No native modules need rebuilding for Electron: the ones in use are prebuilt N-API binaries.
+npmRebuild: false
+afterPack: desktop/build/after-pack.cjs
+afterSign: desktop/build/after-sign.cjs
+
+files:
+  - package.json
+  - next.config.mjs
+  - .env.example
+  - desktop/**
+  - lib/**
+  - sample/**
+  - .next/**
+  - '!.next/cache/**'
+  - '!.next/dev/**'
+  - '!.next/trace*'
+  - '!**/*.map'
+  - '!**/{README,CHANGELOG,HISTORY}.md'
+
+mac:
+  category: public.app-category.productivity
+  icon: desktop/build/icon.png
+  target:
+    - target: dmg
+    - target: zip
+  # Not signed unless CSC_LINK / CSC_KEY_PASSWORD are set; see the guide for first-launch steps.
+  hardenedRuntime: true
+  entitlements: desktop/build/entitlements.mac.plist
+  entitlementsInherit: desktop/build/entitlements.mac.plist
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+dmg:
+  title: ${productName} ${version}
+
+win:
+  icon: desktop/build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-${arch}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: TicketForge

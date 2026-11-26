@@ -12,6 +12,7 @@ New here? Start with the [setup steps](../README.md#set-it-up-step-by-step).
 | [AI agents and code](guide/ai-agents-and-code.md) | Agents, code jobs, GitHub connection, pull requests, development order |
 | [AI models and usage](guide/ai-models-and-usage.md) | Model routing, usage and limits, chatbots, MCP server, GitHub Copilot |
 | [Testing](guide/testing.md) | Playwright automation, GitHub Actions runs, test management |
+| [Desktop app](guide/desktop-app.md) | Windows and macOS app: install, data, building the installers |
 | [Plans and billing](guide/billing.md) | Plans, limits, Stripe, PayMongo and Xendit |
 | [Architecture](guide/architecture.md) | Project layout, code layers, Drizzle ORM, performance |
 

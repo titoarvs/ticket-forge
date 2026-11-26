@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>Connect TicketForge</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <main class="card">
+      <div class="brand">
+        <span class="logo"
+          ><svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M8 9h16v4h-6v11h-4V13H8z" fill="#fff" /></svg></span
+        ><span>TicketForge</span>
+      </div>
+      <h1>Connect to your team’s database</h1>
+      <p class="lead">
+        Everyone who uses TicketForge together connects to the same PostgreSQL database. Paste its
+        connection string. It is saved on this computer only.
+      </p>
+
+      <form id="form" autocomplete="off">
+        <label for="url">PostgreSQL connection string</label>
+        <div class="field">
+          <input
+            id="url"
+            type="password"
+            spellcheck="false"
+            placeholder="postgresql://postgres:••••••@xxxx.proxy.rlwy.net:12345/railway"
+            required
+          />
+          <button type="button" class="ghost" id="show" aria-label="Show the connection string">
+            Show
+          </button>
+        </div>
+        <p class="hint">
+          On Railway: open the <b>Postgres</b> service → <b>Variables</b> → copy
+          <b>DATABASE_PUBLIC_URL</b>.
+        </p>
+        <p class="result" id="result" role="status" aria-live="polite"></p>
+        <div class="actions">
+          <button type="button" id="test">Test connection</button>
+          <button type="submit" class="primary" id="connect">Connect</button>
+        </div>
+      </form>
+
+      <div class="divider"><span>or</span></div>
+      <button type="button" class="link" id="local">Use a database on this computer only</button>
+      <p class="hint small">
+        For trying TicketForge alone. Your data stays on this computer and isn’t shared.
+      </p>
+      <p class="current" id="current"></p>
+    </main>
+    <script src="setup.js"></script>
+  </body>
+</html>

@@ -12,6 +12,9 @@ Jira-style workspace. AI agents can also write the code, open pull requests and 
 
 ![The active sprint board, with issues in To Do, In Progress, In Review and Done columns](docs/images/board.png)
 
+> [!TIP]
+> Prefer an app? Install the [desktop app](docs/guide/desktop-app.md) for Windows or macOS: no Node.js or terminal needed.
+
 > [!NOTE]
 > TicketForge runs on your own computer with no database to install and no API key. The AI features need either
 > a signed-in [Claude Code](#step-6-connect-an-ai) or an API key. Everything else works without AI.
@@ -239,6 +242,7 @@ To update an existing copy, run `git pull`, then repeat steps 3 and 5.
 | [AI agents and code](docs/guide/ai-agents-and-code.md) | Agents, code jobs, GitHub, pull requests |
 | [AI models and usage](docs/guide/ai-models-and-usage.md) | Model routing, usage limits, chatbots, MCP server |
 | [Testing](docs/guide/testing.md) | Playwright automation and test management |
+| [Desktop app](docs/guide/desktop-app.md) | Windows and macOS app: install, data, building the installers |
 | [Plans and billing](docs/guide/billing.md) | Plans and payment gateways on a hosted service |
 | [Architecture](docs/guide/architecture.md) | Project layout, code layers, Drizzle, performance |
 | [Ticket layer rules](docs/ticket-layer-rules.md) | Choosing frontend, backend or both for an issue |
