@@ -4,10 +4,25 @@
 import { type Any, api, toast, mutate, logEvent, aiBody, uid, nowIso } from '../../core';
 import type { CodeJobs } from './use-code-jobs';
 import type { PrForm } from './pr-compose';
+import { attachBranch, branchOfJob } from '../../code-review-flow';
+import { doneOnMerge } from '../../codeStatus';
 
 export type PrContext = { t: Any; cj: CodeJobs; form: PrForm; reviewedPr?: Any };
 
 const openInTab = (url: string) => window.open(url, '_blank', 'noopener');
+
+/** The job's branch is on the remote now: attach it to the issue, or mark the attached one pushed. */
+function attachPushedBranch(t: Any, job: Any, pr: Any) {
+  const b = branchOfJob({
+    ...job,
+    status: 'pr',
+    pr,
+    branch: pr.branch || job.branch,
+    base: pr.base || job.base,
+    repo: pr.repo || job.repo,
+  });
+  if (b && attachBranch(t, b) === 'added') logEvent(t, `attached branch ${b.name}`, 'Development');
+}
 /** "!" for a GitLab merge request, "#" for a pull request. */
 export const prMark = (provider?: string) => (provider === 'GitLab' ? '!' : '#');
 export const prNoun = (provider?: string) =>
@@ -72,6 +87,7 @@ export async function pushUpdate({ t, cj, form }: PrContext) {
 function pushedForCompare(t: Any, job: Any, pr: Any) {
   const noun = prNoun(job.provider);
   mutate(() => {
+    attachPushedBranch(t, job, pr);
     logEvent(t, `pushed ${pr.branch} with code written by AI`, 'Development');
   });
   toast(`Pushed ${pr.branch}. Open the ${noun} on ${job.provider || 'GitHub'} to finish.`, 'ok', {
@@ -89,6 +105,7 @@ export async function openPr({ t, cj, form }: PrContext) {
   cj.setJob(r.job);
   if (r.pr.compare) return pushedForCompare(t, job, r.pr);
   mutate(() => {
+    attachPushedBranch(t, job, r.pr);
     t.prs.push({ id: uid(), ...r.pr, checkedAt: nowIso() });
     logEvent(
       t,
@@ -129,7 +146,7 @@ export async function merge({ t, cj }: PrContext) {
   toast(`${r.repo} #${r.pr?.number} is merged.`, 'ok', {
     title: 'Code merged',
     action: r.pr?.url ? { label: 'Open', onClick: () => openInTab(r.pr.url) } : undefined,
-  });
+  });  await doneOnMerge(t);
 }
 
 /** Posts the AI review as a comment on the pull request it reviewed. */

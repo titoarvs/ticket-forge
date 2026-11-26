@@ -16,8 +16,17 @@ function explain(errors: any[]) {
   return new HttpError(502, `GitHub said: ${String(first.message || 'an unknown error')}`);
 }
 
-/** Runs one GraphQL query or mutation and returns its `data`. */
+/** A mutation in a GraphQL document (any operation, after comments are left out). */
+const MUTATION = /(^|[\s}])mutation\b/;
+const isMutation = (query: string) => MUTATION.test(String(query).replace(/#[^\n]*/g, ''));
+
+/**
+ * Runs one GraphQL query and returns its `data`. GraphQL always goes over POST, so this refuses any
+ * document with a mutation: Ticket Forge only reads from GitHub, and nothing here can write to it.
+ */
 export async function gql(token: string, query: string, variables: any = {}) {
+  if (isMutation(query))
+    throw new HttpError(400, 'Ticket Forge only reads from GitHub: GitHub mutations aren’t sent.');
   let res: Response;
   try {
     res = await fetch('https://api.github.com/graphql', {

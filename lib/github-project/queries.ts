@@ -1,4 +1,5 @@
-// The GraphQL documents for GitHub Projects. Each has an operation name (tests route on it).
+// The GraphQL documents for GitHub Projects. Each has an operation name (tests route on it). All
+// are queries: Ticket Forge only reads GitHub Projects (gql() refuses mutations).
 
 const BOARD_FIELDS = `id number title url closed`;
 
@@ -46,20 +47,3 @@ export const ITEMS = `query BoardItems($id: ID!, $after: String) {
     }
   } }
 }`;
-
-export const ADD_ITEM = `mutation AddBoardItem($project: ID!, $content: ID!) {
-  addProjectV2ItemById(input: { projectId: $project, contentId: $content }) { item { id updatedAt } }
-}`;
-
-/** Sets or clears several fields of one item in one request (one aliased mutation per field). */
-export function setFieldsMutation(changes: { fieldId: string; value: any }[]) {
-  const vars = changes.map(
-    (_c, i) => `$f${i}: ID!${changes[i].value ? `, $v${i}: ProjectV2FieldValue!` : ''}`,
-  );
-  const calls = changes.map((c, i) =>
-    c.value
-      ? `s${i}: updateProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $f${i}, value: $v${i} }) { projectV2Item { id } }`
-      : `s${i}: clearProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $f${i} }) { projectV2Item { id } }`,
-  );
-  return `mutation SetBoardFields($project: ID!, $item: ID!, ${vars.join(', ')}) {\n  ${calls.join('\n  ')}\n}`;
-}

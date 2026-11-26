@@ -1,4 +1,5 @@
-// TF-130: import GitHub issues as tickets and keep them in two-way sync. Run with `npm test`.
+// TF-130: import GitHub issues as tickets. Import-only: Import issues and Sync from GitHub read
+// GitHub and never write to it. Run with `npm test`.
 // The tests use the embedded PostgreSQL (PGlite) in a temporary folder, never a real database, and
 // a fake GitHub (fetch is replaced), so nothing leaves this computer. They call the functions the
 // route uses, as the person making the request.
@@ -26,7 +27,8 @@ const member = { id: 'u-member', name: 'Mia Member', workspace_id: WS, is_owner:
 
 // ---------------------------------------------------------------- a fake GitHub
 let issues: any[] = [];
-let patched: any[] = [];
+/** Every request that wasn't a GET: there must never be one. */
+let writes: any[] = [];
 const T = (n: number) => new Date(Date.UTC(2026, 0, 1, 0, n)).toISOString();
 const issue = (number: number, extra: any = {}) => ({
   number,
@@ -47,24 +49,17 @@ const json = (data: any, status = 200) =>
 globalThis.fetch = (async (url: any, init: any = {}) => {
   const u = new URL(String(url));
   const route = u.pathname.slice(1);
+  if ((init.method || 'GET') !== 'GET') {
+    writes.push({ method: init.method, route, body: init.body });
+    return json({ message: 'Ticket Forge must not write to GitHub' }, 405);
+  }
   if (route === `repos/${REPO}`)
     return json({ full_name: REPO, private: true, html_url: `https://github.com/${REPO}` });
-  if (route === `repos/${REPO}/issues` && (init.method || 'GET') === 'GET')
+  if (route === `repos/${REPO}/issues`)
     return json(
       // pull requests come back in this list too: they must be left out
       [...issues, { number: 999, title: 'A pull request', pull_request: {}, state: 'open' }],
     );
-  const m = route.match(new RegExp(`^repos/${REPO}/issues/(\\d+)$`));
-  if (m && init.method === 'PATCH') {
-    const body = JSON.parse(init.body);
-    patched.push({ number: Number(m[1]), body });
-    const i = issues.find((x) => x.number === Number(m[1]));
-    if ('title' in body) i.title = body.title;
-    if ('body' in body) i.body = body.body;
-    if ('state' in body) i.state = body.state;
-    i.updated_at = T(60);
-    return json(i);
-  }
   return json({ message: 'Not Found' }, 404);
 }) as any;
 
@@ -99,7 +94,7 @@ before(async () => {
 });
 beforeEach(async () => {
   issues = [];
-  patched = [];
+  writes = [];
   await D.q("delete from projects where id = 'p1'");
   await D.q(
     "insert into projects (id, name, key, data, created_by, workspace_id) values ('p1','Shop','SH',$1,$2,$3)",
@@ -247,9 +242,9 @@ test('AC4: when both sides changed, the newer change (GitHub) wins and the confl
   assert.ok(entry, 'the ticket activity has a conflict entry');
   assert.match(entry.text, /title \(GitHub won/);
   assert.match(entry.text, /Edited in Ticket Forge/);
-  assert.equal(patched.length, 0);
+  assert.equal(writes.length, 0);
 });
-test('AC4: when the Ticket Forge change is newer it wins, is written to GitHub, and the conflict is recorded', async () => {
+test('AC4: when the Ticket Forge change is newer it is kept in Ticket Forge, GitHub is left alone, and the conflict is recorded', async () => {
   issues = [issue(1)];
   await link();
   await as(() => G.syncIssues(owner, 'p1'));
@@ -259,16 +254,19 @@ test('AC4: when the Ticket Forge change is newer it wins, is written to GitHub, 
   issues[0].updated_at = T(20);
   const r: any = await as(() => G.syncIssues(owner, 'p1', 'sync'));
   assert.equal(r.conflicts, 1);
-  assert.equal(r.pushed, 1);
+  assert.equal(r.pushed, undefined, 'nothing is pushed');
   const [after] = await tickets();
   assert.equal(after.title, 'Edited in Ticket Forge');
-  assert.ok(after.history.some((h: any) => /^Sync conflict.*Ticket Forge won/.test(h.text || '')));
-  assert.equal(issues[0].title, 'Edited in Ticket Forge');
-  // GitHub now has the same title: the next sync finds nothing to do
+  const entry = after.history.find((h: any) => /^Sync conflict/.test(h.text || ''));
+  assert.match(entry.text, /title \(Ticket Forge won; GitHub’s value was “Edited on GitHub”, and GitHub is left as it is\)/);
+  assert.equal(issues[0].title, 'Edited on GitHub');
+  // GitHub's value is the new common ground: the next sync reports no conflict again.
   const again: any = await as(() => G.syncIssues(owner, 'p1', 'sync'));
-  assert.deepEqual([again.conflicts, again.pushed, again.updated], [0, 0, 0]);
+  assert.deepEqual([again.conflicts, again.updated], [0, 0]);
+  assert.equal((await tickets())[0].title, 'Edited in Ticket Forge');
+  assert.equal(writes.length, 0);
 });
-test("two-way sync: a change made only in Ticket Forge is written to GitHub; only GitHub's is copied", async () => {
+test("Sync from GitHub copies GitHub's changes; a change made only in Ticket Forge stays there", async () => {
   issues = [issue(1), issue(2)];
   await link();
   await as(() => G.syncIssues(owner, 'p1'));
@@ -278,8 +276,12 @@ test("two-way sync: a change made only in Ticket Forge is written to GitHub; onl
   issues[1].updated_at = T(11);
   const r: any = await as(() => G.syncIssues(owner, 'p1', 'sync'));
   assert.equal(r.conflicts, 0);
-  assert.equal(issues[0].title, 'Only in Ticket Forge');
-  assert.equal((await tickets())[1].description, 'Only on GitHub');
+  assert.equal(issues[0].title, 'Issue 1', 'GitHub keeps its title');
+  const [a, b] = await tickets();
+  assert.equal(a.title, 'Only in Ticket Forge');
+  assert.equal(b.description, 'Only on GitHub');
+  assert.equal(writes.length, 0);
+  assert.equal((await project()).githubSync.last.mode, 'sync');
 });
 test('an import never writes to GitHub', async () => {
   issues = [issue(1)];
@@ -288,11 +290,11 @@ test('an import never writes to GitHub', async () => {
   const [t] = await tickets();
   await setTicket(t.id, { title: 'Only in Ticket Forge', updatedAt: T(10) });
   await as(() => G.syncIssues(owner, 'p1', 'import'));
-  assert.equal(patched.length, 0);
+  assert.equal(writes.length, 0);
   assert.equal((await tickets())[0].title, 'Only in Ticket Forge');
 });
 
-test('a Jira-style issue from Ticket Forge maps only its description, and a change rewrites the layout', async () => {
+test('a Jira-style issue maps only its description, and a description edited here is never written back', async () => {
   const B = await import('../lib/github-body');
   issues = [
     issue(7, {
@@ -312,8 +314,7 @@ test('a Jira-style issue from Ticket Forge maps only its description, and a chan
   assert.equal(t.description, 'Old text');
   await setTicket(t.id, { description: 'New text', updatedAt: T(30) });
   await as(() => G.syncIssues(owner, 'p1', 'sync'));
-  const body = patched.at(-1).body.body;
-  assert.match(body, /<!-- tf:description -->\nNew text\n<!-- \/tf:description -->/);
-  assert.match(body, /### Description/);
+  assert.equal(writes.length, 0);
+  assert.match(issues[0].body, /<!-- tf:description -->\nOld text\n<!-- \/tf:description -->/);
   assert.equal((await tickets())[0].description, 'New text');
 });

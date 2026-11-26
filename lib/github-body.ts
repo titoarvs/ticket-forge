@@ -1,10 +1,12 @@
-// The body of a GitHub issue filed from Ticket Forge, laid out like a Jira ticket: a summary line
-// (type, priority, points, epic, key), the user story, the description, the acceptance criteria as
-// Given / When / Then, the ticket's pull requests (links) and the test cases.
-// Two-way sync (lib/github-sync.ts) maps the body to the ticket's description, so the description
+// The Ticket Forge layout of a GitHub issue body, like a Jira ticket: a summary line (type,
+// priority, points, epic, key), the user story, the description, the acceptance criteria as
+// Given / When / Then, the ticket's pull requests (links) and the test cases. Earlier versions of
+// Ticket Forge filed issues with this body; the connection is import-only now, so nothing files
+// them any more, but those issues still exist on GitHub.
+// The import (lib/github-sync.ts) maps the body to the ticket's description, so the description
 // sits between hidden markers: descriptionOf() reads just that part back, and the rest of the
 // layout never leaks into the ticket. A body without the markers (an issue written on GitHub) is
-// the description as a whole.
+// the description as a whole. ticketBody() writes the layout (the tests use it to make such bodies).
 
 const OPEN = '<!-- tf:description -->';
 const CLOSE = '<!-- /tf:description -->';

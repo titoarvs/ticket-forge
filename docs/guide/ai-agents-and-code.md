@@ -74,13 +74,17 @@ Project settings → Code & GitHub is organised top to bottom:
    automatically).
 3. **Coding agent**, the **Backend repository** (same three sources) and **CodeRabbit**.
 
-### Import and sync GitHub issues (TF-130)
+### Import GitHub issues (TF-130)
 
 Project settings → Code & GitHub → **GitHub issues** links a GitHub repository to the project and brings its issues in
-as tickets. It signs in to GitHub with the project's existing GitHub connection (Connect GitHub, a saved token or
-`GITHUB_TOKEN`: connect GitHub under Repository setup first). Only the **project owner** (its creator) and the **Super
-Admin** (the workspace owner) can link a repository, import or sync; everyone else sees the link, and the buttons are
-disabled with a permission message (the server refuses as well).
+as tickets. The connection is **import-only**: issues and GitHub Project fields flow from GitHub into Ticket Forge, and
+Ticket Forge never writes anything back to GitHub. It doesn't create, edit, close or reopen GitHub issues, doesn't add
+items to a GitHub Project and doesn't change their fields, whatever happens to a ticket here.
+
+It signs in to GitHub with the project's existing GitHub connection (Connect GitHub, a saved token or `GITHUB_TOKEN`:
+connect GitHub under Repository setup first). A read-only token is enough. Only the **project owner** (its creator) and
+the **Super Admin** (the workspace owner) can link a repository, import or sync; everyone else sees the link, and the
+buttons are disabled with a permission message (the server refuses as well).
 
 - **Link repository** takes `owner/name` (or a github.com address), checks that the connected account can open it and
   saves it on the project (`githubSync`).
@@ -90,19 +94,33 @@ disabled with a permission message (the server refuses as well).
   labels, assignee → assignee (a project member with the same name, otherwise the GitHub login), milestone → epic (an
   epic with that name is created when the project has none), open → the first workflow status, closed → the first
   "done" status.
-- **Sync now** does the same and also writes Ticket Forge's changes (title, description, labels, assignee, status) to
-  GitHub. A field changed on only one side since the last sync is copied across. When both sides changed it, **the newer
-  change wins** (GitHub's *updated* time against the ticket's *updated* time; a tie goes to GitHub) and the ticket's
-  activity gets a *Sync conflict* entry that says which side won and what the other value was. Milestones are read-only:
-  a changed epic isn't written back.
-- Sync runs when someone presses a button (there is no webhook or timer yet). Issues deleted or transferred in GitHub
+- **Sync from GitHub** pulls the latest issues (and the linked GitHub Project) again, exactly like Import issues; the
+  last run is labelled as a sync. A field changed on GitHub since the last import is copied onto the ticket. A field
+  changed only in Ticket Forge stays as it is in Ticket Forge and is not written to GitHub. When both sides changed
+  it, **the newer change wins in Ticket Forge** (GitHub's *updated* time against the ticket's *updated* time; a tie
+  goes to GitHub) and the ticket's activity gets a *Sync conflict* entry that says which side won and what the other
+  value was. If Ticket Forge's change was newer, GitHub keeps its own value.
+- **GitHub Project** (optional): **Choose a GitHub Project** links one of the repository's or its owner's boards. Its
+  Status, Priority, story points (a number field such as *Estimate*) and Sprint (an Iteration field) are imported into
+  the linked tickets on every import or sync, by the same rule. The settings show which board field fills which ticket
+  field, for example "Imports: Status, Priority, Story points ← Estimate". Issues that aren't on the board are left
+  off it; nothing is added to the board. The token needs Projects read access.
+- New tickets, whether made with **Create**, **Write with Claude** or the MCP server, live only in Ticket Forge, even
+  when a repository is linked: no GitHub issue is filed for them.
+- Runs happen when someone presses a button (there is no webhook or timer). Issues deleted or transferred in GitHub
   leave their tickets as they are. GitHub's rate limit stops the run with a message that says when to try again.
+- On the server every GitHub request for issues is a GET, and GitHub Project requests are GraphQL queries: the
+  GraphQL helper refuses mutations. `POST /api/projects/:id/github-sync` accepts `link`, `import`, `sync`, `boards`,
+  `link-board` and `unlink-board`; the former write actions `create-issue` and `push-tickets` answer **410 Gone**.
+- Earlier versions could push tickets to GitHub ("Push N tickets to GitHub"), file a GitHub issue for each new ticket
+  and write changes back on **Sync now**. That is gone. Issues filed back then keep their Ticket Forge layout on GitHub;
+  an import reads only their marked description.
 
 ### Live GitHub Issues and Projects (TF-140)
 
 Project settings → Code & GitHub also has an **Issues** and a **Projects** section. Each reads from the GitHub API
-every time it opens (and on **Refresh**); nothing is copied into the project. They are read-only: creating or editing
-GitHub issues and Projects from Ticket Forge is a follow-up.
+every time it opens (and on **Refresh**); nothing is copied into the project. They are read-only, like the GitHub
+issues import: Ticket Forge doesn't create or edit GitHub issues or Projects.
 
 - **Issues** lists the repository's most recent issues (up to 100, pull requests left out). **Projects** lists the open
   GitHub Projects of the repository and its owner (GraphQL API; the token needs Projects access).
@@ -271,11 +289,28 @@ merged or committed) has **Write code with AI** disabled and a **View code** but
 start a second job for it (discard the code first to start over). Local jobs (Claude Code on this computer) have no
 approval step.
 
-**Done on code completion.** When a code job finishes with code for an issue (ready for review, committed or in a
-pull request) while the project is open, the issue moves to the workflow's *Done* status by itself, from any status
-including custom ones, with no approval step. An issue that is already done stays done, and an issue whose job failed,
-was stopped or is still running keeps its status. If the change can't be saved (for example the server is unreachable)
-the issue keeps its old status and an error is shown. It needs the *Edit issues* permission.
+**In Review on code completion.** When a code job finishes with code for an issue (ready for review, committed or in a
+pull request) while the project is open, the issue moves to the workflow's review status by itself (*In Review*, else
+another in-progress status named like "review"), from any status before it including custom ones, with no approval
+step. An issue that is already in review, further along (QA, say) or done keeps its status, and so does an issue whose
+job failed, was stopped or is still running. A workflow without a review status leaves the status alone.
+
+**Done on merge.** When the issue's pull request is merged, the issue moves to the workflow's *Done* status (else its
+first status in the done category), from any status including custom ones. That happens when you merge it from
+TicketForge (**Approve and merge**) and when a refresh reads it as merged on GitHub or GitLab (**Refresh status** on the
+issue, or the Pull requests page). An issue with several pull requests (frontend and backend, say) waits until none is
+still open, a draft, or a pushed branch without its request; declined ones don't count. An issue that is already in a
+done status stays where it is.
+
+The job's **branch is attached to the issue** at the same time (`ticket.branches`: name, base branch, repository,
+frontend or backend), and the issue's activity says so. The issue panel's **Development** section lists it: a branch
+still only on this computer is shown as *local branch, not pushed yet*; once it is pushed (the pull request is opened,
+or the job ran on GitHub Actions) it links to the branch on GitHub. An issue built in both repositories gets both
+branches. **×** removes a branch from the issue (the branch itself is kept). Nothing is written to the GitHub issue.
+
+If either change can't be saved (for example the server is unreachable) the issue keeps its old status and branches and
+an error is shown. Both need the *Edit issues* permission and happen in the browser of whoever has the project open.
+The rules are in `client/code-review-flow.ts`.
 
 Set up once per project in **Project settings → Code & GitHub**:
 - **Local folder**: a clone of the project's GitHub repository on the computer running TicketForge. **Browse…** opens a

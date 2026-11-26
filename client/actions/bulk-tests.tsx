@@ -27,6 +27,7 @@ import {
   setField,
 } from '../core';
 import { askFirst } from '../Clarify';
+import { doneOnMerge } from '../codeStatus';
 import { Modal } from '../ui';
 import { TF, SF, MenuItem, DateF, TA } from '../fields';
 
@@ -181,6 +182,7 @@ export async function refreshPr(t: Any, prId: string, { quiet = false } = {}) {
         );
       return false;
     }
+    const nowMerged = info.status === 'Merged' && r.status !== 'Merged';
     mutate(
       () => {
         if (info.status !== r.status)
@@ -194,6 +196,8 @@ export async function refreshPr(t: Any, prId: string, { quiet = false } = {}) {
       { tag: `pr.${r.id}` },
     );
     if (!quiet) toast(`${info.title}: ${info.status}`);
+    // Merged since it was last read: the issue moves to Done once none of its requests is open.
+    if (nowMerged) await doneOnMerge(t, { quiet });
     return true;
   } catch (err: Any) {
     if (!quiet) toast(err.message, 'err');

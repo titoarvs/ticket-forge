@@ -1,11 +1,11 @@
 // TF-132: create an issue from the project workspace (by hand or from AI output), write it to the
-// activity log and notify the project's members.
+// activity log and notify the project's members. The issue lives only in Ticket Forge: a linked
+// GitHub repository is import-only, so no GitHub issue is filed (lib/github-sync.ts).
 import { q, tx } from './db';
 import { HttpError, listUsers } from './auth';
 import { requireAccess, requirePerm, noteVersion, canAccess } from './store';
 import { notify } from './notify';
 import { uid } from './model';
-import { createGithubIssue } from './github-sync';
 
 export const ISSUE_TYPES = ['Story', 'Task', 'Bug', 'Spike'];
 const PRIORITIES = ['Highest', 'High', 'Medium', 'Low'];
@@ -40,8 +40,7 @@ function planning(input: any, data: any) {
 /**
  * Creates one issue at the end of a project's backlog as `user`. input: { title, description, type,
  * status, attachments: [file id], epicId, sprintId, priority, storyPoints, assignee,
- * descriptionRich }. When the project has a GitHub repository linked, the GitHub issue is filed
- * too and linked to the ticket.
+ * descriptionRich }. Nothing is written to GitHub, even when the project has a repository linked.
  */
 export async function createProjectIssue(user: any, projectId: string, input: any) {
   requireAccess(user, projectId);
@@ -65,10 +64,6 @@ export async function createProjectIssue(user: any, projectId: string, input: an
     .filter((x: string) => /^\w{1,40}$/.test(x))
     .slice(0, 20);
   const wanted = String(input?.status ?? '').trim();
-
-  // TF-134: with a repository linked, file the GitHub issue first, so a GitHub failure leaves no
-  // ticket behind. Without one the ticket is only in Ticket Forge.
-  const github = await createGithubIssue(projectId, { ...bodyFields(input, title), type });
 
   const out = await tx(async (t) => {
     const pr = (
@@ -126,7 +121,6 @@ export async function createProjectIssue(user: any, projectId: string, input: an
       ],
       createdAt: now,
       updatedAt: now,
-      ...(github ? { github } : {}),
     };
     await t.query(
       'insert into issues (project_id, id, position, data, updated_by, updated_at, rev) values ($1,$2,$3,$4,$5,now(),$6)',
@@ -167,56 +161,6 @@ export async function createProjectIssue(user: any, projectId: string, input: an
     console.error('issue-created notifications failed', e);
   }
   return { issue: out.issue };
-}
-
-const strings = (v: any) =>
-  (Array.isArray(v) ? v : [])
-    .map((x: any) => String(x ?? '').trim())
-    .filter(Boolean)
-    .slice(0, 30);
-
-/** The ticket fields the GitHub issue body shows (lib/github-body.ts), checked and capped. */
-function bodyFields(input: any, title: string) {
-  const s = (v: any, max: number) =>
-    String(v ?? '')
-      .trim()
-      .slice(0, max);
-  const points = Number(input?.storyPoints);
-  return {
-    title,
-    description: s(input?.description, 20000),
-    userStory: s(input?.userStory, 2000),
-    acceptanceCriteria: strings(input?.acceptanceCriteria).map((c) => c.slice(0, 1000)),
-    testCases: (Array.isArray(input?.testCases) ? input.testCases : [])
-      .slice(0, 30)
-      .map((tc: any) => ({
-        title: s(tc?.title, 300),
-        type: s(tc?.type, 40),
-        steps: strings(tc?.steps).map((x) => x.slice(0, 500)),
-        expected: s(tc?.expected, 1000),
-      })),
-    type: s(input?.type, 20),
-    priority: PRIORITIES.includes(input?.priority) ? input.priority : '',
-    storyPoints: points > 0 && points <= 1000 ? points : null,
-    epicId: input?.epicId ?? null,
-    sprintId: input?.sprintId ?? null,
-    status: s(input?.status, 60),
-    key: s(input?.key, 30),
-  };
-}
-
-/**
- * TF-134 for issues written in the browser (Write issue with AI): files the GitHub issue for a
- * ticket about to be created, when the project has a repository linked. Returns { github }, the
- * link to put on the ticket (null when no repository is linked).
- */
-export async function fileGithubIssue(user: any, projectId: string, input: any) {
-  requireAccess(user, projectId);
-  requirePerm(user, 'issue.create');
-  const title = String(input?.title ?? '').trim();
-  if (!title) throw new HttpError(400, 'Title is required.');
-  if (title.length > 200) throw new HttpError(400, 'Title must be at most 200 characters.');
-  return { github: await createGithubIssue(projectId, bodyFields(input, title)) };
 }
 
 export async function projectExists(id: string) {

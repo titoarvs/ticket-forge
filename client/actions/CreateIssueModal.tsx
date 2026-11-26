@@ -23,7 +23,6 @@ import {
   api,
   aiBody,
   applyAi,
-  pullRemote,
 } from '../core';
 import { askFirst } from '../Clarify';
 import { Modal } from '../ui';
@@ -32,50 +31,8 @@ import { type RichValue, RichTextField } from '../CommentEditor';
 import { openDrawer } from './move-ticket';
 
 // ---------------------------------------------------------------- create issue
-/**
- * A project with a GitHub repository linked creates the issue on the server, which files the
- * GitHub issue first and links it (TF-134); a GitHub problem leaves no ticket and shows why.
- * Returns the new ticket, or null when it failed.
- */
-async function createWithGithub(fields: Any) {
-  try {
-    const r = await api(`/api/projects/${encodeURIComponent(P().id)}/issues`, {
-      method: 'POST',
-      body: fields,
-    });
-    await pullRemote({ quiet: true });
-    if (fields.assignee) mutate(() => addMember(fields.assignee));
-    return r.issue;
-  } catch (e: Any) {
-    toast(e.message, 'err');
-    return null;
-  }
-}
-
-/**
- * For tickets made in the browser: files their GitHub issue first when the project has a
- * repository linked (TF-134), laid out like the ticket (user story, description, Given / When /
- * Then criteria, test cases). Returns the link for `ticket.github`, null when no repository is
- * linked; throws (with GitHub's reason) when it couldn't be filed.
- */
-export async function githubIssueFor(t: Any) {
-  if (!P().githubSync?.repo) return null;
-  const body = {
-    action: 'create-issue',
-    ...pickFields(t, ['key', 'title', 'description', 'userStory', 'acceptanceCriteria']),
-    ...pickFields(t, ['type', 'priority', 'storyPoints', 'epicId', 'sprintId', 'status']),
-    testCases: (t.testCases || []).map((tc: Any) =>
-      pickFields(tc, ['title', 'type', 'steps', 'expected']),
-    ),
-  };
-  const r = await api(`/api/projects/${encodeURIComponent(P().id)}/github-sync`, {
-    method: 'POST',
-    body,
-  });
-  return r.github || null;
-}
-const pickFields = (o: Any, keys: string[]) =>
-  Object.fromEntries(keys.filter((k) => o?.[k] != null).map((k) => [k, o[k]]));
+// Tickets are created only in Ticket Forge. A linked GitHub repository is import-only, so no GitHub
+// issue is filed for a new ticket (lib/github-sync.ts).
 
 export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
   const p = P();
@@ -95,8 +52,6 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
   const set = (k: string) => (e: Any) =>
     setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const isEpic = f.type === 'Epic';
-  const linked = Boolean(p.githubSync?.repo);
-  const [busy, setBusy] = useState(false);
   const fields = () => ({
     title: f.title.trim(),
     type: f.type,
@@ -108,8 +63,8 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
     storyPoints: f.storyPoints === '' ? null : Number(f.storyPoints),
     assignee: f.assignee.trim(),
   });
-  const create = async () => {
-    if (!f.title.trim() || busy) return;
+  const create = () => {
+    if (!f.title.trim()) return;
     let created: Any;
     if (isEpic) {
       created = {
@@ -120,11 +75,6 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
         color: COLORS[P().epics.length % COLORS.length],
       };
       mutate((pp) => pp.epics.push(created));
-    } else if (linked) {
-      setBusy(true);
-      created = await createWithGithub(fields());
-      setBusy(false);
-      if (!created) return;
     } else {
       created = newTicket(fields());
       mutate((pp) => {
@@ -132,8 +82,7 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
         addMember(f.assignee);
       });
     }
-    const gh = created.github?.number ? ` and GitHub issue #${created.github.number}` : '';
-    toast(`Created ${created.key}${gh}`);
+    toast(`Created ${created.key}`);
     if (f.another) {
       setF({ ...f, title: '', description: '' });
       setRich(null);
@@ -141,9 +90,7 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
       return;
     }
     closeModal();
-    // A ticket made on the server shows once this browser has it (it may come with the next sync).
-    if (isEpic || P().tickets.some((t: Any) => t.id === created.id))
-      openDrawer(isEpic ? 'epic' : 'issue', created.id);
+    openDrawer(isEpic ? 'epic' : 'issue', created.id);
   };
   const withClaude = () => {
     const idea = [f.title.trim(), f.description.trim()].filter(Boolean).join('\n');
@@ -176,10 +123,10 @@ export function CreateIssueModal({ epicId = '' }: { epicId?: string }) {
           hidden: isEpic || !can('ai.use'),
         },
         {
-          label: busy ? 'Creating…' : 'Create',
+          label: 'Create',
           kind: 'primary',
           onClick: create,
-          disabled: !f.title.trim() || busy,
+          disabled: !f.title.trim(),
         },
       ]}
     >
@@ -328,21 +275,12 @@ export async function writeWithClaude({
   if (!res) return;
   const nt = applyAi(newTicket({ ...fields }), res.ticket);
   if (type) nt.type = type;
-  // With a repository linked the GitHub issue comes first: if it can't be filed, no ticket is made.
-  try {
-    const github = await githubIssueFor(nt);
-    if (github) nt.github = github;
-  } catch (e: Any) {
-    toast(`Not created: ${e.message}`, 'err');
-    return;
-  }
   mutate((p) => {
     p.tickets.push(nt);
     addMember(fields.assignee);
   });
   openDrawer('issue', nt.id);
-  const gh = nt.github?.number ? ` and GitHub issue #${nt.github.number}` : '';
-  toast(`Claude created ${nt.key}${gh}`);
+  toast(`Claude created ${nt.key}`);
 }
 export function NewWithClaudeModal({ epicId = '' }: { epicId?: string }) {
   const p = P();

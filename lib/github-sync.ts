@@ -1,18 +1,23 @@
-// TF-130: import GitHub issues as tickets and keep them in two-way sync (Project settings → Code &
-// GitHub → GitHub issues). Only the project's owner and the Super Admin (the workspace owner) can
-// link a repository or run an import / sync.
+// TF-130: import GitHub issues as tickets (Project settings → Code & GitHub → GitHub issues). The
+// connection is import-only: issues and GitHub Project fields flow from GitHub into Ticket Forge,
+// and Ticket Forge never writes anything back to GitHub (no issue created, edited or closed, no
+// Project item added or changed). Only the project's owner and the Super Admin (the workspace
+// owner) can link a repository or run an import.
 // - GitHub sign-in is the one the project already has (Connect GitHub, a saved token or GITHUB_TOKEN).
+// - Every request to GitHub here is a GET (gh() below takes no method), so no code path in this file
+//   can write to GitHub.
 // - A ticket remembers its GitHub issue in `ticket.github` ({ repo, number, … }): the external key
-//   used to match on re-import, plus a snapshot (`base`) of the mapped fields as of the last sync.
+//   used to match on re-import, plus a snapshot (`base`) of the mapped fields as of the last import.
 // - Mapping: title → title, body → description, labels → labels, assignee → assignee, milestone →
 //   epic (created when missing), open / closed → the project's first / "done" workflow status.
-//   An issue filed from Ticket Forge has a Jira-style body (lib/github-body.ts): only its marked
-//   description part maps to the ticket, and a description change rewrites the whole layout.
-// - Conflicts: a field changed on both sides since the last sync takes the newer side's value
-//   (GitHub's updated_at against the ticket's updatedAt; a tie goes to GitHub) and the ticket's
-//   activity gets a "Sync conflict" entry. Fields changed on one side only are copied across.
-// - GitHub Project board (when one is linked): Status, Priority, story points and Sprint ↔
-//   Iteration sync the same way, after the issues (lib/github-project/).
+//   An issue with a Ticket Forge layout in its body (lib/github-body.ts) maps only its marked
+//   description part to the ticket.
+// - Changes: a field changed on GitHub since the last import is copied onto the ticket. A field
+//   changed in Ticket Forge only stays as it is in Ticket Forge (it is never written to GitHub). A
+//   field changed on both sides takes the newer side's value (GitHub's updated_at against the
+//   ticket's updatedAt; a tie goes to GitHub) and the ticket's activity gets a "Sync conflict" entry.
+// - GitHub Project board (when one is linked): Status, Priority, story points and Sprint ← Iteration
+//   are read the same way, after the issues (lib/github-project/).
 // Out of scope: pull requests, comments, other hosts, and issues deleted or transferred in GitHub
 // (their tickets are left as they are).
 import { q, tx } from './db';
@@ -22,19 +27,16 @@ import { statsOf } from './store/create-project';
 import { insertVersions } from './store/patch-project';
 import { EPIC_COLORS, uid } from './model';
 import { getProjectSecret } from './secrets';
-import { ticketBody, descriptionOf, isTicketBody, type TicketForBody } from './github-body';
-import { syncBoard, addToBoard } from './github-project/sync';
+import { descriptionOf } from './github-body';
+import { syncBoard } from './github-project/sync';
 
 export const ONLY_OWNERS =
   'Only the project owner or a Super Admin can link a GitHub repository or import from GitHub.';
 const REPO_RE = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
-const LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const PAGE = 100;
 /** The most issues one import reads (20 pages of 100): the rest is reported as `truncated`. */
 export const MAX_PAGES = 20;
 const FIELDS = ['title', 'description', 'labels', 'assignee', 'milestone', 'state'];
-/** The fields a change in Ticket Forge writes back to GitHub (milestones are read-only). */
-const PUSHABLE = ['title', 'description', 'labels', 'assignee', 'state'];
 const FIELD_LABEL = {
   title: 'title',
   description: 'description',
@@ -51,17 +53,16 @@ const DEFAULT_WORKFLOW = [
 ];
 
 // ---------------------------------------------------------------- GitHub
-export async function gh(path: string, token: string,{ method = 'GET', body }: any = {}) {
+/** A GET request to GitHub's REST API. It has no method or body on purpose: it can only read. */
+export async function gh(path: string, token: string) {
   const res = await fetch(`https://api.github.com/${path}`, {
-    method,
+    method: 'GET',
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
       'User-Agent': 'TicketForge',
       'X-GitHub-Api-Version': '2022-11-28',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(20000),
   });
   if (res.ok) return { data: await res.json(), more: /rel="next"/.test(res.headers.get('link') || '') };
@@ -107,7 +108,6 @@ const fromGithub = (i: any) => ({
   updatedAt: i.updated_at || '',
   title: clean(i.title),
   description: descriptionOf(i.body),
-  formatted: isTicketBody(i.body),
   labels: (i.labels || []).map((l: any) => clean(typeof l === 'string' ? l : l?.name)).filter(Boolean),
   assigneeLogin: i.assignee?.login || i.assignees?.[0]?.login || '',
   milestone: clean(i.milestone?.title),
@@ -135,16 +135,16 @@ function ticketValues(d: any, epics: any[], wf: any[]) {
   };
 }
 /**
- * What to do with one linked ticket: the fields to copy from GitHub (`apply`), the ones to write to
- * GitHub (`push`) and the fields both sides changed (`conflicts`, each decided by the newer side).
- * `base` is what both sides had at the last sync.
+ * What to do with one linked ticket: the fields to copy from GitHub (`apply`) and the fields both
+ * sides changed (`conflicts`, each decided by the newer side). A field changed only in Ticket Forge,
+ * or a conflict Ticket Forge's newer change won, is left as it is in Ticket Forge: nothing is ever
+ * written to GitHub. `base` is what GitHub had at the last import.
  */
 type PlanInput = { tf: any; base: any; gh: any; tfTime: number; ghTime: number };
 /** planSync's rule for any set of fields (the GitHub Project board uses it too). */
-export function planFields(fields: string[], pushable: string[], v: PlanInput) {
+export function planFields(fields: string[], v: PlanInput) {
   const { tf, base, gh, tfTime, ghTime } = v;
   const apply: any = {},
-    push: any = {},
     conflicts: any[] = [];
   for (const f of fields) {
     if (same(f, tf[f], gh[f])) continue;
@@ -154,14 +154,12 @@ export function planFields(fields: string[], pushable: string[], v: PlanInput) {
       const github = ghTime >= tfTime;
       conflicts.push({ field: f, winner: github ? 'GitHub' : 'Ticket Forge', tf: tf[f], gh: gh[f] });
       if (github) apply[f] = gh[f];
-      else if (pushable.includes(f)) push[f] = tf[f];
     } else if (ghChanged) apply[f] = gh[f];
-    else if (tfChanged && pushable.includes(f)) push[f] = tf[f];
   }
-  return { apply, push, conflicts };
+  return { apply, conflicts };
 }
 export function planSync(tf: any, base: any, gh: any, tfTime: number, ghTime: number) {
-  return planFields(FIELDS, PUSHABLE, { tf, base, gh, tfTime, ghTime });
+  return planFields(FIELDS, { tf, base, gh, tfTime, ghTime });
 }
 const clip = (v: any) => {
   const s = Array.isArray(v) ? v.join(', ') : String(v ?? '');
@@ -172,28 +170,10 @@ const conflictText = (conflicts: any[], tfTime: number, ghTime: number) => {
   return `Sync conflict: ${conflicts
     .map(
       (c) =>
-        `${FIELD_LABEL[c.field]} (${c.winner} won; ${c.winner === 'GitHub' ? `Ticket Forge’s value was “${clip(c.tf)}”` : `GitHub’s value was “${clip(c.gh)}”`})`,
+        `${FIELD_LABEL[c.field]} (${c.winner} won; ${c.winner === 'GitHub' ? `Ticket Forge’s value was “${clip(c.tf)}”` : `GitHub’s value was “${clip(c.gh)}”, and GitHub is left as it is`})`,
     )
     .join('; ')}. Both sides changed it; the newer change wins (GitHub ${when(ghTime)}, Ticket Forge ${when(tfTime)}).`;
 };
-/** The login to assign on GitHub for a ticket's assignee, or null when it isn't a GitHub login. */
-const loginOf = (assignee: string) => {
-  const s = String(assignee || '').trim().replace(/^@/, '');
-  return LOGIN_RE.test(s) ? s : null;
-};
-const pushBody = (fields: any) => {
-  const b: any = {};
-  if ('title' in fields) b.title = fields.title;
-  if ('description' in fields) b.body = fields.description;
-  if ('labels' in fields) b.labels = fields.labels;
-  if ('state' in fields) b.state = fields.state;
-  if ('assignee' in fields) {
-    const login = loginOf(fields.assignee);
-    if (login || !fields.assignee) b.assignees = login ? [login] : [];
-  }
-  return b;
-};
-
 // ---------------------------------------------------------------- permission and token
 /**
  * The project with its repository link ({ repo, url, private, linkedAt, linkedBy, lastSyncAt, last }
@@ -220,82 +200,6 @@ export async function tokenFor(projectId: string) {
     );
   return token;
 }
-/**
- * TF-134: files a GitHub issue for a new ticket in the project's linked repository. Returns the
- * `ticket.github` link, or null when the project has no repository linked (the ticket then lives
- * only in Ticket Forge). Throws HttpError with a readable message when a linked repository can't
- * be used.
- */
-export async function createGithubIssue(
-  projectId: string,
-  ticket: TicketForBody & { epicId?: any; sprintId?: any; status?: string; labels?: string[] },
-) {
-  const pr = (
-    await q('select data from projects where id = $1 and archived_at is null', [projectId])
-  ).rows[0];
-  const repo = pr?.data?.githubSync?.repo;
-  if (!repo) return null;
-  const title = clean(ticket.title);
-  const epic = (pr.data.epics || []).find((e: any) => e.id === ticket.epicId)?.title || '';
-  const token = (await getProjectSecret(projectId, 'githubToken')) || process.env.GITHUB_TOKEN || '';
-  if (!token)
-    throw new HttpError(
-      400,
-      'GitHub connection missing: add a personal access token in settings (Project settings → Code & GitHub) to create tickets.',
-    );
-  // Labels go with the issue so both sides start equal; a Done ticket's issue is closed right away.
-  const labels = (ticket.labels || []).map(clean).filter(Boolean).slice(0, 20);
-  const done = workflowOf(pr.data).find((w: any) => w.name === ticket.status)?.category === 'done';
-  let data: any;
-  try {
-    ({ data } = await gh(`repos/${repo}/issues`, token, {
-      method: 'POST',
-      body: { title, body: ticketBody(ticket, epic), ...(labels.length ? { labels } : {}) },
-    }));
-  } catch (e: any) {
-    if (e instanceof HttpError) {
-      if (e.status === 400) throw new HttpError(400, `GitHub connection problem: ${e.message}`);
-      throw e;
-    }
-    throw new HttpError(504, 'GitHub connection problem: GitHub didn’t respond. Try again.');
-  }
-  // The issue exists now: a failed close mustn't lose it (the next sync closes it).
-  if (done)
-    data = await gh(`repos/${repo}/issues/${data.number}`, token, {
-      method: 'PATCH',
-      body: { state: 'closed', state_reason: 'completed' },
-    })
-      .then((r) => r.data)
-      .catch(() => data);
-  const g: any = fromGithub(data);
-  const now = new Date().toISOString();
-  // The linked GitHub Project board gets the issue with the ticket's status, priority, points and
-  // sprint. The issue already exists, so a board problem doesn't stop the ticket: the next sync
-  // adds it.
-  let board: any = null;
-  if (pr.data.githubSync?.project?.id && g.nodeId)
-    board = await addToBoard(token, pr.data.githubSync.project.id, g.nodeId, ticket, pr.data).catch(
-      () => null,
-    );
-  return {
-    repo,
-    number: g.number,
-    nodeId: g.nodeId,
-    url: g.url,
-    updatedAt: g.updatedAt,
-    syncedAt: now,
-    base: {
-      title: g.title,
-      description: g.description,
-      labels: g.labels,
-      assignee: '',
-      milestone: '',
-      state: g.state,
-    },
-    ...(board ? { board } : {}),
-  };
-}
-
 // ---------------------------------------------------------------- link a repository
 /** "owner/name" from that or a github.com address. */
 export function parseRepo(input: any) {
@@ -343,9 +247,10 @@ export async function linkRepo(user: any, projectId: string, input: any) {
 
 // ---------------------------------------------------------------- import and sync
 /**
- * Reads every issue of the linked repository and creates or updates its tickets. mode 'import' only
- * changes tickets; mode 'sync' also writes the Ticket Forge side of the changes back to GitHub.
- * Returns { total, created, updated, unchanged, conflicts, epicsCreated, pushed, errors, truncated }.
+ * Reads every issue of the linked repository (and the linked GitHub Project board) and creates or
+ * updates its tickets. Both modes only read from GitHub: 'import' is Import issues and 'sync' is
+ * Sync from GitHub in the settings, and they differ only in how the last run is labelled.
+ * Returns { total, created, updated, unchanged, conflicts, epicsCreated, errors, truncated }.
  */
 export async function syncIssues(user: any, projectId: string, mode: 'import' | 'sync' = 'import') {
   const project = await openProject(user, projectId);
@@ -354,7 +259,6 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
   if (!link?.repo) throw new HttpError(400, 'Link a GitHub repository first.');
   const token = await tokenFor(projectId);
   const { issues, truncated } = await fetchIssues(link.repo, token);
-  const pushes: any[] = [];
   const result: any = {
     total: issues.length,
     created: 0,
@@ -362,13 +266,11 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
     unchanged: 0,
     conflicts: 0,
     epicsCreated: [] as string[],
-    pushed: 0,
     errors: [] as string[],
     truncated,
   };
 
   const version = await tx(async (t) => {
-    pushes.length = 0;
     // The project row first (the same order as every other save): it holds the project's lock.
     const pr = (
       await t.query(
@@ -492,17 +394,12 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
         });
       }
       // What GitHub looks like now becomes the new common ground; whatever Ticket Forge still
-      // differs in is written to GitHub next (sync) or at the next sync (import).
+      // differs in stays in Ticket Forge only.
       const stale =
         JSON.stringify(d.github.base) !== JSON.stringify(mapped) ||
         d.github.updatedAt !== g.updatedAt ||
         d.github.nodeId !== g.nodeId;
       d.github = { ...d.github, ...meta() };
-      // A Jira-style body is rewritten whole, so the layout stays around the new description.
-      if ('description' in plan.push && g.formatted)
-        plan.push.description = ticketBody(d, epics.find((e) => e.id === d.epicId)?.title || '');
-      if (Object.keys(plan.push).length && mode === 'sync')
-        pushes.push({ id: d.id, key: d.key, number: g.number, fields: plan.push });
       if (applied.length || plan.conflicts.length || stale) {
         rows.push({ id: d.id, pos: row.position, data: d });
         if (row.data.status !== d.status) moved.push({ id: d.id, data: d });
@@ -537,7 +434,7 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
         epicsChanged ? JSON.stringify(statsOf({ epics })) : null,
       ],
     );
-    const summary = `${mode === 'sync' ? 'synced' : 'imported'} GitHub issues from ${link.repo}: ${result.created} new, ${result.updated} updated, ${result.unchanged} unchanged${result.conflicts ? `, ${result.conflicts} conflict${result.conflicts === 1 ? '' : 's'}` : ''}`;
+    const summary = `${mode === 'sync' ? 'synced from GitHub' : 'imported GitHub issues from'} ${link.repo}: ${result.created} new, ${result.updated} updated, ${result.unchanged} unchanged${result.conflicts ? `, ${result.conflicts} conflict${result.conflicts === 1 ? '' : 's'}` : ''}`;
     const list = [{ kind: 'project', target: '', text: summary }, ...events].slice(0, 25);
     await t.query(
       `insert into activity (project_id, version, user_id, author, kind, target, text)
@@ -547,83 +444,13 @@ export async function syncIssues(user: any, projectId: string, mode: 'import' | 
     return pr.version;
   });
   noteVersion(projectId, version);
-  if (pushes.length) await pushToGithub(user, projectId, link, token, pushes, result);
   if (link.project?.id) {
-    const plan = (v: PlanInput, fields: string[]) => planFields(fields, fields, v);
+    const plan = (v: PlanInput, fields: string[]) => planFields(fields, v);
     try {
-      await syncBoard({ user, projectId, link, token, mode, plan }, result);
+      await syncBoard({ user, projectId, link, token, plan }, result);
     } catch (e: any) {
       result.errors.push(`GitHub Project: ${e.message}`);
     }
   }
   return result;
-}
-
-/**
- * Writes Ticket Forge's side of the changes to GitHub, then records what GitHub now has as the
- * common ground. A failed issue is reported and tried again at the next sync.
- */
-async function pushToGithub(user: any, projectId: string, link: any, token: string, pushes: any[], result: any) {
-  const done: any[] = [];
-  for (const p of pushes) {
-    const body = pushBody(p.fields);
-    if (!Object.keys(body).length) continue;
-    try {
-      const { data } = await gh(`repos/${link.repo}/issues/${p.number}`, token, { method: 'PATCH', body });
-      done.push({ id: p.id, issue: fromGithub(data) });
-      result.pushed++;
-    } catch (e: any) {
-      result.errors.push(`${p.key}: ${e.message}`);
-      if (e.status === 429) break; // the rest would be refused too
-    }
-  }
-  if (!done.length && !result.errors.length) return;
-  const version = await tx(async (t) => {
-    const pr = (
-      await t.query(
-        'update projects set version = version + 1, updated_at = now() where id = $1 and archived_at is null returning version, data',
-        [projectId],
-      )
-    ).rows[0];
-    if (!pr) return null;
-    const members: any[] = Array.isArray(pr.data?.members) ? pr.data.members : [];
-    const person = (login: string) =>
-      members.find((m) => String(m?.name || '').toLowerCase() === login.toLowerCase())?.name || login;
-    const now = new Date().toISOString();
-    for (const x of done) {
-      const g: any = x.issue;
-      const row = (
-        await t.query('select data from issues where project_id = $1 and id = $2', [projectId, x.id])
-      ).rows[0];
-      if (!row) continue;
-      const base = {
-        title: g.title,
-        description: g.description,
-        labels: g.labels,
-        assignee: g.assigneeLogin ? person(g.assigneeLogin) : '',
-        milestone: g.milestone,
-        state: g.state,
-      };
-      const d = { ...row.data, github: { ...row.data.github, updatedAt: g.updatedAt, syncedAt: now, base } };
-      await t.query(
-        'update issues set data = $3, updated_by = $4, updated_at = now(), rev = $5 where project_id = $1 and id = $2',
-        [projectId, x.id, JSON.stringify(d), user.id, pr.version],
-      );
-    }
-    const section = {
-      ...(pr.data?.githubSync || link),
-      last: { ...(pr.data?.githubSync?.last || {}), pushed: result.pushed, errors: result.errors },
-    };
-    await t.query(
-      "update projects set data = data || jsonb_build_object('githubSync', $2::jsonb), revs = revs || jsonb_build_object('githubSync', $3::int) where id = $1",
-      [projectId, JSON.stringify(section), pr.version],
-    );
-    if (result.pushed)
-      await t.query(
-        "insert into activity (project_id, version, user_id, author, kind, target, text) values ($1,$2,$3,$4,'project','',$5)",
-        [projectId, pr.version, user.id, user.name || '', `wrote ${result.pushed} ticket change${result.pushed === 1 ? '' : 's'} to GitHub (${link.repo})`],
-      );
-    return pr.version;
-  });
-  if (version) noteVersion(projectId, version);
 }

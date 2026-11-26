@@ -114,6 +114,9 @@ export const I = {
   pr: s(
     '<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="12.5" r="1.6"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 00-2-2H7.5M9 3l-1.5 1.5L9 6"/>',
   ),
+  branch: s(
+    '<circle cx="4.5" cy="3.5" r="1.6"/><circle cx="4.5" cy="12.5" r="1.6"/><circle cx="11.5" cy="4.5" r="1.6"/><path d="M4.5 5.1v5.8M11.5 6.1c0 3.2-7 2.4-7 4.8"/>',
+  ),
   pencil: s('<path d="M10.5 2.5l3 3L6 13H3v-3z"/>'),
   play: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.2v9.6c0 .4.5.7.8.4l7-4.8c.3-.2.3-.6 0-.8l-7-4.8c-.3-.3-.8 0-.8.4z"/></svg>',
   stop: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1.2"/></svg>',

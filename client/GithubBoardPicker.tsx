@@ -1,6 +1,7 @@
 'use client';
 // Project settings → GitHub issues → GitHub Project: pick the board (github.com/…/projects/N) whose
-// Status, Priority, story points and sprint iterations sync with the tickets, or unlink it. The
+// Status, Priority, story points and sprint iterations are imported into the tickets (read-only:
+// nothing is written to the board), or unlink it. The
 // list comes from the linked repository and its owner. Only the project owner and the Super Admin
 // can change it (the server checks too).
 import { useState } from 'react';
@@ -18,15 +19,15 @@ const FIELD_NAMES: [string, string][] = [
 const call = (body: Any) =>
   api(`/api/projects/${encodeURIComponent(P().id)}/github-sync`, { method: 'POST', body });
 
-/** Which board fields carry which ticket field ("Status → Status, Sprint → Iteration"). */
+/** Which board field fills which ticket field ("Status, Story points ← Estimate"). */
 function Mapped({ fields }: { fields: Any }) {
   const parts = FIELD_NAMES.filter(([k]) => fields?.[k]).map(([k, label]) =>
-    fields[k] === label ? label : `${label} → ${fields[k]}`,
+    fields[k] === label ? label : `${label} ← ${fields[k]}`,
   );
   const missing = FIELD_NAMES.filter(([k]) => !fields?.[k]).map(([, label]) => label);
   return (
     <small className="muted">
-      Syncs: {parts.length ? parts.join(', ') : 'nothing yet'}.
+      Imports: {parts.length ? parts.join(', ') : 'nothing yet'}.
       {missing.length > 0 && ` Not on the board: ${missing.join(', ')}.`}
     </small>
   );
@@ -86,7 +87,7 @@ function Chooser({ allowed }: { allowed: boolean }) {
     try {
       const r = await call({ action: 'link-board', boardId: pick });
       await pullRemote({ quiet: true });
-      toast(`Linked “${r.board.title}”. Sync now to bring the board in.`, 'ok', {
+      toast(`Linked “${r.board.title}”. Sync from GitHub to bring the board in.`, 'ok', {
         title: 'GitHub Project linked',
       });
     } catch (e: Any) {
@@ -106,7 +107,7 @@ function Chooser({ allowed }: { allowed: boolean }) {
         </div>
         <small className="muted">
           {repo
-            ? 'Optional: sync Status, Priority, story points and sprints with a GitHub Project board.'
+            ? 'Optional: import Status, Priority, story points and sprints from a GitHub Project board.'
             : 'Link a repository first.'}
         </small>
       </div>

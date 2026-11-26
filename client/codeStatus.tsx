@@ -3,8 +3,9 @@
 // review, pull request open, merged, committed, failed). Shown on backlog rows, board cards and the
 // issue panel. The state comes from the project's code jobs (this computer and the AI API) and from
 // the issue's linked pull requests, and is refreshed every few seconds while a job is running. When
-// a job finishes and the issue has code, the issue moves to Done by itself (no approval step): see
-// completeOnCode.
+// a job finishes and the issue has code, the issue moves to the workflow's review status (In Review)
+// and the job's branch is attached to it (reviewOnCode); when its pull request is merged it moves
+// to Done (doneOnMerge). The rules are in client/code-review-flow.ts.
 import {
   S,
   emit,
@@ -18,9 +19,17 @@ import {
   setField,
   saveNow,
   toast,
+  logEvent,
   type Any,
 } from './core';
 import { Ico, I, Spinner } from './ui';
+import {
+  attachBranch,
+  branchOfJob,
+  doneMoveFor,
+  reviewMoveFor,
+  type BranchLink,
+} from './code-review-flow';
 
 type Job = {
   id: string;
@@ -31,6 +40,10 @@ type Job = {
   startedAt?: string;
   where?: string;
   pr?: Any;
+  branch?: string;
+  base?: string;
+  repo?: string;
+  provider?: string;
 };
 const G: { pid: string; byTicket: Record<string, Job[]>; at: number; timer: Any; busy: boolean } = {
   pid: '',
@@ -157,46 +170,90 @@ export function CodeChip({ t, compact = false }: { t: Any; compact?: boolean }) 
 }
 
 const MOVING = new Set<string>();
-/**
- * The status code completion moves an issue to: the workflow's "Done", or else its first status in
- * the done category.
- */
-const doneStatus = (): string => {
-  const w: Any[] = (P()?.workflow || []).filter((x: Any) => x.category === 'done');
-  return (w.find((x) => /^done$/i.test(x.name)) || w[0])?.name || '';
-};
 
 /**
- * Moves an issue to Done once its code is complete, with no approval step, from any status (custom
- * ones too).
- * An issue that is already done is left alone. When the change can't be saved (the server is
- * unreachable) the old status is put back and an error is shown.
+ * Applies a change to an issue and saves it now. When it can't be saved (the server is unreachable)
+ * `undo` puts the issue back and `failed` is shown; otherwise `ok` (when given).
  */
-export async function completeOnCode(t: Any) {
-  const to = doneStatus();
-  if (!t || !to || isDone(t) || MOVING.has(t.id) || !can('issue.edit')) return;
+async function saveChange(
+  t: Any,
+  { apply, undo, failed, ok }: { apply: () => void; undo: () => void; failed: string; ok: string },
+) {
   MOVING.add(t.id);
-  const from = t.status;
   try {
-    mutate(() => setField(ticket(t.id), 'status', to, 'Code job'), { tag: 'code-done' });
+    mutate(apply, { tag: 'code-done' });
     await saveNow();
     while (S.saving || S.saveTimer) await new Promise((r) => setTimeout(r, 200)); // a save was already running: wait for ours
     if (S.saveText === 'Save failed') {
-      mutate(
-        () => {
-          const x = ticket(t.id);
-          if (x && x.status === to) setField(x, 'status', from, 'Code job');
-        },
-        { tag: 'code-done' },
-      );
-      toast(
-        `${t.key} stays “${from}”: its code is complete but its status couldn’t be changed to “${to}”. Check the connection and try again.`,
-        'err',
-      );
-    } else toast(`${t.key} moved to “${to}”: its code is complete.`);
+      mutate(undo, { tag: 'code-done' });
+      toast(failed, 'err');
+    } else if (ok) toast(ok);
   } finally {
     MOVING.delete(t.id);
   }
+}
+
+/**
+ * Once an issue's code is written: attaches the branch of each job that has code to the issue and
+ * moves the issue to the workflow's review status (In Review), with no approval step and from any
+ * status before it (custom flows too). An issue already in review, done or further along keeps its
+ * status; without a review status in the workflow only the branch is attached. When the change
+ * can't be saved the issue is put back as it was and an error is shown.
+ */
+export async function reviewOnCode(t: Any, jobs: Job[] = []) {
+  if (!t || MOVING.has(t.id) || !can('issue.edit')) return;
+  const live = ticket(t.id);
+  if (!live) return;
+  const branches = jobs.map((j) => branchOfJob(j)).filter((b): b is BranchLink => b !== null);
+  const to = reviewMoveFor(live.status, P()?.workflow || []);
+  const probe = { branches: JSON.parse(JSON.stringify(live.branches || [])) };
+  if (!to && !branches.some((b) => attachBranch(probe, b))) return;
+  const from = live.status;
+  const before = JSON.parse(JSON.stringify(live.branches || []));
+  await saveChange(t, {
+    apply: () => {
+      const x = ticket(t.id);
+      if (!x) return;
+      for (const b of branches)
+        if (attachBranch(x, b) === 'added')
+          logEvent(x, `attached branch ${b.name}${b.repo ? ` (${b.repo})` : ''}`, 'Code job');
+      if (to) setField(x, 'status', to, 'Code job');
+    },
+    undo: () => {
+      const x = ticket(t.id);
+      if (!x) return;
+      x.branches = before;
+      if (to && x.status === to) setField(x, 'status', from, 'Code job');
+    },
+    failed: `${t.key} stays “${from}”: its code is written but the change couldn’t be saved. Check the connection and try again.`,
+    ok: to ? `${t.key} moved to “${to}”: its code is ready for review.` : '',
+  });
+}
+
+/**
+ * After a pull request of the issue is merged (merged from Ticket Forge, or its refreshed status
+ * says Merged): moves the issue to Done once none of its pull requests is still open, from any
+ * status (custom flows too). An issue that is already done is left alone. quiet: no success toast
+ * (a background refresh of many pull requests).
+ */
+export async function doneOnMerge(t: Any, { quiet = false } = {}) {
+  if (!t || MOVING.has(t.id) || !can('issue.edit')) return;
+  const live = ticket(t.id);
+  const to = live ? doneMoveFor(live, P()?.workflow || []) : '';
+  if (!live || !to) return;
+  const from = live.status;
+  await saveChange(t, {
+    apply: () => {
+      const x = ticket(t.id);
+      if (x) setField(x, 'status', to, 'Pull request merged');
+    },
+    undo: () => {
+      const x = ticket(t.id);
+      if (x && x.status === to) setField(x, 'status', from, 'Pull request merged');
+    },
+    failed: `${t.key} stays “${from}”: its pull request is merged but its status couldn’t be changed to “${to}”. Check the connection and try again.`,
+    ok: quiet ? '' : `${t.key} moved to “${to}”: its pull request is merged.`,
+  });
 }
 
 async function load(pid: string) {
@@ -213,7 +270,7 @@ async function load(pid: string) {
     G.at = Date.now();
     if (JSON.stringify(by) !== before) emit();
     // Code completed: an issue whose job was running at the last refresh and now has code moves to
-    // Done.
+    // In Review, with its branch attached.
     for (const id of Object.keys(prev)) {
       const t = ticket(id);
       if (
@@ -222,7 +279,7 @@ async function load(pid: string) {
         !(by[id] || []).some((j) => LIVE.includes(j.status)) &&
         codeInfo(t).coded
       )
-        completeOnCode(t).catch(() => {});
+        reviewOnCode(t, by[id]).catch(() => {});
     }
     return (r.jobs || []).some((j: Job) => LIVE.includes(j.status));
   } catch {

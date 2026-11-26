@@ -1,5 +1,6 @@
 'use client';
-// Development: the issue's code status, its pull requests and the "Link pull request" form.
+// Development: the issue's code status, the branches its code jobs wrote (attached when the code is
+// written, client/code-review-flow.ts), its pull requests and the "Link pull request" form.
 import { useState } from 'react';
 import { type Any, P, can, mutate, S, logEvent, feat, ago } from '../../core';
 import { Ico, I } from '../../ui';
@@ -73,6 +74,46 @@ function PrRow({ t, edit, r }: IssueProps & { r: Any }) {
             <Ico svg={I.close} />
           </button>
         </>
+      )}
+    </div>
+  );
+}
+
+/** One attached branch: name → base, repository, and whether it is pushed or only local. */
+function BranchRow({ t, edit, b }: IssueProps & { b: Any }) {
+  const where = [
+    b.repo,
+    b.side === 'backend' ? 'backend' : '',
+    b.pushed ? '' : 'local branch, not pushed yet',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const unlink = () =>
+    mutate(() => {
+      t.branches = (t.branches || []).filter((x: Any) => x !== b);
+      logEvent(t, `removed branch ${b.name}`);
+    });
+  return (
+    <div className="pr-row">
+      <Ico svg={I.branch} />
+      <div className="pr-main">
+        {b.url ? (
+          <a href={b.url} target="_blank" rel="noopener noreferrer">
+            {b.name}
+          </a>
+        ) : (
+          <code>{b.name}</code>
+        )}
+        <div className="muted small">
+          {b.base ? `→ ${b.base}` : ''}
+          {b.base && where ? ' · ' : ''}
+          {where}
+        </div>
+      </div>
+      {edit && (
+        <button className="icon-btn" title="Remove the branch from this issue" onClick={unlink}>
+          <Ico svg={I.close} />
+        </button>
       )}
     </div>
   );
@@ -159,11 +200,14 @@ export function DevelopmentSection({ t, edit }: IssueProps) {
         <CodeChip t={t} />
         {(edit || feat('code')) && <DevTools t={t} edit={edit} />}
       </div>
+      {(t.branches || []).map((b: Any) => (
+        <BranchRow key={`${b.repo}\u0000${b.name}`} t={t} edit={edit} b={b} />
+      ))}
       {t.prs.map((r: Any) => (
         <PrRow key={r.id} t={t} edit={edit} r={r} />
       ))}
       {S.prForm && <LinkPrForm t={t} />}
-      {!t.prs.length && !S.prForm && (
+      {!t.prs.length && !t.branches?.length && !S.prForm && (
         <p className="muted small">
           Link the pull requests that implement this issue to track their status here.
         </p>

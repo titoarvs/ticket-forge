@@ -9,7 +9,7 @@
 //   github_repo_links table), else the one chosen in Repository (dev.repo), else the one linked for
 //   GitHub issues (githubSync.repo). None → { repo: '' } and no GitHub request.
 // - A failed GitHub request throws HttpError, so the client shows an error state, never old data.
-// Read-only: creating or editing issues and Projects from Ticket Forge is a follow-up.
+// Read-only, like the GitHub issues import (lib/github-sync.ts): Ticket Forge never writes to GitHub.
 import { q } from './db';
 import { HttpError } from './auth';
 import { has, listProjects } from './store';

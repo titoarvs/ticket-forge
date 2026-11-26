@@ -1,6 +1,7 @@
-// TF-136: two-way sync of Status, Priority, story points and Sprint ↔ Iteration with a linked
-// GitHub Project board. Run with `npm test`. Embedded PostgreSQL (PGlite) in a temporary folder
-// and a fake GitHub (REST and GraphQL; fetch is replaced), so nothing leaves this computer.
+// TF-136: importing Status, Priority, story points and Sprint ← Iteration from a linked GitHub
+// Project board. Import-only: nothing is ever added to the board or written to it. Run with
+// `npm test`. Embedded PostgreSQL (PGlite) in a temporary folder and a fake GitHub (REST and
+// GraphQL; fetch is replaced), so nothing leaves this computer.
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,6 @@ process.env.TICKETFORGE_DATA = dir;
 process.env.DATABASE_URL = '';
 process.env.SUPABASE_DB_URL = '';
 process.env.GITHUB_TOKEN = 'test-token';
-process.env.GITHUB_PUSH_PAUSE_MS = '0';
 
 let G: typeof import('../lib/github-sync');
 let L: typeof import('../lib/github-project/link');
@@ -66,18 +66,12 @@ const FIELDS = [
     },
   },
 ];
-const optionName = (id: string) =>
-  FIELDS.flatMap((f: any) =>
-    [
-      ...(f.options || []),
-      ...(f.configuration?.iterations || []),
-      ...(f.configuration?.completedIterations || []),
-    ].map((o: any) => [o.id, o.name || o.title]),
-  ).find(([x]) => x === id)?.[1];
 
 let issues: any[] = [];
 let items: any[] = [];
 let calls: string[] = [];
+/** Every GraphQL mutation and every non-GET REST request: there must never be one. */
+let writes: string[] = [];
 let scopeError = false;
 const issue = (number: number) => ({
   number,
@@ -121,16 +115,13 @@ const valueNodes = (it: any) =>
       field: { id: 'F_sprint' },
     },
   ].filter(Boolean);
-const FIELD_KEY: any = {
-  F_status: 'status',
-  F_prio: 'priority',
-  F_points: 'points',
-  F_sprint: 'sprint',
-};
-
-function graphql(query: string, v: any) {
+function graphql(query: string) {
   const op = query.match(/(?:query|mutation) (\w+)/)?.[1] || '';
   calls.push(op);
+  if (/\bmutation\b/.test(query)) {
+    writes.push(`graphql ${op}`);
+    return { errors: [{ type: 'FORBIDDEN', message: 'Ticket Forge must not write to GitHub' }] };
+  }
   if (scopeError) return { errors: [{ type: 'INSUFFICIENT_SCOPES', message: 'needs project' }] };
   const board = {
     id: BOARD_ID,
@@ -169,26 +160,6 @@ function graphql(query: string, v: any) {
         },
       },
     };
-  if (op === 'AddBoardItem') {
-    const n = Number(String(v.content).replace('I_', ''));
-    const it = item(n, { status: '', priority: '', points: null, sprint: '' }, T(50));
-    items.push(it);
-    return { data: { addProjectV2ItemById: { item: { id: it.id, updatedAt: it.updatedAt } } } };
-  }
-  if (op === 'SetBoardFields') {
-    const it = items.find((x) => x.id === v.item);
-    for (let i = 0; `f${i}` in v; i++) {
-      const key = FIELD_KEY[v[`f${i}`]];
-      const val = v[`v${i}`];
-      it.values[key] = !val
-        ? key === 'points'
-          ? null
-          : ''
-        : (val.number ?? optionName(val.singleSelectOptionId || val.iterationId));
-    }
-    it.updatedAt = T(60);
-    return { data: {} };
-  }
   return { errors: [{ type: 'NOT_FOUND', message: `unknown ${op}` }] };
 }
 
@@ -198,25 +169,16 @@ globalThis.fetch = (async (url: any, init: any = {}) => {
   const u = new URL(String(url));
   if (u.pathname === '/graphql') {
     const b = JSON.parse(init.body);
-    return json(graphql(b.query, b.variables));
+    return json(graphql(b.query));
   }
   const route = u.pathname.slice(1);
+  if ((init.method || 'GET') !== 'GET') {
+    writes.push(`${init.method} ${route}`);
+    return json({ message: 'Ticket Forge must not write to GitHub' }, 405);
+  }
   if (route === `repos/${REPO}`)
     return json({ full_name: REPO, private: true, html_url: `https://github.com/${REPO}` });
-  if (route === `repos/${REPO}/issues` && (init.method || 'GET') === 'GET') return json(issues);
-  if (route === `repos/${REPO}/issues` && init.method === 'POST') {
-    const b = JSON.parse(init.body);
-    const labels = (b.labels || []).map((name: string) => ({ name }));
-    const i = { ...issue(issues.length + 100), title: b.title, body: b.body, labels };
-    issues.push(i);
-    return json(i, 201);
-  }
-  const one = route.match(new RegExp(`^repos/${REPO}/issues/(\\d+)$`));
-  if (one && init.method === 'PATCH') {
-    const i = issues.find((x) => x.number === Number(one[1]));
-    Object.assign(i, JSON.parse(init.body), { updated_at: T(70) });
-    return json(i);
-  }
+  if (route === `repos/${REPO}/issues`) return json(issues);
   return json({ message: 'Not Found' }, 404);
 }) as any;
 
@@ -257,6 +219,7 @@ beforeEach(async () => {
   issues = [];
   items = [];
   calls = [];
+  writes = [];
   scopeError = false;
   await D.q("delete from projects where id = 'p1'");
   await D.q(
@@ -345,28 +308,29 @@ test('an import copies the board’s values onto the tickets and writes nothing 
     ['In Progress', 'High', 5, 's2'],
   );
   assert.equal(r.board.updated, 1);
-  assert.ok(!calls.includes('SetBoardFields') && !calls.includes('AddBoardItem'));
+  assert.deepEqual(writes, []);
 });
 
-test('a change made in Ticket Forge is written to the board, once', async () => {
+test('a change made in Ticket Forge stays in Ticket Forge and is never written to the board', async () => {
   issues = [issue(1)];
   items = [item(1, { status: 'Todo', priority: 'P2', points: 3, sprint: 'Sprint 1' })];
   await linkAll();
   await sync('import');
   const [t] = await tickets();
   await setTicket(t.id, { priority: 'Highest', storyPoints: 8, sprintId: 's2', updatedAt: T(30) });
-  calls = [];
-  await sync('sync');
+  for (const mode of ['sync', 'sync', 'import'] as const) {
+    const r: any = await sync(mode);
+    assert.deepEqual([r.board.updated, r.board.conflicts], [0, 0]);
+  }
   assert.deepEqual(items[0].values, {
     status: 'Todo',
-    priority: 'P0',
-    points: 8,
-    sprint: 'Sprint 2',
+    priority: 'P2',
+    points: 3,
+    sprint: 'Sprint 1',
   });
-  assert.equal(calls.filter((c) => c === 'SetBoardFields').length, 1);
-  calls = [];
-  await sync('sync');
-  assert.ok(!calls.includes('SetBoardFields'), 'nothing left to write');
+  const [after] = await tickets();
+  assert.deepEqual([after.priority, after.storyPoints, after.sprintId], ['Highest', 8, 's2']);
+  assert.deepEqual(writes, []);
 });
 
 test('when both sides changed, the newer change wins and the conflict is recorded', async () => {
@@ -386,38 +350,45 @@ test('when both sides changed, the newer change wins and the conflict is recorde
       /GitHub Project sync conflict: priority \(GitHub won\)/.test(h.text),
     ),
   );
+  assert.deepEqual(writes, []);
 });
 
-test('a sync adds issues missing from the board with the ticket’s values; an import doesn’t', async () => {
+test('when the Ticket Forge change is newer it is kept, the board is left alone, and the conflict is recorded once', async () => {
+  issues = [issue(1)];
+  items = [item(1, { status: 'Todo', priority: 'P2', points: null, sprint: '' })];
+  await linkAll();
+  await sync('import');
+  const [t] = await tickets();
+  await setTicket(t.id, { priority: 'Low', updatedAt: T(50) });
+  items[0].values.priority = 'P1';
+  items[0].updatedAt = T(40); // Ticket Forge's change is newer
+  const r: any = await sync('sync');
+  assert.equal(r.board.conflicts, 1);
+  const [after] = await tickets();
+  assert.equal(after.priority, 'Low');
+  assert.equal(items[0].values.priority, 'P1');
+  assert.ok(
+    after.history.some((h: any) =>
+      /GitHub Project sync conflict: priority \(Ticket Forge won\)/.test(h.text),
+    ),
+  );
+  // The board's value is the new common ground, so the next sync has no conflict to report.
+  const again: any = await sync('sync');
+  assert.equal(again.board.conflicts, 0);
+  assert.equal((await tickets())[0].priority, 'Low');
+  assert.deepEqual(writes, []);
+});
+
+test('issues missing from the board are never added to it, by an import or a sync', async () => {
   issues = [issue(1)];
   await linkAll();
   await sync('import');
-  assert.equal(items.length, 0);
   const [t] = await tickets();
   await setTicket(t.id, { priority: 'High', storyPoints: 2, updatedAt: T(30) });
   await sync('sync');
-  assert.equal(items.length, 1);
-  assert.deepEqual(items[0].values, { status: 'Todo', priority: 'P1', points: 2, sprint: '' });
-});
-
-test('a new issue filed from Ticket Forge goes on the board with its values', async () => {
-  await linkAll();
-  const github: any = await as(() =>
-    G.createGithubIssue('p1', {
-      title: 'Pay by card',
-      priority: 'High',
-      storyPoints: 5,
-      sprintId: 's2',
-    }),
-  );
-  assert.equal(github.board.itemId, items[0].id);
-  assert.deepEqual(items[0].values, {
-    status: 'Todo',
-    priority: 'P1',
-    points: 5,
-    sprint: 'Sprint 2',
-  });
-  assert.equal(github.board.base.priority, 'P1');
+  assert.equal(items.length, 0);
+  assert.deepEqual(writes, []);
+  assert.ok(!calls.some((c) => /Add|Set/.test(c)));
 });
 
 test('a token without Projects access is reported and the issues still sync', async () => {
@@ -429,84 +400,26 @@ test('a token without Projects access is reported and the issues still sync', as
   assert.ok(r.errors.some((e: string) => /project/.test(e)));
 });
 
-// ---------------------------------------------------------------- push tickets to GitHub
-const addTicket = (id: string, key: string, extra: any = {}) =>
-  D.q("insert into issues (project_id, id, position, data) values ('p1', $1, $2, $3)", [
-    id,
-    Number(key.split('-')[1]),
-    JSON.stringify({
-      id,
-      key,
-      title: `Ticket ${key}`,
-      type: 'Story',
-      status: 'To Do',
-      priority: 'Medium',
-      labels: [],
-      prs: [],
-      history: [],
-      ...extra,
-    }),
-  ]);
-
-test('pushing files an issue for every ticket without one, with PR links, and puts it on the board', async () => {
-  const P = await import('../lib/github-push');
-  await linkAll();
-  await addTicket('t2', 'SH-2', {
-    status: 'Done',
-    labels: ['FE'],
-    prs: [
-      {
-        number: 19,
-        title: 'SH-2: Pay by card',
-        url: `https://github.com/${REPO}/pull/19`,
-        status: 'Merged',
-      },
-    ],
-  });
-  await addTicket('t1', 'SH-1');
-  await addTicket('t3', 'SH-3', { github: { repo: REPO, number: 5 } }); // already on GitHub
-  const r: any = await as(() => P.pushTickets(owner, 'p1'));
-  assert.deepEqual([r.pushed, r.remaining, r.errors], [2, 0, []]);
-  assert.deepEqual(
-    r.issues.map((x: any) => x.key),
-    ['SH-1', 'SH-2'],
-    'key order',
-  );
-  const done = issues.find((i) => i.title === 'Ticket SH-2');
-  assert.match(
-    done.body,
-    /### Pull requests\n- \[#19 SH-2: Pay by card\]\(https:\/\/github\.com\/acme\/shop\/pull\/19\) · Merged/,
-  );
-  assert.deepEqual(done.labels, [{ name: 'FE' }]);
-  assert.equal(done.state, 'closed');
-  assert.deepEqual(items.map((i) => i.values.status).sort(), ['Done', 'Todo']);
-  const t2 = (await tickets()).find((t) => t.key === 'SH-2');
-  assert.equal(t2.github.number, done.number);
-  assert.equal(t2.github.base.state, 'closed');
-  assert.ok(t2.history.some((h: any) => h.text === `filed as GitHub issue #${done.number}`));
-  // The next issues sync finds them linked: no duplicate tickets.
-  await sync('sync');
-  assert.equal((await tickets()).length, 3);
-});
-
-test('a big backlog goes in batches; the next push carries on where it stopped', async () => {
-  const P = await import('../lib/github-push');
-  await linkAll();
-  for (let n = 1; n <= P.PUSH_BATCH + 2; n++) await addTicket(`t${n}`, `SH-${n}`);
-  const first: any = await as(() => P.pushTickets(owner, 'p1'));
-  assert.deepEqual([first.pushed, first.remaining], [P.PUSH_BATCH, 2]);
-  const second: any = await as(() => P.pushTickets(owner, 'p1'));
-  assert.deepEqual([second.pushed, second.remaining], [2, 0]);
-  assert.equal(issues.length, P.PUSH_BATCH + 2);
-});
-
-test('only the project owner or a Super Admin can push', async () => {
-  const P = await import('../lib/github-push');
-  await linkAll();
-  await addTicket('t1', 'SH-1');
+// ---------------------------------------------------------------- nothing can write to a board
+test('the board helpers only read: no add-item or set-fields helper, and gql refuses mutations', async () => {
+  const B = await import('../lib/github-project/board');
+  const S = await import('../lib/github-project/sync');
+  const Q = await import('../lib/github-project/queries');
+  const { gql } = await import('../lib/github-project/graphql');
+  assert.equal('addItem' in B, false);
+  assert.equal('setValues' in B, false);
+  assert.equal('addToBoard' in S, false);
+  assert.equal('ADD_ITEM' in Q, false);
+  assert.equal('setFieldsMutation' in Q, false);
+  for (const doc of Object.values(Q)) assert.doesNotMatch(String(doc), /\bmutation\b/);
   await assert.rejects(
-    as(() => P.pushTickets(member, 'p1')),
-    /Only the project owner/,
+    gql('test-token', 'mutation SetBoardFields($p: ID!) { x }', {}),
+    /only reads from GitHub/,
   );
-  assert.equal(issues.length, 0);
+  await assert.rejects(
+    gql('test-token', '# a comment\n  mutation { addProjectV2ItemById(input: {}) { item { id } } }'),
+    /only reads from GitHub/,
+  );
+  assert.deepEqual(calls, [], 'a refused mutation never reaches GitHub');
+  assert.deepEqual(writes, []);
 });

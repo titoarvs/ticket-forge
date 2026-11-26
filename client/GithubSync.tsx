@@ -1,6 +1,7 @@
 'use client';
 // Project settings → Code & GitHub → GitHub issues (TF-130): link a GitHub repository to this
-// project, import its issues as tickets and keep them in sync. Only the project owner and the
+// project and import its issues as tickets. Import-only: nothing here writes to GitHub; "Sync from
+// GitHub" pulls the latest issues and GitHub Project fields again. Only the project owner and the
 // Super Admin can; everyone else sees the link and a permission message.
 import { useState } from 'react';
 import { P, api, pullRemote, toast, type Any } from './core';
@@ -8,7 +9,6 @@ import { SetCard, Spinner } from './ui';
 import { TF } from './fields';
 import { canDeleteProject } from './DeleteProject';
 import { GithubBoardPicker } from './GithubBoardPicker';
-import { GithubPushButton } from './GithubPushButton';
 
 export const ONLY_OWNERS =
   'Only the project owner or a Super Admin can link a GitHub repository or import from GitHub.';
@@ -16,17 +16,15 @@ export const ONLY_OWNERS =
 const summary = (r: Any) =>
   `${r.created} new, ${r.updated} updated, ${r.unchanged} unchanged` +
   (r.conflicts ? `, ${r.conflicts} conflict${r.conflicts === 1 ? '' : 's'}` : '') +
-  (r.pushed ? `, ${r.pushed} written to GitHub` : '') +
   (r.board
-    ? `. Project “${r.board.title}”: ${r.board.updated} updated, ${r.board.pushed} written` +
-      (r.board.added ? `, ${r.board.added} added` : '') +
+    ? `. Project “${r.board.title}”: ${r.board.updated} updated` +
       (r.board.conflicts ? `, ${r.board.conflicts} conflicts` : '')
     : '');
 
 function LastRun({ last }: { last: Any }) {
   return (
     <small className="muted">
-      Last {last.mode === 'sync' ? 'sync' : 'import'} {new Date(last.at).toLocaleString()}
+      Last {last.mode === 'sync' ? 'sync from GitHub' : 'import'} {new Date(last.at).toLocaleString()}
       {last.by ? ` by ${last.by}` : ''}: {summary(last)}.
     </small>
   );
@@ -52,7 +50,7 @@ export function GithubSyncCard() {
         toast(
           `${summary(r)}${r.truncated ? '. Only the first 2000 issues were read.' : ''}`,
           r.errors?.length ? 'err' : 'ok',
-          { title: action === 'sync' ? 'GitHub issues synced' : 'GitHub issues imported' },
+          { title: action === 'sync' ? 'Synced from GitHub' : 'GitHub issues imported' },
         );
         if (r.errors?.length) toast(r.errors.join(' '), 'err');
       }
@@ -68,7 +66,7 @@ export function GithubSyncCard() {
     <SetCard
       id="github-issues"
       title="GitHub issues"
-      desc="Link a GitHub repository, import its issues as tickets and keep them in sync. Titles, descriptions, labels, assignees and milestones (as epics) carry over, and with a GitHub Project linked so do Status, Priority, story points and sprints (as Iterations); when both sides changed, the newer change wins and the ticket’s activity records the conflict."
+      desc="Link a GitHub repository and import its issues as tickets. This is one-way: GitHub → Ticket Forge. Titles, descriptions, labels, assignees and milestones (as epics) come over, and with a GitHub Project linked so do Status, Priority, story points and sprints (from Iterations). Ticket Forge never creates, edits or closes GitHub issues or changes the GitHub Project; edits made here stay in Ticket Forge. When a field changed on both sides, the newer change wins in Ticket Forge and the ticket’s activity records the conflict."
     >
       {!allowed && (
         <div className="warn-banner" role="status">
@@ -134,18 +132,18 @@ export function GithubSyncCard() {
             className="btn sm"
             disabled={!allowed || !link?.repo || Boolean(busy)}
             onClick={() => run('sync')}
+            title="Pull the latest issues and GitHub Project fields from GitHub. Nothing is written to GitHub."
           >
             {busy === 'sync' ? (
               <>
                 <Spinner />
-                Syncing…
+                Syncing from GitHub…
               </>
             ) : (
-              'Sync now'
+              'Sync from GitHub'
             )}
           </button>
         </span>
-        <GithubPushButton allowed={allowed} />
       </div>
       <GithubBoardPicker allowed={allowed} />
       {last && <LastRun last={last} />}

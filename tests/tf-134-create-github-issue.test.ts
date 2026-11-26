@@ -1,6 +1,7 @@
-// TF-134: creating an issue files a GitHub issue too, but only when the project has a repository
-// linked. Run with `npm test`. Embedded PostgreSQL (PGlite) in a temporary folder and a fake GitHub
-// (fetch is replaced), so nothing leaves this computer.
+// TF-134 (now import-only): creating an issue never files a GitHub issue, with or without a
+// linked repository; the ticket lives only in Ticket Forge. Run with `npm test`. Embedded
+// PostgreSQL (PGlite) in a temporary folder and a fake GitHub (fetch is replaced), so nothing
+// leaves this computer.
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -29,28 +30,13 @@ const person = {
 };
 
 // ---------------------------------------------------------------- a fake GitHub
-let posted: any[] = [];
-let failWith = 0;
+/** Every request made to GitHub: creating an issue must make none. */
+let requests: any[] = [];
 globalThis.fetch = (async (url: any, init: any = {}) => {
-  const route = new URL(String(url)).pathname.slice(1);
-  if (route === `repos/${REPO}/issues` && init.method === 'POST') {
-    if (failWith) return new Response(JSON.stringify({ message: 'Nope' }), { status: failWith });
-    const body = JSON.parse(init.body);
-    posted.push(body);
-    const n = 40 + posted.length;
-    const data = {
-      number: n,
-      title: body.title,
-      body: body.body,
-      state: 'open',
-      labels: [],
-      html_url: `https://github.com/${REPO}/issues/${n}`,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
-    return new Response(JSON.stringify(data), { status: 201 });
-  }
-  return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+  requests.push({ method: init.method || 'GET', url: String(url), body: init.body });
+  return new Response(JSON.stringify({ message: 'Ticket Forge must not call GitHub here' }), {
+    status: 405,
+  });
 }) as any;
 
 const tickets = async () =>
@@ -76,8 +62,7 @@ before(async () => {
   );
 });
 beforeEach(async () => {
-  posted = [];
-  failWith = 0;
+  requests = [];
   process.env.GITHUB_TOKEN = 'test-token';
   await D.q("delete from projects where id = 'p1'");
   const data = {
@@ -101,7 +86,7 @@ test('without a linked repository the issue is created only in Ticket Forge', as
   const { issue } = await create({ title: 'Pay by card', type: 'Story' });
   assert.equal(issue.key, 'SH-1');
   assert.equal(issue.github, undefined);
-  assert.equal(posted.length, 0);
+  assert.equal(requests.length, 0);
   assert.equal((await tickets()).length, 1);
 });
 
@@ -133,98 +118,58 @@ test('the planning fields are kept and checked against the project', async () =>
   );
 });
 
-test('with a linked repository the GitHub issue is filed and linked to the ticket', async () => {
-  await setProject({ githubSync: { repo: REPO } });
+test('with a linked repository no GitHub issue is filed: the ticket is only in Ticket Forge', async () => {
+  await setProject({ githubSync: { repo: REPO, project: { id: 'PVT_1', title: 'Board' } } });
   const { issue } = await create({ title: 'Pay by card', type: 'Story', description: 'Visa' });
-  assert.equal(posted.length, 1);
-  assert.equal(posted[0].title, 'Pay by card');
-  assert.match(
-    posted[0].body,
-    /### Description\n<!-- tf:description -->\nVisa\n<!-- \/tf:description -->/,
-  );
-  // The first sync sees the plain description, not the layout, so nothing looks changed.
-  assert.equal(issue.github.base.description, 'Visa');
-  assert.equal(issue.github.repo, REPO);
-  assert.equal(issue.github.number, 41);
-  assert.equal(issue.github.url, `https://github.com/${REPO}/issues/41`);
-  assert.equal((await tickets())[0].github.number, 41);
+  assert.equal(issue.key, 'SH-1');
+  assert.equal(issue.github, undefined);
+  assert.equal(requests.length, 0, 'GitHub is not called at all');
+  const [saved] = await tickets();
+  assert.equal(saved.title, 'Pay by card');
+  assert.equal(saved.github, undefined);
 });
 
-test('when GitHub refuses, no ticket is saved and the reason is shown', async () => {
-  await setProject({ githubSync: { repo: REPO } });
-  failWith = 403;
-  await assert.rejects(
-    create({ title: 'Pay by card', type: 'Story' }),
-    (e: any) => e.status >= 400,
-  );
-  assert.equal((await tickets()).length, 0);
-});
-
-test('a linked repository without a token asks for one and saves nothing', async () => {
+test('a linked repository without a token still creates the ticket (GitHub isn’t needed)', async () => {
   await setProject({ githubSync: { repo: REPO } });
   process.env.GITHUB_TOKEN = '';
-  await assert.rejects(
-    create({ title: 'Pay by card', type: 'Story' }),
-    (e: any) => e.status === 400 && /personal access token/.test(e.message),
+  const { issue } = await create({ title: 'Pay by card', type: 'Story' });
+  assert.equal(issue.key, 'SH-1');
+  assert.equal(requests.length, 0);
+  assert.equal((await tickets()).length, 1);
+});
+
+test('the browser’s former “file a GitHub issue” call is gone from the server', async () => {
+  assert.equal('fileGithubIssue' in I, false);
+  const G = await import('../lib/github-sync');
+  assert.equal('createGithubIssue' in G, false);
+});
+
+test('the Ticket Forge issue layout is still written and read the same way', async () => {
+  const B = await import('../lib/github-body');
+  const body = B.ticketBody(
+    {
+      key: 'SH-7',
+      title: 'Reset password',
+      type: 'Story',
+      priority: 'High',
+      storyPoints: 3,
+      userStory: 'As a user, I want to reset my password, so that I can sign in again.',
+      description: 'Send a reset link by email.',
+      acceptanceCriteria: [
+        'Given a registered email, when I ask for a reset, then a link is emailed',
+        'The link expires after 1 hour',
+      ],
+      testCases: [
+        {
+          title: 'Link arrives',
+          type: 'Functional',
+          steps: ['Ask', 'Open mail'],
+          expected: 'Mail has a link',
+        },
+      ],
+    },
+    'Checkout',
   );
-  assert.equal(posted.length, 0);
-  assert.equal((await tickets()).length, 0);
-});
-
-// ---------------------------------------------------------------- Write issue with AI
-const file = (input: any, who: any = person) => as(() => I.fileGithubIssue(who, 'p1', input));
-
-test('an AI-written ticket gets its GitHub issue filed when a repository is linked', async () => {
-  await setProject({ githubSync: { repo: REPO } });
-  const { github } = await file({ title: 'Export to CSV', description: 'From the table' });
-  assert.equal(posted[0].title, 'Export to CSV');
-  assert.match(posted[0].body, /From the table/);
-  assert.equal(github.number, 41);
-  // The browser saves the ticket itself: nothing is written to issues here.
-  assert.equal((await tickets()).length, 0);
-});
-
-test('without a linked repository nothing is filed', async () => {
-  const { github } = await file({ title: 'Export to CSV' });
-  assert.equal(github, null);
-  assert.equal(posted.length, 0);
-});
-
-test('filing needs a title and the permission to create issues', async () => {
-  await setProject({ githubSync: { repo: REPO } });
-  await assert.rejects(file({ title: '  ' }), (e: any) => e.status === 400);
-  await assert.rejects(
-    file({ title: 'Export' }, { ...person, permissions: [] }),
-    (e: any) => e.status === 403,
-  );
-  assert.equal(posted.length, 0);
-});
-
-test('the GitHub issue is laid out like the ticket, with Given / When / Then criteria', async () => {
-  await setProject({ githubSync: { repo: REPO } });
-  await file({
-    key: 'SH-7',
-    title: 'Reset password',
-    type: 'Story',
-    priority: 'High',
-    storyPoints: 3,
-    epicId: 'e1',
-    userStory: 'As a user, I want to reset my password, so that I can sign in again.',
-    description: 'Send a reset link by email.',
-    acceptanceCriteria: [
-      'Given a registered email, when I ask for a reset, then a link is emailed',
-      'The link expires after 1 hour',
-    ],
-    testCases: [
-      {
-        title: 'Link arrives',
-        type: 'Functional',
-        steps: ['Ask', 'Open mail'],
-        expected: 'Mail has a link',
-      },
-    ],
-  });
-  const body = posted[0].body;
   assert.match(
     body,
     /^> \*\*Story\*\* · Priority: \*\*High\*\* · Story points: \*\*3\*\* · Epic: \*\*Checkout\*\* · Ticket Forge: \*\*SH-7\*\*/,
@@ -239,6 +184,7 @@ test('the GitHub issue is laid out like the ticket, with Given / When / Then cri
     body,
     /### Test cases\n1\. \*\*Link arrives\*\* _\(Functional\)_\n   1\. Ask\n   2\. Open mail\n   - Expected: Mail has a link/,
   );
+  assert.equal(B.descriptionOf(body), 'Send a reset link by email.');
 });
 
 test('only the marked description is read back from the layout', async () => {

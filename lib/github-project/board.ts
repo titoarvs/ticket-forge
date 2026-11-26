@@ -1,8 +1,8 @@
-// Reading and writing a GitHub Project board: the boards a repository can use, a board's fields
-// (the ones Ticket Forge maps: Status, Priority, story points, the sprint iteration), its items
-// with their values, adding an issue to it and setting an item's fields.
+// Reading a GitHub Project board: the boards a repository can use, a board's fields (the ones
+// Ticket Forge maps: Status, Priority, story points, the sprint iteration) and its items with their
+// values. Read-only: Ticket Forge never adds items to a board or sets their fields.
 import { gql } from './graphql';
-import { BOARDS, BOARD, ITEMS, ADD_ITEM, setFieldsMutation } from './queries';
+import { BOARDS, BOARD, ITEMS } from './queries';
 
 const MAX_ITEM_PAGES = 20;
 
@@ -111,50 +111,4 @@ export async function readItems(token: string, board: Board, repo: string) {
     after = items.pageInfo.endCursor;
   }
   return out;
-}
-
-/** Adds an issue (its GraphQL node id) to the board; returns the new item, empty. */
-export async function addItem(token: string, board: Board, contentId: string): Promise<Item> {
-  const d = await gql(token, ADD_ITEM, { project: board.id, content: contentId });
-  const item = d?.addProjectV2ItemById?.item;
-  return {
-    id: item.id,
-    updatedAt: item.updatedAt,
-    values: { status: '', priority: '', points: null, sprint: '' },
-  };
-}
-
-/** Writes values (GitHub's terms) to an item; a value that can't be found on the board is skipped. */
-export async function setValues(
-  token: string,
-  board: Board,
-  itemId: string,
-  values: Partial<Values>,
-) {
-  const f = board.fields;
-  const option = (field: Field | undefined, name: string) =>
-    field?.options?.find((o) => o.name === name)?.id;
-  const changes: { fieldId: string; value: any }[] = [];
-  const add = (field: Field | undefined, value: any) =>
-    field && changes.push({ fieldId: field.id, value });
-  if ('status' in values && values.status) {
-    const id = option(f.status, values.status);
-    if (id) add(f.status, { singleSelectOptionId: id });
-  }
-  if ('priority' in values && values.priority) {
-    const id = option(f.priority, values.priority);
-    if (id) add(f.priority, { singleSelectOptionId: id });
-  }
-  if ('points' in values) add(f.points, values.points == null ? null : { number: values.points });
-  if ('sprint' in values) {
-    const id = values.sprint ? option(f.sprint, values.sprint) : null;
-    if (id || !values.sprint) add(f.sprint, id ? { iterationId: id } : null);
-  }
-  if (!changes.length) return;
-  const vars: any = { project: board.id, item: itemId };
-  changes.forEach((c, i) => {
-    vars[`f${i}`] = c.fieldId;
-    if (c.value) vars[`v${i}`] = c.value;
-  });
-  await gql(token, setFieldsMutation(changes), vars);
 }
