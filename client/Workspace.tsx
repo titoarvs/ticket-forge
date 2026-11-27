@@ -9,14 +9,14 @@ import { useStore, openProject, P, S, emit, type Any, ticket, statusColorCss, fe
 import { WorkspaceSkeleton } from './skeletons';
 import { RowPop } from './RowActions';
 import { Drawer } from './Drawer';
-import { openCode } from './DevCode';
+import { CodePage, codePageHref } from './DevCode/CodePage';
 import { watchCodeStatus, stopWatching } from './codeStatus';
 import { VIEWS, COMPONENTS, VIEW_FEATURE } from './Workspace/view-list';
 import { ProjectError, LockedView } from './Workspace/ProjectError';
 
 export { VIEWS } from './Workspace/view-list';
 
-export default function Workspace({ id, view }: { id: string; view: string }) {
+export default function Workspace({ id, view, sub }: { id: string; view: string; sub?: string }) {
   useStore();
   useEffect(() => {
     openProject(id);
@@ -62,7 +62,11 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
     if (t) {
       Object.assign(S, { drawer: { kind: 'issue', id: issueParam }, menu: null });
       emit();
-      if (codeParam) openCode(t, codeParam === 'backend' ? 'backend' : 'frontend');
+      // Older links to the code job (?code=frontend|backend) open its page now.
+      if (codeParam) {
+        router.replace(codePageHref(id, t.id, codeParam === 'backend' ? 'backend' : 'frontend'));
+        return;
+      }
     }
     router.replace(`/p/${id}/${view || 'backlog'}`, { scroll: false });
   }, [loaded, issueParam]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,7 +76,7 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
     watchCodeStatus(id);
     return () => stopWatching();
   }, [loaded, id]);
-  const v = VIEWS[view] ? view : 'backlog';
+  const v = view === 'code' ? 'code' : VIEWS[view] ? view : 'backlog';
   if (S.projectError?.id === id)
     return (
       <div className="page">
@@ -86,7 +90,15 @@ export default function Workspace({ id, view }: { id: string; view: string }) {
       <style>{statusColorCss()}</style>
       <div className="main">
         <section className="view">
-          {feat(VIEW_FEATURE[v] || '') ? <View /> : <LockedView label={VIEWS[v]} />}
+          {feat(v === 'code' ? 'code' : VIEW_FEATURE[v] || '') ? (
+            v === 'code' ? (
+              <CodePage sub={sub} />
+            ) : (
+              <View />
+            )
+          ) : (
+            <LockedView label={VIEWS[v] || 'Code jobs'} />
+          )}
         </section>
         <Drawer />
       </div>

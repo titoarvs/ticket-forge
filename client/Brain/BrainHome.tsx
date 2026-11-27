@@ -82,7 +82,7 @@ export function BrainHome({
       <EmptyState
         icon={I.brain}
         tone="ai"
-        title="The project’s brain"
+        title="The project’s Obsidian vault"
         compact
         actions={
           <>
@@ -107,9 +107,9 @@ export function BrainHome({
         </p>
         <p>
           AI actions and code agents read the notes linked to their task before they start
-          {list.useInAi ? '' : ' (switched off for this project in Brain settings)'}. Add your own
-          notes for what isn’t written anywhere else, link them with <code>[[PRJ-12]]</code>, and
-          TicketForge never overwrites them.
+          {list.useInAi ? '' : ' (switched off for this project in Obsidian settings)'}. Add your
+          own notes for what isn’t written anywhere else, link them with <code>[[PRJ-12]]</code>,
+          and TicketForge never overwrites them.
         </p>
       </EmptyState>
       {recent.length > 0 && (

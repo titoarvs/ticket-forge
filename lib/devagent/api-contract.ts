@@ -94,6 +94,10 @@ export function issueContext(project, ticket) {
   const siblings = epic
     ? project.tickets.filter((t) => t.epicId === epic.id && !t.parentId && t.id !== ticket.id)
     : [];
+  const fbd = epic?.fbd?.markdown
+    ? mdSections(epic.fbd.markdown, /scope|requirement|acceptance/i)
+    : '';
+  const ard = epic?.ard?.markdown || '';
   return [
     `PROJECT: ${project.name}${project.description ? ` — ${clipText(project.description, 600)}` : ''}`,
     epic &&
@@ -111,10 +115,21 @@ export function issueContext(project, ticket) {
         .slice(0, 30)
         .map((t) => `- ${t.key || ''} ${t.title}`)
         .join('\n')}`,
+    fbd &&
+      `From the feature's Feature Brief (requirements and acceptance criteria; the parts that concern this issue apply):\n${clipText(fbd, 6000)}`,
+    ard &&
+      `The feature's Architecture Record Design (follow its decisions):\n${clipText(ard, 8000)}`,
   ]
     .filter(Boolean)
     .join('\n\n');
 }
+/** The `## ` sections of a Markdown document whose heading matches `re`. */
+const mdSections = (md, re) =>
+  String(md || '')
+    .split(/^(?=##\s)/m)
+    .filter((sec) => re.test(sec.split('\n')[0]))
+    .join('\n')
+    .trim();
 /**
  * One API contract for an issue built in both repositories at once, so the backend and frontend
  * jobs can run in parallel and still meet: the backend implements exactly this, the frontend calls

@@ -1,7 +1,10 @@
-// An epic's generated agent documents (Agent doc) as Word files. The download route (…/agent/docx)
-// and the Google Drive save use the same builder, so the file in Drive is the one a person would
-// download.
+// An epic's generated documents (PSD, FBD, ARD and agent documents) as Word files. The download
+// routes (…/psd/docx and the others) and the Google Drive save use the same builders, so the file
+// in Drive is the one a person would download.
 import { HttpError } from './auth';
+import { getPsdTemplate } from './psd-template';
+import { buildPsdDocx, buildPlainPsdDocx } from './psd-docx';
+import { normalizePsd } from './psd';
 import { markdownToDocx } from './md-docx';
 import { destination, saveDocument, markFailed } from './gdrive';
 
@@ -9,14 +12,17 @@ export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordproc
 const safe = (s: string) => s.replace(/[\\/:*?"<>|]+/g, ' ');
 
 /**
- * The Word file of one agent document of an epic. `doc` is what the epic keeps: `{ markdown, name
- * }`.
+ * The Word file of one document of an epic. `doc` is what the epic keeps: for a PSD its fields
+ * (+ version, status, generatedAt, generatedBy), for the FBD and ARD `{ markdown, version }`, for
+ * an agent document `{ markdown, name }`.
  */
 export async function epicDocx({
   kind,
+  project,
   epic,
   doc,
   agentId = '',
+  user,
 }: {
   kind: string;
   project?: any;
@@ -25,6 +31,40 @@ export async function epicDocx({
   agentId?: string;
   user?: any;
 }): Promise<{ name: string; buf: Buffer }> {
+  if (kind === 'psd') {
+    const psd = normalizePsd(doc, { project, epic });
+    const meta = {
+      version: doc.version || 'v1.0',
+      status: doc.status || 'Draft',
+      date: new Date(doc.generatedAt || Date.now()).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      preparedBy: doc.generatedBy || user?.name,
+      description: `Written from the epic “${epic.title}” and its issues in TicketForge.`,
+    };
+    const tpl = await getPsdTemplate(project.id);
+    let buf;
+    try {
+      buf = tpl ? await buildPsdDocx(tpl.data, psd, meta) : await buildPlainPsdDocx(psd, meta);
+    } catch (e: any) {
+      throw new HttpError(500, `Couldn’t build the document from the template: ${e.message}`);
+    }
+    return { name: safe(`Problem Statement - ${psd.title} - ${meta.version}.docx`), buf };
+  }
+  if (kind === 'fbd')
+    return {
+      name: safe(`Feature Brief - ${epic.title} - ${doc.version || 'v1.0'}.docx`),
+      buf: await markdownToDocx(doc.markdown, { title: `Feature Brief for ${epic.title}` }),
+    };
+  if (kind === 'ard')
+    return {
+      name: safe(`Architecture Record Design - ${epic.title} - ${doc.version || 'v1.0'}.docx`),
+      buf: await markdownToDocx(doc.markdown, {
+        title: `Architecture Record Design for ${epic.title}`,
+      }),
+    };
   if (kind === 'agent')
     return {
       name: safe(`${doc.name || agentId} - ${epic.title}.docx`),

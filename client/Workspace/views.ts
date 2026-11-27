@@ -16,7 +16,7 @@ export const VIEWS: Record<string, string> = {
   prs: 'Pull requests',
   codejobs: 'Code jobs',
   source: 'Source documents',
-  brain: 'Brain',
+  brain: 'Obsidian',
   settings: 'Project settings',
 };
 /** Pages that belong to a feature the owner can lock (Administration → Features). */

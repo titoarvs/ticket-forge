@@ -67,8 +67,16 @@ export const FEATURES = [
     api: [
       /^\/api\/(generate|ai\/)/,
       /^\/api\/projects\/[^/]+\/(feature|split|layers|testrepo-ai|testplan|testselect)(\/|$)/,
-      /^\/api\/projects\/[^/]+\/agent$/,
+      /^\/api\/projects\/[^/]+\/(psd|fbd|ard|agent)$/,
+      /^\/api\/projects\/[^/]+\/(psd|fbd|ard)\/answers$/,
     ],
+  },
+  {
+    id: 'docs',
+    group: 'AI',
+    label: 'Epic documents',
+    desc: 'Problem Statement, Feature Brief and Architecture Record per epic.',
+    api: [/^\/api\/projects\/[^/]+\/(psd|fbd|ard)(\/|$)/],
   },
   {
     id: 'agents',
@@ -80,8 +88,8 @@ export const FEATURES = [
   {
     id: 'brain',
     group: 'AI',
-    label: 'Project brain',
-    desc: 'The Brain page: linked Markdown notes about each project (Obsidian-compatible) that AI actions and code agents read first. Locking it also stops adding them to prompts.',
+    label: 'Obsidian',
+    desc: 'The Obsidian page: linked Markdown notes about each project (Obsidian-compatible) that AI actions and code agents read first. Locking it also stops adding them to prompts.',
     views: ['brain'],
     api: [/^\/api\/projects\/[^/]+\/brain(\/|$)/],
   },

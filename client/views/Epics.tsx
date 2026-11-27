@@ -20,6 +20,7 @@ import { openSplitIssues, isBig } from '../Split';
 import { FeatureModal } from '../FeatureModal';
 import { epicRange } from '../Timeline';
 import { DraftBadge } from '../EpicDrafts';
+import { EpicDocCell, MissingDocsMenu, DOC_COLUMNS } from '../EpicDocs';
 import { Header, epicProgress, ProgBar } from './row-dnd';
 
 // ---------------------------------------------------------------- epics
@@ -68,6 +69,7 @@ function EpicsAiMenu() {
               <small>{p.tickets.filter((t: Any) => !isSub(t) && isBig(t)).length} big</small>
             </button>
           )}
+          {feat('docs') && <MissingDocsMenu />}
         </>
       )}
     </Menu>
@@ -99,11 +101,12 @@ export function Epics() {
       />
       {p.epics.length ? (
         <>
-          <table className="tbl ep-tbl">
+          <table className={`tbl ep-tbl ${feat('docs') ? '' : 'no-docs'}`}>
             <thead>
               <tr>
                 <th>Epic</th>
                 <th>Dates</th>
+                {feat('docs') && DOC_COLUMNS.map(([k, label]) => <th key={k}>{label}</th>)}
                 <th>Progress</th>
                 <th className="num ep-done">Done</th>
                 <th className="num">Issues</th>
@@ -154,6 +157,10 @@ export function Epics() {
                         );
                       })()}
                     </td>
+                    {feat('docs') &&
+                      DOC_COLUMNS.map(([k, label]) => (
+                        <EpicDocCell key={k} k={k} e={e} label={label} />
+                      ))}
                     <td style={{ width: 200 }} data-label="Progress">
                       <ProgBar {...pr} />
                     </td>

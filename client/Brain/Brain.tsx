@@ -151,7 +151,7 @@ export function Brain() {
           ? `${r.written} note${r.written === 1 ? '' : 's'} updated${r.removed ? `, ${r.removed} removed` : ''}. ${r.total} notes from the project.`
           : `Up to date: ${r.total} notes from the project.`,
         'ok',
-        { title: 'Brain refreshed' },
+        { title: 'Obsidian notes refreshed' },
       );
     } catch (e: Any) {
       toast(e.message, 'err');
@@ -207,7 +207,7 @@ export function Brain() {
       <Confirm
         title={`Delete “${n.title}”?`}
         label="Delete"
-        text="It’s removed from the brain for everyone. Links to it stay as plain text."
+        text="It’s removed from Obsidian for everyone. Links to it stay as plain text."
         onYes={async () => {
           try {
             await api(`/api/projects/${p.id}/brain`, {
@@ -227,7 +227,7 @@ export function Brain() {
   if (err && !list)
     return (
       <>
-        <Header title="Brain" />
+        <Header title="Obsidian" />
         <ErrorState error={err} onRetry={load} />
       </>
     );
@@ -263,14 +263,14 @@ export function Brain() {
         onClick={refresh}
         title="Rebuild the notes TicketForge writes from the project (your own notes stay as they are)"
       >
-        {busy === 'refresh' ? <Spinner /> : <Ico svg={I.refresh} />}Refresh brain
+        {busy === 'refresh' ? <Spinner /> : <Ico svg={I.refresh} />}Refresh notes
       </button>
       <Menu
         id="brain-more"
         button={
           <button
             className="icon-btn"
-            aria-label="More brain actions"
+            aria-label="More Obsidian actions"
             title="More"
             onClick={() => setMenu('brain-more')}
           >
@@ -292,7 +292,7 @@ export function Brain() {
         )}
         <button onClick={() => openModal(<BrainSettings list={list} reload={load} />)}>
           <Ico svg={I.settings} />
-          Brain settings{list?.local ? ' and folder sync' : ''}
+          Obsidian settings{list?.local ? ' and folder sync' : ''}
         </button>
       </Menu>
       <input
@@ -315,12 +315,12 @@ export function Brain() {
 
   return (
     <>
-      <Header title="Brain" sub={sub} right={<div className="brain-actions">{right}</div>} />
+      <Header title="Obsidian" sub={sub} right={<div className="brain-actions">{right}</div>} />
       {!list ? (
         <div className="brain">
           <div className="brain-list">
             <div className="muted small" style={{ padding: 14 }}>
-              <Spinner /> Building the brain…
+              <Spinner /> Building the notes…
             </div>
           </div>
           <div className="brain-main" />

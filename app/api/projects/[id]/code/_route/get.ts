@@ -22,6 +22,7 @@ import { codeTask, writePrText } from '@/lib/devagent';
 import {
   isRemoteId,
   loadJob,
+  remoteJobsFor,
   publicRemote,
   approveRemote,
   mergeRemote,
@@ -371,9 +372,23 @@ export const GET = api(async (req, p) => {
   const { agents } = await publicAgents();
   const project = await store.getProject(p.id);
   const ticketId = String(sp.get('ticketId') || '');
+  // Jobs that ran on GitHub Actions are kept in the database; this computer only remembers its own
+  // jobs until it restarts. Without a job here, show the newest stored one (the Code jobs page lists
+  // them, and its "Open" leads here).
+  const local = jobsForTicket(p.id, ticketId);
+  const stored =
+    local.frontend && local.backend ? [] : await remoteJobsFor(p.id, ticketId).catch(() => []);
+  const newest = (side: string) =>
+    local[side] ||
+    withApprovals(
+      project,
+      publicRemote(stored.find((j: any) => (j.side || 'frontend') === side)),
+    ) ||
+    null;
+  const jobs = { frontend: newest('frontend'), backend: newest('backend') };
   return {
-    job: jobForTicket(p.id, ticketId),
-    jobs: jobsForTicket(p.id, ticketId),
+    job: jobs.frontend,
+    jobs,
     backend: Boolean(backendDev(project)),
     agents: agents.filter(
       (a: any) => (a.runner === 'code' && !a.broken) || a.id === 'review-panel',

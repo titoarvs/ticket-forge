@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { type Any, P, api } from '../core';
 import { ErrorState, Spinner, EmptyState, I, Ico } from '../ui';
+import { SF, MenuItem } from '../fields';
 import { parseDiff, type DiffFile } from '../logic/diff';
 import {
   VIEW_KEY,
@@ -121,20 +122,23 @@ export function DiffReview({
   return (
     <section className={`dv ${narrow ? 'narrow' : ''}`} ref={box} aria-label="Code changes">
       <div className="dv-top">
-        <label className="dv-cmp">
+        <div className="dv-cmp">
           <span>Compare with</span>
-          <select
+          <SF
+            filter
+            className="dv-csel"
             value={target}
-            onChange={(e) => setTarget(e.target.value)}
+            onChange={(e: Any) => setTarget(e.target.value)}
             title={DIFF_TARGETS.find((x) => x[0] === target)?.[2]}
+            aria-label="Compare with"
           >
-            {DIFF_TARGETS.map(([k, l]) => (
-              <option key={k} value={k}>
+            {DIFF_TARGETS.map(([k, l, hint]) => (
+              <MenuItem key={k} value={k} title={hint}>
                 {l}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </label>
+          </SF>
+        </div>
         {res?.against && (
           <code className="dv-against" title="What the AI output is compared with">
             {res.against}
@@ -250,18 +254,19 @@ export function DiffReview({
                   <Ico svg={I.chevron} className="left" />
                 </button>
                 {narrow ? (
-                  <select
+                  <SF
+                    filter
                     className="dv-fsel"
                     value={cur.path}
-                    onChange={(e) => pick(e.target.value)}
+                    onChange={(e: Any) => pick(e.target.value)}
                     aria-label="File"
                   >
                     {files.map((f) => (
-                      <option key={f.path} value={f.path}>
+                      <MenuItem key={f.path} value={f.path} className="dv-fopt">
                         {f.path}
-                      </option>
+                      </MenuItem>
                     ))}
-                  </select>
+                  </SF>
                 ) : (
                   <span className="dv-path" title={cur.path}>
                     <span className={`dv-st ${cur.status}`}>{LETTER[cur.status]}</span>

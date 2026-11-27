@@ -14,6 +14,7 @@ import { GithubLive } from '../GithubLive';
 import { GithubConnectionCard } from '../GithubConnection';
 import { DatabaseSettings } from '../Database';
 import { SECTIONS, Details } from './Details';
+import { ProjectTemplateCards } from '../EpicDocs';
 
 function People({ ed }: { ed: boolean }) {
   const p = P();
@@ -303,6 +304,16 @@ export function Settings() {
           {cur === 'details' && <Details ed={ed} />}
           {cur === 'people' && <People ed={ed} />}
           {cur === 'workflow' && <WorkflowSettings />}
+          {cur === 'templates' && (
+            <div className="set-templates">
+              <p className="muted small" style={{ margin: '0 0 12px' }}>
+                The templates this project’s documents follow. Without its own, a project uses the
+                team’s templates from Administration → Generation. Documents already written don’t
+                change.
+              </p>
+              <ProjectTemplateCards ed={ed} />
+            </div>
+          )}
           {cur === 'context' && <AppContextSettings ed={ed} />}
           {cur === 'code' && (
             <>

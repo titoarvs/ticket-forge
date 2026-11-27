@@ -8,50 +8,6 @@ import { Crumbs } from '../views';
 import { openCodingBoard, toCodeCount } from '../CodingBoard';
 import { type Filter, REVIEW, TROUBLE, LIVE, TicketContext, LABEL } from './TicketContext';
 import { JobActions } from './JobActions';
-import { JobsOffice } from './JobsOffice';
-
-const VIEW_KEY = 'tf.codejobs.view';
-/** List or office, remembered on this device. */
-function useJobsView() {
-  const [view, setView] = useState('list');
-  useEffect(() => {
-    try {
-      setView(localStorage.getItem(VIEW_KEY) || 'list');
-    } catch {
-      /* storage off */
-    }
-  }, []);
-  const set = (v: string) => {
-    setView(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      /* storage off */
-    }
-  };
-  return [view, set] as const;
-}
-
-function ViewSwitch({ view, setView }: { view: string; setView: (v: string) => void }) {
-  const tab = (v: string, title: string, icon: string) => (
-    <button
-      role="tab"
-      aria-selected={view === v}
-      className={view === v ? 'on' : ''}
-      onClick={() => setView(v)}
-      title={title}
-      aria-label={title}
-    >
-      <Ico svg={icon} />
-    </button>
-  );
-  return (
-    <div className="seg cjp-view" role="tablist" aria-label="View">
-      {tab('list', 'List', I.backlog)}
-      {tab('office', 'Office', I.office)}
-    </div>
-  );
-}
 
 /**
  * The Code jobs page. With `projectId` it is that project's page (Development → Code jobs): its
@@ -65,7 +21,6 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
   const [q, setQ] = useState('');
   const [project, setProject] = useState('');
   const [busy, setBusy] = useState('');
-  const [view, setView] = useJobsView();
   const timer = useRef<Any>(null);
   // Opened by "Write code" on an issue (TF-124): /code-jobs?project=…&ticket=…
   const [asked, setAsked] = useState<{ project: string; ticket: string } | null>(null);
@@ -253,7 +208,6 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
-              <ViewSwitch view={view} setView={setView} />
             </div>
             {!shown.length ? (
               <div className="cjp-empty">
@@ -297,8 +251,6 @@ export function CodeJobsPage({ projectId = '' }: { projectId?: string }) {
                   </p>
                 </EmptyState>
               </div>
-            ) : view === 'office' ? (
-              <JobsOffice jobs={shown} busy={busy} stop={stop} />
             ) : (
               <div className="jobs-list cjp-list">
                 {shown.map((j) => {

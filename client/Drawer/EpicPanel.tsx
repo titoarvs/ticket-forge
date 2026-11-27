@@ -9,6 +9,7 @@ import { openDevOrder, canWriteCode, epicCodeIds, openBulkCode } from '../DevPla
 import { openSplitIssues } from '../Split';
 import { TA, DateF } from '../fields';
 import { DraftBanner, DraftReference } from '../EpicDrafts';
+import { EpicDocSections } from '../EpicDocs';
 import { Head, Crumb } from './Drawer';
 
 // ---------------------------------------------------------------- epic
@@ -126,6 +127,7 @@ export function EpicPanel({ e }: { e: Any }) {
           />
         </div>
         <DraftReference e={e} />
+        {feat('docs') && <EpicDocSections epic={e} />}
         <div className="sec">
           <div className="sec-title">
             <h3>Dates</h3>

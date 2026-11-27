@@ -1,22 +1,22 @@
 'use client';
 // What you can do with one code job: review its changes, open its GitHub Actions run or pull
-// request, stop it while it runs, and open (or review) its issue. Used by the list and the office.
+// request, stop it while it runs, and open (or review) its issue. Used by the job list.
 import Link from 'next/link';
 import { type Any, openModal } from '../core';
 import { Ico, I, Spinner, Modal } from '../ui';
 import { DiffReview } from '../DiffReview';
 import { REVIEW } from './TicketContext';
 
+/** The job's own page (CodePage): its live log, changes and review. */
 export const openHref = (j: Any) =>
-  `/p/${j.projectId}/backlog?issue=${encodeURIComponent(j.ticketId)}&code=${j.side || 'frontend'}`;
+  `/p/${j.projectId}/code/${encodeURIComponent(j.ticketId)}?side=${j.side || 'frontend'}`;
 
-/** office: styled as the office card's chips instead of buttons. */
-type Props = { j: Any; busy: string; stop: (j: Any) => void; office?: boolean };
+type Props = { j: Any; busy: string; stop: (j: Any) => void };
 
-export function JobActions({ j, busy, stop, office = false }: Props) {
+export function JobActions({ j, busy, stop }: Props) {
   const review = REVIEW.includes(j.status);
-  const className = office ? 'of-chip' : 'btn sm subtle';
-  const main = office ? `of-chip ${review ? 'pri' : ''}` : `btn sm ${review ? 'primary' : ''}`;
+  const className = 'btn sm subtle';
+  const main = `btn sm ${review ? 'primary' : ''}`;
   return (
     <>
       {j.files?.length > 0 && !j.live && (

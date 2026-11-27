@@ -174,10 +174,9 @@ export async function remoteGet(p: any, sp: URLSearchParams) {
     if (sp.get('compare')) {
       const target = compareTarget(sp.get('compare'));
       const dev = remoteDev(project, j.side);
-      const gh = await ghFor(project, dev).catch((e: any) => {
-        if (target !== 'default') throw e;
-        return null;
-      });
+      // Without a GitHub connection, the stored diff still answers "default", and "job" / "spec"
+      // can still say there is nothing earlier to compare with (remoteCompare explains the rest).
+      const gh = await ghFor(project, dev).catch(() => null);
       return remoteCompare(j, target, {
         token: gh?.token || '',
         defaultBranch: gh?.defaultBranch || j.base,

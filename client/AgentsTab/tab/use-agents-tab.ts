@@ -11,7 +11,8 @@ const VIEW_KEY = 'tf.agents.view';
 
 function savedView() {
   try {
-    return localStorage.getItem(VIEW_KEY) || 'cards';
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === 'list' ? 'list' : 'cards';
   } catch {
     return 'cards';
   }

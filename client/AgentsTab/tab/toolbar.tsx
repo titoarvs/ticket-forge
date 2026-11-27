@@ -88,7 +88,6 @@ function ViewSwitch({ g }: { g: AgentsPage }) {
     <div className="seg ag-view" role="tablist" aria-label="View">
       {tab('cards', 'Cards', I.grid)}
       {tab('list', 'List', I.backlog)}
-      {tab('office', 'Office', I.office)}
     </div>
   );
 }

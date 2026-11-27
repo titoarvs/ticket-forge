@@ -11,6 +11,12 @@ export const SECTIONS: [string, string, string, string][] = [
   ['details', 'Details', 'settings', 'Name, key and what the project is about'],
   ['people', 'People', 'people', 'Who can be assigned issues'],
   ['workflow', 'Workflow', 'board', 'Statuses, board columns and transitions'],
+  [
+    'templates',
+    'Templates',
+    'doc',
+    'Problem Statement, Feature Brief and Architecture Record Design',
+  ],
   ['context', 'App context', 'sparkle', 'What the AI knows about this app, reused in every prompt'],
   ['code', 'Code & GitHub', 'pr', 'Repository, coding agent and pull requests'],
   ['database', 'Database', 'database', 'The databases of the app this project builds'],

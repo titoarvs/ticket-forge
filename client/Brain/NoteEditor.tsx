@@ -97,7 +97,7 @@ export function NoteEditor({
           },
         }),
       );
-      toast(d.id ? 'Note saved' : 'Note added to the brain');
+      toast(d.id ? 'Note saved' : 'Note added to Obsidian');
     } catch (e: Any) {
       toast(e.message, 'err');
     } finally {

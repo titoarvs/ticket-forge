@@ -36,6 +36,14 @@ export const AI_TASKS = [
     escalate: true,
   },
   {
+    id: 'docs',
+    group: 'Documents',
+    label: 'Documents',
+    desc: 'Problem statements, feature briefs, architecture records',
+    tier: 'high',
+    maxOut: 32000,
+  },
+  {
     id: 'agents',
     group: 'Documents',
     label: 'Document agents',

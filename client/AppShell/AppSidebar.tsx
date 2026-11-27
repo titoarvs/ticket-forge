@@ -33,7 +33,8 @@ export function useWhere() {
     pathname,
     project,
     loading: inProject && !project && S.projectError?.id !== id,
-    view: VIEWS[rawView] ? rawView : 'backlog',
+    // A code job's page (/p/<id>/code/<issue>) belongs under Code jobs.
+    view: rawView === 'code' ? 'codejobs' : VIEWS[rawView] ? rawView : 'backlog',
   };
 }
 

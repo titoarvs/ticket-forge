@@ -31,5 +31,8 @@ export const POST = api(async (req, p) => {
   if (b.action === 'link-board') return linkBoard(user, p.id, b.boardId);
   if (b.action === 'unlink-board') return unlinkBoard(user, p.id);
   if (WRITES.includes(b.action)) throw new HttpError(410, IMPORT_ONLY);
-  throw new HttpError(400, 'Send an action: link, import, sync, boards, link-board or unlink-board.');
+  throw new HttpError(
+    400,
+    'Send an action: link, import, sync, boards, link-board or unlink-board.',
+  );
 });

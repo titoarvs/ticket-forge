@@ -146,7 +146,8 @@ export async function merge({ t, cj }: PrContext) {
   toast(`${r.repo} #${r.pr?.number} is merged.`, 'ok', {
     title: 'Code merged',
     action: r.pr?.url ? { label: 'Open', onClick: () => openInTab(r.pr.url) } : undefined,
-  });  await doneOnMerge(t);
+  });
+  await doneOnMerge(t);
 }
 
 /** Posts the AI review as a comment on the pull request it reviewed. */

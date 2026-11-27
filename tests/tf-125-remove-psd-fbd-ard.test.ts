@@ -1,51 +1,30 @@
-// TF-125: PSD, FBD and ARD are gone from the app, and the data migration deletes them (and only
-// them) for good.
+// TF-125: the data migration that deleted PSD, FBD and ARD documents (and only them) for good.
+// The documents themselves are back in the app (Problem Statement, Feature Brief, Architecture
+// Record Design per epic); the first tests check that, the rest check the old migration script.
 // Run with `npm test`. The data tests use an in-memory PostgreSQL (PGlite), never a real database.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { removePsdFbdArd, survey, MIGRATION_ID } from '../lib/remove-psd-fbd-ard';
 
-const ROOT = path.join(import.meta.dirname, '..');
-const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
-const files = (dir: string, re: RegExp): string[] =>
-  fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
-    const rel = path.join(dir, e.name);
-    return e.isDirectory() ? files(rel, re) : re.test(e.name) ? [rel] : [];
-  });
+// ---------------------------------------------------------------- the documents are back
 
-// ---------------------------------------------------------------- AC 1 and 3: nothing in the app
-// offers them
-
-test('AC1: no PSD, FBD or ARD endpoint exists, so each returns not found', () => {
-  for (const route of [
-    'app/api/projects/[id]/psd',
-    'app/api/projects/[id]/fbd',
-    'app/api/projects/[id]/ard',
-    'app/api/projects/[id]/templates',
-    'app/api/projects/[id]/epic-issues',
-    'app/api/projects/[id]/feature-docs',
-    'app/api/projects/[id]/brainstorm',
-    'app/api/admin/psd-template',
-    'app/api/admin/fbd-template',
-    'app/api/admin/ard-template',
-  ]) {
-    assert.equal(fs.existsSync(path.join(ROOT, route)), false, `${route} should be removed`);
-  }
-});
-
-test('AC1: the Word export refuses PSD, FBD and ARD, and still builds the Agent doc', async () => {
+test('the Word export builds PSD, FBD and ARD again, and still the Agent doc', async () => {
   const { epicDocx } = await import('../lib/epic-docx');
   const epic = { id: 'e1', title: 'Checkout' };
-  for (const kind of ['psd', 'fbd', 'ard']) {
-    await assert.rejects(
-      epicDocx({ kind, epic, doc: { markdown: '# x' } }),
-      (e: any) => e.status === 404,
-      `${kind} should be not found`,
-    );
+  for (const [kind, name] of [
+    ['fbd', /Feature Brief - Checkout - v1\.0\.docx/],
+    ['ard', /Architecture Record Design - Checkout - v1\.0\.docx/],
+  ] as const) {
+    const out = await epicDocx({ kind, epic, doc: { markdown: '# x\n\n## One\n\nHello' } });
+    assert.match(out.name, name);
+    assert.ok(out.buf.length > 0);
   }
+  const { buildPlainPsdDocx } = await import('../lib/psd-docx');
+  const { normalizePsd } = await import('../lib/psd');
+  const psd = normalizePsd({ problemStatement: 'Checkout loses carts.' }, { epic });
+  const buf = await buildPlainPsdDocx(psd, { version: 'v1.0', status: 'Draft' });
+  assert.ok(buf.length > 0);
   const agent = await epicDocx({
     kind: 'agent',
     epic,
@@ -53,37 +32,16 @@ test('AC1: the Word export refuses PSD, FBD and ARD, and still builds the Agent 
     agentId: 'kick-off',
   });
   assert.match(agent.name, /Kick Off - Checkout\.docx/);
-  assert.ok(agent.buf.length > 0);
+  await assert.rejects(epicDocx({ kind: 'nope', epic, doc: {} }), (e: any) => e.status === 404);
 });
 
-test('AC1: no screen offers a PSD, FBD or ARD option', () => {
-  const words =
-    /Problem Statement|Feature Brief|Architecture Record|\bPSDs?\b|\bFBDs?\b|\bARDs?\b|openWritePsd|writeMissingPsds|ApprovalSection|PsdTemplateCard/;
-  const hits = files('client', /\.tsx?$/).filter((f) => words.test(read(f)));
-  assert.deepEqual(hits, [], `still mentioned in: ${hits.join(', ')}`);
-});
-
-test('AC1: the PSD, FBD and ARD agents and the Epic documents feature are gone', async () => {
+test('the PSD, FBD and ARD agents and the Epic documents feature are back', async () => {
   const { AGENTS } = await import('../lib/agents');
   const ids = AGENTS.map((a: any) => a.id);
   for (const id of ['problem-statement', 'feature-brief', 'architecture-record'])
-    assert.equal(ids.includes(id), false, `${id} should be removed`);
-  assert.ok(ids.includes('test-plan'), 'other agents stay');
+    assert.ok(ids.includes(id), `${id} should be in the catalog`);
   const { FEATURES } = await import('../lib/features');
-  assert.equal(
-    FEATURES.some((f: any) => f.id === 'docs'),
-    false,
-  );
-});
-
-test('AC3: the admin templates area lists no PSD, FBD or ARD template', () => {
-  for (const f of ['client/GenerationTab.tsx', 'client/ProjectSettings.tsx']) {
-    assert.doesNotMatch(
-      read(f),
-      /TemplateCard|psd-template|fbd-template|ard-template|templates\/(psd|fbd|ard)/,
-      f,
-    );
-  }
+  assert.ok(FEATURES.some((f: any) => f.id === 'docs'));
 });
 
 // ---------------------------------------------------------------- AC 2 to 5: the data migration

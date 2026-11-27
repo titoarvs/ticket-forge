@@ -24,8 +24,8 @@ export function BrainSettings({ list, reload }: { list: List | null; reload: () 
       await reload();
       toast(
         v
-          ? 'AI actions read the brain again.'
-          : 'AI actions no longer read the brain for this project.',
+          ? 'AI actions read the Obsidian notes again.'
+          : 'AI actions no longer read the Obsidian notes for this project.',
       );
     } catch (e: Any) {
       setUseInAi(!v);
@@ -67,7 +67,7 @@ export function BrainSettings({ list, reload }: { list: List | null; reload: () 
     }
   };
   return (
-    <Modal title="Brain settings" actions={[{ label: 'Done', kind: 'primary' }]}>
+    <Modal title="Obsidian settings" actions={[{ label: 'Done', kind: 'primary' }]}>
       <label className="row brain-toggle" style={{ gap: 10, alignItems: 'flex-start' }}>
         <input
           type="checkbox"
@@ -77,7 +77,7 @@ export function BrainSettings({ list, reload }: { list: List | null; reload: () 
           style={{ marginTop: 3 }}
         />
         <span>
-          <b>AI reads the brain</b>
+          <b>AI reads the Obsidian notes</b>
           <br />
           <span className="muted small">
             Writing tickets and test cases, documents, splits, plans and code jobs start from the

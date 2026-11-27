@@ -1,5 +1,6 @@
 // Questions before the AI writes: for every generation or enhancement (tickets, acceptance
-// criteria, test cases, automation scripts), the AI first reads what it was given and asks the few
+// criteria, test cases, automation scripts, Problem Statements, Feature Briefs, Architecture
+// Record Designs), the AI first reads what it was given and asks the few
 // questions whose answers would most change the result. The person answers (or skips), and the
 // answers go to the generation as extra instructions.
 import { askJson } from './claude';
@@ -29,7 +30,11 @@ const TASKS = {
   'bulk-tests': 'write test cases for each of these issues',
   automation:
     'write Playwright test scripts that automate these test cases against the running application',
+  psd: 'write the Problem Statement for this epic',
+  fbd: 'write the Feature Brief for this epic',
+  ard: 'write the Architecture Record Design (technical design, decisions, rollout, rollback, verification) for this epic',
 };
+const DOC_KINDS = ['psd', 'fbd', 'ard'];
 
 const ticketText = (t) =>
   [
@@ -64,7 +69,28 @@ export async function clarifyQuestions({
   const task = TASKS[kind];
   if (!task) throw Object.assign(new Error('Unknown generation.'), { status: 400 });
   const epic = project?.epics?.find((e) => e.id === (epicId || ticket?.epicId));
+  const epicIssues = epic ? project.tickets.filter((t) => t.epicId === epic.id && !t.parentId) : [];
+  const docMaterial = epic &&
+    DOC_KINDS.includes(kind) && [
+      `Issues in the epic:\n${
+        epicIssues
+          .slice(0, 40)
+          .map((t) => `- ${t.key || ''} ${t.title}`)
+          .join('\n') || '- none'
+      }`,
+      epic.psd &&
+        kind !== 'psd' &&
+        `The epic has a Problem Statement: ${clip(epic.psd.atAGlance?.problem || epic.psd.problemStatement, 500)}`,
+      epic.fbd?.markdown &&
+        kind === 'ard' &&
+        `The epic's Feature Brief:\n${clip(epic.fbd.markdown, 5000)}`,
+      kind === 'ard' &&
+        project?.dev &&
+        (project.dev.repo || project.dev.notes) &&
+        `Repository: ${project.dev.repo || project.dev.localPath || ''} ${clip(project.dev.notes, 800)}`,
+    ];
   const material = [
+    ...(docMaterial || []),
     project &&
       `Project: ${project.name}\nDescription: ${clip(project.description || project.summary, 1200) || 'n/a'}`,
     project?.assumptions?.length &&

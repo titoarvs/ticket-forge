@@ -4,6 +4,7 @@
 import { useSection, ErrorState, I, SectionNav, Loading, Sk } from '../ui';
 import { GuideCard } from '../GuideCard';
 import { AiTold } from '../AiTold';
+import { TeamTemplateCards } from '../EpicDocs';
 import { type Rules, useGenerationRules } from './sections/use-rules';
 import { GeneralSection } from './sections/general';
 import { TicketsSection } from './sections/tickets';
@@ -60,7 +61,7 @@ function navItems(g: Rules) {
       icon: I.check,
       badge: dot(['testmgmt']),
     },
-    { key: 'documents', label: 'Documents', hint: 'The generation guide', icon: I.doc },
+    { key: 'documents', label: 'Documents', hint: 'Guide and document templates', icon: I.doc },
     {
       key: 'prompts',
       label: 'What the AI is told',
@@ -96,6 +97,7 @@ export function GenerationTab() {
         {sec === 'documents' && (
           <div className="cards">
             <GuideCard onChange={g.refreshPrompts} />
+            <TeamTemplateCards />
           </div>
         )}
         {sec === 'prompts' && (

@@ -29,6 +29,7 @@ import { Markdown } from './GuideCard';
 import { bulkTests, runTests, NewWithClaudeModal } from './actions';
 import { openWriteCode } from './DevCode';
 import { DriveState } from './Drive';
+import { openWritePsd, openWriteDoc } from './EpicDocs';
 
 // ---------------------------------------------------------------- catalog
 let cache: Any = null;
@@ -307,6 +308,12 @@ export function hireAgent(a: Any, epic: Any) {
     return openModal(<PickIssueModal epic={epic} a={a} />);
   if (a.runner === 'document') return openModal(<DocHireModal epic={epic} a={a} />);
   switch (a.use) {
+    case 'psd':
+      return openWritePsd(epic);
+    case 'fbd':
+      return openWriteDoc('fbd', epic);
+    case 'ard':
+      return openWriteDoc('ard', epic);
     case 'tickets':
       return openModal(<NewWithClaudeModal epicId={epic.id} />);
     case 'tests':

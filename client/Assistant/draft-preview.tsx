@@ -3,6 +3,7 @@
 // fields. Nothing is an issue until Create (off while the title is empty or without permission).
 import { useState } from 'react';
 import { can, TYPES, PRIORITIES, type Any } from '../core';
+import { SF, MenuItem } from '../fields';
 
 const POINTS = [1, 2, 3, 5, 8, 13, 21];
 
@@ -10,21 +11,16 @@ type FieldsProps = { d: Any; set: (k: string, v: Any) => void };
 
 function Pick({ label, value, options, onChange }: Any) {
   return (
-    <label className="pchat-f">
+    <div className="pchat-f">
       <span>{label}</span>
-      <select
-        className="select compact"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={label}
-      >
+      <SF filter value={value} onChange={(e: Any) => onChange(e.target.value)} aria-label={label}>
         {options.map((o: Any) => (
-          <option key={o.value ?? o} value={o.value ?? o}>
+          <MenuItem key={o.value ?? o} value={o.value ?? o}>
             {o.label ?? o}
-          </option>
+          </MenuItem>
         ))}
-      </select>
-    </label>
+      </SF>
+    </div>
   );
 }
 

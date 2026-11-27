@@ -1,6 +1,8 @@
 'use client';
 import { I } from '../icons';
 import { S, type Any, setAiRun } from '../core';
+import ListSubheader from '@mui/material/ListSubheader';
+import { SF, MenuItem } from '../fields';
 import { Ico } from './Modal';
 
 /**
@@ -29,36 +31,35 @@ export function AiRunPicker({ compact = false }: { compact?: boolean }) {
     return c ? `${c.name}${c.model ? ` · ${c.model}` : ''}` : k;
   };
   return (
-    <label
+    <div
       className={`ai-run ${compact ? 'compact' : ''} ${val !== 'auto' ? 'set' : ''}`}
       title="Which AI runs this. Auto follows Administration → AI → Model routing."
     >
       <Ico svg={I.sparkle} />
       <span className="ai-run-l">Runs on</span>
-      <select
+      <SF
+        bare
+        className="ai-run-sel"
+        searchable={false}
         value={val}
-        onChange={(e) => setAiRun(e.target.value)}
+        onChange={(e: Any) => setAiRun(e.target.value)}
         aria-label="Which AI runs this"
       >
-        <option value="auto">{label('auto')}</option>
-        <optgroup label="Model tier">
-          {Object.keys(TIER_NAME).map((k) => (
-            <option key={k} value={k}>
-              {label(k)}
-            </option>
-          ))}
-        </optgroup>
-        {(ch?.configs || []).length > 0 && (
-          <optgroup label="Custom configurations">
-            {ch.configs.map((c: Any) => (
-              <option key={c.id} value={`cfg:${c.id}`}>
-                {label(`cfg:${c.id}`)}
-              </option>
-            ))}
-          </optgroup>
-        )}
-      </select>
-    </label>
+        <MenuItem value="auto">{label('auto')}</MenuItem>
+        <ListSubheader>Model tier</ListSubheader>
+        {Object.keys(TIER_NAME).map((k) => (
+          <MenuItem key={k} value={k}>
+            {label(k)}
+          </MenuItem>
+        ))}
+        {(ch?.configs || []).length > 0 && <ListSubheader>Custom configurations</ListSubheader>}
+        {(ch?.configs || []).map((c: Any) => (
+          <MenuItem key={c.id} value={`cfg:${c.id}`}>
+            {label(`cfg:${c.id}`)}
+          </MenuItem>
+        ))}
+      </SF>
+    </div>
   );
 }
 /** "4:00 PM" today, "Thu 9:00 AM" this week, else "Nov 20, 9:00 AM". */

@@ -48,6 +48,17 @@ export function epicContext(project, epic) {
         .join('\n'),
     )
     .join('\n');
+  const psd = epic.psd
+    ? `Problem Statement (${epic.psd.status || 'Draft'}): ${clip(epic.psd.problemStatement, 1200)}
+At a glance: ${clip(epic.psd.atAGlance?.problem, 300)} / Why it matters: ${clip(epic.psd.atAGlance?.whyItMatters, 300)}
+Affected: ${(epic.psd.affected || []).map((a) => a.who).join(', ')}`
+    : 'Problem Statement: not written yet.';
+  const fbd = epic.fbd?.markdown
+    ? `Feature Brief (${epic.fbd.status || 'Draft'}):\n${clip(epic.fbd.markdown, 9000)}`
+    : 'Feature Brief: not written yet.';
+  const ard = epic.ard?.markdown
+    ? `Architecture Record Design (${epic.ard.status || 'Draft'}):\n${clip(epic.ard.markdown, 6000)}`
+    : 'Architecture Record Design: not written yet.';
   const others = Object.entries<any>(epic.agentDocs || {})
     .map(([id, d]: any) => `### Earlier document: ${d.name || id}\n${clip(d.markdown, 2500)}`)
     .join('\n\n');
@@ -65,6 +76,12 @@ Epic description: ${clip(epic.description, 1500) || 'n/a'}
 Dates: start ${epic.startDate || epic.start || 'not set'}, due ${epic.dueDate || epic.end || 'not set'}
 Totals: ${tickets.length} issues (${tickets.filter((t) => /done/i.test(t.status || '')).length} done), ${points} story points;
 ${tests.length} test cases: ${count('Passed')} passed, ${count('Failed')} failed, ${count('Blocked')} blocked, ${tests.length - count('Passed') - count('Failed') - count('Blocked')} not run.
+
+${psd}
+
+${fbd}
+
+${ard}
 
 ISSUES:
 ${issues || '- (no issues yet)'}

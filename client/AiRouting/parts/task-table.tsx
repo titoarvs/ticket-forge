@@ -2,6 +2,7 @@
 // The table of AI tasks: what each covers, its tier (or a custom configuration), the model that
 // means now, and how often it was used. Tasks are grouped under their group's name.
 import type { Any } from '../../core';
+import { SF, MenuItem } from '../../fields';
 import { TIER_LABEL, TIER_HINT } from '../presets';
 import type { RoutingDraft } from './use-routing-draft';
 
@@ -32,20 +33,22 @@ function TierPicker({ t, c, d }: RowProps) {
         ))}
       </div>
       {configs.length > 0 && (
-        <select
+        <SF
+          filter
           className="rt-cfg"
           aria-label={`${t.label}: custom configuration`}
           disabled={d.off}
           value={isConfig(cur) ? cur : ''}
-          onChange={(e) => d.setTier(t.id, e.target.value || t.tier)}
+          placeholder="or a configuration…"
+          onChange={(e: Any) => d.setTier(t.id, e.target.value || t.tier)}
         >
-          <option value="">or a configuration…</option>
+          <MenuItem value="">or a configuration…</MenuItem>
           {configs.map((x: Any) => (
-            <option key={x.id} value={`cfg:${x.id}`}>
+            <MenuItem key={x.id} value={`cfg:${x.id}`}>
               {x.name}
-            </option>
+            </MenuItem>
           ))}
-        </select>
+        </SF>
       )}
     </>
   );

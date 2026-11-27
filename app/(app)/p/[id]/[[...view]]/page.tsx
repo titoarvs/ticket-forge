@@ -9,7 +9,7 @@ export default async function Page({
   const { id, view } = await params;
   return (
     <Suspense>
-      <Workspace id={id} view={view?.[0] || 'backlog'} />
+      <Workspace id={id} view={view?.[0] || 'backlog'} sub={view?.[1]} />
     </Suspense>
   );
 }

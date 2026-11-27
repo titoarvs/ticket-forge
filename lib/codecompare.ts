@@ -229,6 +229,12 @@ export async function remoteCompare(
   const prev = baseJobFor(j, jobs, target, specAt);
   if (!prev) return compareResult(target, { reason: noBaseReason(target, specAt) });
   const against = `${prev.ticketKey} run of ${String(prev.startedAt).slice(0, 16).replace('T', ' ')} (${prev.branch})`;
+  if (!token)
+    return compareResult(target, {
+      against,
+      reason:
+        'Connect GitHub (Project settings → Code & GitHub) to compare with the other run’s branch.',
+    });
   try {
     const [from, to] = await Promise.all([
       treeOf(j.repo, prev.branch, token),
